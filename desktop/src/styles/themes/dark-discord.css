@@ -1,0 +1,41 @@
+[data-theme="dark-discord"] {
+  /* Background */
+  --theme-background-primary: var(--color-neutral-900);
+  --theme-background-secondary: var(--color-neutral-950);
+  --theme-background-tertiary: var(--color-neutral-1000);
+  --theme-background-floating: var(--color-neutral-1100);
+  --theme-background-elevated: var(--color-neutral-800);
+
+  --theme-background-input: var(--color-neutral-1000);
+  --theme-background-hover: #35373C;
+  --theme-background-active: #3C3F45;
+  --theme-background-selected: var(--color-neutral-700);
+  --theme-background-disabled: var(--color-neutral-950);
+
+  /* Text */
+  --theme-text-primary: var(--color-neutral-050);
+  --theme-text-secondary: var(--color-neutral-200);
+  --theme-text-muted: var(--color-neutral-300);
+  --theme-text-disabled: var(--color-neutral-500);
+  --theme-text-link: var(--color-cyan-400);
+  --theme-text-inverse: var(--color-neutral-1100);
+
+  /* Accent */
+  --theme-accent-primary: var(--color-blue-400);
+  --theme-accent-hover: var(--color-blue-500);
+  --theme-accent-active: var(--color-blue-600);
+  --theme-accent-subtle: var(--color-blue-300);
+
+  /* Status */
+  --theme-status-online: var(--color-green-400);
+  --theme-status-idle: var(--color-yellow-400);
+  --theme-status-dnd: var(--color-red-400);
+  --theme-status-offline: var(--color-neutral-400);
+
+  /* Border */
+  --theme-border-subtle: var(--color-neutral-1000);
+  --theme-border-default: var(--color-neutral-950);
+
+  /* Semantic danger */
+  --theme-danger: var(--color-red-400);
+}
