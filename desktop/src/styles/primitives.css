@@ -1,16 +1,16 @@
 @theme {
   /* Neutral */
-  --color-neutral-050: #F2F3F5;
-  --color-neutral-100: #DBDEE1;
-  --color-neutral-200: #B5BAC1;
-  --color-neutral-300: #949BA4;
-  --color-neutral-400: #80848E;
-  --color-neutral-500: #6D6F78;
-  --color-neutral-600: #4E5058;
-  --color-neutral-700: #404249;
-  --color-neutral-800: #383A40;
-  --color-neutral-900: #313338;
-  --color-neutral-950: #2B2D31;
+  --color-neutral-050:  #F2F3F5;
+  --color-neutral-100:  #DBDEE1;
+  --color-neutral-200:  #B5BAC1;
+  --color-neutral-300:  #949BA4;
+  --color-neutral-400:  #80848E;
+  --color-neutral-500:  #6D6F78;
+  --color-neutral-600:  #4E5058;
+  --color-neutral-700:  #404249;
+  --color-neutral-800:  #383A40;
+  --color-neutral-900:  #313338;
+  --color-neutral-950:  #2B2D31;
   --color-neutral-1000: #1E1F22;
   --color-neutral-1100: #111214;
 
@@ -26,11 +26,34 @@
   --color-red-500: #D83A3E;
   --color-red-600: #B52F33;
 
-  /* Status */
+  /* Green */
+  --color-green-300: #2DC770;
   --color-green-400: #23A55A;
-  --color-yellow-400: #F0B232;
+  --color-green-500: #1A8A47;
 
-  /* Other */
+  /* Yellow */
+  --color-yellow-300: #F5C842;
+  --color-yellow-400: #F0B232;
+  --color-yellow-500: #C8911A;
+
+  /* Cyan */
+  --color-cyan-300: #33BBFF;
   --color-cyan-400: #00A8FC;
+
+  /* Orange */
+  --color-orange-300: #FBB84A;
   --color-orange-400: #FAA61A;
+  --color-orange-500: #D48A10;
+
+  /* White alpha */
+  --color-white-010: rgba(255, 255, 255, 0.04);
+  --color-white-020: rgba(255, 255, 255, 0.08);
+  --color-white-030: rgba(255, 255, 255, 0.16);
+  --color-white-060: rgba(255, 255, 255, 0.32);
+
+  /* Black alpha */
+  --color-black-010: rgba(0, 0, 0, 0.08);
+  --color-black-020: rgba(0, 0, 0, 0.16);
+  --color-black-060: rgba(0, 0, 0, 0.60);
+  --color-black-080: rgba(0, 0, 0, 0.80);
 }

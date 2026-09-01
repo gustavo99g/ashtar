@@ -1,7 +1,10 @@
 @import "tailwindcss";
-
 @import "./primitives.css";
 @import "./themes/dark-discord.css";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "@fontsource-variable/inter";
+
 
 @layer base {
   *,
@@ -25,7 +28,7 @@
 
   body {
     min-width: 320px;
-    background: var(--theme-background-primary);
+    background: var(--theme-bg-primary);
     color: var(--theme-text-primary);
     font-family: Inter, system-ui, sans-serif;
     font-synthesis: none;
@@ -69,4 +72,120 @@
   [aria-disabled="true"] {
     cursor: default;
   }
+
+  /* Scrollbar global */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: var(--theme-scrollbar-track);
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: var(--theme-scrollbar-thumb);
+    border-radius: 4px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--theme-scrollbar-thumb-hover);
+  }
+}
+
+@theme {
+  --font-sans: Inter, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  --color-surface:      var(--theme-bg-primary);
+  --color-surface-alt:  var(--theme-bg-secondary);
+  --color-surface-low:  var(--theme-bg-tertiary);
+  --color-float:        var(--theme-bg-floating);
+  --color-tooltip:      var(--theme-bg-tooltip);
+  --color-raised:       var(--theme-bg-elevated);
+  --color-input:        var(--theme-bg-input);
+  --color-hover:        var(--theme-bg-hover);
+  --color-active:       var(--theme-bg-active);
+  --color-selected:     var(--theme-bg-selected);
+  --color-disabled:     var(--theme-bg-disabled);
+
+  --color-primary:    var(--theme-text-primary);
+  --color-secondary:  var(--theme-text-secondary);
+  --color-muted:      var(--theme-text-muted);
+  --color-faint:      var(--theme-text-disabled);
+  --color-link:       var(--theme-text-link);
+  --color-link-hover: var(--theme-text-link-hover);
+  --color-inverse:    var(--theme-text-inverse);
+
+  --color-accent:        var(--theme-accent-primary);
+  --color-accent-hover:  var(--theme-accent-hover);
+  --color-accent-active: var(--theme-accent-active);
+  --color-accent-subtle: var(--theme-accent-subtle);
+  --color-accent-wash:   var(--theme-accent-subtle-bg);
+
+  --color-online:  var(--theme-status-online);
+  --color-idle:    var(--theme-status-idle);
+  --color-dnd:     var(--theme-status-dnd);
+  --color-offline: var(--theme-status-offline);
+
+  --color-line:         var(--theme-border-subtle);
+  --color-line-mid:     var(--theme-border-default);
+  --color-line-strong:  var(--theme-border-strong);
+  --color-line-focus:   var(--theme-border-focus);
+
+  --color-danger:        var(--theme-danger);
+  --color-danger-hover:  var(--theme-danger-hover);
+  --color-success:       var(--theme-success);
+  --color-success-hover: var(--theme-success-hover);
+  --color-warning:       var(--theme-warning);
+  --color-warning-hover: var(--theme-warning-hover);
+
+  --color-mention:        var(--theme-mention-bg);
+  --color-mention-text:   var(--theme-mention-text);
+  --color-mention-border: var(--theme-mention-border);
+
+  /* ── Reaction ── */
+  --color-reaction:              var(--theme-reaction-bg);
+  --color-reaction-border:       var(--theme-reaction-border);
+  --color-reaction-mine:         var(--theme-reaction-bg-mine);
+  --color-reaction-mine-border:  var(--theme-reaction-border-mine);
+
+  --color-embed:        var(--theme-embed-bg);
+  --color-embed-border: var(--theme-embed-border);
+
+  --color-code:       var(--theme-code-bg);
+  --color-code-text:  var(--theme-code-text);
+  --color-codeblock:  var(--theme-codeblock-bg);
+
+  --color-badge:      var(--theme-badge-bg);
+  --color-badge-text: var(--theme-badge-text);
+
+  --color-scrollbar:       var(--theme-scrollbar-thumb);
+  --color-scrollbar-hover: var(--theme-scrollbar-thumb-hover);
+
+  --color-divider: var(--theme-divider);
+
+  --color-scrim-low:  var(--theme-overlay-low);
+  --color-scrim-mid:  var(--theme-overlay-mid);
+  --color-scrim-high: var(--theme-overlay-high);
+
+  --color-backdrop: var(--theme-backdrop);
+
+  --color-role: var(--theme-role-default);
+
+  --color-chart-1: var(--color-blue-400);
+  --color-chart-2: var(--color-green-400);
+  --color-chart-3: var(--color-yellow-400);
+  --color-chart-4: var(--color-red-400);
+  --color-chart-5: var(--color-orange-400);
+
+  /* Sidebar */
+  --color-sidebar: var(--theme-bg-secondary);
+  --color-sidebar-foreground: var(--theme-text-primary);
+  --color-sidebar-primary: var(--theme-accent-primary);
+  --color-sidebar-primary-foreground: var(--theme-text-inverse);
+  --color-sidebar-accent: var(--theme-bg-hover);
+  --color-sidebar-accent-foreground: var(--theme-text-primary);
+  --color-sidebar-border: var(--theme-border-subtle);
+  --color-sidebar-ring: var(--theme-border-focus);
 }
