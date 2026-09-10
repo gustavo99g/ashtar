@@ -1,16 +1,49 @@
 # Discord-like
 
-Aplicação privada de comunicação para uma única comunidade, inspirada no Discord.
+Aplicação privada de comunicação para uma única comunidade, inspirada no Discord. Features:
 
+* ✓ chat de texto (mockado)
+* ✓ voz via LiveKit
+* ✓ compartilhamento de tela
+* ⚙️ áudio do sistema quando disponível
 
-* chat de texto;
-* voz;
-* compartilhamento de tela;
-* áudio do sistema quando disponível.
+> O nome do projeto é provisório.  
+> Status atual: **v0.1 - Vertical Slice**
 
-> O nome do projeto é provisório.
+## Requisitos mínimos 
+
+### Sistema
+
+* **Windows 10/11** ou **macOS 12+** ou **Linux (x86_64)**
+* ~~Rust~~ 1.80.0+
+* Node.js >20.x
+* Tauri v2 CLI instalado globalmente
+
+### Dependências locais
+
+```bash
+# Clona o repositório
+git clone https://github.com/your-username/discord-like.git
+
+# Instala dependências do frontend e backend
+cd discord-like
+pnpm install  # instala tudo no desktop/
+```
 
 ## Arquitetura
+
+```text
+v0.1 [🚧 WIP] ─┬─ Vertical Slice (Tauri + React + Axum)
+              │  ├─ App Shell basic
+              │  ├─ Chat mockado
+              │  ├─ API /health
+              │  └─ Integração LiveKit
+v0.2 [🚧 PENDING] ─┬─ Identidade e acesso
+                  │  ├─ Login + Cadastro
+                  │  └─ Convites
+```
+
+## Requisitos mínimos
 
 Monorepo com dois projetos:
 
