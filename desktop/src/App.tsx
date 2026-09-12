@@ -1,14 +1,9 @@
 import "@/styles/App.css";
-import { Chat } from "@/components/chat";
-import { AppLayout } from "@/layouts/AppLayout";
-import { Voice } from "./components/voice";
+import { RouterProvider } from "react-router-dom";
+import { router } from "./router";
 
 function App() {
-	return (
-		<AppLayout>
-			<Voice />
-		</AppLayout>
-	);
+	return <RouterProvider router={router} />;
 }
 
 export default App;

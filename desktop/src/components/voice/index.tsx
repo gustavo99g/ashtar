@@ -5,9 +5,10 @@ import { VoiceHeader } from "./voiceHeader";
 
 interface VoiceChannelProps {
 	children?: ReactNode;
+	id: string;
 }
 
-const Voice = ({ children }: VoiceChannelProps) => {
+const Voice = ({ children, id }: VoiceChannelProps) => {
 	return (
 		<section className="flex min-h-0 flex-1 flex-col bg-surface">
 			<VoiceHeader />

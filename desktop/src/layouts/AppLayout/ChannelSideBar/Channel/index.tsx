@@ -1,3 +1,5 @@
+import { useNavigationStore } from "@/stores/navigation";
+
 const textChannels = [
 	{
 		id: "general",
@@ -15,7 +17,7 @@ const textChannels = [
 
 const voiceChannels = [
 	{
-		id: "general",
+		id: "general_voice",
 		name: "General",
 	},
 	{
@@ -34,7 +36,12 @@ const Channel = () => {
 
 				<div className="mt-1">
 					{textChannels.map((channel) => (
-						<ChannelItem key={channel.id} type="text" name={channel.name} />
+						<ChannelItem
+							id={channel.id}
+							key={channel.id}
+							type="text"
+							name={channel.name}
+						/>
 					))}
 				</div>
 			</section>
@@ -46,7 +53,12 @@ const Channel = () => {
 
 				<div className="mt-1">
 					{voiceChannels.map((channel) => (
-						<ChannelItem key={channel.id} type="voice" name={channel.name} />
+						<ChannelItem
+							id={channel.id}
+							key={channel.id}
+							type="voice"
+							name={channel.name}
+						/>
 					))}
 				</div>
 			</section>
@@ -55,12 +67,22 @@ const Channel = () => {
 };
 
 interface ChannelItemProps {
+	id: string;
 	name: string;
 	type: "text" | "voice";
-	active?: boolean;
 }
 
-export function ChannelItem({ name, type, active = false }: ChannelItemProps) {
+export function ChannelItem({ id, name, type }: ChannelItemProps) {
+	const currentView = useNavigationStore((state) => state.currentView);
+
+	const setView = useNavigationStore((state) => state.setCurrentView);
+
+	const active = currentView.type === type && currentView.channelId === id;
+
+	const handleClick = () => {
+		setView({ type, channelId: id });
+	};
+
 	return (
 		<button
 			type="button"
@@ -71,6 +93,7 @@ export function ChannelItem({ name, type, active = false }: ChannelItemProps) {
 					? "bg-selected text-primary"
 					: "text-muted hover:bg-hover hover:text-primary",
 			].join(" ")}
+			onClick={handleClick}
 		>
 			<span
 				aria-hidden

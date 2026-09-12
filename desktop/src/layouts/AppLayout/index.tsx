@@ -1,9 +1,10 @@
 import type { ReactNode } from "react";
 import { ChannelSideBar } from "./ChannelSideBar";
+import { MainContent } from "./MainContent";
 import { ServerSideBar } from "./ServerSideBar";
 
 interface AppLayoutProps {
-	children: ReactNode;
+	children?: ReactNode;
 }
 
 const AppLayout = ({ children }: AppLayoutProps) => {
@@ -14,7 +15,7 @@ const AppLayout = ({ children }: AppLayoutProps) => {
 			<ChannelSideBar />
 
 			<main className="flex min-w-0 flex-1 flex-col bg-surface">
-				{children}
+				{children ?? <MainContent />}
 			</main>
 		</div>
 	);
