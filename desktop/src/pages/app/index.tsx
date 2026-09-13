@@ -1,8 +1,12 @@
-import { Voice } from "@/components/voice";
 import { AppLayout } from "@/layouts/AppLayout";
+import VoiceProvider from "@/providers/voiceProvider";
 
 const AppPage = () => {
-	return <AppLayout />;
+	return (
+		<VoiceProvider>
+			<AppLayout />
+		</VoiceProvider>
+	);
 };
 
 export { AppPage };

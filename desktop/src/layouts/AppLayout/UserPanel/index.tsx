@@ -1,37 +1,56 @@
+import { Button } from "@/components/ui/button";
+import useVoice from "@/hooks/useVoice";
+
 const UserPanel = () => {
+	const { voiceChannelId, isConnected, isMuted, mute, unmute, leave } =
+		useVoice();
+
+	if (!voiceChannelId) {
+		return null;
+	}
+
 	return (
-		<section className="shrink-0 bg-surface-low px-2 py-2">
-			<button
-				type="button"
-				className="
-          flex w-full items-center gap-2
-          rounded-md
-          px-2 py-1.5
-          text-left
-          transition-colors
-          hover:bg-hover
-        "
-			>
-				<div
-					className="
-            flex size-8 shrink-0 items-center justify-center
-            rounded-full
-            bg-accent
-            text-xs font-semibold
-            text-inverse
-          "
+		<section className="border-t border-line bg-surface-low px-2 py-2">
+			<div className="mb-2 flex items-center gap-2 px-2">
+				<span
+					className={[
+						"size-2 rounded-full",
+						isConnected ? "bg-online" : "bg-danger",
+					].join(" ")}
+				/>
+
+				<div className="min-w-0">
+					<p className="truncate text-xs font-semibold text-primary">
+						{voiceChannelId}
+					</p>
+
+					<p className="text-xs text-muted">
+						{isConnected ? "Conectado" : "Conectando..."}
+					</p>
+				</div>
+			</div>
+
+			<div className="flex items-center justify-end gap-1">
+				<Button
+					type="button"
+					variant={isMuted ? "danger" : "ghost"}
+					size="icon"
+					onClick={() => void (isMuted ? unmute() : mute())}
+					aria-label={isMuted ? "Ativar microfone" : "Desativar microfone"}
 				>
-					G
-				</div>
+					{isMuted ? "🔇" : "🎙️"}
+				</Button>
 
-				<div className="min-w-0 flex-1">
-					<div className="truncate text-sm font-medium text-primary">
-						Gustavo
-					</div>
-
-					<div className="truncate text-xs text-muted">Online</div>
-				</div>
-			</button>
+				<Button
+					type="button"
+					variant="danger"
+					size="icon"
+					onClick={() => void leave()}
+					aria-label="Sair do canal"
+				>
+					📞
+				</Button>
+			</div>
 		</section>
 	);
 };

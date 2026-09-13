@@ -74,12 +74,21 @@ interface ChannelItemProps {
 
 export function ChannelItem({ id, name, type }: ChannelItemProps) {
 	const currentView = useNavigationStore((state) => state.currentView);
+	const voiceChannelId = useNavigationStore((state) => state.voiceChannelId);
 
 	const setView = useNavigationStore((state) => state.setCurrentView);
+	const joinVoiceChannel = useNavigationStore(
+		(state) => state.joinVoiceChannel,
+	);
 
 	const active = currentView.type === type && currentView.channelId === id;
+	const connected = type === "voice" && voiceChannelId === id;
 
 	const handleClick = () => {
+		if (type === "voice") {
+			joinVoiceChannel(id);
+			return;
+		}
 		setView({ type, channelId: id });
 	};
 
@@ -97,7 +106,10 @@ export function ChannelItem({ id, name, type }: ChannelItemProps) {
 		>
 			<span
 				aria-hidden
-				className="shrink-0 text-base leading-none text-muted group-hover:text-secondary"
+				className={[
+					"shrink-0 text-base leading-none text-muted group-hover:text-secondary",
+					connected ? "text-online" : "text-muted",
+				].join(" ")}
 			>
 				{type === "text" ? "#" : "🔊"}
 			</span>

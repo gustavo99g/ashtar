@@ -5,7 +5,7 @@ import { VoiceHeader } from "./voiceHeader";
 
 interface VoiceChannelProps {
 	children?: ReactNode;
-	id: string;
+	channelId: string;
 }
 
 const Voice = ({ children, id }: VoiceChannelProps) => {

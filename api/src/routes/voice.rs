@@ -21,11 +21,9 @@ pub async fn join_voice(
     Json(request): Json<JoinVoiceRequest>,
 ) -> Result<Json<JoinVoiceResponse>, String> {
     let token = create_voice_token(&request.channel_id, &request.user_id, &request.display_name)?;
+    let url = env::var("LIVEKIT_URL").map_err(|error| error.to_string())?;
 
-    Ok(Json(JoinVoiceResponse {
-        token,
-        url: "ws://localhost:3000".to_owned(),
-    }))
+    Ok(Json(JoinVoiceResponse { token, url }))
 }
 
 fn create_voice_token(

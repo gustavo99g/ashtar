@@ -4,6 +4,7 @@ use axum::{
 };
 use dotenvy::dotenv;
 use serde::Serialize;
+use tower_http::cors::CorsLayer;
 
 mod routes;
 
@@ -23,7 +24,8 @@ async fn main() {
     dotenv().ok();
     let app = Router::new()
         .route("/health", get(health))
-        .route("/api/voice/join", post(join_voice));
+        .route("/api/voice/join", post(join_voice))
+        .layer(CorsLayer::permissive());
 
     let listener = tokio::net::TcpListener::bind("127.0.0.1:3000")
         .await

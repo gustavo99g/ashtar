@@ -1,10 +1,5 @@
-interface Participant {
-	id: string;
-	name: string;
-	avatar: string;
-	speaking?: boolean;
-	muted?: boolean;
-}
+import type { Participant } from "livekit-client";
+import useVoice from "@/hooks/useVoice";
 
 function getGridClass(count: number) {
 	if (count === 1) {
@@ -30,37 +25,13 @@ function getGridClass(count: number) {
 	return "grid-cols-4";
 }
 
-const participants: Participant[] = [
-	{
-		id: "1",
-		name: "Gustavo",
-		avatar: "G",
-		speaking: true,
-		muted: false,
-	},
-	{
-		id: "2",
-		name: "João",
-		avatar: "J",
-		speaking: false,
-		muted: true,
-	},
-	{
-		id: "3",
-		name: "Maria",
-		avatar: "M",
-		speaking: false,
-		muted: false,
-	},
-];
-
 const Participants = () => {
+	const { participants } = useVoice();
 	const gridClass = getGridClass(participants.length);
-
 	return (
 		<div className={["grid min-h-0 flex-1 gap-4 p-6", gridClass].join(" ")}>
 			{participants.map((participant) => (
-				<ParticipantCard key={participant.id} participant={participant} />
+				<ParticipantCard key={participant.identity} participant={participant} />
 			))}
 		</div>
 	);
@@ -71,6 +42,8 @@ interface ParticipantCardProps {
 }
 
 function ParticipantCard({ participant }: ParticipantCardProps) {
+	console.log(participant.name, participant.isSpeaking);
+
 	return (
 		<div
 			className="
@@ -86,10 +59,10 @@ function ParticipantCard({ participant }: ParticipantCardProps) {
 					className={[
 						"flex size-28 items-center justify-center rounded-full",
 						"bg-accent text-3xl font-semibold text-inverse",
-						participant.speaking ? "ring-4 ring-online" : "",
+						participant.isSpeaking ? "ring-4 ring-red-400" : "",
 					].join(" ")}
 				>
-					{participant.avatar}
+					{participant.name?.charAt(0)}
 				</div>
 
 				<div className="flex items-center gap-2">
@@ -97,7 +70,9 @@ function ParticipantCard({ participant }: ParticipantCardProps) {
 						{participant.name}
 					</span>
 
-					{participant.muted && <span className="text-danger">🔇</span>}
+					{!participant.isMicrophoneEnabled && (
+						<span className="text-danger">🔇</span>
+					)}
 				</div>
 			</div>
 		</div>
