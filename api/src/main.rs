@@ -1,5 +1,13 @@
-use axum::{Json, Router, routing::get};
+use axum::{
+    Json, Router,
+    routing::{get, post},
+};
+use dotenvy::dotenv;
 use serde::Serialize;
+
+mod routes;
+
+use routes::voice::join_voice;
 
 #[derive(Serialize)]
 struct HealthResponse {
@@ -12,7 +20,10 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[tokio::main]
 async fn main() {
-    let app = Router::new().route("/health", get(health));
+    dotenv().ok();
+    let app = Router::new()
+        .route("/health", get(health))
+        .route("/api/voice/join", post(join_voice));
 
     let listener = tokio::net::TcpListener::bind("127.0.0.1:3000")
         .await
