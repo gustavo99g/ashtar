@@ -15,20 +15,42 @@ export type Appview =
 
 interface NavigationStore {
 	currentView: Appview;
-	setCurrentView: (view: Appview) => void;
 	voiceChannelId: string | null;
+	lastTextChannelId: string | null;
+	setCurrentView: (view: Appview) => void;
 	joinVoiceChannel: (channelId: string) => void;
 	leaveVoiceChannel: () => void;
 }
 
 export const useNavigationStore = create<NavigationStore>((set) => ({
 	currentView: { type: "home" },
-	setCurrentView: (view) => set({ currentView: view }),
+	lastTextChannelId: null,
+	setCurrentView: (view) =>
+		set((state) => ({
+			currentView: view,
+			lastTextChannelId:
+				view.type === "text" ? view.channelId : state.lastTextChannelId,
+		})),
 	voiceChannelId: null,
 	joinVoiceChannel: (channelId) =>
 		set({
 			voiceChannelId: channelId,
-			currentView: { type: "voice", channelId },
+			currentView: {
+				type: "voice",
+				channelId,
+			},
 		}),
-	leaveVoiceChannel: () => set({ voiceChannelId: null }),
+	leaveVoiceChannel: () =>
+		set((state) => ({
+			voiceChannelId: null,
+
+			currentView: state.lastTextChannelId
+				? {
+						type: "text",
+						channelId: state.lastTextChannelId,
+					}
+				: {
+						type: "home",
+					},
+		})),
 }));

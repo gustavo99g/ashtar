@@ -1,24 +1,43 @@
 import { Button } from "@/components/ui/button";
+import useVoice from "@/hooks/useVoice";
 
 const VoiceControls = () => {
+	const {
+		voiceChannelId,
+		isConnected,
+		isMuted,
+		isDeafened,
+		mute,
+		unmute,
+		leave,
+		deafen,
+		undeafen,
+	} = useVoice();
+
 	return (
 		<footer className="flex shrink-0 items-center justify-center gap-2 border-t border-line bg-surface-alt px-4 py-3">
 			<Button
 				type="button"
-				variant="secondary"
+				variant={isMuted ? "danger" : "secondary"}
 				size="icon"
-				aria-label="Desativar microfone"
+				aria-label={isMuted ? "Ativar microfone" : "Desativar microfone"}
+				onClick={() => {
+					void (isMuted ? unmute() : mute());
+				}}
 			>
-				🎙️
+				{isMuted ? "🔇" : "🎙️"}
 			</Button>
 
 			<Button
 				type="button"
-				variant="secondary"
+				variant={isDeafened ? "danger" : "secondary"}
 				size="icon"
-				aria-label="Desativar áudio"
+				aria-label={isDeafened ? "Ativar áudio" : "Desativar áudio"}
+				onClick={() => {
+					void (isDeafened ? undeafen() : deafen());
+				}}
 			>
-				🔊
+				{isDeafened ? "🔇" : "🎧"}
 			</Button>
 
 			<Button
@@ -26,6 +45,9 @@ const VoiceControls = () => {
 				variant="outline"
 				size="icon"
 				aria-label="Sair do canal"
+				onClick={() => {
+					void leave();
+				}}
 			>
 				📞
 			</Button>

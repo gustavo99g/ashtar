@@ -6,14 +6,19 @@ import { useNavigationStore } from "@/stores/navigation";
 
 interface VoiceContextValue {
 	room: Room | null;
+	voiceChannelId: string | null;
 	participants: Participant[];
 	isConnected: boolean;
 	isMuted: boolean;
-	voiceChannelId: string | null;
-
+	isDeafened: boolean;
+	isScreenSharing: boolean;
 	mute: () => Promise<void>;
 	unmute: () => Promise<void>;
 	leave: () => Promise<void>;
+	deafen: () => void;
+	undeafen: () => void;
+	startScreenShare: () => Promise<void>;
+	stopScreenShare: () => Promise<void>;
 }
 
 export const VoiceContext = createContext<VoiceContextValue | null>(null);
@@ -24,18 +29,20 @@ interface VoiceProviderProps {
 
 const VoiceProvider = ({ children }: VoiceProviderProps) => {
 	const voiceChannelId = useNavigationStore((state) => state.voiceChannelId);
+	const leaveVoiceChannel = useNavigationStore(
+		(state) => state.leaveVoiceChannel,
+	);
 
 	const [room, setRoom] = useState<Room | null>(null);
 	const [participants, setParticipants] = useState<Participant[]>([]);
 	const [isConnected, setIsConnected] = useState(false);
 	const [isMuted, setIsMuted] = useState(false);
+	const [isDeafened, setIsDeafened] = useState(false);
+	const [isScreenSharing, setIsScreenSharing] = useState(false);
 
 	useEffect(() => {
 		if (!voiceChannelId) {
-			setRoom(null);
-			setParticipants([]);
-			setIsConnected(false);
-			setIsMuted(false);
+			resetVoiceState();
 			return;
 		}
 
@@ -81,6 +88,18 @@ const VoiceProvider = ({ children }: VoiceProviderProps) => {
 
 				nextRoom.on(RoomEvent.Disconnected, handleDisconnected);
 				nextRoom.on(RoomEvent.ActiveSpeakersChanged, updateParticipants);
+
+				nextRoom.on(RoomEvent.LocalTrackPublished, updateParticipants);
+
+				nextRoom.on(RoomEvent.LocalTrackUnpublished, updateParticipants);
+
+				nextRoom.on(RoomEvent.TrackPublished, updateParticipants);
+
+				nextRoom.on(RoomEvent.TrackUnpublished, updateParticipants);
+
+				nextRoom.on(RoomEvent.TrackSubscribed, updateParticipants);
+
+				nextRoom.on(RoomEvent.TrackUnsubscribed, updateParticipants);
 
 				await nextRoom.connect(data.url, data.token);
 				await nextRoom.localParticipant.setMicrophoneEnabled(true);
@@ -151,21 +170,95 @@ const VoiceProvider = ({ children }: VoiceProviderProps) => {
 		}
 		await room.disconnect();
 
+		if (isScreenSharing) {
+			await stopScreenShare();
+		}
+
+		resetVoiceState();
+		leaveVoiceChannel();
+	}
+
+	function deafen() {
+		if (!room) {
+			return;
+		}
+
+		for (const participant of room.remoteParticipants.values()) {
+			for (const publication of participant.audioTrackPublications.values()) {
+				publication.setSubscribed(false);
+			}
+		}
+
+		setIsDeafened(true);
+		mute();
+	}
+
+	function undeafen() {
+		if (!room) {
+			return;
+		}
+
+		for (const participant of room.remoteParticipants.values()) {
+			for (const publication of participant.audioTrackPublications.values()) {
+				publication.setSubscribed(true);
+			}
+		}
+
+		setIsDeafened(false);
+		unmute();
+	}
+
+	function resetVoiceState() {
 		setRoom(null);
 		setParticipants([]);
 		setIsConnected(false);
 		setIsMuted(false);
+		setIsDeafened(false);
+	}
+
+	async function startScreenShare() {
+		if (!room) {
+			return;
+		}
+
+		try {
+			await room.localParticipant.setScreenShareEnabled(true);
+
+			setIsScreenSharing(true);
+		} catch (error) {
+			console.error("Erro ao iniciar compartilhamento de tela:", error);
+		}
+	}
+
+	async function stopScreenShare() {
+		if (!room) {
+			return;
+		}
+
+		try {
+			await room.localParticipant.setScreenShareEnabled(false);
+
+			setIsScreenSharing(false);
+		} catch (error) {
+			console.error("Erro ao parar compartilhamento de tela:", error);
+		}
 	}
 
 	const value: VoiceContextValue = {
 		room,
 		participants,
 		isConnected,
+		isScreenSharing,
+		isDeafened,
 		isMuted,
 		voiceChannelId,
 		mute,
 		unmute,
 		leave,
+		deafen,
+		undeafen,
+		startScreenShare,
+		stopScreenShare,
 	};
 
 	return (
