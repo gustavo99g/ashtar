@@ -1,8 +1,12 @@
 use hound::{SampleFormat, WavSpec, WavWriter};
 use std::{
     error::Error,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
     thread,
-    time::{Duration, Instant},
+    time::Duration,
 };
 use tauri::ipc::Channel;
 use wasapi::{
@@ -61,13 +65,17 @@ impl WindowsSystemAudioCapture {
         Ok(())
     }
 
-    pub fn stream_to_channel(self, channel: Channel<Vec<u8>>) -> Result<(), Box<dyn Error>> {
+    pub fn stream_to_channel(
+        self,
+        channel: Channel<Vec<u8>>,
+        stop: Arc<AtomicBool>,
+    ) -> Result<(), Box<dyn Error>> {
         self.client.start_stream()?;
         let bytes_per_sample = 4usize;
         let channels = 2usize;
         let bytes_per_frame = bytes_per_sample * channels;
 
-        loop {
+        while !stop.load(Ordering::Relaxed) {
             let frames = self.capture_client.get_next_packet_size()?.unwrap_or(0);
             if frames == 0 {
                 thread::sleep(Duration::from_millis(1));
@@ -94,10 +102,14 @@ impl WindowsSystemAudioCapture {
                 buffer.len(),
                 buffer_info.flags.silent
             );
-
-            channel
-                .send(buffer)
-                .map_err(|e| -> Box<dyn Error> { Box::new(e) })?;
+            if channel.send(buffer).is_err() {
+                break;
+            }
         }
+        self.client.stop_stream()?;
+
+        println!("Captura de áudio encerrada.");
+
+        Ok(())
     }
 }
