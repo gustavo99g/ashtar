@@ -35,7 +35,7 @@ const Participants = ({ compact = false }: ParticipantsProps) => {
 			className={[
 				"grid h-full min-h-0 gap-4",
 				compact
-					? "grid-cols-[repeat(auto-fit,minmax(120px,160px))]"
+					? "grid-cols-[repeat(auto-fit,minmax(140px,180px))]"
 					: getGridClass(participants.length),
 			].join(" ")}
 		>
@@ -55,7 +55,10 @@ interface ParticipantCardProps {
 	compact?: boolean;
 }
 
-function ParticipantCard({ participant, compact }: ParticipantCardProps) {
+function ParticipantCard({
+	participant,
+	compact = true,
+}: ParticipantCardProps) {
 	const name = participant.name || participant.identity;
 	const isMuted = !participant.isMicrophoneEnabled;
 
@@ -66,41 +69,41 @@ function ParticipantCard({ participant, compact }: ParticipantCardProps) {
 	return (
 		<div
 			className={[
-				"relative flex min-w-0",
+				"relative flex min-w-0 min-h-0",
 				"items-center justify-center p-2",
 				"overflow-hidden rounded-lg",
 				"bg-surface-alt",
 				"transition-colors",
-				compact ? "min-h-12" : "min-h-0",
+				compact ? "h-30 w-44" : "",
 				participant.isSpeaking ? "ring-2 ring-online" : "",
 			].join(" ")}
 		>
-			<div className="flex flex-col items-center gap-3">
+			<div className="flex flex-col items-center gap-2">
 				<div
 					className={[
-						"flex size-28 items-center justify-center rounded-full",
-						"bg-accent text-3xl font-semibold text-inverse",
+						"flex items-center justify-center rounded-full",
+						"bg-accent  font-semibold text-inverse",
 						"transition-all",
-						compact ? "size-16 text-xl" : "size-28 text-3xl",
+						compact ? "size-10 text-xl" : "size-24 text-3xl",
 						participant.isSpeaking ? "ring-4 ring-online/30" : "",
 					].join(" ")}
 				>
 					{name?.charAt(0).toUpperCase()}
 				</div>
 
-				<div className="flex items-center gap-2">
+				<div className="flex flex-col items-center gap-2">
+					<div>
+						{isScreenSharing && <span className="text-xs text-online">🖥️</span>}
+						{isMuted && <span className="text-danger">🔇</span>}
+					</div>
 					<span
 						className={[
-							"max-w-48 truncate text-sm font-semibold text-primary",
+							"max-w-56  text-sm font-semibold text-primary text-center",
 							compact ? "text-xs" : "text-sm",
 						].join(" ")}
 					>
 						{participant.name}
 					</span>
-
-					{isMuted && <span className="text-danger">🔇</span>}
-
-					{isScreenSharing && <span className="text-xs text-online">🖥️</span>}
 				</div>
 			</div>
 		</div>

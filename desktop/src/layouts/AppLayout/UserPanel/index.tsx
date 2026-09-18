@@ -1,13 +1,47 @@
 import { Button } from "@/components/ui/button";
 import useVoice from "@/hooks/useVoice";
+import type { VoiceConnectionState } from "@/providers/voiceProvider";
+
+function getConnectionLabel(state: VoiceConnectionState) {
+	switch (state) {
+		case "connecting":
+			return "Conectando...";
+
+		case "connected":
+			return "Voz conectada";
+
+		case "error":
+			return "Falha na conexão";
+
+		case "disconnected":
+			return "Desconectado";
+	}
+}
+
+function getConnectionColor(state: VoiceConnectionState) {
+	switch (state) {
+		case "connecting":
+			return "bg-warning";
+
+		case "connected":
+			return "bg-online";
+
+		case "error":
+			return "bg-danger";
+
+		case "disconnected":
+			return "bg-offline";
+	}
+}
 
 const UserPanel = () => {
 	const {
 		voiceChannelId,
 		isScreenSharing,
-		isConnected,
 		isMuted,
 		isDeafened,
+		isSomeoneScreenSharing,
+		connectionState,
 		mute,
 		unmute,
 		leave,
@@ -29,7 +63,7 @@ const UserPanel = () => {
 				<span
 					className={[
 						"size-2 shrink-0 rounded-full",
-						isConnected ? "bg-online" : "bg-warning",
+						getConnectionColor(connectionState),
 					].join(" ")}
 				/>
 
@@ -39,7 +73,7 @@ const UserPanel = () => {
 					</p>
 
 					<p className="truncate text-xs text-muted">
-						{isConnected ? "Voz conectada" : "Conectando..."}
+						{getConnectionLabel(connectionState)}
 					</p>
 				</div>
 			</div>
@@ -71,6 +105,7 @@ const UserPanel = () => {
 				<Button
 					type="button"
 					variant={isScreenSharing ? "danger" : "ghost"}
+					disabled={!isScreenSharing && isSomeoneScreenSharing}
 					size="icon"
 					aria-label={
 						isScreenSharing

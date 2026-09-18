@@ -4,6 +4,12 @@ import { type Participant, Room, RoomEvent } from "livekit-client";
 import { createContext, type ReactNode, useEffect, useState } from "react";
 import { useNavigationStore } from "@/stores/navigation";
 
+export type VoiceConnectionState =
+	| "disconnected"
+	| "connecting"
+	| "connected"
+	| "error";
+
 interface VoiceContextValue {
 	room: Room | null;
 	voiceChannelId: string | null;
@@ -12,6 +18,8 @@ interface VoiceContextValue {
 	isMuted: boolean;
 	isDeafened: boolean;
 	isScreenSharing: boolean;
+	isSomeoneScreenSharing: boolean;
+	connectionState: VoiceConnectionState;
 	mute: () => Promise<void>;
 	unmute: () => Promise<void>;
 	leave: () => Promise<void>;
@@ -35,14 +43,24 @@ const VoiceProvider = ({ children }: VoiceProviderProps) => {
 
 	const [room, setRoom] = useState<Room | null>(null);
 	const [participants, setParticipants] = useState<Participant[]>([]);
-	const [isConnected, setIsConnected] = useState(false);
+
 	const [isMuted, setIsMuted] = useState(false);
 	const [isDeafened, setIsDeafened] = useState(false);
 	const [isScreenSharing, setIsScreenSharing] = useState(false);
+	const [connectionState, setConnectionState] =
+		useState<VoiceConnectionState>("disconnected");
+	const isConnected = connectionState === "connected";
+
+	const isSomeoneScreenSharing = participants.some(
+		(participant) =>
+			participant.isScreenShareEnabled &&
+			participant.identity !== room?.localParticipant.identity,
+	);
 
 	useEffect(() => {
 		if (!voiceChannelId) {
 			resetVoiceState();
+			setConnectionState("disconnected");
 			return;
 		}
 
@@ -52,6 +70,7 @@ const VoiceProvider = ({ children }: VoiceProviderProps) => {
 
 		async function connect() {
 			try {
+				setConnectionState("connecting");
 				const random = crypto.randomUUID();
 
 				const res = await fetch("http://127.0.0.1:3000/api/voice/join", {
@@ -109,7 +128,7 @@ const VoiceProvider = ({ children }: VoiceProviderProps) => {
 				}
 
 				setRoom(nextRoom);
-				setIsConnected(true);
+				setConnectionState("connected");
 				updateParticipants();
 				setIsMuted(false);
 			} catch (error) {
@@ -118,7 +137,7 @@ const VoiceProvider = ({ children }: VoiceProviderProps) => {
 				if (!cancelled) {
 					setRoom(null);
 					setParticipants([]);
-					setIsConnected(false);
+					setConnectionState("error");
 				}
 			}
 		}
@@ -133,8 +152,8 @@ const VoiceProvider = ({ children }: VoiceProviderProps) => {
 		function handleDisconnected() {
 			setRoom(null);
 			setParticipants([]);
-			setIsConnected(false);
 			setIsMuted(false);
+			setConnectionState("disconnected");
 		}
 
 		void connect();
@@ -175,6 +194,7 @@ const VoiceProvider = ({ children }: VoiceProviderProps) => {
 		}
 
 		resetVoiceState();
+		setConnectionState("disconnected");
 		leaveVoiceChannel();
 	}
 
@@ -211,7 +231,7 @@ const VoiceProvider = ({ children }: VoiceProviderProps) => {
 	function resetVoiceState() {
 		setRoom(null);
 		setParticipants([]);
-		setIsConnected(false);
+		setConnectionState("disconnected");
 		setIsMuted(false);
 		setIsDeafened(false);
 	}
@@ -252,6 +272,8 @@ const VoiceProvider = ({ children }: VoiceProviderProps) => {
 		isDeafened,
 		isMuted,
 		voiceChannelId,
+		isSomeoneScreenSharing,
+		connectionState,
 		mute,
 		unmute,
 		leave,
