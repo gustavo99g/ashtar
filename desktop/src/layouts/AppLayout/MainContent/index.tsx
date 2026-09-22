@@ -6,11 +6,11 @@ const MainContent = () => {
 	const currentView = useNavigationStore((state) => state.currentView);
 
 	if (currentView.type === "text") {
-		return <Chat channelId={currentView.channelId} />;
+		return <Chat />;
 	}
 
 	if (currentView.type === "voice") {
-		return <Voice channelId={currentView.channelId} />;
+		return <Voice />;
 	}
 
 	return <DefaultView />;

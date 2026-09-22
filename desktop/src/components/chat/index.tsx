@@ -2,11 +2,11 @@ import { ChatHeader } from "./ChatHeader";
 import { ChatInput } from "./input";
 import { Messages } from "./messages";
 
-interface ChatProps {
-	channelId: string;
-}
+// interface ChatProps {
+// 	channelId: string;
+// }
 
-const Chat = ({ channelId }: ChatProps) => {
+const Chat = () => {
 	function handleSend(message: string) {
 		console.log("Mensagem:", message);
 	}

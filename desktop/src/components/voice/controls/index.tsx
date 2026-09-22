@@ -3,8 +3,8 @@ import useVoice from "@/hooks/useVoice";
 
 const VoiceControls = () => {
 	const {
-		voiceChannelId,
-		isConnected,
+		// voiceChannelId,
+		// isConnected,
 		isMuted,
 		isDeafened,
 		mute,

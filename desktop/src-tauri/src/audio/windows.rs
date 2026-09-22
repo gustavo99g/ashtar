@@ -96,12 +96,12 @@ impl WindowsSystemAudioCapture {
 
             buffer.truncate(bytes_read);
 
-            println!(
-                "Enviando {} frames / {} bytes / silent={}",
-                frames_read,
-                buffer.len(),
-                buffer_info.flags.silent
-            );
+            // println!(
+            //     "Enviando {} frames / {} bytes / silent={}",
+            //     frames_read,
+            //     buffer.len(),
+            //     buffer_info.flags.silent
+            // );
             if channel.send(buffer).is_err() {
                 break;
             }

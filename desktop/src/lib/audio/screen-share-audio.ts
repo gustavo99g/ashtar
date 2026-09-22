@@ -1,6 +1,7 @@
 import {
 	type ScreenShareAudioOptions,
 	startScreenShareAudio,
+	stopScreenShareAudio,
 } from "@/lib/tauri/audio";
 import workletUrl from "./screen-share-audio.worklet.js?url";
 
@@ -8,6 +9,8 @@ export class ScreenShareAudio {
 	private readonly context: AudioContext;
 	private readonly worklet: AudioWorkletNode;
 	private readonly destination: MediaStreamAudioDestinationNode;
+
+	private captureId: number | null = null;
 
 	private constructor(
 		context: AudioContext,
@@ -52,10 +55,14 @@ export class ScreenShareAudio {
 	}
 
 	async start(options: ScreenShareAudioOptions): Promise<MediaStreamTrack> {
+		if (this.captureId !== null) {
+			throw new Error("A captura de áudio já está iniciada");
+		}
+
 		await this.context.resume();
 
-		await startScreenShareAudio(options, (chunk) => {
-			console.log("Chunk:", chunk.constructor.name, "length:", chunk.length);
+		this.captureId = await startScreenShareAudio(options, (chunk) => {
+			// console.log("Chunk:", chunk.constructor.name, "length:", chunk.length);
 
 			const bytes = new Uint8Array(chunk);
 
@@ -72,12 +79,13 @@ export class ScreenShareAudio {
 
 			const samples = new Float32Array(view);
 
-			this.worklet.port.postMessage(samples);
+			this.worklet.port.postMessage(samples, [samples.buffer]);
 		});
 
 		const track = this.destination.stream.getAudioTracks()[0];
 
 		if (!track) {
+			await this.stop();
 			throw new Error("Não foi possível criar o MediaStreamTrack de áudio");
 		}
 
@@ -85,6 +93,14 @@ export class ScreenShareAudio {
 	}
 
 	async stop(): Promise<void> {
+		if (this.captureId !== null) {
+			const captureId = this.captureId;
+
+			this.captureId = null;
+
+			await stopScreenShareAudio(captureId);
+		}
+
 		this.worklet.disconnect();
 
 		for (const track of this.destination.stream.getAudioTracks()) {

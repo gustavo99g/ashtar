@@ -17,13 +17,19 @@ export async function startScreenShareAudio(
 	const channel = new Channel<number[]>();
 
 	channel.onmessage = (chunk) => {
-		console.log("Chunk recebido no React:", chunk.length);
+		// console.log("Chunk recebido no React:", chunk.length);
 		onChunk(chunk);
 	};
 
-	await invoke("start_screen_share_audio", {
+	return await invoke<number>("start_screen_share_audio", {
 		channel,
 		processId: options.processId,
 		application: options.mode === "application",
+	});
+}
+
+export async function stopScreenShareAudio(captureId: number): Promise<void> {
+	await invoke("stop_screen_share_audio", {
+		captureId,
 	});
 }
