@@ -245,7 +245,7 @@ pub fn test_capture_window(
                 target: "perf",
                 captured = current_captured - last_captured,
                 dropped = current_dropped - last_dropped,
-                sent = current_sent - last_sent,
+                sent = current_sent - last_soent,
                 in_flight = current_in_flight,
                 "capture stats"
             );
