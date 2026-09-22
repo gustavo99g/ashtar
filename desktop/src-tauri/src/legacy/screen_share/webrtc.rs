@@ -108,6 +108,8 @@ pub fn test_capture_window(
         .find(|source| source.id() == source_id)
         .ok_or_else(|| format!("HWND {source_id} não encontrado."))?;
 
+    info!(source_id, "captura de vídeo (DesktopCapturer) iniciada");
+
     let stop = Arc::clone(&control.stop);
 
     let captured = Arc::clone(&control.captured);
@@ -265,6 +267,14 @@ pub fn test_capture_window(
             last_timing_report = Instant::now();
         }
     }
+
+    info!(
+        source_id,
+        captured = control.captured.load(Ordering::Relaxed),
+        dropped = control.dropped.load(Ordering::Relaxed),
+        sent = control.sent.load(Ordering::Relaxed),
+        "captura de vídeo (DesktopCapturer) encerrada"
+    );
 
     Ok(())
 }
