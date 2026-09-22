@@ -58,7 +58,11 @@ Cada item deve ser resolvido ou conscientemente adiado (marcar como tal) antes d
       vazia (`RUST_LOG=`) como filtro válido e vazio, suprimindo todo log (até `error!`) sem cair no
       fallback. Corrigido em `main.rs` tratando "ausente" e "vazia" como o mesmo caso. De brinde,
       corrigido também o nome de crate errado no filtro padrão (`desktop` → `desktop_lib`, que é o
-      nome real da lib no Cargo.toml e onde vive o `legacy/`).
+      nome real da lib no Cargo.toml e onde vive o `legacy/`). Também faltava `info!` de ciclo de
+      vida na captura de vídeo (`DesktopCapturer`) — só o áudio tinha, porque o código original só
+      tinha `println!` de início/fim no áudio. Confirmado end-to-end com `RUST_LOG=info,desktop_lib=debug,perf=debug`:
+      início/fim de vídeo e áudio em `info!`, formato do stream em `debug!`, métricas de `perf` a cada
+      segundo (`capture_frame() calls`, `capture stats`, `pipeline stats`).
 - [ ] Sem backpressure entre captura e sink de IPC: nada impede o produtor de acumular frames em trânsito
       caso o consumidor (React/worklet) fique para trás.
 
