@@ -54,6 +54,11 @@ Cada item deve ser resolvido ou conscientemente adiado (marcar como tal) antes d
       por segundo → `debug!(target: "perf", ...)` com campos estruturados (filtrar só métricas com
       `RUST_LOG=info,perf=debug`). `pack_bgra` (morto) e o `process_frame_to_jpeg` comentado foram
       removidos junto.
+      **Bug encontrado depois:** `EnvFilter::try_from_default_env()` trata `RUST_LOG` presente porém
+      vazia (`RUST_LOG=`) como filtro válido e vazio, suprimindo todo log (até `error!`) sem cair no
+      fallback. Corrigido em `main.rs` tratando "ausente" e "vazia" como o mesmo caso. De brinde,
+      corrigido também o nome de crate errado no filtro padrão (`desktop` → `desktop_lib`, que é o
+      nome real da lib no Cargo.toml e onde vive o `legacy/`).
 - [ ] Sem backpressure entre captura e sink de IPC: nada impede o produtor de acumular frames em trânsito
       caso o consumidor (React/worklet) fique para trás.
 
