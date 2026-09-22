@@ -1,12 +1,13 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 
-mod audio;
-mod screen_share;
+mod error;
+mod legacy;
+mod media;
 
-mod commands;
-
-use commands::audio::{start_screen_share_audio, stop_screen_share_audio, ScreenShareAudioState};
-use commands::screen_share::{
+use legacy::commands::audio::{
+    start_screen_share_audio, stop_screen_share_audio, ScreenShareAudioState,
+};
+use legacy::commands::screen_share::{
     ack_livekit_window_capture, list_screen_share_monitors, list_screen_share_windows,
     start_monitor_preview, start_screen_share_video, start_window_preview,
     stop_all_screen_share_previews, stop_livekit_window_capture, stop_screen_share_video,
@@ -14,7 +15,7 @@ use commands::screen_share::{
     ScreenShareVideoState,
 };
 
-use crate::screen_share::ScreenShareTestState;
+use crate::legacy::screen_share::ScreenShareTestState;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {

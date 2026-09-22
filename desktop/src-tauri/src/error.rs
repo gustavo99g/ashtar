@@ -1,3 +1,5 @@
+use serde::ser::{Serialize, SerializeStruct, Serializer};
+
 #[derive(Debug, thiserror::Error)]
 pub enum AppError {
     #[error("fonte de captura não encontrada: {0}")]
@@ -8,16 +10,26 @@ pub enum AppError {
     VideoCapture(String),
     #[error("falha na captura de áudio: {0}")]
     AudioCapture(String),
+    #[error("erro interno: {0}")]
+    Internal(String),
 }
 
-impl serde::Serialize for AppError {
-    fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
-        use serde::ser::SerializeStruct;
+impl AppError {
+    pub fn kind(&self) -> &'static str {
+        match self {
+            Self::SourceNotFound(_) => "SourceNotFound",
+            Self::AlreadySharing => "AlreadySharing",
+            Self::VideoCapture(_) => "VideoCapture",
+            Self::AudioCapture(_) => "AudioCapture",
+            Self::Internal(_) => "Internal",
+        }
+    }
+}
+
+impl Serialize for AppError {
+    fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
         let mut st = s.serialize_struct("AppError", 2)?;
-        st.serialize_field(
-            "kind",
-            &format!("{self:?}").split('(').next().unwrap_or_default(),
-        )?;
+        st.serialize_field("kind", self.kind())?;
         st.serialize_field("message", &self.to_string())?;
         st.end()
     }

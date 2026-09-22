@@ -8,7 +8,7 @@ use std::{
 
 use tauri::ipc::Channel;
 
-use crate::audio::{windows::WindowsSystemAudioCapture, ScreenShareAudioMode};
+use crate::legacy::audio::{windows::WindowsSystemAudioCapture, ScreenShareAudioMode};
 
 struct ActiveCapture {
     id: u64,
@@ -64,21 +64,24 @@ pub fn start_screen_share_audio(
 
     let active_state = Arc::clone(&state.active);
 
-    thread::spawn(move || {
-        let capture = match WindowsSystemAudioCapture::new(mode) {
-            Ok(capture) => capture,
-            Err(e) => {
-                eprintln!("Erro ao criar captura de audio: {}", e);
-                clear_active_capture(&active_state, id);
-                return;
-            }
-        };
+    thread::Builder::new()
+        .name("audio-capture".into())
+        .spawn(move || {
+            let capture = match WindowsSystemAudioCapture::new(mode) {
+                Ok(capture) => capture,
+                Err(e) => {
+                    eprintln!("Erro ao criar captura de audio: {}", e);
+                    clear_active_capture(&active_state, id);
+                    return;
+                }
+            };
 
-        if let Err(error) = capture.stream_to_channel(channel, stop) {
-            eprintln!("Erro na capture de audio: {}", error)
-        }
-        clear_active_capture(&active_state, id);
-    });
+            if let Err(error) = capture.stream_to_channel(channel, stop) {
+                eprintln!("Erro na capture de audio: {}", error)
+            }
+            clear_active_capture(&active_state, id);
+        })
+        .expect("falha ao criar thread audio-capture");
 
     Ok(id)
 }

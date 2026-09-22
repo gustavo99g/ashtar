@@ -241,39 +241,42 @@ fn spawn_frame_worker(
     stop: Arc<AtomicBool>,
     channel: Channel<InvokeResponseBody>,
 ) {
-    thread::spawn(move || {
-        let mut resizer = Resizer::new();
+    thread::Builder::new()
+        .name("video-frame-worker".into())
+        .spawn(move || {
+            let mut resizer = Resizer::new();
 
-        let mut frame_count = 0u32;
-        let mut last_fps_log = Instant::now();
+            let mut frame_count = 0u32;
+            let mut last_fps_log = Instant::now();
 
-        loop {
-            let Some(frame) = latest.take(&stop) else {
-                break;
-            };
+            loop {
+                let Some(frame) = latest.take(&stop) else {
+                    break;
+                };
 
-            let Some(payload) = process_frame(frame, &mut resizer) else {
-                continue;
-            };
+                let Some(payload) = process_frame(frame, &mut resizer) else {
+                    continue;
+                };
 
-            if channel.send(InvokeResponseBody::Raw(payload)).is_err() {
-                stop.store(true, Ordering::Relaxed);
-                latest.wake();
-                break;
+                if channel.send(InvokeResponseBody::Raw(payload)).is_err() {
+                    stop.store(true, Ordering::Relaxed);
+                    latest.wake();
+                    break;
+                }
+
+                frame_count += 1;
+
+                if last_fps_log.elapsed() >= Duration::from_secs(1) {
+                    println!("VIDEO IPC FPS: {}", frame_count);
+
+                    frame_count = 0;
+                    last_fps_log = Instant::now();
+                }
             }
 
-            frame_count += 1;
-
-            if last_fps_log.elapsed() >= Duration::from_secs(1) {
-                println!("VIDEO IPC FPS: {}", frame_count);
-
-                frame_count = 0;
-                last_fps_log = Instant::now();
-            }
-        }
-
-        println!("Frame worker encerrado.");
-    });
+            println!("Frame worker encerrado.");
+        })
+        .expect("falha ao criar thread video-frame-worker");
 }
 fn process_frame(frame: CapturedFrame, resizer: &mut Resizer) -> Option<Vec<u8>> {
     let (dst_width, dst_height) = target_resolution(frame.width, frame.height);

@@ -10,7 +10,7 @@ use std::{
 use livekit::webrtc::video_source::{native::NativeVideoSource, VideoResolution};
 use tauri::ipc::{Channel, InvokeResponseBody};
 
-use crate::screen_share::{
+use crate::legacy::screen_share::{
     test_capture_window,
     windows::{
         list_monitors, list_windows, stream_monitor_preview, stream_screen_share_video,
@@ -73,33 +73,36 @@ pub fn start_window_preview(
     let previews = Arc::clone(&state.previews);
     let key = format!("window:{source_id}");
 
-    std::thread::spawn(move || {
-        match crate::screen_share::windows::capture_window_snapshot(source_id) {
-            Ok(frame) => {
-                if let Err(error) = channel.send(frame) {
-                    eprintln!("Erro ao enviar snapshot inicial: {error}");
+    std::thread::Builder::new()
+        .name("window-preview".into())
+        .spawn(move || {
+            match crate::legacy::screen_share::windows::capture_window_snapshot(source_id) {
+                Ok(frame) => {
+                    if let Err(error) = channel.send(frame) {
+                        eprintln!("Erro ao enviar snapshot inicial: {error}");
 
-                    if let Ok(mut previews) = previews.lock() {
-                        previews.remove(&key);
+                        if let Ok(mut previews) = previews.lock() {
+                            previews.remove(&key);
+                        }
+
+                        return;
                     }
+                }
 
-                    return;
+                Err(error) => {
+                    eprintln!("Snapshot inicial indisponível para {source_id}: {error}");
                 }
             }
 
-            Err(error) => {
-                eprintln!("Snapshot inicial indisponível para {source_id}: {error}");
+            if let Err(error) = stream_window_preview(source_id, channel, Arc::clone(&stop)) {
+                eprintln!("Erro no preview da janela: {error}");
             }
-        }
 
-        if let Err(error) = stream_window_preview(source_id, channel, Arc::clone(&stop)) {
-            eprintln!("Erro no preview da janela: {error}");
-        }
-
-        if let Ok(mut previews) = previews.lock() {
-            previews.remove(&key);
-        }
-    });
+            if let Ok(mut previews) = previews.lock() {
+                previews.remove(&key);
+            }
+        })
+        .expect("falha ao criar thread window-preview");
     Ok(())
 }
 
@@ -116,15 +119,18 @@ pub fn start_monitor_preview(
     let previews = Arc::clone(&state.previews);
     let key = format!("monitor:{source_id}");
 
-    thread::spawn(move || {
-        if let Err(error) = stream_monitor_preview(source_id, channel, Arc::clone(&stop)) {
-            eprintln!("Erro no preview do monitor: {error}");
-        }
+    thread::Builder::new()
+        .name("monitor-preview".into())
+        .spawn(move || {
+            if let Err(error) = stream_monitor_preview(source_id, channel, Arc::clone(&stop)) {
+                eprintln!("Erro no preview do monitor: {error}");
+            }
 
-        if let Ok(mut previews) = previews.lock() {
-            previews.remove(&key);
-        }
-    });
+            if let Ok(mut previews) = previews.lock() {
+                previews.remove(&key);
+            }
+        })
+        .expect("falha ao criar thread monitor-preview");
 
     Ok(())
 }
@@ -163,17 +169,20 @@ pub fn start_screen_share_video(
 
     let state_stop = Arc::clone(&state.stop);
 
-    std::thread::spawn(move || {
-        let result = stream_screen_share_video(source, channel, stop);
+    std::thread::Builder::new()
+        .name("screen-share-video".into())
+        .spawn(move || {
+            let result = stream_screen_share_video(source, channel, stop);
 
-        if let Err(error) = result {
-            eprintln!("Erro no screen share: {error}");
-        }
+            if let Err(error) = result {
+                eprintln!("Erro no screen share: {error}");
+            }
 
-        if let Ok(mut active) = state_stop.lock() {
-            *active = None;
-        }
-    });
+            if let Ok(mut active) = state_stop.lock() {
+                *active = None;
+            }
+        })
+        .expect("falha ao criar thread screen-share-video");
 
     Ok(())
 }
@@ -226,7 +235,7 @@ pub fn list_screen_share_monitors() -> Result<Vec<MonitorSource>, String> {
 
 #[tauri::command]
 pub fn test_list_webrtc_windows() -> Result<(), String> {
-    crate::screen_share::list_webrtc_windows()
+    crate::legacy::screen_share::list_webrtc_windows()
 }
 
 #[tauri::command]
