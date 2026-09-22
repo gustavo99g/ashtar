@@ -13,6 +13,7 @@ use std::{
     time::{Duration, Instant},
 };
 use tauri::ipc::{Channel, InvokeResponseBody};
+use tracing::debug;
 use windows_capture::{
     capture::{Context, GraphicsCaptureApiHandler},
     frame::Frame,
@@ -205,7 +206,7 @@ impl GraphicsCaptureApiHandler for ScreenShareVideoCapture {
         self.frame_count += 1;
 
         if self.last_fps_log.elapsed() >= Duration::from_secs(1) {
-            println!("WGC FPS: {}", self.frame_count);
+            debug!(target: "perf", fps = self.frame_count, "WGC FPS");
 
             self.frame_count = 0;
             self.last_fps_log = Instant::now();
@@ -267,14 +268,14 @@ fn spawn_frame_worker(
                 frame_count += 1;
 
                 if last_fps_log.elapsed() >= Duration::from_secs(1) {
-                    println!("VIDEO IPC FPS: {}", frame_count);
+                    debug!(target: "perf", fps = frame_count, "VIDEO IPC FPS");
 
                     frame_count = 0;
                     last_fps_log = Instant::now();
                 }
             }
 
-            println!("Frame worker encerrado.");
+            tracing::info!("frame worker encerrado");
         })
         .expect("falha ao criar thread video-frame-worker");
 }
@@ -331,68 +332,6 @@ fn target_resolution(width: u32, height: u32) -> (u32, u32) {
 
     (new_width.max(2), new_height.max(2))
 }
-
-// fn process_frame_to_jpeg(frame: CapturedFrame) -> Option<Vec<u8>> {
-//     let start = Instant::now();
-
-//     let src_width = frame.width as usize;
-//     let src_height = frame.height as usize;
-
-//     const MAX_WIDTH: usize = 1280;
-//     const MAX_HEIGHT: usize = 720;
-
-//     let scale_x = MAX_WIDTH as f32 / src_width as f32;
-//     let scale_y = MAX_HEIGHT as f32 / src_height as f32;
-//     let scale = scale_x.min(scale_y);
-
-//     let dst_width = ((src_width as f32 * scale).round() as usize).max(1);
-//     let dst_height = ((src_height as f32 * scale).round() as usize).max(1);
-
-//     let resize_start = Instant::now();
-
-//     let mut rgb = Vec::with_capacity(dst_width * dst_height * 3);
-
-//     for y in 0..dst_height {
-//         let src_y = y * src_height / dst_height;
-//         let src_row = src_y * src_width * 4;
-
-//         for x in 0..dst_width {
-//             let src_x = x * src_width / dst_width;
-//             let src_index = src_row + src_x * 4;
-
-//             rgb.extend_from_slice(&[
-//                 frame.data[src_index],
-//                 frame.data[src_index + 1],
-//                 frame.data[src_index + 2],
-//             ]);
-//         }
-//     }
-
-//     let resize_time = resize_start.elapsed();
-
-//     let jpeg_start = Instant::now();
-
-//     let image = image::RgbImage::from_raw(dst_width as u32, dst_height as u32, rgb)?;
-
-//     let mut jpeg = Vec::with_capacity(64 * 1024);
-
-//     {
-//         let mut encoder = JpegEncoder::new_with_quality(&mut jpeg, 90);
-
-//         encoder.encode_image(&DynamicImage::ImageRgb8(image)).ok()?;
-//     }
-
-//     let jpeg_time = jpeg_start.elapsed();
-
-//     println!(
-//         "PROCESS resize={:?} jpeg={:?} total={:?}",
-//         resize_time,
-//         jpeg_time,
-//         start.elapsed()
-//     );
-
-//     Some(jpeg)
-// }
 
 pub fn stream_screen_share_video(
     source: ScreenShareVideoSource,

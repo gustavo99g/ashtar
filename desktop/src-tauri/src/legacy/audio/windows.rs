@@ -8,6 +8,7 @@ use std::{
     time::Duration,
 };
 use tauri::ipc::Channel;
+use tracing::{debug, info, trace};
 use wasapi::{
     initialize_mta, AudioCaptureClient, AudioClient, DeviceEnumerator, Direction, SampleType,
     StreamMode, WaveFormat,
@@ -25,11 +26,14 @@ impl WindowsSystemAudioCapture {
         initialize_mta();
         let (process_id, include_tree) = match mode {
             ScreenShareAudioMode::System(process_id) => {
-                println!("Captura: sistema exceto processo {process_id}");
+                info!(
+                    process_id,
+                    "captura de áudio iniciada: sistema, exceto o processo"
+                );
                 (process_id, false)
             }
             ScreenShareAudioMode::Application(process_id) => {
-                println!("Captura: processo {process_id}");
+                info!(process_id, "captura de áudio iniciada: aplicação");
                 (process_id, true)
             }
         };
@@ -38,9 +42,12 @@ impl WindowsSystemAudioCapture {
 
         let format = WaveFormat::new(32, 32, &SampleType::Float, 48_000, 2, None);
 
-        println!("Sample rate: {}", format.get_samplespersec());
-        println!("Channels: {}", format.get_nchannels());
-        println!("Bits: {}", format.get_bitspersample());
+        debug!(
+            sample_rate = format.get_samplespersec(),
+            channels = format.get_nchannels(),
+            bits = format.get_bitspersample(),
+            "formato do stream de áudio"
+        );
 
         client.initialize_client(
             &format,
@@ -95,19 +102,20 @@ impl WindowsSystemAudioCapture {
 
             buffer.truncate(bytes_read);
 
-            // println!(
-            //     "Enviando {} frames / {} bytes / silent={}",
-            //     frames_read,
-            //     buffer.len(),
-            //     buffer_info.flags.silent
-            // );
+            trace!(
+                frames = frames_read,
+                bytes = buffer.len(),
+                silent = buffer_info.flags.silent,
+                "pacote de áudio capturado"
+            );
+
             if channel.send(buffer).is_err() {
                 break;
             }
         }
         self.client.stop_stream()?;
 
-        println!("Captura de áudio encerrada.");
+        info!("captura de áudio encerrada");
 
         Ok(())
     }

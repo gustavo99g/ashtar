@@ -46,8 +46,14 @@ Cada item deve ser resolvido ou conscientemente adiado (marcar como tal) antes d
       de bytes crus (`InvokeResponseBody::Raw`), com custo de serialização desnecessário.
 - [ ] Erros de comando são `String` livre; frontend não consegue diferenciar casos (ex. "fonte fechada")
       sem comparar texto de mensagem.
-- [ ] Logging via `println!`/`eprintln!` espalhado pelo código, incluindo os relatórios de profiling
+- [x] Logging via `println!`/`eprintln!` espalhado pelo código, incluindo os relatórios de profiling
       (`StageTimings` e estatísticas por segundo) — sem nível, sem filtro, sempre ligados.
+      **Resolvido:** `tracing` inicializado em `main.rs` (`EnvFilter` + hook de panic nomeando a
+      thread). Todo `println!`/`eprintln!` do legado convertido: erros que interrompem algo →
+      `error!`, problemas recuperáveis → `warn!`, eventos de ciclo de vida → `info!`, estatísticas
+      por segundo → `debug!(target: "perf", ...)` com campos estruturados (filtrar só métricas com
+      `RUST_LOG=info,perf=debug`). `pack_bgra` (morto) e o `process_frame_to_jpeg` comentado foram
+      removidos junto.
 - [ ] Sem backpressure entre captura e sink de IPC: nada impede o produtor de acumular frames em trânsito
       caso o consumidor (React/worklet) fique para trás.
 

@@ -7,6 +7,7 @@ use std::{
 };
 
 use tauri::ipc::Channel;
+use tracing::error;
 
 use crate::legacy::audio::{windows::WindowsSystemAudioCapture, ScreenShareAudioMode};
 
@@ -70,14 +71,14 @@ pub fn start_screen_share_audio(
             let capture = match WindowsSystemAudioCapture::new(mode) {
                 Ok(capture) => capture,
                 Err(e) => {
-                    eprintln!("Erro ao criar captura de audio: {}", e);
+                    error!(capture_id = id, error = %e, "falha ao criar captura de áudio");
                     clear_active_capture(&active_state, id);
                     return;
                 }
             };
 
             if let Err(error) = capture.stream_to_channel(channel, stop) {
-                eprintln!("Erro na capture de audio: {}", error)
+                error!(capture_id = id, %error, "captura de áudio encerrada com erro");
             }
             clear_active_capture(&active_state, id);
         })

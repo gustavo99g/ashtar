@@ -9,6 +9,7 @@ use std::{
 
 use livekit::webrtc::video_source::{native::NativeVideoSource, VideoResolution};
 use tauri::ipc::{Channel, InvokeResponseBody};
+use tracing::{error, warn};
 
 use crate::legacy::screen_share::{
     test_capture_window,
@@ -79,7 +80,7 @@ pub fn start_window_preview(
             match crate::legacy::screen_share::windows::capture_window_snapshot(source_id) {
                 Ok(frame) => {
                     if let Err(error) = channel.send(frame) {
-                        eprintln!("Erro ao enviar snapshot inicial: {error}");
+                        error!(source_id, %error, "erro ao enviar snapshot inicial do preview");
 
                         if let Ok(mut previews) = previews.lock() {
                             previews.remove(&key);
@@ -90,12 +91,12 @@ pub fn start_window_preview(
                 }
 
                 Err(error) => {
-                    eprintln!("Snapshot inicial indisponível para {source_id}: {error}");
+                    warn!(source_id, %error, "snapshot inicial indisponível para preview de janela");
                 }
             }
 
             if let Err(error) = stream_window_preview(source_id, channel, Arc::clone(&stop)) {
-                eprintln!("Erro no preview da janela: {error}");
+                warn!(source_id, %error, "preview da janela encerrado com erro");
             }
 
             if let Ok(mut previews) = previews.lock() {
@@ -123,7 +124,7 @@ pub fn start_monitor_preview(
         .name("monitor-preview".into())
         .spawn(move || {
             if let Err(error) = stream_monitor_preview(source_id, channel, Arc::clone(&stop)) {
-                eprintln!("Erro no preview do monitor: {error}");
+                warn!(source_id, %error, "preview do monitor encerrado com erro");
             }
 
             if let Ok(mut previews) = previews.lock() {
@@ -175,7 +176,7 @@ pub fn start_screen_share_video(
             let result = stream_screen_share_video(source, channel, stop);
 
             if let Err(error) = result {
-                eprintln!("Erro no screen share: {error}");
+                error!(source_id, %error, "screen share (WGC) encerrado com erro");
             }
 
             if let Ok(mut active) = state_stop.lock() {
@@ -264,7 +265,7 @@ pub fn test_livekit_window_capture(
         let result = test_capture_window(source_id, channel, control);
 
         if let Err(error) = result {
-            eprintln!("Captura {capture_id} encerrada: {error}");
+            error!(capture_id, %error, "captura de vídeo (DesktopCapturer) encerrada com erro");
         }
     });
 

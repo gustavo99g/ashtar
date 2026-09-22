@@ -8,6 +8,7 @@ use livekit::webrtc::{
     video_source::{native::NativeVideoSource, VideoResolution},
 };
 use tauri::ipc::{Channel, InvokeResponseBody};
+use tracing::{debug, info, warn};
 
 use std::{
     sync::{
@@ -70,15 +71,16 @@ impl StageTimings {
         }
         let n = self.count as f64;
         let avg_frame_ms = self.frame_total.as_secs_f64() * 1000.0 / n;
-        println!(
-            "PIPELINE | n={} | resize={:.2}ms | i420={:.2}ms | pack={:.2}ms | send={:.2}ms | TOTAL/frame={:.2}ms | fps_max={:.1}",
-            self.count,
-            self.resize_total.as_secs_f64() * 1000.0 / n,
-            self.i420_total.as_secs_f64() * 1000.0 / n,
-            self.pack_total.as_secs_f64() * 1000.0 / n,
-            self.send_total.as_secs_f64() * 1000.0 / n,
-            avg_frame_ms,
-            1000.0 / avg_frame_ms,
+        debug!(
+            target: "perf",
+            n = self.count,
+            resize_ms = self.resize_total.as_secs_f64() * 1000.0 / n,
+            i420_ms = self.i420_total.as_secs_f64() * 1000.0 / n,
+            pack_ms = self.pack_total.as_secs_f64() * 1000.0 / n,
+            send_ms = self.send_total.as_secs_f64() * 1000.0 / n,
+            total_ms = avg_frame_ms,
+            fps_max = 1000.0 / avg_frame_ms,
+            "pipeline stats"
         );
         *self = StageTimings::new();
     }
@@ -143,7 +145,7 @@ pub fn test_capture_window(
             let (bgra, w, h) = match resize_bgra(&frame, &mut resizer, TARGET_WIDTH) {
                 Ok(r) => r,
                 Err(e) => {
-                    eprintln!("resize falhou: {e}");
+                    warn!(error = %e, "resize do frame capturado falhou, frame descartado");
                     in_flight.fetch_sub(1, Ordering::AcqRel);
                     return;
                 }
@@ -192,7 +194,7 @@ pub fn test_capture_window(
         }
 
         Err(error) => {
-            eprintln!("DesktopCapturer erro: {:?}", error);
+            warn!(?error, "DesktopCapturer retornou erro para o frame");
         }
     });
 
@@ -222,7 +224,7 @@ pub fn test_capture_window(
                 if capture_calls > 0 {
                     let avg = capture_total.as_secs_f64() * 1000.0 / capture_calls as f64;
 
-                    println!("CAPTURE CALL | calls={} | avg={:.2} ms", capture_calls, avg);
+                    debug!(target: "perf", calls = capture_calls, avg_ms = avg, "capture_frame() calls");
                 }
 
                 capture_calls = 0;
@@ -239,15 +241,13 @@ pub fn test_capture_window(
             let current_sent = control.sent.load(Ordering::Relaxed);
             let current_in_flight = control.in_flight.load(Ordering::Relaxed);
 
-            println!(
-                "CAPTURE STATS | captured={} ({}/s) | dropped={} ({}/s) | sent={} ({}/s) | in_flight={}",
-                current_captured,
-                current_captured - last_captured,
-                current_dropped,
-                current_dropped - last_dropped,
-                current_sent,
-                current_sent - last_sent,
-                current_in_flight,
+            debug!(
+                target: "perf",
+                captured = current_captured - last_captured,
+                dropped = current_dropped - last_dropped,
+                sent = current_sent - last_sent,
+                in_flight = current_in_flight,
+                "capture stats"
             );
 
             last_captured = current_captured;
@@ -267,27 +267,6 @@ pub fn test_capture_window(
     }
 
     Ok(())
-}
-
-fn pack_bgra(frame: &DesktopFrame, width: u32, height: u32, capture_timestamp: u64) -> Vec<u8> {
-    let width = frame.width() as u32;
-    let height = frame.height() as u32;
-    let bgra = frame.data();
-
-    let mut payload = Vec::with_capacity(16 + bgra.len());
-
-    // 0..4   width
-    // 4..8   height
-    // 8..16  timestamp
-    // 16..   BGRA
-
-    payload.extend_from_slice(&width.to_le_bytes());
-    payload.extend_from_slice(&height.to_le_bytes());
-    payload.extend_from_slice(&capture_timestamp.to_le_bytes());
-    payload.extend_from_slice(&0u64.to_le_bytes());
-    payload.extend_from_slice(bgra);
-
-    payload
 }
 
 fn resize_bgra(
@@ -406,15 +385,17 @@ pub fn list_webrtc_windows() -> Result<(), String> {
 
     let sources = capturer.get_source_list();
 
-    println!("=== LiveKit DesktopCapturer ===");
-    println!("Fontes encontradas: {}", sources.len());
+    info!(
+        count = sources.len(),
+        "fontes encontradas no DesktopCapturer"
+    );
 
     for source in sources {
-        println!(
-            "id={} | title={:?} | display_id={}",
-            source.id(),
-            source.title(),
-            source.display_id(),
+        info!(
+            id = source.id(),
+            title = ?source.title(),
+            display_id = source.display_id(),
+            "fonte do DesktopCapturer"
         );
     }
 
