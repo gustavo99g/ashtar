@@ -19,7 +19,8 @@ export type AppErrorKind =
 	| "AlreadySharing"
 	| "VideoCapture"
 	| "AudioCapture"
-	| "Internal";
+	| "Internal"
+	| "Unsupported";
 
 export interface AppError {
 	kind: AppErrorKind;

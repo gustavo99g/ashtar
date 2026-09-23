@@ -12,6 +12,8 @@ pub enum AppError {
     AudioCapture(String),
     #[error("erro interno: {0}")]
     Internal(String),
+    #[error("recurso não suportado nesta plataforma: {0}")]
+    Unsupported(&'static str),
 }
 
 impl AppError {
@@ -22,6 +24,7 @@ impl AppError {
             Self::VideoCapture(_) => "VideoCapture",
             Self::AudioCapture(_) => "AudioCapture",
             Self::Internal(_) => "Internal",
+            Self::Unsupported(_) => "Unsupported",
         }
     }
 }
