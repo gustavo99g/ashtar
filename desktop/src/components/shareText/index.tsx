@@ -1,9 +1,14 @@
-import { Channel, invoke } from "@tauri-apps/api/core";
+import { Channel } from "@tauri-apps/api/core";
 import { useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
-import type { ScreenShareSelection } from "@/lib/tauri/screen-share";
-import { ScreenSharePicker } from "../voice/screenSharePicker";
+import {
+	ackLivekitWindowCapture,
+	startLivekitWindowCapture,
+	stopLivekitWindowCapture,
+} from "@/lib/tauri/commands";
+import type { ScreenShareSelection } from "@/lib/tauri/commands";
+import ScreenSharePicker from "../voice/screenSharePicker";
 
 export function ScreenShareVideoTest() {
 	const [pickerOpen, setPickerOpen] = useState(false);
@@ -61,10 +66,7 @@ export function ScreenShareVideoTest() {
 			});
 		};
 
-		const captureId = await invoke<number>("test_livekit_window_capture", {
-			sourceId: source.id,
-			channel,
-		});
+		const captureId = await startLivekitWindowCapture(source.id, channel);
 
 		captureIdRef.current = captureId;
 		setCapturing(true);
@@ -140,9 +142,7 @@ export function ScreenShareVideoTest() {
 			video?.requestVideoFrameCallback(() => {
 				displayedFramesRef.current++;
 				if (captureId !== null) {
-					void invoke("ack_livekit_window_capture", {
-						captureId,
-					});
+					void ackLivekitWindowCapture(captureId);
 				}
 			});
 
@@ -177,9 +177,7 @@ export function ScreenShareVideoTest() {
 
 		captureIdRef.current = null;
 
-		await invoke("stop_livekit_window_capture", {
-			captureId,
-		});
+		await stopLivekitWindowCapture(captureId);
 
 		const writer = writerRef.current;
 

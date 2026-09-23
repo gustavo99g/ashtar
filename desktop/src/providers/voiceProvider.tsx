@@ -1,5 +1,5 @@
 import { RoomAudioRenderer } from "@livekit/components-react";
-import { Channel, invoke } from "@tauri-apps/api/core";
+import { Channel } from "@tauri-apps/api/core";
 import { type Participant, Room, RoomEvent, Track } from "livekit-client";
 import {
 	createContext,
@@ -9,6 +9,11 @@ import {
 	useState,
 } from "react";
 import { ScreenShareAudio } from "@/lib/audio";
+import {
+	ackLivekitWindowCapture,
+	startLivekitWindowCapture,
+	stopLivekitWindowCapture,
+} from "@/lib/tauri/commands";
 import { useNavigationStore } from "@/stores/navigation";
 
 export type VoiceConnectionState =
@@ -74,9 +79,9 @@ const VoiceProvider = ({ children }: VoiceProviderProps) => {
 	});
 
 	/**
-	 * A captura pode começar a enviar frames antes de o invoke()
-	 * devolver o captureId. Mantemos a Promise para conseguir dar
-	 * ACK nesses frames também.
+	 * A captura pode começar a enviar frames antes de a chamada
+	 * ao Rust devolver o captureId. Mantemos a Promise para
+	 * conseguir dar ACK nesses frames também.
 	 */
 	const screenShareCapturePromiseRef = useRef<Promise<number> | null>(null);
 
@@ -221,8 +226,9 @@ const VoiceProvider = ({ children }: VoiceProviderProps) => {
 
 		try {
 			/**
-			 * Pode chegar um frame antes de invoke() devolver o captureId.
-			 * Esperamos a Promise nesse caso para conseguir enviar o ACK.
+			 * Pode chegar um frame antes da chamada ao Rust devolver o
+			 * captureId. Esperamos a Promise nesse caso para conseguir
+			 * enviar o ACK.
 			 */
 			if (captureId === null && screenShareCapturePromiseRef.current) {
 				try {
@@ -307,9 +313,7 @@ const VoiceProvider = ({ children }: VoiceProviderProps) => {
 			console.error("Erro ao processar frame do compartilhamento:", error);
 		} finally {
 			if (captureId !== null) {
-				void invoke("ack_livekit_window_capture", {
-					captureId,
-				});
+				void ackLivekitWindowCapture(captureId);
 			}
 		}
 	}
@@ -435,12 +439,9 @@ const VoiceProvider = ({ children }: VoiceProviderProps) => {
 			 * ==========================================
 			 *
 			 * Guardamos a Promise porque o Rust pode começar
-			 * a enviar frames antes do invoke() retornar.
+			 * a enviar frames antes dessa chamada retornar.
 			 */
-			const capturePromise = invoke<number>("test_livekit_window_capture", {
-				sourceId,
-				channel,
-			});
+			const capturePromise = startLivekitWindowCapture(sourceId, channel);
 
 			screenShareCapturePromiseRef.current = capturePromise;
 
@@ -504,7 +505,7 @@ const VoiceProvider = ({ children }: VoiceProviderProps) => {
 			let captureId = screenShareCaptureIdRef.current;
 
 			/**
-			 * Se ainda estamos esperando o invoke(), aguardamos
+			 * Se ainda estamos esperando a chamada ao Rust, aguardamos
 			 * para descobrir o captureId antes de tentar parar.
 			 */
 			if (captureId === null && screenShareCapturePromiseRef.current) {
@@ -516,9 +517,7 @@ const VoiceProvider = ({ children }: VoiceProviderProps) => {
 			}
 
 			if (captureId !== null) {
-				await invoke("stop_livekit_window_capture", {
-					captureId,
-				});
+				await stopLivekitWindowCapture(captureId);
 			}
 
 			/**

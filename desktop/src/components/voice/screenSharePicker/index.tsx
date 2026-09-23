@@ -1,32 +1,25 @@
-import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
 	listScreenShareMonitors,
 	listScreenShareWindows,
 	type MonitorSource,
+	type ScreenShareSelection,
 	startMonitorPreview,
 	startWindowPreview,
 	stopAllScreenSharePreviews,
+	testListWebrtcWindows,
 	type WindowPreviewFrame,
 	type WindowSource,
-} from "@/lib/tauri/screen-share";
+} from "@/lib/tauri/commands";
+
+export type { ScreenShareSelection } from "@/lib/tauri/commands";
 
 type ScreenSharePickerProps = {
 	open: boolean;
 	onClose: () => void;
 	onConfirm: (selection: ScreenShareSelection) => void;
 };
-
-export type ScreenShareSelection =
-	| {
-			type: "window";
-			source: WindowSource;
-	  }
-	| {
-			type: "monitor";
-			source: MonitorSource;
-	  };
 
 type PreviewMap = Record<string, string>;
 
@@ -86,7 +79,7 @@ const ScreenSharePicker = ({
 		let cancelled = false;
 
 		async function load() {
-			await invoke("test_list_webrtc_windows");
+			await testListWebrtcWindows();
 
 			try {
 				const [nextWindows, nextMonitors] = await Promise.all([

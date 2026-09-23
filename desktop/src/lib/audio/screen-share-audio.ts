@@ -2,7 +2,7 @@ import {
 	type ScreenShareAudioOptions,
 	startScreenShareAudio,
 	stopScreenShareAudio,
-} from "@/lib/tauri/audio";
+} from "@/lib/tauri/commands";
 import workletUrl from "./screen-share-audio.worklet.js?url";
 
 export class ScreenShareAudio {
