@@ -18,6 +18,16 @@ export default defineConfig(async () => ({
 	//
 	// 1. prevent Vite from obscuring rust errors
 	clearScreen: false,
+
+	// O scanner de optimizeDeps varre o projeto atrás de HTML pra achar
+	// dependências, e isso não é afetado por `server.watch.ignored` (abaixo).
+	// Sem restringir as entradas, ele acaba entrando em
+	// `src-tauri/target/doc` (milhares de .html gerados pelo `cargo doc`)
+	// e estoura o limite de arquivos abertos do SO (EMFILE).
+	optimizeDeps: {
+		entries: ["index.html"],
+	},
+
 	// 2. tauri expects a fixed port, fail if that port is not available
 	server: {
 		port: 1420,

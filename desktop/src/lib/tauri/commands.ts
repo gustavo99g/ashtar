@@ -8,7 +8,7 @@
  * `call()` normaliza isso para o mesmo formato de `AppError` que os
  * comandos novos (Etapa 2.2 do PLAN.md) já devolvem.
  */
-import { Channel, invoke, type InvokeArgs } from "@tauri-apps/api/core";
+import { Channel, type InvokeArgs, invoke } from "@tauri-apps/api/core";
 
 // ---------------------------------------------------------------------------
 // Erro
