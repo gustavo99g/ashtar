@@ -985,6 +985,7 @@ dependencies = [
  "tracing-subscriber",
  "wasapi",
  "windows-capture",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

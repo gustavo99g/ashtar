@@ -6,3 +6,5 @@
 
 pub mod audio_capture;
 pub mod sources;
+
+pub use sources::{monitor_details, window_details};
