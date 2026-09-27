@@ -14,6 +14,11 @@ export default defineConfig(async () => ({
 		},
 	},
 
+	// O .env fica na raiz do monorepo (compartilhado com a api/), não em
+	// desktop/. Só variáveis com prefixo VITE_ chegam ao código do
+	// browser; o resto (segredos da api/) não aparece pro webview.
+	envDir: path.resolve(__dirname, ".."),
+
 	// Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
 	//
 	// 1. prevent Vite from obscuring rust errors
