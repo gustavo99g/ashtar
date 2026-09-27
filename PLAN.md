@@ -1,256 +1,319 @@
 # Plano — Marco 0: reorganização e correções do protótipo de screen share
 
-Este plano cobre as etapas 1 a 4 da ordem combinada: preparar o projeto, definir o contrato e mover o
-caminho atual (IPC) para trás dele, já com as correções das revisões. O publicador em Rust e a medição
-ficam para o plano seguinte, que vai se encaixar na estrutura criada aqui.
+Este plano cobre a reorganização do protótipo e as correções das revisões, **antes** do publicador nativo
+em Rust. O publicador e a medição comparativa ficam para o plano seguinte, que vai se encaixar na
+estrutura criada aqui.
 
 **Objetivo desta fase:** o app faz exatamente o que faz hoje, mas organizado, sem os vazamentos e bugs
-que encontramos, e pronto para receber uma segunda implementação de compartilhamento sem mexer no resto.
+encontrados, e pronto para receber uma segunda implementação de compartilhamento sem mexer no resto.
 
-**Fora do escopo:** publicador nativo, mudanças no backend, miniaturas no seletor de fontes e qualquer
-funcionalidade nova de voz.
+**Fora do escopo:** publicador nativo, mudanças no backend, miniaturas no seletor de fontes, qualquer
+funcionalidade nova de voz, e suporte a Linux e web (ver decisão 14 para os cuidados já adotados).
 
-## Decisões tomadas nesta fase
+## Progresso
 
-1. **Pipeline de vídeo único:** consolidar em `DesktopCapturer` (LiveKit). O caminho `windows_capture`/WGC
-   (`ScreenShareVideoCapture`, `WindowPreviewCapture`) e os comandos `test_*`/`StageTimings` são removidos.
-   Evita manter dois caminhos de captura redundantes e já deixa a base pronta para o publicador nativo do
-   próximo plano.
+| Etapa | Descrição | Status |
+|---|---|---|
+| 1 | Preparação | Concluída |
+| 2 | Esqueleto do Rust | Concluída |
+| 3 | Captura desacoplada do destino | Em andamento (passos 0 a 3 concluídos) |
+| 4 | Contrato entre Rust e React | Pendente |
+| 5 | Frontend | Pendente |
+| 6 | Verificação | Pendente |
 
-   **Por que o teste favoreceu o `DesktopCapturer`:** não foi uma limitação do WGC em si, foi um pipeline
-   contra outro. O caminho WGC lia `frame.buffer()` (cópia GPU→memória, a etapa cara) em toda chegada de
-   frame na taxa do monitor, fazia duas cópias em resolução cheia por frame — inclusive dos descartados —
-   e mandava RGBA pelo IPC (~3.7 MB/frame a 720p). O caminho `DesktopCapturer` só lê sob demanda via
-   `capture_frame` (chamado apenas quando há espaço no `in_flight`) e manda I420 (~1.4 MB/frame), menos
-   de metade do payload, sendo o IPC o gargalo desse caminho. Isso está registrado no `NOTES.md`: se o
-   `DesktopCapturer` falhar no teste de correção abaixo, um WGC ajustado (leitura só dos frames aceitos,
-   envio em I420) volta a ser uma opção real — não foi descartado por ser pior tecnicamente.
+---
 
-   **Teste de correção obrigatório antes de construir o publicador em cima do `DesktopCapturer`** (o maior
-   risco aqui é correção, não desempenho — se usar GDI internamente para janelas, jogos DirectX e janelas
-   aceleradas por hardware podem sair pretos ou congelados):
-   1. Compartilhar um jogo em modo janela e, se possível, em tela cheia sem borda.
-   2. Compartilhar uma janela do Chrome ou de um app Electron com vídeo rodando.
-   3. Compartilhar uma janela parada (bloco de notas) por um minuto e checar se as estatísticas de captura
-      continuam mostrando frames por segundo. Se não mostrarem, implementar reenvio do último frame para
-      quem começa a assistir não ver preto.
+## Decisões
 
-   Só considerar a decisão 1 confirmada de vez depois que os três passarem.
-2. **`list_capture_sources` roda a enumeração (FFI síncrona: `EnumWindows`, `EnumDisplayMonitors`,
-   extração de ícone via GDI) dentro de `tauri::async_runtime::spawn_blocking`**, mesmo sendo um comando
-   `async fn`, para não bloquear o runtime.
-3. **Modo de áudio `System` não recebe mais `process_id` do frontend.** Usa `std::process::id()`
-   internamente para excluir o próprio processo do app. `AudioMode` no contrato vira
-   `Off | Application(u32) | System` (sem payload em `System`).
-4. **`AppError` serializa `kind` via match explícito**, não via `Debug` + `split('(')`:
-   ```rust
-   fn kind(&self) -> &'static str {
-       match self {
-           Self::SourceNotFound(_) => "SourceNotFound",
-           Self::AlreadySharing => "AlreadySharing",
-           Self::VideoCapture(_) => "VideoCapture",
-           Self::AudioCapture(_) => "AudioCapture",
-       }
-   }
-   ```
-5. **`CaptureHandle::stop_and_join` só pode ser chamado de dentro de `spawn_blocking`.** Documentado com
-   `///` no próprio método; `session.rs` sempre chama assim, nunca direto de uma `async fn`.
-6. **Início de sessão é atômico e bloqueante do ponto de vista do comando:** `ipc_screen_share_start`
-   aguarda os oneshots de inicialização de vídeo e (se ligado) áudio antes de responder. Se um falhar,
-   o que já subiu é parado com `stop_and_join` e o erro é retornado — o JavaScript nunca vê uma sessão
-   pela metade.
-7. **Falha de áudio não derruba o vídeo.** Só o `on_end` da captura de vídeo encerra a sessão e emite
-   `screen-share-ended`. Se a captura de áudio cair sozinha, o handle de áudio é descartado e um aviso é
-   logado/emitido separadamente, mas o vídeo continua.
-8. **Ícone da janela (`get_window_icon`) permanece em `media/sources.rs`.** É dado estático de
-   identificação da fonte, não miniatura de conteúdo ao vivo — miniaturas seguem fora do escopo.
+### 1. Pipeline de vídeo único com `DesktopCapturer` — confirmada
 
-## Etapa 1: preparação
+O caminho `windows_capture`/WGC (`ScreenShareVideoCapture`, `WindowPreviewCapture`) e os comandos
+`test_*`/`StageTimings` são removidos quando o código legado sair (Etapas 4 e 5).
 
-1. Commit, tag `prototipo-v0`, push e branch `marco-0`.
-2. `NOTES.md` na raiz com uma linha por problema conhecido do protótipo (ver arquivo) — lista de
-   verificação da Etapa 6.
+**Teste de correção: passou.**
+- Janela do Chrome com vídeo: capturada normalmente.
+- Janela parada (bloco de notas): os frames continuam chegando (~43 fps no caminho IPC, em dev). O
+  `DesktopCapturer` funciona por demanda e devolve a imagem atual a cada `capture_frame`, então o
+  espectador que entra durante uma tela parada não fica no preto. O reenvio do último frame vira
+  proteção opcional, não obrigatória.
+- Jogo: capturado corretamente. O fps caiu para ~18–20 (quedas até 10), em dev. **Investigação de
+  desempenho pendente**, a ser feita com o profiling por etapa (target `perf`), em build de release.
 
-## Etapa 2: esqueleto do Rust
+**Conteúdo com DRM** (HBO, Netflix etc.) aparece preto por proteção do próprio Windows, em qualquer
+método de captura. Não é bug e não deve ser contornado. Melhoria futura: avisar quem compartilha quando
+a captura entregar frames totalmente pretos por alguns segundos.
 
-**2.1 Estrutura de módulos** (arquivos já criados, vazios, em `desktop/src-tauri/src/`):
+**Por que o teste inicial favoreceu o `DesktopCapturer`:** não foi uma limitação do WGC em si, e sim um
+pipeline contra outro. O caminho WGC lia `frame.buffer()` (cópia GPU→memória) em toda chegada de frame
+na taxa do monitor, fazia duas cópias em resolução cheia por frame (inclusive dos descartados) e mandava
+RGBA pelo IPC (~3,7 MB/frame a 720p, contra ~1,4 MB em I420). Se o `DesktopCapturer` um dia falhar, um
+WGC ajustado (leitura só dos frames aceitos, envio em I420) volta a ser opção real.
 
-```
-src-tauri/src/
-├── main.rs
-├── error.rs
-├── commands/
-│   ├── mod.rs
-│   └── screen_share.rs
-└── media/
-    ├── mod.rs            # tipos compartilhados: CapturedFrame, sinks, CaptureHandle
-    ├── sources.rs        # listagem de janelas e monitores
-    ├── video_capture.rs
-    ├── audio_capture.rs
-    ├── session.rs        # ScreenShareManager
-    └── ipc_sink.rs       # caminho IPC, temporário
-```
+### 2. Listagem de fontes vem do `DesktopCapturer`
 
-**2.2 Tipo de erro único.** Todos os comandos retornam `Result<T, AppError>`, serializado com campo
-`kind` (ver decisão 4):
+O `DesktopCapturer` é a fonte da verdade de **quais fontes existem e quais são seus ids**. A plataforma
+só complementa cada item (PID, ícone, geometria do monitor). Com isso, toda fonte listada é capturável,
+e a listagem em si é código compartilhado (o `DesktopCapturer` também existe no Linux). `EnumWindows`
+sai do projeto.
+
+Ids de monitor: o libwebrtc identifica telas pelo índice do `EnumDisplayDevicesW`, não pelo `HMONITOR`.
+O mapeamento é feito pelo nome do dispositivo (`\\.\DISPLAY1`).
+
+`list_capture_sources` bloqueia (enumeração e extração de ícones) e é chamada dentro de
+`tauri::async_runtime::spawn_blocking`.
+
+### 3. `AudioMode`
+
+Mora em `media/audio.rs` (compartilhado). O modo `System` não recebe PID do frontend: usa
+`std::process::id()` para excluir o próprio app. Formato com tag, fácil de tipar no TypeScript:
 
 ```rust
-#[derive(Debug, thiserror::Error)]
-pub enum AppError {
-    #[error("fonte de captura não encontrada: {0}")]
-    SourceNotFound(u64),
-    #[error("já existe um compartilhamento ativo")]
-    AlreadySharing,
-    #[error("falha na captura de vídeo: {0}")]
-    VideoCapture(String),
-    #[error("falha na captura de áudio: {0}")]
-    AudioCapture(String),
-}
-
-impl serde::Serialize for AppError {
-    fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
-        use serde::ser::SerializeStruct;
-        let mut st = s.serialize_struct("AppError", 2)?;
-        st.serialize_field("kind", self.kind())?;
-        st.serialize_field("message", &self.to_string())?;
-        st.end()
-    }
+#[derive(Deserialize)]
+#[serde(tag = "mode", rename_all = "camelCase", rename_all_fields = "camelCase")]
+pub enum AudioMode {
+    Off,
+    Application { process_id: u32 },
+    System,
 }
 ```
 
-**2.3 Logs com `tracing`.** Inicializar `tracing-subscriber` com `EnvFilter` em `main.rs`; trocar todos
-os `println!`/`eprintln!`. Relatórios de profiling (`StageTimings`, estatísticas por segundo) viram
-`tracing::debug!`, ligados com `RUST_LOG=seu_app=debug`.
+JSON: `{ "mode": "off" }`, `{ "mode": "application", "processId": 123 }`, `{ "mode": "system" }`.
 
-**2.4 Sobre `tauri-specta`.** Adiado: o caminho IPC usa `Channel<InvokeResponseBody>` e não há certeza de
-que o specta gera tipos para ele. Como esse caminho é temporário, criar um único arquivo
-`src/lib/tauri/commands.ts` com wrappers tipados à mão para cada comando e evento. Nenhum outro arquivo
-do frontend chama `invoke` diretamente. Quando o caminho IPC for removido, trocar esse arquivo pelos
-bindings gerados é trivial.
+### 4. `AppError`
 
-**Critério de pronto:** o projeto compila com a estrutura nova, sem `println!` no código, e o app ainda
-funciona chamando os comandos antigos.
+Variantes: `SourceNotFound(u64)`, `AlreadySharing`, `VideoCapture(String)`, `AudioCapture(String)`,
+`Internal(String)` e `Unsupported(&'static str)`. Serializado como `{ kind, message }`, com o `kind`
+vindo de um `match` explícito (sem `_`, para o compilador obrigar a tratar variantes novas).
 
-## Etapa 3: captura desacoplada do destino
+### 5. Threads de captura: `spawn_capture`
 
-Etapa central. A captura não pode saber se os dados vão para o IPC ou para o LiveKit.
+Toda captura (áudio, vídeo, e futuras versões de outras plataformas) usa `media::spawn_capture`, que:
+- cria a thread com nome;
+- bloqueia até o corpo chamar `ctx.ready.ok()` ou `ctx.ready.fail(erro)` (canal da biblioteca padrão;
+  o `tokio` não é necessário);
+- garante, via `EndGuard`, que o `on_end` seja chamado **exatamente uma vez** e **só se a captura
+  iniciou**, inclusive em caso de panic.
 
-**3.1 Tipos compartilhados em `media/mod.rs`:**
+`CaptureHandle` tem `request_stop()` (não bloqueia, seguro de qualquer lugar) e `stop_and_join()`
+(bloqueia). `spawn_capture` e `stop_and_join` só podem ser chamados dentro de `spawn_blocking`, e
+`stop_and_join` **nunca** a partir da própria thread de captura.
+
+### 6. Início de sessão atômico
+
+O comando de início aguarda a inicialização do vídeo e, se ligado, do áudio antes de responder. Se um
+falhar, o que já subiu é parado e o erro é retornado. O JavaScript nunca vê uma sessão pela metade.
+
+### 7. Falha de áudio não derruba o vídeo
+
+Só o fim da captura de **vídeo** encerra a sessão e emite `screen-share-ended`. Se o áudio cair sozinho,
+o handle de áudio é descartado e o evento `screen-share-audio-ended` é emitido; o frontend despublica a
+trilha de áudio e avisa o usuário. Observação: quando o processo alvo fecha, o process loopback pode
+simplesmente parar de entregar pacotes sem erro; nesse caso o evento nunca dispara, o que é aceitável.
+
+### 8. Encerramento da sessão por eventos
+
+Os `on_end` das capturas não encerram nada diretamente (evita a thread fazer join em si mesma). Eles
+mandam um `SessionEvent` por um canal, e o manager trata:
 
 ```rust
-pub struct CapturedFrame {
-    pub buffer: I420Buffer,
-    pub timestamp_us: i64, // relativo ao início da sessão, via Instant
-}
-
-pub enum SinkStatus { Continue, Stop }
-
-pub trait VideoSink: Send + 'static {
-    fn push(&mut self, frame: CapturedFrame) -> SinkStatus;
-    /// Portão de backpressure. None = sempre aberto.
-    fn gate(&self) -> Option<FrameGate> { None }
-}
-
-pub trait AudioSink: Send + 'static {
-    /// f32 estéreo intercalado a 48 kHz, já zerado se o pacote veio silencioso.
-    fn push(&mut self, samples: &[f32]) -> SinkStatus;
+pub enum SessionEvent {
+    VideoEnded { session_id: u64, reason: EndReason },
+    AudioEnded { session_id: u64, reason: EndReason },
 }
 ```
 
-`FrameGate` é um `Arc` em volta do contador de frames em trânsito. O loop de captura pega o gate *antes*
-de mover o sink para o callback do `DesktopCapturer`, e consulta o gate para decidir se captura. O
-`ipc_sink` devolve um gate (é onde o ACK entra); o publicador nativo não vai precisar de nenhum.
+**Regra de emissão:** quem remove a sessão do `Mutex` é quem emite o evento de fim. Se o usuário clicou
+em parar, o `screen_share_stop` remove e emite `stopped`; o `VideoEnded` que chega depois não encontra a
+sessão (id não bate) e não emite nada.
 
-**3.2 `CaptureHandle`,** representa uma thread de captura viva:
+### 9. Estrutura por plataforma
 
-```rust
-pub struct CaptureHandle {
-    stop: Arc<AtomicBool>,
-    thread: Option<JoinHandle<()>>,
-}
+Código específico do Windows fica em `media/platform/win32/`, atrás de `#[cfg(target_os = "windows")]`.
+Em qualquer outro sistema, `media/platform/unsupported.rs` fornece as mesmas funções, retornando valores
+padrão ou `AppError::Unsupported`. **Regra:** só os pontos de entrada comuns (`media/sources.rs`,
+`media/audio.rs`) chamam `platform::`; o resto do código nunca usa `platform::win32` diretamente.
 
-impl CaptureHandle {
-    /// Só chamar de dentro de `spawn_blocking` — o join pode levar até ~100 ms
-    /// (timeout do evento do WASAPI).
-    pub fn stop_and_join(mut self) {
-        self.stop.store(true, Ordering::Release);
-        if let Some(t) = self.thread.take() { let _ = t.join(); }
-    }
-}
+A pasta se chama `win32` (e não `windows`) para evitar conflito de nome com a crate `windows`.
 
-impl Drop for CaptureHandle {
-    fn drop(&mut self) { self.stop.store(true, Ordering::Release); }
-}
+### 10. `windows-sys` e guards RAII
+
+As declarações FFI escritas à mão foram substituídas pela `windows-sys`. Recursos GDI são embrulhados em
+guards (`ScreenDc`, `GdiObject`) que se liberam no `Drop`, eliminando a limpeza manual e o risco de
+vazar objetos GDI (limite de 10 mil por processo). Um teste verifica que criar e soltar mil bitmaps não
+altera a contagem de objetos GDI do processo.
+
+### 11. Ícones
+
+Ícones são dado estático de identificação da fonte (não miniatura ao vivo) e ficam em
+`platform/win32/sources/icon.rs`. Obtidos com `SendMessageTimeoutW` (`SMTO_ABORTIFHUNG`, 50 ms) para não
+travar em janelas que não respondem, com correção do alfa para ícones antigos. Enviados ao frontend como
+data URL em PNG.
+
+### 12. Sinks e captura independentes
+
+- `VideoSink::push` recebe `&CapturedFrame`, permitindo reenviar o último frame e, no futuro, um
+  `TeeSink` (publicador + preview) sem cópia.
+- A captura de vídeo não depende do `ScreenShareManager`: previews rodam em paralelo com a sessão e
+  entre si.
+
+### 13. `FrameGate` e ACKs
+
+O decremento do `FrameGate` para no zero (um ACK duplicado não fecha o portão para sempre). O
+`ipc_screen_share_ack` ignora silenciosamente ids que não são da sessão atual, já que frames em trânsito
+de uma sessão encerrada ainda geram ACKs.
+
+### 14. Linux e web: fora do escopo, com cuidados
+
+- Código do Windows isolado (decisão 9).
+- `src/lib/tauri/commands.ts` é o único arquivo que importa `@tauri-apps/api` (regra de lint). A versão
+  web, se existir, troca a implementação do `ScreenShareController` (por `getDisplayMedia`), usando
+  `isTauri()`.
+- O seletor de fontes deve ser escrito sabendo que, em algumas plataformas (Wayland), quem mostra o
+  seletor é o sistema. Um comando de capacidades por plataforma entra mais adiante.
+- Risco conhecido do Linux: o WebKitGTK tem suporte fraco a WebRTC, o que pode inviabilizar a voz no
+  React nessa plataforma. Testar cedo quando houver uma máquina Linux disponível.
+
+### 15. `tauri-specta` adiado
+
+O caminho IPC usa `Channel<InvokeResponseBody>`, e não há certeza de suporte no specta. Enquanto isso,
+`commands.ts` tem wrappers tipados à mão. Quando o caminho IPC for removido, trocar pelos bindings
+gerados.
+
+---
+
+## Etapa 1: preparação — concluída
+
+- Commit, tag `prototipo-v0`, push e branch `marco-0`.
+- `NOTES.md` na raiz com os problemas conhecidos do protótipo, usado como lista de verificação.
+
+## Etapa 2: esqueleto do Rust — concluída
+
+- Código do protótipo movido, sem mudanças de lógica, para `src-tauri/src/legacy/`. Continua sendo o
+  que o app usa até as Etapas 4 e 5.
+- `error.rs` com `AppError` e teste de serialização.
+- `tracing` inicializado com `EnvFilter` (padrão `info,<crate>=debug` em dev), hook de panic que registra
+  o nome da thread, e threads nomeadas. Métricas de desempenho no target `perf`
+  (`RUST_LOG=info,perf=debug`), com campos estruturados.
+- Nenhum `println!`/`eprintln!` no código.
+- `src/lib/tauri/commands.ts` com `AppError`, `isAppError` e wrappers para os comandos legados; regra de
+  lint proibindo `invoke` fora dele.
+- Dependências enxutas: `hound` removido, `image` só com PNG e JPEG.
+
+**Lembrete de medição:** números de desempenho só valem em build de release; em dev o código próprio
+roda sem otimização.
+
+## Etapa 3: captura desacoplada do destino — em andamento
+
+A captura não pode saber se os dados vão para o IPC ou para o LiveKit.
+
+### Árvore
+
+```
+src-tauri/src/media/
+├── mod.rs              # só declarações e reexportações
+├── sink.rs             # CapturedFrame, SinkStatus, VideoSink, AudioSink, constantes de áudio
+├── gate.rs             # FrameGate
+├── capture.rs          # EndReason, OnEnd, EndGuard, CaptureHandle, CaptureContext, ReadySignal, spawn_capture
+├── sources.rs          # tipos das fontes + list_capture_sources
+├── audio.rs            # AudioMode + entrada comum da captura de áudio
+├── diagnostics.rs      # sinks de diagnóstico
+├── video_capture.rs
+├── ipc_sink.rs         # temporário
+├── session.rs
+└── platform/
+    ├── mod.rs
+    ├── unsupported.rs
+    └── win32/
+        ├── mod.rs
+        ├── audio_capture.rs
+        └── sources/
+            ├── mod.rs
+            ├── gdi.rs
+            ├── icon.rs
+            ├── window.rs
+            ├── monitor.rs
+            └── thumbnail.rs   # vazio até as miniaturas entrarem no escopo
 ```
 
-`Drop` garante que uma captura esquecida sempre para.
+### Passo 0: validar o `DesktopCapturer` — concluído
 
-**3.3 `video_capture.rs`.** `spawn_video_capture(config, sink, on_end) -> Result<CaptureHandle, AppError>`:
+Ver decisão 1.
 
-- `VideoCaptureConfig { source: SourceRef, max_width: u32, fps: u32 }`, `SourceRef` = `Window(u64)` |
-  `Monitor(u64)`.
-- `DesktopCapturer` criado dentro da thread, resultado devolvido por oneshot (mesmo padrão do áudio). Se
-  a fonte não existir, o comando falha na hora com `SourceNotFound`.
-- Loop com controle de taxa por deadline, respeitando o gate.
-- Conversão para I420 com `frame.stride()`, `scale` quando passar de `max_width`, com proteções para
-  janelas pequenas.
-- **Fonte fechada:** ~30 erros consecutivos (≈1s) → encerra com motivo `SourceClosed`, em vez de logar
-  erro indefinidamente.
-- `on_end: Box<dyn FnOnce(EndReason) + Send>` chamado exatamente uma vez ao terminar (stop, erro ou fonte
-  fechada).
+### Passo 1: estrutura por plataforma — concluído
 
-**3.4 `audio_capture.rs`.** `spawn_audio_capture(mode, sink, on_end)`: modo por eventos, buffer de 100 ms,
-flag de silêncio, log de descontinuidade, resultado de inicialização por oneshot, modo `System` usando
-`std::process::id()` (decisão 3).
+Ver decisão 9.
 
-**3.5 `sources.rs`.** `list_capture_sources()` retorna janelas e monitores num formato único, com o PID
-do processo (via `GetWindowThreadProcessId`, crate `windows`) já resolvido para janelas:
+### Passo 2: tipos compartilhados — concluído
+
+`sink.rs`, `gate.rs` e `capture.rs`, reexportados pelo `media/mod.rs`. Testes:
+1. `FrameGate` fecha no máximo, reabre com `release`, e um `release` extra não o deixa fechado.
+2. `spawn_capture` normal: `stop_and_join` faz o `on_end` receber `Stopped`.
+3. Corpo que chama `fail()`: retorna o erro e o `on_end` não é chamado.
+4. Panic depois do `ok()`: o `on_end` recebe `Error`.
+5. Panic antes do `ok()`: retorna `Internal` e o `on_end` não é chamado.
+
+### Passo 3: listagem de fontes — concluído
+
+Tipos em `media/sources.rs`:
 
 ```rust
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(tag = "kind", content = "id", rename_all = "camelCase")]
+pub enum SourceRef { Window(u64), Monitor(u64) }   // { "kind": "window", "id": 123 }
+
 pub struct CaptureSource {
-    pub id: u64,
-    pub kind: SourceKind,       // Window | Monitor
+    pub source: SourceRef,
     pub title: String,
-    pub process_id: Option<u32>, // só para janelas
+    pub process_id: Option<u32>,
+    pub icon: Option<String>,          // data URL
+    pub monitor: Option<MonitorInfo>,  // x, y, width, height, is_primary
 }
 ```
 
-Executado via `spawn_blocking` a partir do comando (decisão 2).
+A plataforma fornece `window_details(id) -> Option<WindowDetails>` (`None` esconde a janela; usado para
+as janelas do próprio app) e `monitor_details(id) -> Option<MonitorInfo>`. Telas recebem títulos como
+"Tela 1 (principal)".
 
-**Ids de monitor — não usar `HMONITOR` do `EnumDisplayMonitors`.** O `DesktopCapturer` do libwebrtc no
-Windows identifica telas pelo índice do `EnumDisplayDevicesW`, não pelo `HMONITOR`. Numa máquina com um
-monitor só isso pode funcionar por coincidência e quebrar com dois. Os monitores devem vir do próprio
-`DesktopCapturer` (tipo `Screen`, via `get_source_list`), usando as APIs do Windows só para enriquecer os
-dados (nome, posição, resolução, principal). Para cruzar o `id()` do libwebrtc com o `HMONITOR`/`szDevice`
-do `GetMonitorInfoW`:
+Testes ignorados (precisam de área de trabalho real; rodar com `-- --ignored --nocapture`): ícone da
+janela em foco, detalhes da janela em foco, mapeamento das telas do capturer e listagem completa.
 
-```rust
-let mut device: DISPLAY_DEVICEW = unsafe { std::mem::zeroed() };
-device.cb = std::mem::size_of::<DISPLAY_DEVICEW>() as u32;
+**Pendente:** confirmar o mapeamento de monitores com dois monitores conectados, se ainda não foi feito.
+A exclusão das janelas do próprio app só pode ser verificada na Etapa 4, com o app rodando.
 
-if unsafe { EnumDisplayDevicesW(std::ptr::null(), source.id() as u32, &mut device, 0) } != 0 {
-    // device.DeviceName == "\\.\DISPLAY1" → compare com o szDevice do MONITORINFOEXW
-}
-```
+### Passo 4: sinks de diagnóstico — pendente
 
-Testar com dois monitores conectados, imprimindo as duas listas, para confirmar o mapeamento antes de dar
-por certo. Para janelas não há esse problema: os dois lados (libwebrtc e Win32) usam o mesmo HWND.
+Em `media/diagnostics.rs`: um sink de vídeo que registra fps e resolução, e um de áudio que registra o
+nível (RMS) das amostras, ambos no target `perf`. Servem para testar cada captura isoladamente, sem IPC
+nem LiveKit.
 
-**Outros ajustes que entram no `sources.rs` nesta fase, independentes do capturer escolhido:**
-- `SendMessageTimeoutW` no lugar de `SendMessageW` (evita travar em janelas que não respondem).
-- Callback do `EnumWindows` só coleta HWNDs; enriquecimento (título, PID, ícone) é feito depois, fora do
-  callback.
-- Correção do alfa em ícones antigos (sem canal alpha) na conversão para PNG/data URL.
-- Exclusão das janelas do próprio app da listagem.
-- Migração das declarações FFI manuais para a crate `windows-sys`, onde fizer sentido.
+### Passo 5: captura de áudio — pendente
 
-Pontos sobre previews (JSON no `Channel`, uma sessão WGC por janela) ficam para quando miniaturas
-entrarem no escopo — fora desta fase.
+- Entrada comum em `media/audio.rs`, que escolhe a implementação da plataforma; implementação WASAPI em
+  `platform/win32/audio_capture.rs`; versão em `unsupported.rs` retornando `Unsupported`.
+- Construída sobre `spawn_capture`.
+- Modo por eventos (não polling), buffer de 100 ms, formato f32 estéreo 48 kHz.
+- Flag de silêncio tratada (zerar o buffer); descontinuidade registrada em log.
+- Modo `System` com `std::process::id()` (decisão 3).
 
-**3.6 `session.rs`.** Um único `ScreenShareManager` substitui `ScreenShareTestState` e
-`ScreenShareAudioState`. Sessão agrupa vídeo e áudio:
+### Passo 6: `video_capture.rs` — pendente
+
+- `VideoCaptureConfig { source: SourceRef, max_width: u32, fps: u32 }`.
+- Construída sobre `spawn_capture`; `DesktopCapturer` criado dentro da thread. Fonte inexistente falha
+  com `SourceNotFound` na inicialização.
+- Controle de taxa por deadline (sem acumular atraso), respeitando o `FrameGate` quando houver.
+- Conversão para I420 usando o stride do frame; redução com o `scale` do I420 quando passar de
+  `max_width`; proteção para janelas muito pequenas; dimensões pares.
+- Timestamps a partir de `Instant` (não `SystemTime`).
+- **Fonte fechada:** ~30 erros consecutivos (≈1 s) encerram com `SourceClosed`.
+- Opcional: reenvio do último frame após ~500 ms sem novidade.
+
+### Passo 7: `ipc_sink.rs` — pendente
+
+- `IpcVideoSink`: empacotamento I420 atual, envio com `InvokeResponseBody::Raw`, `FrameGate` para o ACK.
+- `IpcAudioSink`: envio dos f32 com `InvokeResponseBody::Raw` (corrige o envio atual em JSON).
+
+### Passo 8: `session.rs` — pendente
+
+Um `ScreenShareManager` substitui `ScreenShareTestState` e `ScreenShareAudioState`:
 
 ```rust
 struct Session {
@@ -261,22 +324,21 @@ struct Session {
 }
 ```
 
-Iniciar uma sessão é atômico (decisão 6): se o vídeo sobe e o áudio falha, o vídeo é parado e o comando
-retorna o erro. Quando a captura de **vídeo** chama `on_end`, o manager encerra a sessão inteira e emite
-o evento de fim. Quando é a captura de **áudio** que chama `on_end` sozinha, o manager só derruba o
-handle de áudio e emite um aviso separado — o vídeo continua (decisão 7).
+- Início atômico (decisão 6), dentro de `spawn_blocking`.
+- Encerramento por `SessionEvent` e regra de emissão (decisão 8).
+- Política de falha do áudio (decisão 7).
+- Parar: remover a sessão, emitir o evento e fazer `stop_and_join` dos handles em `spawn_blocking`.
 
-**3.7 `ipc_sink.rs`.** Código de empacotamento atual: `IpcVideoSink` (`pack_i420` + envio via
-`InvokeResponseBody::Raw`) e `IpcAudioSink` (envio dos f32 também como `Raw`, corrigindo o problema do
-JSON).
+### Critério de pronto da Etapa 3
 
-**Critério de pronto:** as capturas rodam, param e reportam o fim corretamente num teste manual chamando
-os comandos pelo console do webview, e o `DesktopCapturer` passa no teste de correção (jogo em janela/tela
-cheia sem borda, Chrome/Electron com vídeo, janela parada por 1 minuto sem perder FPS reportado).
+- Passos 4 a 6 validados com os sinks de diagnóstico.
+- Ciclo de vida da sessão validado com um comando temporário de teste, se desejado; a verificação de
+  ponta a ponta acontece na Etapa 4.
+- O app continua funcionando pelo `legacy/`.
 
-## Etapa 4: contrato entre Rust e React
+## Etapa 4: contrato entre Rust e React — pendente
 
-**4.1 Comandos**, em `commands/screen_share.rs`, todos `async`:
+### 4.1 Comandos (`commands/screen_share.rs`, todos `async`)
 
 ```rust
 list_capture_sources() -> Result<Vec<CaptureSource>, AppError>
@@ -285,20 +347,39 @@ ipc_screen_share_ack(session_id: u64)
 screen_share_stop(session_id: u64) -> Result<(), AppError>
 ```
 
-Prefixo `ipc_` marca o que é específico desse caminho. `screen_share_stop` e o evento de fim são comuns
-e vão servir também ao publicador nativo. `StartOptions` leva a fonte, a qualidade (`720p30` ou
-`1080p60`, mapeadas para `max_width`/`fps` no Rust) e o modo de áudio (`Off | Application(u32) | System`,
-decisão 3).
+O prefixo `ipc_` marca o que é específico do caminho atual. `screen_share_stop` e os eventos servirão
+também ao publicador nativo. `StartOptions`:
 
-**4.2 Evento** `screen-share-ended` com `{ sessionId, reason, message }`, `reason` = `stopped` |
-`sourceClosed` | `error`.
+```json
+{
+  "source": { "kind": "window", "id": 123 },
+  "quality": "720p30",
+  "audio": { "mode": "application", "processId": 456 }
+}
+```
 
-**4.3 Wrappers no `commands.ts`,** um por comando e um `onScreenShareEnded(callback)` que retorna a
-função de cancelar a escuta.
+`quality` é `720p30` ou `1080p60`, mapeada para `max_width`/`fps` no Rust.
 
-## Etapa 5: frontend
+### 4.2 Eventos
 
-**5.1 Estrutura:**
+- `screen-share-ended`: `{ sessionId, reason, message }`, com `reason` = `stopped` | `sourceClosed` |
+  `error`.
+- `screen-share-audio-ended`: `{ sessionId, reason, message }` (decisão 7).
+
+### 4.3 `commands.ts`
+
+Wrappers para os comandos novos, tipos `CaptureSource`, `SourceRef`, `StartOptions` e `AudioMode`, e
+funções `onScreenShareEnded(callback)` e `onScreenShareAudioEnded(callback)` que retornam a função de
+cancelar a escuta. Adicionar `"Unsupported"` e `"Internal"` ao `AppErrorKind`, se ainda não estiverem.
+
+### 4.4 Remoção do legado
+
+Os comandos e o código de `legacy/` saem quando o `IpcScreenShare` (Etapa 5) estiver usando os comandos
+novos. Junto saem as dependências `windows-capture` e `fast_image_resize`.
+
+## Etapa 5: frontend — pendente
+
+### 5.1 Estrutura
 
 ```
 src/features/
@@ -314,7 +395,7 @@ src/features/
     └── SourcePicker.tsx
 ```
 
-**5.2 Contrato.** `ScreenShareController` com estado como união discriminada:
+### 5.2 Contrato
 
 ```ts
 export type ScreenShareState =
@@ -324,41 +405,71 @@ export type ScreenShareState =
   | { status: "error"; kind: string; message: string };
 ```
 
-Método `dispose()`: o provider chama quando a sala cai ou o usuário troca de canal; a implementação para
-tudo o que estiver rodando.
+`ScreenShareController` com `listSources`, `start`, `stop`, `onStateChange` e `dispose()`. O provider
+chama `dispose()` quando a sala cai ou o usuário troca de canal.
 
-**5.3 `IpcScreenShare`.** Recebe o `Room` no construtor; concentra o generator, o `ScreenShareAudio`, os
-ACKs, a escuta do `screen-share-ended` e o teardown. Com as correções: `videoEncoding` e `contentHint` na
-publicação do vídeo, `AudioPresets.musicHighQualityStereo` e `dtx: false` no áudio, sem cópia extra no
-handler de frame, proteção contra início duplo.
+### 5.3 `IpcScreenShare`
 
-**5.4 Worklet.** Jitter buffer: ring buffer pré-alocado de 1 segundo, estado "acumulando" até 50 ms
-(2.400 frames), silêncio e volta ao acúmulo quando esvaziar, descarte das amostras mais antigas ao passar
-de 150 ms. Nenhuma alocação dentro do `process()`.
+Recebe o `Room`; concentra o generator, o `ScreenShareAudio`, os ACKs, a escuta dos dois eventos e o
+teardown. Correções: `videoEncoding` e `contentHint = "detail"` no vídeo;
+`AudioPresets.musicHighQualityStereo` e `dtx: false` no áudio; sem cópia extra no handler de frame;
+proteção contra início duplo; ao receber `screen-share-audio-ended`, despublicar a trilha de áudio.
 
-**5.5 `VoiceProvider` enxuto.** Só conexão, mute e deafen; expõe o controller. Mudanças: `RoomAudioRenderer`
-com `muted={isDeafened}` e restauração do mute anterior, tratamento de `Reconnecting`/`Reconnected`,
-`controller.dispose()` no cleanup do efeito e no `Disconnected`, árvore envolvida por `RoomContext`.
+### 5.4 Worklet
 
-**5.6 `SourcePicker`.** Lista simples, sem miniaturas, janelas e monitores separados, escolha de
-qualidade e de áudio. PID vem pronto do Rust.
+Jitter buffer: ring buffer pré-alocado de 1 segundo, estado "acumulando" até 50 ms (2.400 frames),
+silêncio e volta ao acúmulo quando esvaziar, descarte das amostras mais antigas ao passar de 150 ms.
+Nenhuma alocação dentro do `process()`.
 
-## Etapa 6: verificação
+### 5.5 `VoiceProvider` enxuto
 
-1. Iniciar e parar o compartilhamento 20 vezes seguidas, inclusive clicando rápido; memória do app no
-   Gerenciador de Tarefas deve voltar ao patamar inicial.
-2. Trocar de canal de voz durante um compartilhamento; a captura para e nenhum log de frame continua
-   aparecendo.
+Só conexão, mute e deafen; expõe o controller. `RoomAudioRenderer` com `muted={isDeafened}` e
+restauração do mute anterior ao sair do deafen; tratamento de `Reconnecting`/`Reconnected`;
+`controller.dispose()` no cleanup do efeito e no `Disconnected`; árvore envolvida por `RoomContext`.
+
+### 5.6 `SourcePicker`
+
+Lista sem miniaturas, telas e janelas separadas, com os ícones vindos do Rust; escolha de qualidade e de
+áudio. Escrito sabendo que, em algumas plataformas, o seletor será do sistema (decisão 14).
+
+## Etapa 6: verificação — pendente
+
+1. Iniciar e parar o compartilhamento 20 vezes seguidas, inclusive clicando rápido; a memória do app
+   volta ao patamar inicial.
+2. Trocar de canal de voz durante um compartilhamento; a captura para e nenhum log de frame continua.
 3. Desligar a rede por 30 segundos durante um compartilhamento e religar; a UI mostra a reconexão e o
    compartilhamento volta ou é encerrado de forma limpa.
-4. Fechar a janela que está sendo compartilhada; o evento `sourceClosed` chega e a UI volta ao estado
-   `idle`.
-5. Fechar o programa cujo áudio está sendo capturado; o áudio para sem derrubar o vídeo (decisão 7).
-6. Deafen, e então alguém novo entra no canal; não deve ouvi-lo. Mute, deafen, undeafen; o microfone
+4. Fechar a janela compartilhada; o evento `sourceClosed` chega e a UI volta a `idle`.
+5. Fechar o programa cujo áudio está sendo capturado; o vídeo continua. Registrar o comportamento real
+   do áudio (evento de fim ou só silêncio).
+6. Deafen e alguém novo entra no canal: não deve ser ouvido. Mute, deafen, undeafen: o microfone
    continua mutado.
-7. Compartilhar um jogo por duas horas com o app minimizado, com alguém assistindo; anotar CPU, memória
-   e picotes. Esse número vira a base de comparação do próximo plano.
+7. As janelas do próprio app não aparecem no seletor.
+8. Compartilhar um jogo por duas horas com o app minimizado, com alguém assistindo, em build de release;
+   anotar CPU, memória e picotes, separadamente para 720p30 e 1080p60. É a linha de base do próximo
+   plano (1080p60 lento pelo caminho IPC é esperado, não é bug desta fase).
 
 **Critério de pronto da fase:** todos os itens do `NOTES.md` resolvidos ou conscientemente adiados, a
 lista acima passando, e o provider sem nenhuma referência direta a generator, worklet ou comandos de
 captura.
+
+---
+
+## Registro de desempenho
+
+| Cenário | Build | Resultado | Observação |
+|---|---|---|---|
+| Janela parada, caminho IPC | dev | ~43 fps | Limitado pela ida e volta do ACK; sem controle de taxa |
+| Jogo, caminho IPC | dev | ~18–20 fps, quedas até 10 | Investigação pendente com o target `perf` |
+
+## Próximos passos (fora deste plano)
+
+- Publicador nativo em Rust (conexão `{user_id}:screen`) e medição lado a lado com o caminho IPC.
+- Investigação do fps com jogos (tempo do `capture_frame`, conversão, IPC).
+- Miniaturas no seletor: `get_source_thumbnail` por pedido (cards visíveis, concorrência limitada,
+  atualização a cada 3 s, data URL); preview ao vivo da fonte selecionada via `PreviewSink` (480 px,
+  5 fps, desenhado num canvas).
+- Aviso de possível conteúdo protegido (frames pretos por vários segundos).
+- Comando de capacidades por plataforma.
+- Teste do `livekit-client` no WebKitGTK (Linux).
+- Troca do `commands.ts` pelos bindings do `tauri-specta`, após remover o caminho IPC.

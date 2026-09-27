@@ -2,26 +2,18 @@
 
 use crate::media::sources::{MonitorInfo, WindowDetails};
 
-pub mod monitors;
+pub mod monitor;
 pub mod thumbnail;
-pub mod windows;
+pub mod window;
 
 mod gdi;
 mod icon;
 
-pub fn window_details(_id: u64) -> Option<WindowDetails> {
-    Some(WindowDetails {
-        process_id: None,
-        icon: None,
-    })
-}
-
-pub fn monitor_details(_id: u64) -> Option<MonitorInfo> {
-    None
-}
+pub use monitor::monitor_details;
+pub use window::window_details;
 
 #[cfg(test)]
-mod tests {
+mod window_tests {
     use crate::media::platform::sources::icon::icon_data_url;
 
     use super::*;
@@ -34,5 +26,46 @@ mod tests {
         let url = icon_data_url(hwnd).expect("a janela em foco deveria ter ícone");
         assert!(url.starts_with("data:image/png;base64,"));
         println!("{url}");
+    }
+}
+
+#[cfg(test)]
+mod monitor_tests {
+    use crate::media::platform::sources::monitor::until_nul;
+
+    use super::*;
+
+    #[test]
+    fn corta_no_primeiro_zero() {
+        assert_eq!(until_nul(&[65, 66, 0, 67]), vec![65, 66]);
+        assert_eq!(until_nul(&[65, 66]), vec![65, 66]);
+    }
+
+    #[test]
+    #[ignore = "precisa de uma área de trabalho real"]
+    fn mapeia_telas_do_capturer() {
+        use livekit::webrtc::desktop_capturer::{
+            DesktopCaptureSourceType, DesktopCapturer, DesktopCapturerOptions,
+        };
+
+        let capturer = DesktopCapturer::new(DesktopCapturerOptions::new(
+            DesktopCaptureSourceType::Screen,
+        ))
+        .expect("não foi possível criar o DesktopCapturer");
+
+        for source in capturer.get_source_list() {
+            let details = monitor_details(source.id());
+            println!(
+                "id={} titulo={:?} -> {:?}",
+                source.id(),
+                source.title(),
+                details
+            );
+            assert!(
+                details.is_some(),
+                "a tela {} não teve correspondência",
+                source.id()
+            );
+        }
     }
 }
