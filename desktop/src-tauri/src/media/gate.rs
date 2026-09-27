@@ -1,3 +1,5 @@
+//! Backpressure do caminho IPC: ver FrameGate abaixo.
+
 use std::sync::{
     atomic::{AtomicU32, Ordering},
     Arc,

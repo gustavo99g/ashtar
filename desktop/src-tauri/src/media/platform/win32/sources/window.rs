@@ -1,12 +1,22 @@
-//! Enumeração de janelas (`EnumWindows`).
+//! Enriquece uma janela do DesktopCapturer com PID e icone.
 //!
-//! Vazio por enquanto — entra no passo 3/5.
+//! Usado por `media::sources::list_capture_sources`. As janelas em si (ids,
+//! titulos) vem do DesktopCapturer — `EnumWindows` saiu do projeto (decisao
+//! 2 do PLAN.md). Os filtros de janela visivel/oculta/ferramenta tambem
+//! saiam, porque o DesktopCapturer ja aplica filtros equivalentes na lista
+//! dele; se aparecerem janelas que nao deveriam, esses filtros voltam aqui.
 
 use windows_sys::Win32::{Foundation::HWND, UI::WindowsAndMessaging::GetWindowThreadProcessId};
 
 use crate::media::{platform::sources::icon::icon_data_url, sources::WindowDetails};
 
-/// Detalhes da janela, ou `None` se ela não deve aparecer na lista.
+/// Detalhes da janela, ou `None` se ela nao deve aparecer na lista (PID
+/// invalido, ou janela do proprio app).
+///
+/// # Bloqueia
+///
+/// Chama `icon_data_url`, que pode esperar ate 50ms (veja `icon.rs`).
+/// Chamar dentro de `spawn_blocking`.
 pub fn window_details(id: u64) -> Option<WindowDetails> {
     let hwnd = id as usize as HWND;
 
@@ -26,6 +36,10 @@ pub fn window_details(id: u64) -> Option<WindowDetails> {
 
 fn window_process_id(hwnd: HWND) -> Option<u32> {
     let mut process_id: u32 = 0;
+    // SAFETY: `hwnd` e um HWND recebido do DesktopCapturer (ou 0 nos
+    // testes); `GetWindowThreadProcessId` aceita um HWND invalido e so
+    // devolve 0 nesse caso, sem UB. `&mut process_id` e valido para escrita
+    // de um u32.
     unsafe {
         GetWindowThreadProcessId(hwnd, &mut process_id);
 
@@ -50,6 +64,8 @@ mod tests {
     #[test]
     #[ignore = "precisa de uma área de trabalho real"]
     fn detalhes_da_janela_em_foco() {
+        // SAFETY: `GetForegroundWindow` nao tem pre-condicoes; pode devolver
+        // null (tratado como "sem janela em foco"), sem UB.
         let hwnd = unsafe { GetForegroundWindow() };
         let details =
             window_details(hwnd as usize as u64).expect("a janela em foco deveria aparecer");

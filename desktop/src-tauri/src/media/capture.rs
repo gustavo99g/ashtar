@@ -1,3 +1,18 @@
+//! Criação e ciclo de vida das threads de captura.
+//!
+//! Toda captura (áudio, vídeo, e futuras versões de outras plataformas) nasce
+//! por [`spawn_capture`]. Garantias que este módulo dá:
+//!
+//! - o `on_end` é chamado exatamente uma vez, e só se a captura chegou a iniciar,
+//!   inclusive em caso de panic;
+//! - um [`CaptureHandle`] esquecido pede a parada da thread no `Drop`.
+//!
+//! Regras para quem usa:
+//!
+//! - [`spawn_capture`] e [`CaptureHandle::stop_and_join`] bloqueiam: chamar só
+//!   dentro de `spawn_blocking`;
+//! - nunca chamar `stop_and_join` a partir da própria thread de captura.
+
 use std::{
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -62,8 +77,12 @@ impl CaptureHandle {
         self.stop.store(true, Ordering::Release);
     }
 
-    /// Bloqueia até a thread terminar. Só chamar dentro de `spawn_blocking`,
-    /// e nunca a partir da própria thread de captura.
+    /// Espera a thread de captura terminar e libera os recursos dela.
+    ///
+    /// # Bloqueia
+    ///
+    /// Só chamar dentro de `spawn_blocking`, e nunca a partir da própria
+    /// thread de captura.
     pub fn stop_and_join(mut self) {
         self.request_stop();
 
@@ -111,7 +130,9 @@ impl ReadySignal {
 /// `ctx.ready.ok()` ou `ctx.ready.fail(erro)`, rodar enquanto `ctx.stop`
 /// for falso, e devolver o motivo do fim.
 ///
-/// Bloqueia até a inicialização terminar. Só chamar dentro de
+/// # Bloqueia
+///
+/// Espera a inicialização terminar antes de devolver. Só chamar dentro de
 /// `spawn_blocking`.
 pub fn spawn_capture(
     name: &str,

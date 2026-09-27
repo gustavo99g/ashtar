@@ -1,3 +1,11 @@
+//! Módulos de captura de mídia (vídeo/áudio), independentes do destino (IPC
+//! hoje, publicador LiveKit nativo depois — decisão 12 do `PLAN.md`).
+//! `sink.rs`, `gate.rs` e `capture.rs` são a base compartilhada por qualquer
+//! captura, em qualquer plataforma; `sources.rs`/`audio.rs` são os pontos de
+//! entrada comuns, e `platform/` escolhe a implementação real (`win32` hoje).
+//! Ninguém fora de `platform/` deve usar `platform::win32` diretamente — só
+//! os pontos de entrada comuns chamam `platform::...`.
+
 // `dead_code` cobre os tipos/funções ainda sem uso; `unused_imports` cobre
 // os `pub use` deste arquivo, que o rustc flagra por ninguém (dentro do
 // crate) ainda importar `crate::media::...`. Remover os dois na Etapa 4,

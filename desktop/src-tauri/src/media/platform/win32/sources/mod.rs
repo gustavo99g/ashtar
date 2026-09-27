@@ -1,6 +1,8 @@
-//! Implementação real da listagem/captura de fontes no Windows.
-
-use crate::media::sources::{MonitorInfo, WindowDetails};
+//! Implementacao real, no Windows, dos pontos de entrada de media::sources.
+//!
+//! window.rs e monitor.rs reexportam window_details/monitor_details (o
+//! contrato que platform::mod.rs espera); icon.rs e gdi.rs sao detalhe de
+//! implementacao, privados a este modulo.
 
 pub mod monitor;
 pub mod thumbnail;
@@ -22,6 +24,8 @@ mod window_tests {
     #[test]
     #[ignore = "precisa de uma área de trabalho real"]
     fn icone_da_janela_em_foco() {
+        // SAFETY: GetForegroundWindow nao tem pre-condicoes; pode devolver
+        // null (o icon_data_url so devolveria None nesse caso).
         let hwnd = unsafe { GetForegroundWindow() };
         let url = icon_data_url(hwnd).expect("a janela em foco deveria ter ícone");
         assert!(url.starts_with("data:image/png;base64,"));

@@ -1,4 +1,14 @@
-// Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
+//! Ponto de entrada da lib do app desktop (`desktop_lib`, ver `[lib] name` no
+//! `Cargo.toml`). Registra os comandos Tauri e o estado gerenciado; hoje só
+//! os comandos legados (`legacy::commands::*`) estão ligados ao
+//! `invoke_handler!` — `media/` ainda não tem comandos novos (Etapa 4 do
+//! `PLAN.md`).
+//!
+//! Learn more about Tauri commands at <https://tauri.app/develop/calling-rust/>
+
+// Todo bloco `unsafe` sem `// SAFETY: ...` vira aviso do clippy. A maior
+// parte do FFI do projeto mora em `media::platform::win32`.
+#![warn(clippy::undocumented_unsafe_blocks)]
 
 mod error;
 mod legacy;

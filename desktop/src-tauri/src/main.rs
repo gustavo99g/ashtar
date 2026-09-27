@@ -1,3 +1,7 @@
+//! Binário do app desktop. Só inicializa observabilidade (`init_tracing`,
+//! incluindo o hook de panic) e delega para `desktop_lib::run()`, que é onde
+//! o Tauri é montado de verdade (ver `lib.rs`).
+
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 

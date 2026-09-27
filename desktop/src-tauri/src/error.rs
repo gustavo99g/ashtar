@@ -1,3 +1,11 @@
+//! Tipo de erro único dos comandos Tauri (`Result<T, AppError>`).
+//!
+//! Serializado para o frontend como `{ kind, message }` (ver `commands.ts`,
+//! que espelha `AppErrorKind`) em vez de string livre, para o React poder
+//! tratar casos específicos (ex.: `SourceNotFound`) sem comparar texto de
+//! mensagem. `kind()` usa um `match` explícito, sem `_`, para o compilador
+//! obrigar a tratar variantes novas nos dois lugares (aqui e no TS).
+
 use serde::ser::{Serialize, SerializeStruct, Serializer};
 
 #[derive(Debug, thiserror::Error)]

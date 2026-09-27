@@ -19,6 +19,13 @@ Documentada em [`docs/commit-convention.md`](docs/commit-convention.md). Resumo:
 mensagem`, com `feat`/`chore`/`docs`/`fix` etc., escopo `desktop`/`api`/sem escopo. Seguir esse
 formato em toda mensagem proposta ao usuário, mesmo antes da confirmação.
 
+## Convencao de documentacao no codigo Rust
+
+Documentada em [docs/rust-code-documentation.md](docs/rust-code-documentation.md): `//!` de modulo
+(papel/quem usa/regras), secao `# Bloqueia` em funcoes que nao podem rodar no runtime async,
+`// SAFETY:` em todo `unsafe`, e `#![warn(clippy::undocumented_unsafe_blocks)]` cobrando isso.
+Aplicada hoje em `media/` e nos arquivos-raiz; `legacy/` ainda nao.
+
 ## Onde ficam as decisões técnicas
 
 - [`PLAN.md`](PLAN.md) — plano em andamento (fase atual: reorganização/correções do protótipo de

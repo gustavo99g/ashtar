@@ -46,6 +46,10 @@ pub struct MonitorInfo {
 }
 
 /// Pede ao DesktopCapturer as fontes de um tipo, como pares (id, título).
+///
+/// # Bloqueia
+///
+/// Cria um DesktopCapturer e enumera suas fontes de forma sincrona.
 fn capturer_sources(kind: dc::DesktopCaptureSourceType) -> Result<Vec<(u64, String)>, AppError> {
     let capturer = dc::DesktopCapturer::new(dc::DesktopCapturerOptions::new(kind))
         .ok_or_else(|| AppError::Internal("não foi possível criar o DesktopCapturer".into()))?;
@@ -59,8 +63,15 @@ fn capturer_sources(kind: dc::DesktopCaptureSourceType) -> Result<Vec<(u64, Stri
 
 /// Lista os monitores e janelas que podem ser compartilhados.
 ///
-/// Bloqueia (enumeração e extração de ícones): chamar dentro de `spawn_blocking`.
+/// O DesktopCapturer eh a fonte da verdade de quais fontes existem e de
+/// seus ids (decisao 2 do PLAN.md); a plataforma so complementa cada item
+/// (PID, icone, geometria do monitor). Uma janela que a plataforma decide
+/// esconder (window_details devolvendo None) simplesmente nao entra na lista.
 ///
+/// # Bloqueia
+///
+/// Enumeracao e extracao de icones sao sincronas. Chamar dentro de
+/// `spawn_blocking`.
 pub fn list_capture_sources() -> Result<Vec<CaptureSource>, AppError> {
     let mut sources = Vec::new();
 
