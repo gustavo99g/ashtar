@@ -1,107 +1,116 @@
 # Discord-like
 
-Aplicação privada de comunicação para uma única comunidade, inspirada no Discord. Features:
+Aplicação privada de comunicação para uma única comunidade, inspirada no Discord.
+
+> O nome do projeto é provisório.
+> Status atual: **v0.1 — Vertical Slice** (em andamento)
+
+## Funcionalidades
 
 * ✓ chat de texto (mockado)
 * ✓ voz via LiveKit
-* ✓ compartilhamento de tela
-* ⚙️ áudio do sistema quando disponível
+* ✓ compartilhamento de tela (janela ou tela inteira)
+* ⚙️ áudio do compartilhamento: só do aplicativo escolhido ou de todo o sistema, quando o Windows suportar
 
-> O nome do projeto é provisório.  
-> Status atual: **v0.1 - Vertical Slice**
+## Plataformas
 
-## Requisitos mínimos 
+| Plataforma | Situação |
+|---|---|
+| **Windows 10 e 11** | Suportado. É a única plataforma do app hoje. |
+| **Linux (x86_64)** | A avaliar depois. A estrutura do código já prevê uma segunda plataforma, mas há riscos a verificar antes: o suporte a WebRTC no webview do Linux e a captura de tela pelo portal do sistema. |
+| **macOS** | Fora do escopo. |
 
-### Sistema
+A captura de áudio de um aplicativo específico usa um recurso recente do Windows. Em versões mais
+antigas, o compartilhamento de tela funciona, mas sem essa opção de áudio.
 
-* **Windows 10/11** ou **macOS 12+** ou **Linux (x86_64)**
-* ~~Rust~~ 1.80.0+
-* Node.js >20.x
-* Tauri v2 CLI instalado globalmente
+## Requisitos para desenvolver
 
-### Dependências locais
+* **Windows 10 ou 11**
+* **Rust**, na versão fixada em `rust-toolchain.toml` (o `rustup` instala automaticamente)
+* **Visual Studio Build Tools** com o workload de C++ e o **WebView2** (já vem no Windows 11); veja os
+  [pré-requisitos do Tauri](https://v2.tauri.app/start/prerequisites/)
+* **Node.js 20** ou mais recente e **pnpm**
+* **Servidor LiveKit**: local para desenvolver, ou um projeto no LiveKit Cloud (veja
+  [Infraestrutura](#infraestrutura))
 
-```bash
-# Clona o repositório
-git clone https://github.com/your-username/discord-like.git
+Não é preciso instalar o Tauri CLI globalmente: o `pnpm tauri` usa o pacote do próprio projeto.
 
-# Instala dependências do frontend e backend
-cd discord-like
-pnpm install  # instala tudo no desktop/
-```
-
-## Arquitetura
-
-```text
-v0.1 [🚧 WIP] ─┬─ Vertical Slice (Tauri + React + Axum)
-              │  ├─ App Shell basic
-              │  ├─ Chat mockado
-              │  ├─ API /health
-              │  └─ Integração LiveKit
-v0.2 [🚧 PENDING] ─┬─ Identidade e acesso
-                  │  ├─ Login + Cadastro
-                  │  └─ Convites
-```
-
-## Requisitos mínimos
+## Estrutura do repositório
 
 Monorepo com dois projetos:
 
 ```text
 discord-like/
-├── desktop/   # Tauri + React + TypeScript
-├── api/       # Rust + Axum
+├── desktop/          # app: Tauri + React + TypeScript, com núcleo em Rust
+├── api/              # backend: Rust + Axum
 ├── docs/
+│   ├── adr/          # registros de decisões de arquitetura
 │   └── roadmap.md
+├── ARCHITECTURE.md   # mapa do código e regras entre módulos
 ├── .env.example
 ├── .gitignore
 ├── rust-toolchain.toml
 └── README.md
 ```
 
-### Desktop
+## Rodando localmente
 
-O `desktop` é o aplicativo principal.
+### 1. Configuração
 
-Responsável por:
+Copie o `.env.example` para `.env` e preencha as variáveis do LiveKit (URL do servidor, chave e
+segredo). Para o servidor local em modo de desenvolvimento, a chave é `devkey` e o segredo é `secret`.
 
-* interface;
-* navegação;
-* chat;
-* conexão com a API;
-* integração com LiveKit;
-* voz;
-* screen share;
-* integração com recursos locais via Tauri.
+### 2. LiveKit
 
-### API
+Baixe o `livekit-server` na [página de releases](https://github.com/livekit/livekit/releases) e rode
+em modo de desenvolvimento:
 
-O `api` é o backend da aplicação.
+```bash
+livekit-server --dev
+```
 
-Responsável por:
+### 3. API
 
-* usuários;
-* autenticação;
-* sessões;
-* convites;
-* canais;
-* mensagens;
-* permissões;
-* geração de tokens do LiveKit.
+```bash
+cd api
+cargo run
+```
 
-### Mídia
+### 4. Desktop
 
-O LiveKit será responsável pela camada de mídia:
+```bash
+cd desktop
+pnpm install
+pnpm tauri dev
+```
+
+Para ver as métricas de desempenho da captura no terminal, rode com `RUST_LOG=info,perf=debug`.
+Números de desempenho só valem em build de release.
+
+## Arquitetura
+
+O app se divide em duas partes que conversam pelo IPC do Tauri:
+
+* **React (webview):** interface, conexão com a sala do LiveKit, microfone, reprodução das vozes e
+  exibição das transmissões dos outros participantes.
+* **Rust:** captura de janelas, telas e do áudio de aplicativos, e tudo que depende do sistema
+  operacional.
 
 ```text
 Desktop
-   ├── HTTP ──────→ API
-   │                 └── token LiveKit
-   │
-   └── LiveKit SDK ─→ LiveKit Server
+   ├── React ── HTTP ──────────→ API
+   │     │                        └── token LiveKit
+   │     └── LiveKit SDK ──────→ LiveKit Server
+   │           ↑
+   └── Rust (captura de tela e áudio) ── IPC ──┘
 ```
 
-Não será implementado um servidor WebRTC/SFU próprio.
+A API cuida de usuários, autenticação, sessões, convites, canais, mensagens, permissões e da geração
+dos tokens do LiveKit. Não será implementado um servidor de mídia próprio: o LiveKit cuida dessa
+camada.
+
+Os detalhes estão em [`ARCHITECTURE.md`](ARCHITECTURE.md), e os motivos das principais decisões em
+[`docs/adr/`](docs/adr/).
 
 ## Prioridade
 
@@ -156,52 +165,39 @@ O detalhamento do roadmap fica em [`docs/roadmap.md`](docs/roadmap.md).
 
 ## Infraestrutura
 
-O desenvolvimento será inicialmente local.
-
-Antes de contratar uma VPS, a ideia é testar o projeto utilizando **Cloudflare Tunnel** para expor os serviços necessários e avaliar:
-
-* estabilidade;
-* latência;
-* conectividade;
-* praticidade;
-* experiência com usuários reais.
-
-A VPS será considerada somente se os testes mostrarem que o túnel não atende às necessidades do projeto.
+O desenvolvimento é local. Para os testes com usuários reais, a infraestrutura será montada em
+etapas, sem custo fixo até que o uso justifique:
 
 ```text
 Desenvolvimento local
         ↓
-Cloudflare Tunnel
-        ↓
 Testes com usuários reais
+  • API pelo Cloudflare Tunnel
+  • mídia pelo LiveKit Cloud (plano gratuito)
         ↓
 Avaliação
         ↓
-VPS, se necessário
+VPS com LiveKit próprio, quando o uso ficar regular
 ```
 
-## Desenvolvimento
+**API pelo Cloudflare Tunnel.** O túnel nomeado é gratuito e exige uma conta na Cloudflare e um domínio
+com o DNS gerenciado por ela. Ele só transporta HTTP e WebSocket, por isso serve para a API, mas não
+para a mídia, que trafega por UDP.
 
-### Desktop
+**Mídia pelo LiveKit Cloud.** O plano gratuito (Build) inclui, por mês, 5.000 minutos de participante,
+50 GB de dados transferidos e até 100 participantes simultâneos. Os limites são um teto rígido: se
+forem atingidos, novas conexões falham até o início do mês seguinte. Como estimativa, isso comporta
+algumas noites de chamada por mês com o grupo inteiro, e perto de 10 horas de compartilhamento de tela
+assistido por quatro pessoas. Acompanhe o consumo no painel do LiveKit Cloud.
 
-```bash
-cd desktop
-pnpm install
-pnpm tauri dev
-```
-
-### API
-
-```bash
-cd api
-cargo run
-```
+**VPS.** Quando os limites do plano gratuito começarem a apertar, o servidor do LiveKit (que é
+gratuito e de código aberto) passa a rodar numa VPS. Para o código, a troca é só de configuração: a
+URL, a chave e o segredo do LiveKit no `.env`.
 
 ## Status
 
-Em desenvolvimento.
-
-A implementação atual está começando pela base do `desktop` com Tauri/React e da `api` com Rust/Axum.
+Em desenvolvimento, na **v0.1**. O foco atual é a reorganização do compartilhamento de tela em uma
+estrutura definitiva, detalhada em [`ARCHITECTURE.md`](ARCHITECTURE.md).
 
 ## Licença
 

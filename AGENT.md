@@ -29,7 +29,7 @@ Aplicada hoje em `media/` e nos arquivos-raiz; `legacy/` ainda nao.
 ## Onde ficam as decisões técnicas
 
 - [`PLAN.md`](PLAN.md) — plano em andamento (fase atual: reorganização/correções do protótipo de
-  screen share, "marco-0"), com as decisões já tomadas registradas no topo.
+  screen share, "v0.1"), com as decisões já tomadas registradas no topo.
 - [`NOTES.md`](NOTES.md) — checklist dos problemas conhecidos do protótipo, o que já foi resolvido
   e o que foi conscientemente adiado.
 

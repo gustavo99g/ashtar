@@ -681,7 +681,7 @@ A10 — Navegação texto + voz
 
 ## Infraestrutura
 
-A primeira tentativa será utilizando **Cloudflare Tunnel** para expor os serviços necessários a partir do ambiente disponível.
+A API vai atrás do **Cloudflare Tunnel** (gratuito, só HTTP/WebSocket); a mídia usa o **LiveKit Cloud** (plano gratuito). Ver o detalhamento em [README.md](../README.md).
 
 A avaliação deverá considerar:
 
@@ -693,7 +693,7 @@ A avaliação deverá considerar:
 * experiência dos usuários;
 * manutenção.
 
-Somente depois dessa avaliação será decidido se uma VPS é necessária.
+Quando os limites do plano gratuito do LiveKit Cloud começarem a apertar com o uso regular, o LiveKit passa a rodar numa VPS própria.
 
 ---
 

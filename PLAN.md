@@ -1,8 +1,8 @@
-# Plano — Marco 0: reorganização e correções do protótipo de screen share
+# Plano — v0.1: reorganização e correções do compartilhamento de tela
 
 Este plano cobre a reorganização do protótipo e as correções das revisões, **antes** do publicador nativo
-em Rust. O publicador e a medição comparativa ficam para o plano seguinte, que vai se encaixar na
-estrutura criada aqui.
+em Rust. O publicador e a medição comparativa ficam para um plano seguinte, que vai se encaixar na
+estrutura criada aqui. As versões seguem a numeração do `README.md` (v0.1, v0.2...).
 
 **Objetivo desta fase:** o app faz exatamente o que faz hoje, mas organizado, sem os vazamentos e bugs
 encontrados, e pronto para receber uma segunda implementação de compartilhamento sem mexer no resto.
@@ -179,11 +179,33 @@ O caminho IPC usa `Channel<InvokeResponseBody>`, e não há certeza de suporte n
 `commands.ts` tem wrappers tipados à mão. Quando o caminho IPC for removido, trocar pelos bindings
 gerados.
 
+### 16. Presets de qualidade
+
+O compartilhamento oferece três presets, nomeados pelo uso na interface:
+
+| Preset | Valor no contrato | Caixa máxima | fps | Bitrate inicial | Dica ao encoder |
+|---|---|---|---|---|---|
+| Movimento | `720p60` | 1280×720 | 60 | 3 a 4 Mbps | `contentHint "motion"`, `maintain-framerate` |
+| Equilibrado | `900p60` | 1600×900 | 60 | 4 a 5 Mbps | `contentHint "motion"`, `maintain-framerate` |
+| Nitidez | `1080p30` | 1920×1080 | 30 | 4 a 5 Mbps | `contentHint "detail"`, `maintain-resolution` |
+
+- A imagem é reduzida para caber na **caixa** do preset (largura e altura), mantendo a proporção, e
+  nunca é ampliada. Janelas de proporção livre (altas e estreitas, por exemplo) também respeitam o limite.
+- A dica ao encoder define o que é sacrificado quando a banda aperta: nos presets de 60 fps cai a
+  resolução, no de 1080p30 cai o fps e o texto continua legível.
+- Os bitrates são pontos de partida, a ajustar depois de testes reais.
+- **Teto do ACK no caminho IPC:** com no máximo N frames em trânsito, o fps máximo é N dividido pelo tempo
+  de ida e volta de um frame. Os ~43 fps medidos com N = 3 indicam ~70 ms de ida e volta (em dev). Para
+  sustentar 60 fps, o tempo precisa cair para menos de 50 ms ou N precisa subir; por isso o limite do
+  `FrameGate` faz parte da configuração de cada preset.
+- 1080p60 e resoluções acima (4K) ficam fora desta versão. Dependem do publicador nativo com encoder por
+  hardware (ver ADR 0007) e pesam no plano gratuito do LiveKit Cloud.
+
 ---
 
 ## Etapa 1: preparação — concluída
 
-- Commit, tag `prototipo-v0`, push e branch `marco-0`.
+- Commit, tag `prototipo-v0`, push. O trabalho seguiu na branch `dev-screen-share`; a branch `marco-0` prevista aqui não chegou a ser criada.
 - `NOTES.md` na raiz com os problemas conhecidos do protótipo, usado como lista de verificação.
 
 ## Etapa 2: esqueleto do Rust — concluída
@@ -296,12 +318,14 @@ nem LiveKit.
 
 ### Passo 6: `video_capture.rs` — pendente
 
-- `VideoCaptureConfig { source: SourceRef, max_width: u32, fps: u32 }`.
+- `VideoCaptureConfig { source: SourceRef, max_width: u32, max_height: u32, fps: u32 }`, preenchido a
+  partir do preset (decisão 16).
 - Construída sobre `spawn_capture`; `DesktopCapturer` criado dentro da thread. Fonte inexistente falha
   com `SourceNotFound` na inicialização.
 - Controle de taxa por deadline (sem acumular atraso), respeitando o `FrameGate` quando houver.
 - Conversão para I420 usando o stride do frame; redução com o `scale` do I420 quando passar de
-  `max_width`; proteção para janelas muito pequenas; dimensões pares.
+  a caixa `max_width` × `max_height`, sem nunca ampliar; proteção para janelas muito pequenas;
+  dimensões pares.
 - Timestamps a partir de `Instant` (não `SystemTime`).
 - **Fonte fechada:** ~30 erros consecutivos (≈1 s) encerram com `SourceClosed`.
 - Opcional: reenvio do último frame após ~500 ms sem novidade.
@@ -353,12 +377,13 @@ também ao publicador nativo. `StartOptions`:
 ```json
 {
   "source": { "kind": "window", "id": 123 },
-  "quality": "720p30",
+  "quality": "720p60",
   "audio": { "mode": "application", "processId": 456 }
 }
 ```
 
-`quality` é `720p30` ou `1080p60`, mapeada para `max_width`/`fps` no Rust.
+`quality` é `720p60`, `900p60` ou `1080p30` (decisão 16). O Rust mapeia o valor para a caixa máxima, o
+fps e o limite do `FrameGate`; o frontend mapeia para o bitrate e as dicas ao encoder.
 
 ### 4.2 Eventos
 
@@ -411,7 +436,8 @@ chama `dispose()` quando a sala cai ou o usuário troca de canal.
 ### 5.3 `IpcScreenShare`
 
 Recebe o `Room`; concentra o generator, o `ScreenShareAudio`, os ACKs, a escuta dos dois eventos e o
-teardown. Correções: `videoEncoding` e `contentHint = "detail"` no vídeo;
+teardown. Correções: `videoEncoding`, `contentHint` e `degradationPreference` de acordo com o preset
+(decisão 16);
 `AudioPresets.musicHighQualityStereo` e `dtx: false` no áudio; sem cópia extra no handler de frame;
 proteção contra início duplo; ao receber `screen-share-audio-ended`, despublicar a trilha de áudio.
 
@@ -429,8 +455,10 @@ restauração do mute anterior ao sair do deafen; tratamento de `Reconnecting`/`
 
 ### 5.6 `SourcePicker`
 
-Lista sem miniaturas, telas e janelas separadas, com os ícones vindos do Rust; escolha de qualidade e de
-áudio. Escrito sabendo que, em algumas plataformas, o seletor será do sistema (decisão 14).
+Lista sem miniaturas, telas e janelas separadas (a aba de telas mostra a disposição física dos monitores,
+a partir do `MonitorInfo`), com os ícones vindos do Rust; os três presets de qualidade nomeados pelo uso,
+com a descrição do selecionado; e a escolha de áudio. Escrito sabendo que, em algumas plataformas, o
+seletor será do sistema (decisão 14). O desenho de referência está no canvas de telas.
 
 ## Etapa 6: verificação — pendente
 
@@ -446,8 +474,9 @@ Lista sem miniaturas, telas e janelas separadas, com os ícones vindos do Rust; 
    continua mutado.
 7. As janelas do próprio app não aparecem no seletor.
 8. Compartilhar um jogo por duas horas com o app minimizado, com alguém assistindo, em build de release;
-   anotar CPU, memória e picotes, separadamente para 720p30 e 1080p60. É a linha de base do próximo
-   plano (1080p60 lento pelo caminho IPC é esperado, não é bug desta fase).
+   anotar CPU, memória e picotes, separadamente para os três presets. Registrar fps, maior intervalo
+   entre frames e quantos intervalos passaram de 20, 34 e 50 ms, não só a média. Antes, confirmar a
+   taxa real da fonte (um vídeo a 30 fps nunca vai medir 60). É a linha de base do plano seguinte.
 
 **Critério de pronto da fase:** todos os itens do `NOTES.md` resolvidos ou conscientemente adiados, a
 lista acima passando, e o provider sem nenhuma referência direta a generator, worklet ou comandos de

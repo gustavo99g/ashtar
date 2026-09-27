@@ -1,4 +1,4 @@
-# NOTES — problemas conhecidos do protótipo (marco-0)
+# NOTES — problemas conhecidos do protótipo (v0.1)
 
 Lista de verificação para a fase "reorganização + correções" (Etapas 1-6 do `PLAN.md`).
 Cada item deve ser resolvido ou conscientemente adiado (marcar como tal) antes de fechar a fase.
@@ -143,7 +143,8 @@ some de fato quando o código legado for substituído por ela.
       do webview, que o WebView2 pode desacelerar. Se degradar, testar `additionalBrowserArgs` com
       `--disable-background-timer-throttling --disable-renderer-backgrounding
       --disable-backgrounding-occluded-windows` (mantendo os argumentos padrão do Tauri).
-- [ ] Linha de base de desempenho em build de release, separada para 720p30 e 1080p60.
+- [ ] Linha de base de desempenho em build de release, separada para os três presets de qualidade
+      (decisão 16 do PLAN.md).
 
 ## Limitações conhecidas (não são bugs)
 
