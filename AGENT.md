@@ -33,6 +33,16 @@ Aplicada hoje em `media/` e nos arquivos-raiz; `legacy/` ainda nao.
 - [`NOTES.md`](NOTES.md) — checklist dos problemas conhecidos do protótipo, o que já foi resolvido
   e o que foi conscientemente adiado.
 
+### Raiz vs. `docs/`
+
+- **Raiz** = documentos de trabalho, estado atual da fase em andamento: `README.md`, `AGENT.md`,
+  `PLAN.md`, `NOTES.md`. Mudam a cada tarefa, ficam visiveis assim que alguem abre o repo.
+- **`docs/`** = referencia/convencao, o que vale independente da fase (`commit-convention.md`,
+  `rust-code-documentation.md`). Editado com pouca frequencia, consultado quando surge a duvida
+  ("qual o padrao de commit?", "como documento unsafe aqui?").
+
+Novo documento de trabalho da fase atual entra na raiz; nova convencao estavel entra em `docs/`.
+
 Antes de propor mudanças de arquitetura, checar se já existe uma decisão registrada nesses dois
 arquivos em vez de decidir de novo.
 
