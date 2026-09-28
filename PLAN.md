@@ -301,11 +301,17 @@ janela em foco, detalhes da janela em foco, mapeamento das telas do capturer e l
 **Pendente:** confirmar o mapeamento de monitores com dois monitores conectados, se ainda não foi feito.
 A exclusão das janelas do próprio app só pode ser verificada na Etapa 4, com o app rodando.
 
-### Passo 4: sinks de diagnóstico — pendente
+### Passo 4: sinks de diagnóstico — concluído
 
-Em `media/diagnostics.rs`: um sink de vídeo que registra fps e resolução, e um de áudio que registra o
-nível (RMS) das amostras, ambos no target `perf`. Servem para testar cada captura isoladamente, sem IPC
-nem LiveKit.
+Em `media/diagnostics.rs`: `LogVideoSink` registra fps, resolução e os intervalos entre frames (máximo
+da janela, e contagem cumulativa acima de 20/34/50 ms — a média de fps sozinha esconde travadas
+pontuais); `LogAudioSink` registra a taxa real de amostras e o nível do sinal (RMS e pico, em dBFS).
+Ambos no target `perf`, um relatório por segundo. Servem para testar cada captura isoladamente, sem IPC
+nem LiveKit no meio; se a captura parar de entregar, os logs param, o que já é o sinal de travamento.
+
+Testes: contagem cumulativa dos intervalos (um gap de 60 ms conta nos três limites), `mem::take` zera
+as estatísticas do relatório anterior, conversão linear → dBFS (piso de -100 dB pro silêncio), e o sink
+de áudio nunca devolve `Stop`.
 
 ### Passo 5: captura de áudio — pendente
 
