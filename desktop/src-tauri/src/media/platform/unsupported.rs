@@ -8,6 +8,9 @@
 
 use crate::media::sources::{MonitorInfo, WindowDetails};
 
+use crate::error::AppError;
+use crate::media::{audio::AudioTarget, AudioSink, CaptureHandle, OnEnd};
+
 /// Sempre `Some`, com os campos vazios: sem implementacao de plataforma,
 /// ainda mostramos a janela na lista, so sem PID/icone.
 pub fn window_details(_id: u64) -> Option<WindowDetails> {
@@ -21,4 +24,12 @@ pub fn window_details(_id: u64) -> Option<WindowDetails> {
 /// o monitor alem do que o DesktopCapturer ja devolve.
 pub fn monitor_details(_id: u64) -> Option<MonitorInfo> {
     None
+}
+
+pub fn spawn_audio_capture(
+    _target: AudioTarget,
+    _sink: impl AudioSink,
+    _on_end: OnEnd,
+) -> Result<CaptureHandle, AppError> {
+    Err(AppError::Unsupported("captura de áudio"))
 }

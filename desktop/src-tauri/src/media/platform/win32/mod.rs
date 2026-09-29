@@ -7,4 +7,5 @@
 pub mod audio_capture;
 pub mod sources;
 
+pub use audio_capture::spawn_audio_capture;
 pub use sources::{monitor_details, window_details};
