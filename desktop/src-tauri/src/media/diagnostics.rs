@@ -90,8 +90,6 @@ impl VideoSink for LogVideoSink {
             // Esvazia as estatísticas e as devolve, deixando um GapStats::default() no lugar.
             let gaps = std::mem::take(&mut self.gaps);
 
-            // Se o compilador disser que `width()` não existe no I420Buffer, acrescente
-            // `use livekit::webrtc::video_frame::VideoBuffer;` no topo do arquivo.
             debug!(
                 target: "perf",
                 fps = round1(self.frames as f64 / elapsed.as_secs_f64()),

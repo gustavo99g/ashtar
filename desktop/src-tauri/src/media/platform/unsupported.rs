@@ -2,13 +2,11 @@
 //!
 //! window_details devolve valores vazios (a janela ainda aparece na
 //! lista, so sem PID/icone); monitor_details devolve None (nenhum dado
-//! extra sobre o monitor). audio_capture.rs ganha o equivalente
-//! (retornando AppError::Unsupported) quando a captura de audio entrar
-//! aqui (passo 5).
-
-use crate::media::sources::{MonitorInfo, WindowDetails};
+//! extra sobre o monitor); spawn_audio_capture devolve
+//! AppError::Unsupported, ja que nao ha captura de audio sem plataforma.
 
 use crate::error::AppError;
+use crate::media::sources::{MonitorInfo, WindowDetails};
 use crate::media::{audio::AudioTarget, AudioSink, CaptureHandle, OnEnd};
 
 /// Sempre `Some`, com os campos vazios: sem implementacao de plataforma,
@@ -26,6 +24,13 @@ pub fn monitor_details(_id: u64) -> Option<MonitorInfo> {
     None
 }
 
+/// Sempre `Err(Unsupported)`: sem implementacao de plataforma nao ha como
+/// capturar audio. Nao cria thread nem chama o `on_end`.
+///
+/// # Bloqueia
+///
+/// Aqui falha na hora, mas a assinatura e a mesma da versao real, que espera
+/// a captura inicializar: chamar so dentro de `spawn_blocking`.
 pub fn spawn_audio_capture(
     _target: AudioTarget,
     _sink: impl AudioSink,
