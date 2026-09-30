@@ -313,7 +313,7 @@ Testes: contagem cumulativa dos intervalos (um gap de 60 ms conta nos três limi
 as estatísticas do relatório anterior, conversão linear → dBFS (piso de -100 dB pro silêncio), e o sink
 de áudio nunca devolve `Stop`.
 
-### Passo 5: captura de áudio — pendente
+### Passo 5: captura de áudio — implementado, validação manual pendente
 
 - Entrada comum em `media/audio.rs`, que escolhe a implementação da plataforma; implementação WASAPI em
   `platform/win32/audio_capture.rs`; versão em `unsupported.rs` retornando `Unsupported`.
@@ -321,6 +321,11 @@ de áudio nunca devolve `Stop`.
 - Modo por eventos (não polling), buffer de 100 ms, formato f32 estéreo 48 kHz.
 - Flag de silêncio tratada (zerar o buffer); descontinuidade registrada em log.
 - Modo `System` com `std::process::id()` (decisão 3).
+
+**Pendente:** validar com áudio real, usando os testes ignorados de `media/audio.rs` e o `LogAudioSink`
+(taxa perto de 48.000 frames/s e nível coerente com o que está tocando):
+`cargo test --lib media::audio -- --ignored --nocapture captura_o_sistema` e, para um aplicativo,
+`CAPTURE_PID=<pid> cargo test --lib media::audio -- --ignored --nocapture captura_um_aplicativo`.
 
 ### Passo 6: `video_capture.rs` — pendente
 
