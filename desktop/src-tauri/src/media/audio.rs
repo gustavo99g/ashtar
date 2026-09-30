@@ -2,6 +2,7 @@
 //!
 //! A implementação de verdade mora em `platform/<plataforma>/`. Este módulo define
 //! o contrato, resolve os casos que não dependem de plataforma e escolhe a implementação.
+
 use serde::Deserialize;
 
 use super::{platform, AudioSink, CaptureHandle, OnEnd};
@@ -33,7 +34,8 @@ pub enum AudioTarget {
 /// Devolve `Ok(None)` para `AudioMode::Off`, sem criar thread nem chamar o `on_end`.
 ///
 /// # Bloqueia
-/// Até a captura inicializar. Chamar só dentro de `spawn_blocking`.
+///
+/// Espera a captura inicializar. Só chamar dentro de `spawn_blocking`.
 pub fn spawn_audio_capture(
     mode: AudioMode,
     sink: impl AudioSink,
@@ -45,7 +47,7 @@ pub fn spawn_audio_capture(
         AudioMode::Off => return Ok(None),
         AudioMode::Application { process_id } if process_id == own_pid => {
             return Err(AppError::AudioCapture(
-                "Não é possivel capturar o áudio do próprio app".into(),
+                "Não é possível capturar o áudio do próprio app".into(),
             ));
         }
         AudioMode::Application { process_id } => AudioTarget::Process(process_id),
@@ -58,10 +60,46 @@ pub fn spawn_audio_capture(
 mod tests {
     use super::*;
     use crate::media::diagnostics::LogAudioSink;
+    use crate::media::EndReason;
     use std::sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
     };
+    use std::time::Duration;
+
+    /// Liga os logs dentro dos testes. Sem isso, os relatórios do sink não aparecem.
+    fn init_test_logs() {
+        let _ = tracing_subscriber::fmt()
+            .with_env_filter(tracing_subscriber::EnvFilter::new("info,perf=debug"))
+            .with_test_writer()
+            .try_init();
+    }
+
+    fn capture_for(mode: AudioMode, seconds: u64) {
+        init_test_logs();
+
+        let (tx, rx) = std::sync::mpsc::channel();
+        let handle = spawn_audio_capture(
+            mode,
+            LogAudioSink::new(),
+            Box::new(move |reason| {
+                let _ = tx.send(reason);
+            }),
+        )
+        .expect("a captura deveria iniciar")
+        .expect("esse modo deveria criar uma captura");
+
+        std::thread::sleep(Duration::from_secs(seconds));
+        handle.stop_and_join();
+
+        let reason = rx
+            .recv_timeout(Duration::from_secs(1))
+            .expect("o on_end deveria ter sido chamado");
+        assert!(
+            matches!(reason, EndReason::Stopped),
+            "motivo inesperado: {reason:?}"
+        );
+    }
 
     #[test]
     fn off_nao_inicia_nada() {
@@ -98,5 +136,24 @@ mod tests {
 
         let mode: AudioMode = serde_json::from_str(r#"{"mode":"system"}"#).unwrap();
         assert_eq!(mode, AudioMode::System);
+
+        let mode: AudioMode = serde_json::from_str(r#"{"mode":"off"}"#).unwrap();
+        assert_eq!(mode, AudioMode::Off);
+    }
+
+    #[test]
+    #[ignore = "precisa de áudio tocando no computador"]
+    fn captura_o_sistema() {
+        capture_for(AudioMode::System, 10);
+    }
+
+    #[test]
+    #[ignore = "precisa de CAPTURE_PID com o PID de um programa tocando áudio"]
+    fn captura_um_aplicativo() {
+        let pid: u32 = std::env::var("CAPTURE_PID")
+            .expect("defina a variável CAPTURE_PID")
+            .parse()
+            .expect("CAPTURE_PID deve ser um número");
+        capture_for(AudioMode::Application { process_id: pid }, 10);
     }
 }
