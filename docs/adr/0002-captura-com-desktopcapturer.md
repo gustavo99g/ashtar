@@ -47,7 +47,14 @@ A decisão foi condicionada a um teste de correção, que passou:
   acima foi atingido para janelas. Medindo o WGC direto (crate `windows-capture`) na mesma janela 4K,
   com vídeo tocando, ele entrega ~48 fps com a cópia GPU→memória custando ~7 ms. Portanto o custo não
   está na cópia do WGC, nem na espera por conteúdo novo, nem na conversão para I420, nem no cursor: ele
-  está dentro do `capture_frame` do libwebrtc para janelas, **com causa ainda não identificada**. O jogo
-  em si não foi medido. A revisão desta decisão (uma captura de janela própria com o WGC, por exemplo)
-  fica para o plano do publicador nativo; os números e as limitações estão em `NOTES.md`. Nesta fase a
-  decisão continua valendo: tela e janela funcionam, só que abaixo de 60 fps em janelas grandes.
+  está dentro do `capture_frame` do libwebrtc para janelas. **O libwebrtc não usa o WGC para janelas
+  aqui:** durante a captura ele não carrega `GraphicsCapture.dll` nem as DLLs do driver da GPU (que o
+  `windows-capture` carrega), e uma janela minimizada devolve frames 1×1 sem erro. Por inferência, ele
+  usa o GDI, que copia pela CPU.
+  A causa provável é a thread de vídeo não ter o COM inicializado, o que faz o `IsWgcSupported` falhar.
+  Teste: com `wasapi::initialize_mta()` antes de criar o capturer, a janela 4K sobe de ~14 para ~43 fps.
+  Mas há efeitos colaterais medidos (a tela 4K cai de 60 para ~47 fps e o `SourceClosed` deixa de
+  disparar quando a janela fecha), registrados em `NOTES.md`; a mudança não foi aplicada ao código. O
+  jogo em si não foi medido. A revisão desta decisão (inicializar o COM, ou uma captura de janela própria
+  com o WGC) fica para o plano seguinte. Nesta fase a decisão continua valendo: tela e janela
+  funcionam, só que abaixo de 60 fps em janelas grandes.

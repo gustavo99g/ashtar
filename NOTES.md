@@ -159,7 +159,59 @@ some de fato quando o código legado for substituído por ela.
 
 ## Fora do escopo desta fase (adiado conscientemente)
 
-- Publicador de vídeo/áudio nativo em Rust (fica para o próximo plano).
+- Publicador de vídeo/áudio nativo em Rust (fica para o próximo plano). **O plano seguinte não deve
+  começar só por ele:** o publicador troca o envio (IPC → LiveKit direto), mas o atraso das janelas está
+  na captura (ver o item da queda de fps em janelas, abaixo). Ele precisa de três peças:
+  1. **Captura própria de janelas com o WGC** (crate `windows-capture`), só para janelas; as telas
+     continuam no `DesktopCapturer`, que já está rápido. Entra sem mexer no resto, por ser só outra
+     função de captura que entrega `CapturedFrame` a um `VideoSink`. Estimativa (não medida de ponta a
+     ponta): readback (~7 ms em 4K) mais conversão custam ~5 ms em janelas de até ~2,5 Mpx, o que cabe
+     em 60 fps.
+  2. **Redução na GPU antes de copiar para a memória**, para janelas em 4K cheio: readback (~7 ms) mais
+     conversão (~10 ms) somam ~17 ms, mais que os 16,7 ms de um frame a 60 fps. Combina com o encoder
+     por hardware, que também põe a GPU no caminho.
+  3. **O publicador em si**, que tira o teto do `FrameGate`/ACK no caminho IPC (~43 fps, estimado na
+     decisão 16 do `PLAN.md` com o caminho antigo, em dev; vale remedir após o Passo 7).
+
+  **Causa dos ~50 ms: o libwebrtc não usa o WGC para janelas aqui (confirmado); o que ele usa é, por
+  inferência, o GDI.** O GDI copia a janela pela CPU, com custo crescendo com os pixels, o que bate com
+  os ~17 a ~55 ms medidos; as telas ficam rápidas. Três evidências, todas de 2026-10-01, em release,
+  com o Brave maximizado no 4K (3840×2088):
+  1. *Janela minimizada:* o libwebrtc devolveu 687 frames `width=1 height=1` em ~12 s, sem nenhum `WARN`
+     de falha; o fps caiu para ~2 (só os reenvios) e voltou a ~15 ao restaurar. É o comportamento
+     esperado do capturer GDI. (Medido com um `debug!` temporário em `to_i420`; para repetir, usar
+     `debug!(target: "perf", ...)`, porque o filtro dos testes é `info,perf=debug` e o target padrão do
+     módulo seria descartado.)
+  2. *Módulos carregados durante a captura* (`Get-Process ... .Modules`, mesmo binário de teste): com o
+     `windows-capture` (WGC direto) carregam `GraphicsCapture.dll`, `dcomp.dll`, `dxcore.dll` e as DLLs
+     do driver da GPU (`amdxx64`, `atidxx64`, `amdenc64`...). Com o `captura_uma_janela` (libwebrtc)
+     **nenhuma** delas carrega: só `d3d11.dll` e `dxgi.dll`, sem dispositivo D3D na GPU, que o WGC exige.
+  3. *O WGC existe no binário:* o `webrtc.lib` pré-compilado contém `WgcCapturerWin`,
+     `WgcCaptureSession` e `IsWgcSupported`, além de `WindowCapturerWinGdi`, e o lado Rust passa
+     `SourceType::Window` ao `webrtc-sys`, que pede o WGC de janelas. Ou seja, o WGC está disponível e
+     é pedido, mas não é escolhido na hora de criar o capturer.
+
+  **Causa provável encontrada e testada (2026-10-01):** o libwebrtc só escolhe o WGC para janelas se
+  `IsWgcSupported` passar, e isso usa WinRT, que exige COM inicializado na thread que cria o capturer.
+  A thread de captura de vídeo não o inicializava (a de áudio sim, via `wasapi::initialize_mta()`), e o
+  `IsWgcSupported` não gera log. Teste: `let _ = wasapi::initialize_mta();` antes de
+  `DesktopCapturer::new`, em `open_capturer` (experimento revertido; nada disso está no código). Com o
+  Brave 4K e vídeo tocando, em release:
+  - *Janela:* ~14 fps → ~35–45 fps (estável em ~43), e passam a carregar `GraphicsCapture.dll`,
+    `dcomp.dll`, `dxcore.dll` e as DLLs da GPU, ou seja, o WGC entrou. Fica abaixo dos ~48 do WGC direto
+    porque o fluxo ainda paga a conversão para I420 (~10 ms em 4K).
+  - *Efeito colateral 1, tela 4K:* caiu de 54–60 fps para 43–50 fps, porque as telas também passam do
+    DXGI para o WGC (o `webrtc-sys` liga `allow_wgc_screen_capturer`). A tela 1080p segue a 60 fps.
+  - *Efeito colateral 2, janela minimizada:* passa a entregar 60 fps do último frame, sem frames 1×1 e
+    sem `WARN`.
+  - *Efeito colateral 3, janela fechada:* **o `SourceClosed` deixa de disparar.** Numa janela descartável
+    fechada aos ~12 s, o fps ficou em 60 por mais ~18 s, sem nenhum `WARN`, e a captura só terminou pelo
+    tempo do teste (`Stopped`). A detecção do Passo 6 depende de `Grab::Failed`, que o WGC não produz
+    aqui. Uma rodada só; precisa de uma checagem própria da existência da janela (por exemplo, conferir a
+    lista de fontes a cada ~1 s, mesmo sem falha, ou `IsWindow` atrás de `platform::`).
+  - Opção para manter as telas no DXGI: inicializar o COM só quando a fonte for uma janela. Isso depende
+    de um efeito colateral (sem COM, o `IsWgcSupported` falha e o libwebrtc cai no DXGI), então precisa
+    de um teste que o proteja.
 - Medição/comparação de desempenho estruturada (fica para o próximo plano; a Etapa 6 só coleta a
   linha de base).
 - Queda de fps na captura de **janelas** (antes registrada como "queda com jogos": ~18–20 fps em dev,
@@ -194,7 +246,7 @@ some de fato quando o código legado for substituído por ela.
   no libwebrtc. (3) **Não** é a conversão para I420 (3–10 ms). (4) **Não** é a composição do cursor:
   com `set_include_cursor(false)` continuou em ~14 fps. (5) Sobram ~50 ms por frame dentro do
   `capture_frame` do libwebrtc para janelas, que nem o readback nem a conversão explicam, e que não
-  aparecem em telas do mesmo tamanho. **A causa dessa diferença não foi identificada.**
+  aparecem em telas do mesmo tamanho. **Causa: o libwebrtc não usa o WGC para janelas (confirmado pelos módulos carregados) e, por inferência, usa o GDI; ver o item do publicador nativo.**
 
   Consequências para o plano do publicador nativo: como o `capture_frame` é síncrono, ele limita o fps
   do laço (fps ≈ 1000 / `capture_frame_ms`). Uma captura própria de janela com o `windows-capture`
