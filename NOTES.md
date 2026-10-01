@@ -162,8 +162,26 @@ some de fato quando o código legado for substituído por ela.
 - Publicador de vídeo/áudio nativo em Rust (fica para o próximo plano).
 - Medição/comparação de desempenho estruturada (fica para o próximo plano; a Etapa 6 só coleta a
   linha de base).
-- Investigação da queda de fps com jogos (~18–20 fps em dev, quedas até 10): usar o target `perf` em
-  build de release para descobrir se o tempo está no `capture_frame`, na conversão ou no IPC.
+- Queda de fps na captura de **janelas** grandes (antes registrada como "queda com jogos": ~18–20 fps em
+  dev, quedas até 10). Medido em release, só com o `LogVideoSink` (sem IPC), por etapa:
+
+  | Fonte | Pixels | `capture_frame` | conversão | fps |
+  |---|---|---|---|---|
+  | Tela 1080p | 2,1 Mpx | 4,1 ms | 3,7 ms | 60 |
+  | Tela 4K | 8,3 Mpx | ~12 ms | ~9 ms | 54–60 |
+  | Janela 1928×1043 | 2,0 Mpx | 21–29 ms | 3,4–4,4 ms | ~47 |
+  | Janela 2393×1146 | 2,7 Mpx | ~29 ms | ~3,9 ms | ~36 |
+  | Janela 3854×2105 (4K) | 8,1 Mpx | ~65 ms | ~10,5 ms | ~16 |
+
+  Conclusões: (1) o custo está na **captura de janela** (`capture_frame` menos a conversão: ~17–25 ms
+  com 2 Mpx e ~55 ms com 8 Mpx, contra ~0,3–3 ms numa tela do mesmo tamanho), e cresce com os pixels
+  da janela; é consistente com a cópia GPU→memória do WGC, mas isso não foi isolado. (2) A conversão
+  para I420 não é o gargalo hoje (3–10 ms), embora em 4K ela já ocupe ~10 dos 16,7 ms de um frame a
+  60 fps. (3) O `capture_frame` é síncrono, então ele limita o fps do laço: fps ≈ 1000 / `capture_frame_ms`.
+  O número da tela, sozinho, não vale para janelas. Limitações da medição: uma rodada por fonte, com
+  outros programas abertos; falta medir um jogo de verdade. Direções para o plano seguinte (decisão 1 e
+  ADR 0002): WGC próprio, reduzindo na GPU antes de copiar. A falha de 0,31 s no primeiro teste de tela
+  4K não se repetiu em 3 execuções e a causa não foi identificada.
 - Miniaturas no seletor de fontes. Enquanto isso, o seletor mostra só ícones. Pontos do código de preview
   do protótipo a corrigir quando voltarem ao escopo: previews enviados como `Vec<u8>` em JSON e uma
   sessão WGC aberta por janela.

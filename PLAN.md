@@ -16,7 +16,7 @@ funcionalidade nova de voz, e suporte a Linux e web (ver decisão 14 para os cui
 |---|---|---|
 | 1 | Preparação | Concluída |
 | 2 | Esqueleto do Rust | Concluída |
-| 3 | Captura desacoplada do destino | Em andamento (passos 0 a 3 concluídos) |
+| 3 | Captura desacoplada do destino | Em andamento (passos 0 a 6 concluídos) |
 | 4 | Contrato entre Rust e React | Pendente |
 | 5 | Frontend | Pendente |
 | 6 | Verificação | Pendente |
@@ -330,7 +330,7 @@ Validado manualmente com áudio real, pelos testes ignorados de `media/audio.rs`
 `cargo test --lib media::audio -- --ignored --nocapture captura_o_sistema` e, para um aplicativo,
 `CAPTURE_PID=<pid> cargo test --lib media::audio -- --ignored --nocapture captura_um_aplicativo`.
 
-### Passo 6: `video_capture.rs` — pendente
+### Passo 6: `video_capture.rs` — concluído
 
 - `VideoCaptureConfig { source: SourceRef, max_width: u32, max_height: u32, fps: u32 }`, preenchido a
   partir do preset (decisão 16).
@@ -341,8 +341,18 @@ Validado manualmente com áudio real, pelos testes ignorados de `media/audio.rs`
   a caixa `max_width` × `max_height`, sem nunca ampliar; proteção para janelas muito pequenas;
   dimensões pares.
 - Timestamps a partir de `Instant` (não `SystemTime`).
-- **Fonte fechada:** ~30 erros consecutivos (≈1 s) encerram com `SourceClosed`.
-- Opcional: reenvio do último frame após ~500 ms sem novidade.
+- **Fonte fechada:** 1 s de falhas seguidas dispara a conferência na lista de fontes do capturer; se a
+  fonte sumiu, encerra com `SourceClosed`. Se ainda está lá (janela minimizada), a captura continua e a
+  conferência se repete a cada 1 s. (Critério mudou em relação ao plano inicial, de ~30 erros
+  consecutivos, porque contar erros não distingue janela fechada de janela minimizada.)
+- Reenvio do último frame após 500 ms sem novidade, respeitando o `FrameGate`.
+
+Testes automáticos: `fit_in_box` (reduz, nunca amplia, lados pares e nunca zero), validação da
+configuração e intervalo entre frames. Testes ignorados (precisam de área de trabalho real): fonte
+inexistente falha na inicialização, tela principal por 10 s, e `captura_uma_tela`/`captura_uma_janela`
+(`CAPTURE_MONITOR`/`CAPTURE_WINDOW`; `CAPTURE_FPS` opcional). Validado à mão: tela a 60 fps; fechar a
+janela no meio da captura encerra a captura (o motivo exato impresso não foi conferido). O desempenho com janelas grandes ficou
+abaixo de 60 fps; as medições estão no `NOTES.md`.
 
 ### Passo 7: `ipc_sink.rs` — pendente
 
