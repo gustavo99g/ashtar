@@ -162,8 +162,11 @@ some de fato quando o código legado for substituído por ela.
 - Publicador de vídeo/áudio nativo em Rust (fica para o próximo plano).
 - Medição/comparação de desempenho estruturada (fica para o próximo plano; a Etapa 6 só coleta a
   linha de base).
-- Queda de fps na captura de **janelas** grandes (antes registrada como "queda com jogos": ~18–20 fps em
-  dev, quedas até 10). Medido em release, só com o `LogVideoSink` (sem IPC), por etapa:
+- Queda de fps na captura de **janelas** (antes registrada como "queda com jogos": ~18–20 fps em dev,
+  quedas até 10). Medido em release, sem IPC, só com o `LogVideoSink`.
+
+  **Pelo libwebrtc (`DesktopCapturer`), por etapa** (cada janela com um conteúdo diferente, de cadência
+  desconhecida; uma rodada por fonte, com outros programas abertos):
 
   | Fonte | Pixels | `capture_frame` | conversão | fps |
   |---|---|---|---|---|
@@ -173,20 +176,39 @@ some de fato quando o código legado for substituído por ela.
   | Janela 2393×1146 | 2,7 Mpx | ~29 ms | ~3,9 ms | ~36 |
   | Janela 3854×2105 (4K) | 8,1 Mpx | ~65 ms | ~10,5 ms | ~16 |
 
-  Conclusões: (1) o custo está na **captura de janela** (`capture_frame` menos a conversão: ~17–25 ms
-  com 2 Mpx e ~55 ms com 8 Mpx, contra ~0,3–3 ms numa tela do mesmo tamanho), e cresce com os pixels
-  da janela; é consistente com a cópia GPU→memória do WGC, mas isso não foi isolado. (2) A conversão
-  para I420 não é o gargalo hoje (3–10 ms), embora em 4K ela já ocupe ~10 dos 16,7 ms de um frame a
-  60 fps. (3) O `capture_frame` é síncrono, então ele limita o fps do laço: fps ≈ 1000 / `capture_frame_ms`.
-  O número da tela, sozinho, não vale para janelas. Limitações da medição: uma rodada por fonte, com
-  outros programas abertos; falta medir um jogo de verdade. Direções para o plano seguinte (decisão 1 e
-  ADR 0002): WGC próprio, reduzindo na GPU antes de copiar. **Primeiro experimento, barato:** medir o
-  caminho WGC do `legacy/` (crate `windows-capture`) com a mesma janela 4K, só lendo o buffer dos
-  frames, antes de ele ser removido (Etapa 4.4). Se for rápido, o problema é o uso que o libwebrtc faz
-  do WGC e a alternativa "WGC corrigido" fica concreta; se também for lento, é o WGC em si. A falha de
-  0,31 s no primeiro teste de tela 4K não se repetiu em 3 execuções e a causa não foi identificada.
-  Os logs de tempo por etapa (`capture_frame` e conversão, target `perf`) foram usados nessa medição e
-  depois removidos do código; estão no commit `d418b00` (`video_capture.rs`), caso seja preciso repetir.
+  **WGC direto, sem o libwebrtc** (crate `windows-capture` do `legacy/`, teste
+  `mede_o_wgc_de_uma_janela`; `readback` = `frame.buffer()`, a cópia GPU→memória), janelas de 3840×2088:
+
+  | Janela | Conteúdo | Frames que chegam | Readback |
+  |---|---|---|---|
+  | VS Code | texto, quase parado | 13,5–18,2 fps | 6,4–6,7 ms |
+  | Brave | página parada | 0,4–30 fps | 6,9–7,1 ms |
+  | Brave | vídeo tocando | ~48 fps | 7,2–7,6 ms (máx. 8,9–12,3) |
+
+  **Controle** (mesma janela do Brave, 3840×2088, vídeo tocando, rodadas separadas): o WGC direto entrega
+  ~48 fps; o libwebrtc entrega ~14 fps (~71 ms por frame).
+
+  O que está estabelecido: (1) a cópia GPU→memória do WGC custa ~7 ms em 4K, então **não** é o gargalo
+  (isto corrige uma hipótese anterior deste item). (2) **Não** é espera por conteúdo novo: o WGC direto
+  entrega 48 fps na mesma janela em que o libwebrtc só consegue 14, e o Brave parado chegou a 45–47 fps
+  no libwebrtc. (3) **Não** é a conversão para I420 (3–10 ms). (4) **Não** é a composição do cursor:
+  com `set_include_cursor(false)` continuou em ~14 fps. (5) Sobram ~50 ms por frame dentro do
+  `capture_frame` do libwebrtc para janelas, que nem o readback nem a conversão explicam, e que não
+  aparecem em telas do mesmo tamanho. **A causa dessa diferença não foi identificada.**
+
+  Consequências para o plano do publicador nativo: como o `capture_frame` é síncrono, ele limita o fps
+  do laço (fps ≈ 1000 / `capture_frame_ms`). Uma captura própria de janela com o `windows-capture`
+  custaria readback + conversão: ~5 ms para janelas de até ~2,5 Mpx (cabe em 60 fps) e ~17 ms em 4K
+  cheio (não cabe em CPU; só reduzindo na GPU antes de copiar). Decidir se vale uma captura própria
+  para janelas antes disso é uma decisão do plano seguinte (ADR 0002). O teste
+  `mede_o_wgc_de_uma_janela` fica em `legacy/screen_share/windows.rs` até a Etapa 4.4, a não ser que
+  vire a base da captura própria.
+
+  Limitações: as rodadas do libwebrtc e do WGC direto foram feitas uma depois da outra, não ao mesmo
+  tempo; falta medir um jogo de verdade. A falha de 0,31 s no primeiro teste de tela 4K não se repetiu
+  em 3 execuções e a causa não foi identificada. Os logs de tempo por etapa (`capture_frame` e
+  conversão, target `perf`) foram usados nessa medição e depois removidos do código; estão no commit
+  `d418b00` (`video_capture.rs`), caso seja preciso repetir.
 - Miniaturas no seletor de fontes. Enquanto isso, o seletor mostra só ícones. Pontos do código de preview
   do protótipo a corrigir quando voltarem ao escopo: previews enviados como `Vec<u8>` em JSON e uma
   sessão WGC aberta por janela.

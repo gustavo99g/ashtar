@@ -41,12 +41,13 @@ A decisão foi condicionada a um teste de correção, que passou:
 - Com um jogo aberto, a taxa caiu para cerca de 20 fps em build de dev. A investigação está pendente;
   se a causa estiver no próprio `capture_frame`, esta decisão deve ser revista em favor do WGC
   corrigido.
-- **Medição (2026-10-01, build de release, só com o `LogVideoSink`, sem IPC):** em telas, a captura em
+- **Medição (2026-10-01, build de release, sem IPC, só com o `LogVideoSink`):** em telas, a captura em
   si (o `capture_frame` menos a conversão para I420) custa de 0,3 a 3 ms, e a tela 4K chega a 60 fps.
-  Em janelas custa ~17 a ~25 ms com 2 a 2,7 Mpx e ~55 ms com 8 Mpx (cerca de 16 fps numa janela 4K),
-  crescendo com os pixels da janela. A conversão fica em 3 a 10 ms nos dois casos. Ou seja, para
-  janelas o custo está no próprio `capture_frame`, e o gatilho de revisão acima foi atingido. Ainda
-  não se sabe se o problema é o WGC em si ou o jeito como o libwebrtc o usa, e o jogo em si não foi
-  medido com esses logs. A revisão fica para o plano do publicador nativo (detalhes e tabela em
-  `NOTES.md`). A decisão continua valendo nesta fase: tela e janela funcionam, só que abaixo de 60 fps
-  em janelas grandes.
+  Em janelas custa ~17 a ~55 ms, e numa janela 4K o libwebrtc chega a ~14–16 fps. O gatilho de revisão
+  acima foi atingido para janelas. Medindo o WGC direto (crate `windows-capture`) na mesma janela 4K,
+  com vídeo tocando, ele entrega ~48 fps com a cópia GPU→memória custando ~7 ms. Portanto o custo não
+  está na cópia do WGC, nem na espera por conteúdo novo, nem na conversão para I420, nem no cursor: ele
+  está dentro do `capture_frame` do libwebrtc para janelas, **com causa ainda não identificada**. O jogo
+  em si não foi medido. A revisão desta decisão (uma captura de janela própria com o WGC, por exemplo)
+  fica para o plano do publicador nativo; os números e as limitações estão em `NOTES.md`. Nesta fase a
+  decisão continua valendo: tela e janela funcionam, só que abaixo de 60 fps em janelas grandes.
