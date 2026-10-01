@@ -1095,3 +1095,94 @@ impl LatestFrame {
         self.condvar.notify_all();
     }
 }
+
+// Mede o WGC direto, sem o libwebrtc (ver NOTES.md, item da queda de fps em janelas). É a única forma de
+// repetir essa comparação. Sai junto com o `legacy/` (Etapa 4.4), a não ser que vire a base de uma captura
+// própria de janelas.
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use windows_capture::graphics_capture_api::InternalCaptureControl;
+
+    /// Mede o WGC sem o libwebrtc: frames que chegam por segundo e quanto custa
+    /// trazer cada um da GPU para a memória.
+    struct WgcBench {
+        arrived: u32,
+        readback_total: Duration,
+        readback_max: Duration,
+        last_report: Instant,
+    }
+
+    impl GraphicsCaptureApiHandler for WgcBench {
+        type Flags = ();
+        type Error = Box<dyn Error + Send + Sync>;
+
+        fn new(_ctx: Context<Self::Flags>) -> Result<Self, Self::Error> {
+            Ok(Self {
+                arrived: 0,
+                readback_total: Duration::ZERO,
+                readback_max: Duration::ZERO,
+                last_report: Instant::now(),
+            })
+        }
+
+        fn on_frame_arrived(
+            &mut self,
+            frame: &mut Frame,
+            _control: InternalCaptureControl,
+        ) -> Result<(), Self::Error> {
+            let (width, height) = (frame.width(), frame.height());
+
+            // Cópia GPU → textura de staging, Map (espera a GPU) e Unmap no drop.
+            let started = Instant::now();
+            let buffer = frame.buffer()?;
+            drop(buffer);
+            let readback = started.elapsed();
+
+            self.arrived += 1;
+            self.readback_total += readback;
+            self.readback_max = self.readback_max.max(readback);
+
+            let elapsed = self.last_report.elapsed();
+            if elapsed >= Duration::from_secs(1) {
+                println!(
+                    "{width}x{height} | chegaram {:.1} fps | readback médio {:.1} ms, máx {:.1} ms",
+                    self.arrived as f64 / elapsed.as_secs_f64(),
+                    self.readback_total.as_secs_f64() * 1000.0 / self.arrived as f64,
+                    self.readback_max.as_secs_f64() * 1000.0,
+                );
+                self.arrived = 0;
+                self.readback_total = Duration::ZERO;
+                self.readback_max = Duration::ZERO;
+                self.last_report = Instant::now();
+            }
+            Ok(())
+        }
+    }
+
+    #[test]
+    #[ignore = "precisa de CAPTURE_WINDOW com o id de uma janela"]
+    fn mede_o_wgc_de_uma_janela() {
+        let id: u64 = std::env::var("CAPTURE_WINDOW")
+            .expect("defina a variável CAPTURE_WINDOW")
+            .parse()
+            .expect("CAPTURE_WINDOW deve ser um número");
+
+        // O id que o DesktopCapturer lista para uma janela é o próprio HWND.
+        let window = Window::from_raw_hwnd(id as usize as *mut c_void);
+        let settings = Settings::new(
+            window,
+            CursorCaptureSettings::WithCursor,
+            DrawBorderSettings::WithoutBorder,
+            SecondaryWindowSettings::Default,
+            MinimumUpdateIntervalSettings::Default,
+            DirtyRegionSettings::Default,
+            ColorFormat::Bgra8,
+            (),
+        );
+
+        let control = WgcBench::start_free_threaded(settings).expect("o WGC deveria iniciar");
+        std::thread::sleep(Duration::from_secs(10));
+        control.stop().expect("o WGC deveria parar");
+    }
+}
