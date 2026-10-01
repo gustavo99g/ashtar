@@ -41,3 +41,12 @@ A decisão foi condicionada a um teste de correção, que passou:
 - Com um jogo aberto, a taxa caiu para cerca de 20 fps em build de dev. A investigação está pendente;
   se a causa estiver no próprio `capture_frame`, esta decisão deve ser revista em favor do WGC
   corrigido.
+- **Medição (2026-10-01, build de release, só com o `LogVideoSink`, sem IPC):** em telas, a captura em
+  si (o `capture_frame` menos a conversão para I420) custa de 0,3 a 3 ms, e a tela 4K chega a 60 fps.
+  Em janelas custa ~17 a ~25 ms com 2 a 2,7 Mpx e ~55 ms com 8 Mpx (cerca de 16 fps numa janela 4K),
+  crescendo com os pixels da janela. A conversão fica em 3 a 10 ms nos dois casos. Ou seja, para
+  janelas o custo está no próprio `capture_frame`, e o gatilho de revisão acima foi atingido. Ainda
+  não se sabe se o problema é o WGC em si ou o jeito como o libwebrtc o usa, e o jogo em si não foi
+  medido com esses logs. A revisão fica para o plano do publicador nativo (detalhes e tabela em
+  `NOTES.md`). A decisão continua valendo nesta fase: tela e janela funcionam, só que abaixo de 60 fps
+  em janelas grandes.

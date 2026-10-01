@@ -426,6 +426,10 @@ cancelar a escuta. Adicionar `"Unsupported"` e `"Internal"` ao `AppErrorKind`, s
 Os comandos e o código de `legacy/` saem quando o `IpcScreenShare` (Etapa 5) estiver usando os comandos
 novos. Junto saem as dependências `windows-capture` e `fast_image_resize`.
 
+**Exceção:** antes de remover o `windows-capture`, medir o caminho WGC do `legacy/` com uma janela 4K
+(experimento descrito em `NOTES.md`, no item da queda de fps em janelas). Se a medição ainda não tiver
+sido feita, a remoção dessa dependência fica adiada.
+
 ## Etapa 5: frontend — pendente
 
 ### 5.1 Estrutura

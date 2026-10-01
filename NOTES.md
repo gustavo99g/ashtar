@@ -180,8 +180,13 @@ some de fato quando o código legado for substituído por ela.
   60 fps. (3) O `capture_frame` é síncrono, então ele limita o fps do laço: fps ≈ 1000 / `capture_frame_ms`.
   O número da tela, sozinho, não vale para janelas. Limitações da medição: uma rodada por fonte, com
   outros programas abertos; falta medir um jogo de verdade. Direções para o plano seguinte (decisão 1 e
-  ADR 0002): WGC próprio, reduzindo na GPU antes de copiar. A falha de 0,31 s no primeiro teste de tela
-  4K não se repetiu em 3 execuções e a causa não foi identificada.
+  ADR 0002): WGC próprio, reduzindo na GPU antes de copiar. **Primeiro experimento, barato:** medir o
+  caminho WGC do `legacy/` (crate `windows-capture`) com a mesma janela 4K, só lendo o buffer dos
+  frames, antes de ele ser removido (Etapa 4.4). Se for rápido, o problema é o uso que o libwebrtc faz
+  do WGC e a alternativa "WGC corrigido" fica concreta; se também for lento, é o WGC em si. A falha de
+  0,31 s no primeiro teste de tela 4K não se repetiu em 3 execuções e a causa não foi identificada.
+  Os logs de tempo por etapa (`capture_frame` e conversão, target `perf`) foram usados nessa medição e
+  depois removidos do código; estão no commit `d418b00` (`video_capture.rs`), caso seja preciso repetir.
 - Miniaturas no seletor de fontes. Enquanto isso, o seletor mostra só ícones. Pontos do código de preview
   do protótipo a corrigir quando voltarem ao escopo: previews enviados como `Vec<u8>` em JSON e uma
   sessão WGC aberta por janela.
