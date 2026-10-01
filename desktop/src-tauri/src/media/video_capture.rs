@@ -9,16 +9,13 @@
 //!   caixa do preset, sem nunca ampliar, sempre com dimensões pares.
 //! - Fonte fechada encerra com `SourceClosed`. Fonte só indisponível (janela
 //!   minimizada) mantém a captura, reenviando o último frame.
-//! - Com `RUST_LOG=info,perf=debug`, registra no target `perf` o tempo médio de
-//!   `capture_frame` e da conversão. A diferença entre os dois é o custo da captura
-//!   em si, e como `capture_frame` é síncrono, ele limita o fps do laço.
 
 use livekit::webrtc::native::yuv_helper::argb_to_i420;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc;
 use std::thread;
 use std::time::{Duration, Instant};
-use tracing::{debug, info, warn};
+use tracing::{info, warn};
 
 use livekit::webrtc::desktop_capturer::{self as dc, DesktopFrame};
 use livekit::webrtc::video_frame::I420Buffer;
@@ -39,8 +36,6 @@ const GATE_POLL: Duration = Duration::from_millis(1);
 const CHECK_SOURCE_AFTER: Duration = Duration::from_secs(1);
 /// Quanto tempo sem frame novo até reenviar o último.
 const RESEND_AFTER: Duration = Duration::from_millis(500);
-/// Quantos frames entram em cada média dos logs de tempo (target `perf`).
-const PERF_WINDOW: u32 = 60;
 
 /// Configuração de uma captura de vídeo (preenchida a partir do preset de qualidade).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -172,34 +167,12 @@ fn open_capturer(
     // então ele não pode pegar emprestado nada do laço. Ele converte o frame (que só
     // existe durante o callback) e manda o resultado pelo canal.
     let (tx, rx) = mpsc::channel();
-    // Tempo de conversão para o log `perf`. Os contadores são movidos para dentro do callback
-    // (que é `FnMut`) e vivem lá: cada chamada enxerga os valores da anterior.
-    let mut convert_total = Duration::ZERO;
-    let mut converted = 0u32;
     capturer.start_capture(Some(source), move |result| {
         let grab = match result {
-            Ok(frame) => {
-                let started = Instant::now();
-                let (src_w, src_h) = (frame.width(), frame.height());
-                let grab = match to_i420(&frame, config.max_width, config.max_height) {
-                    Some(buffer) => Grab::Frame(buffer),
-                    None => Grab::Tiny,
-                };
-                convert_total += started.elapsed();
-                converted += 1;
-                if converted == PERF_WINDOW {
-                    debug!(
-                        target: "perf",
-                        src_w,
-                        src_h,
-                        convert_ms = convert_total.as_secs_f64() * 1000.0 / f64::from(PERF_WINDOW),
-                        "conversão (média da janela)"
-                    );
-                    convert_total = Duration::ZERO;
-                    converted = 0;
-                }
-                grab
-            }
+            Ok(frame) => match to_i420(&frame, config.max_width, config.max_height) {
+                Some(buffer) => Grab::Frame(buffer),
+                None => Grab::Tiny,
+            },
             Err(e) => Grab::Failed(e),
         };
         let _ = tx.send(grab);
@@ -271,10 +244,6 @@ fn run(
     // Início da sequência atual de falhas, e quando a fonte foi conferida pela última vez.
     let mut failing_since: Option<Instant> = None;
     let mut last_source_check = started;
-    // Tempo médio de `capture_frame` para o log `perf`. Inclui a conversão, que roda dentro do
-    // callback; subtraindo o `convert_ms` sobra o custo da captura em si.
-    let mut capture_total = Duration::ZERO;
-    let mut calls = 0u32;
 
     while !stop.load(Ordering::Acquire) {
         let now = Instant::now();
@@ -295,19 +264,7 @@ fn run(
             next = now + interval;
         }
         let timestamp_us = started.elapsed().as_micros() as i64;
-        let call_started = Instant::now();
         capturer.capture_frame();
-        capture_total += call_started.elapsed();
-        calls += 1;
-        if calls == PERF_WINDOW {
-            debug!(
-                target: "perf",
-                capture_frame_ms = capture_total.as_secs_f64() * 1000.0 / f64::from(PERF_WINDOW),
-                "capture_frame (média da janela, inclui a conversão)"
-            );
-            capture_total = Duration::ZERO;
-            calls = 0;
-        }
         match grabs.try_recv() {
             Ok(Grab::Frame(buffer)) => {
                 if let Some(since) = failing_since.take() {
