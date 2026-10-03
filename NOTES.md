@@ -65,41 +65,69 @@ some de fato quando o código legado for substituído por ela.
       descartado por limitação técnica dele; o teste inicial comparou pipelines diferentes.
       **Falta:** remover o WGC junto com o `legacy/` (Etapa 4.4).
 - [ ] Captura de vídeo e áudio acopladas ao destino (`Channel<InvokeResponseBody>`); não dá para trocar
-      por outro sink sem duplicar a captura. **Base pronta:** traits `VideoSink`/`AudioSink`. Resolve com
-      os passos 5 a 7 da Etapa 3.
+      por outro sink sem duplicar a captura. **Base pronta:** traits `VideoSink`/`AudioSink`, a captura de
+      áudio e de vídeo sobre eles e os sinks do IPC (`IpcVideoSink`, `IpcAudioSink`); os passos 5 a 7 da
+      Etapa 3 estão concluídos. Some quando os comandos novos substituírem o `legacy/` (Etapa 4.4).
 - [ ] Loop de captura sem controle de taxa: chama `capture_frame` o mais rápido que o ACK permite
       (~43 fps com a tela parada), gastando CPU com frames idênticos. Corrigir com agendamento por
       deadline no `video_capture.rs`.
+      **Base pronta:** `video_capture.rs` com deadline (um frame por intervalo, sem acumular atraso) e
+      respeito ao `FrameGate`. Resolve quando os comandos novos o usarem (Etapa 4).
 - [ ] Conversão para I420 ignora o stride do frame (assume `width * 4`), o que pode inclinar a imagem
       quando a textura tem padding no fim das linhas.
+      **Base pronta:** `to_i420` passa `frame.stride()` ao libyuv, e o empacotamento do `IpcVideoSink`
+      descarta o padding (testado com stride maior que a largura). A conversão BGRA → I420 não tem teste
+      automático do stride, porque não dá para montar um `DesktopFrame` num teste.
 - [ ] Resize em BGRA com `fast_image_resize` e `ResizeAlg::Nearest`, precedido de `frame.data().to_vec()`
       (cópia do frame inteiro em resolução cheia). Substituir por conversão para I420 seguida do `scale`
       do libyuv (mais rápido e mais legível para texto).
+      **Base pronta:** `to_i420` converte em resolução cheia e reduz com o `scale` do I420 só quando o
+      frame passa da caixa do preset (`fit_in_box`).
 - [ ] Timestamps a partir de `SystemTime` (relógio de parede, pode pular). Usar `Instant`.
+      **Base pronta:** `video_capture.rs` usa `Instant`, contado desde o início da captura.
 - [ ] Loop de captura não trata "fonte fechada": quando a janela compartilhada é fechada, o capturer passa
       a retornar erro em todo frame e o log cresce indefinidamente. Corrigir com ~30 erros consecutivos →
       `EndReason::SourceClosed`.
+      **Base pronta:** 1 s de falhas seguidas dispara a conferência da lista de fontes do capturer; se a
+      fonte sumiu, encerra com `SourceClosed` (critério diferente dos ~30 erros do plano inicial, para não
+      confundir janela fechada com minimizada). **Atenção:** isso depende de o capturer devolver erro para
+      janela fechada, o que vale hoje (caminho atual, que tudo indica ser o GDI) e deixa de valer se o
+      COM for inicializado na thread de vídeo (ver o item da queda de fps em janelas, mais abaixo).
 - [ ] `in_flight` do caminho IPC é um contador sem sinal que pode dar a volta com um ACK duplicado,
       fechando o portão para sempre. **Base pronta:** `FrameGate` com decremento que para no zero.
-      Também falta ignorar ACKs de sessões antigas (Etapa 4).
+      O `IpcVideoSink` usa o `FrameGate` e entra nele (`enter`) antes do envio, o que evita perder uma vaga
+      quando o ACK chega antes de o `send` terminar; se o envio falha, a vaga volta. Continua faltando o
+      `ipc_screen_share_ack` ignorar ACKs de sessões antigas (Etapa 4).
 
 ## Rust — captura de áudio
 
 - [ ] Captura de áudio (WASAPI) usa polling em vez de modo por eventos.
+      **Base pronta:** `audio_capture.rs` usa o modo por eventos. Resolve quando os comandos novos a
+      usarem (Etapa 4).
 - [ ] Buffer de captura de 20 ms, apertado demais: qualquer atraso da thread perde amostras. Usar 100 ms
       (em captura compartilhada, buffer maior não adiciona latência).
+      **Base pronta:** buffer de 100 ms em `audio_capture.rs`. Resolve quando os comandos novos a usarem
+      (Etapa 4).
 - [ ] Flag de silêncio (`AUDCLNT_BUFFERFLAGS_SILENT`) ignorada: o conteúdo desses pacotes deve ser zerado.
+      **Base pronta:** pacotes marcados como silenciosos chegam ao sink como zeros. Resolve quando os
+      comandos novos a usarem (Etapa 4).
 - [ ] Sem log de descontinuidade (glitch/drop) na captura de áudio.
+      **Base pronta:** `warn!` quando o WASAPI sinaliza descontinuidade. Resolve quando os comandos novos
+      a usarem (Etapa 4).
 - [ ] Inicialização da captura de áudio não é determinística no lado do chamador: erros de inicialização
       aparecem depois do comando já ter retornado sucesso. **Base pronta:** `spawn_capture` com
       `ReadySignal` (dispensa o oneshot do `tokio`).
 - [ ] Modo de áudio `System` recebe `process_id` do frontend para decidir o que excluir; deveria usar
       `std::process::id()` automaticamente. `AudioMode` passa para o formato com tag (`PLAN.md`,
       decisão 3).
+      **Base pronta:** `spawn_audio_capture` usa `std::process::id()` no modo `System` e recusa capturar o
+      próprio processo. Resolve quando os comandos novos a usarem (Etapa 4).
 - [ ] Parar e iniciar em seguida pode falhar com "já existe uma captura ativa", porque o slot só é
       liberado quando a thread percebe a parada. Resolve com o `session.rs` (remover a sessão na hora).
 - [ ] Áudio da captura é enviado ao frontend serializado como JSON (via `Channel<Vec<u8>>`) em vez de
       bytes crus (`InvokeResponseBody::Raw`).
+      **Base pronta:** `IpcAudioSink` envia os f32 como `InvokeResponseBody::Raw`. Resolve quando os
+      comandos novos o usarem (Etapa 4).
 - [ ] Imports e dependência do `hound` sem uso. (Verificar se já saiu na Etapa 2.)
 
 ## Rust — sessão
