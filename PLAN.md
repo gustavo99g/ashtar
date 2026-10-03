@@ -16,7 +16,7 @@ funcionalidade nova de voz, e suporte a Linux e web (ver decisão 14 para os cui
 |---|---|---|
 | 1 | Preparação | Concluída |
 | 2 | Esqueleto do Rust | Concluída |
-| 3 | Captura desacoplada do destino | Em andamento (passos 0 a 6 concluídos) |
+| 3 | Captura desacoplada do destino | Em andamento (passos 0 a 7 concluídos) |
 | 4 | Contrato entre Rust e React | Pendente |
 | 5 | Frontend | Pendente |
 | 6 | Verificação | Pendente |
@@ -354,10 +354,23 @@ inexistente falha na inicialização, tela principal por 10 s, e `captura_uma_te
 janela no meio da captura encerra a captura (o motivo exato impresso não foi conferido). O desempenho com janelas grandes ficou
 abaixo de 60 fps; as medições estão no `NOTES.md`.
 
-### Passo 7: `ipc_sink.rs` — pendente
+### Passo 7: `ipc_sink.rs` — concluído
 
 - `IpcVideoSink`: empacotamento I420 atual, envio com `InvokeResponseBody::Raw`, `FrameGate` para o ACK.
 - `IpcAudioSink`: envio dos f32 com `InvokeResponseBody::Raw` (corrige o envio atual em JSON).
+
+**Formato das mensagens** (little-endian). Vídeo: cabeçalho de 16 bytes (`width: u32`, `height: u32`,
+`timestamp_us: i64`, relativo ao início da captura), seguido dos planos Y, U e V colados, sem o padding do
+stride. Áudio: só as amostras f32 intercaladas (estéreo, 48 kHz). **O cabeçalho de vídeo mudou em relação
+ao legado:** eram 24 bytes (`width`, `height`, `capture_timestamp`, `send_timestamp`), agora são 16, sem o
+`send_timestamp`. O `IpcScreenShare` (Etapa 5) precisa decodificar o formato novo.
+
+Cada frame enviado ocupa uma vaga do `FrameGate` até o ACK (o `enter` vem antes do `send`, e a vaga volta
+se o envio falhar); com o portão fechado o frame é descartado antes de ser empacotado. Um envio que falha
+(webview fechado) devolve `Stop`. Testes: empacotamento sem o padding do stride, tamanho e capacidade exatos
+da mensagem, vaga do portão (ocupa, fecha, reabre com o ACK, volta se o envio falha) e áudio (uma mensagem
+por pacote, pacote vazio ignorado). Teste ignorado que precisa de áudio tocando:
+`captura_o_sistema_pelo_ipc`. A verificação de ponta a ponta, com o webview de verdade, é na Etapa 4.
 
 ### Passo 8: `session.rs` — pendente
 
