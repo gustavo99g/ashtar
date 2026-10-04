@@ -185,15 +185,63 @@ para a mídia, que trafega por UDP.
 
 **Mídia pelo LiveKit Cloud.** O plano gratuito (Build) inclui, por mês, 5.000 minutos de participante,
 50 GB de dados transferidos e até 100 participantes simultâneos. Os limites são um teto rígido: se
-forem atingidos, novas conexões falham até o início do mês seguinte. Como estimativa, isso comporta
-algumas noites de chamada por mês com o grupo inteiro, e perto de 10 horas de compartilhamento de tela
-assistido por quatro pessoas. Acompanhe o consumo no painel do LiveKit Cloud.
+forem atingidos, novas conexões falham até o início do mês seguinte. Acompanhe o consumo no painel do
+LiveKit Cloud.
 
-**VPS.** Na v0.2, o servidor do LiveKit (que é gratuito e de código aberto), a API e o banco passam a
+Estimativa para um grupo de 5 pessoas (bitrates típicos de screen share, ainda não medidos no app):
+
+| Transmissão | Tráfego com 4 pessoas assistindo | Horas no plano gratuito |
+|---|---|---|
+| 720p30 (~1,5 Mbps) | ~2,7 GB/h | ~18 h |
+| 1080p30 (~3 Mbps) | ~5,4 GB/h | ~9 h |
+| 1080p60 (~5 Mbps) | ~9 GB/h | ~5,5 h |
+
+Os minutos acabam num ritmo parecido: 5 pessoas por 3 horas gastam 900 minutos, cerca de 5 noites por
+mês. Com o publicador nativo (v0.2.6), quem transmite abre uma segunda conexão e conta como dois
+participantes. Ou seja, o plano gratuito comporta algumas noites de teste, não um mês de uso.
+
+O plano pago seguinte inclui 150.000 minutos e 250 GB, com excedente de US$ 0,12/GB. Com uso intenso
+(4 noites por semana, 3 horas, 1080p60, 4 pessoas assistindo), seriam uns 470 GB por mês, cerca de
+US$ 26 de excedente além da mensalidade. O limite que aperta é sempre o tráfego, nunca os minutos.
+
+Durante o teste da v0.1, um preset mais leve (720p ou 1080p30) estica a cota, e o consumo de uma noite
+real (GB e minutos) deve ser anotado: é o número que confirma o dimensionamento da VPS.
+
+**VPS.** Na v0.2.1, o servidor do LiveKit (que é gratuito e de código aberto), a API e o banco passam a
 rodar numa VPS própria. O LiveKit próprio é pré-requisito das transmissões múltiplas da v0.4, e a API e
 o banco deixam de depender de um computador pessoal ligado. Se os limites do plano gratuito apertarem
-antes, a migração é antecipada. A VPS é escolhida pelo tráfego de saída incluso, não só pela CPU. Para
-o código do LiveKit, a troca é só de configuração: a URL, a chave e o segredo no `.env`.
+antes, a migração é antecipada. Para o código do LiveKit, a troca é só de configuração: a URL, a chave
+e o segredo no `.env`.
+
+A VPS é escolhida pelo **tráfego de saída incluso** e pela **latência** até o grupo, não só pela CPU.
+O LiveKit não recodifica vídeo, só repassa os pacotes, então para 5–10 pessoas ele usa pouca CPU e o que
+pesa é a rede. Um servidor nos EUA ou na Europa sai barato, mas soma de 120 a 200 ms para quem está no
+Brasil.
+
+Candidata: **Hostinger VPS no Brasil** (preços de outubro de 2026, promoção com contrato de 24 meses):
+
+| Plano | Recursos | Tráfego | Promoção | Renovação |
+|---|---|---|---|---|
+| KVM 1 | 1 vCPU, 4 GB RAM, 50 GB NVMe | 4 TB | R$ 29,99/mês | R$ 59,99/mês |
+| **KVM 2** | 2 vCPU, 8 GB RAM, 100 GB NVMe | 8 TB | R$ 43,99/mês | R$ 77,99/mês |
+
+A preferida é a **KVM 2**: na mesma máquina rodam LiveKit, API, banco e TURN, e com um único núcleo um
+pico de qualquer um deles afeta a voz de todos. A KVM 2 também deixa folga para as transmissões
+múltiplas da v0.4. A KVM 1 é viável para começar se for possível fazer upgrade sem migrar a máquina.
+Em tráfego, os dois planos sobram: o uso intenso estimado fica em 0,5–1,5 TB por mês.
+
+A confirmar antes de assinar:
+
+* **portas UDP liberadas**: o LiveKit precisa de uma faixa UDP (por padrão 50000–60000), de 7881/TCP e
+  de 443 para o TURN. O Cloudflare Tunnel não transporta mídia, então o LiveKit fica exposto direto,
+  com domínio próprio e certificado;
+* o que acontece ao passar do tráfego do plano: cobrança extra, redução de velocidade ou bloqueio;
+* se o tráfego do plano conta só a saída ou entrada e saída;
+* upgrade de plano sem migrar a máquina;
+* o consumo medido no teste da v0.1 confirma a estimativa.
+
+O backup semanal da Hostinger não substitui o backup fora da VPS previsto na v0.2.1: se a conta ou a
+máquina tiver problema, os dois se perdem juntos.
 
 ## Status
 
