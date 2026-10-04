@@ -206,32 +206,50 @@ Escolhido antes da implementação (ADR). Inclui:
 
 ### 4. Identidade e convites
 
-Sem senha. O convite é a única forma de entrar, e a identidade fica guardada no computador.
+Sem senha. O convite é a única forma de entrar, e a identidade vem do próprio computador, para que
+formatar o Windows não exija nada.
 
 ```text
 convite
  ↓
 escolha do nick
  ↓
-API cria o usuário e emite um token de dispositivo
+desktop calcula a identidade do dispositivo
  ↓
-desktop guarda o token no cofre do sistema
+API cria o usuário e vincula o dispositivo a ele
  ↓
-aberturas seguintes entram direto
+aberturas seguintes entram direto, inclusive depois de formatar
 ```
 
-* o token é aleatório, gerado pela API, e guardado no cofre de credenciais do sistema (Windows
-  Credential Manager); no banco fica só o hash;
+**Identidade do dispositivo**
+
+* calculada a partir do hardware: hash do UUID da BIOS e do serial da placa-mãe, junto com uma
+  constante do aplicativo. O serial real nunca sai do computador;
+* sobrevive a reinstalações do Windows; muda só com a troca da placa-mãe;
+* no banco fica só o hash do valor recebido;
+* **valores inválidos são rejeitados**: placas baratas e máquinas virtuais costumam ter UUID ou serial
+  genérico (`FFFFFFFF-FFFF-...`, `00000000-...`, "To be filled by O.E.M."), o que faria duas pessoas
+  terem a mesma identidade. Nesses casos o desktop usa um token aleatório gerado pela API e guardado no
+  cofre de credenciais do Windows, que se perde ao formatar.
+
+A identidade do dispositivo é um identificador fixo, não um segredo que possa ser trocado. Para um grupo
+pequeno, com a URL da API privada, o risco é aceito; se ela vazar, o administrador desvincula o
+dispositivo e envia um convite de recuperação.
+
+**Usuários e convites**
+
 * o usuário tem um id interno estável; o nick é só o nome de exibição e pode mudar;
 * convite de uso único, com expiração e revogação;
-* **convite de recuperação**: quando alguém perde a sessão (formatou o computador, trocou de máquina),
-  o administrador gera um convite vinculado ao usuário existente. Ao usar o convite, a pessoa recebe um
-  token novo e mantém o mesmo usuário e o histórico; os tokens antigos são revogados;
+* **convite de recuperação**: para troca de placa-mãe, troca de computador ou perda do token aleatório,
+  o administrador gera um convite vinculado ao usuário existente. Ao usar o convite, o dispositivo novo
+  é vinculado ao mesmo usuário, com o mesmo histórico, e o vínculo antigo é removido;
+* o administrador pode desvincular um dispositivo;
 * o primeiro administrador é criado por configuração ou comando da API;
 * substitui o código de acesso da v0.1: token do LiveKit só para usuários autenticados.
 
-Decisões a registrar em ADR antes de implementar: se um usuário pode ter mais de um dispositivo ao mesmo
-tempo, e a validade dos convites.
+Decisões a registrar em ADR antes de implementar: o cálculo exato da identidade do dispositivo e a lista
+de valores inválidos, se um usuário pode ter mais de um dispositivo ao mesmo tempo, e a validade dos
+convites.
 
 ### 5. Chat real
 
@@ -267,6 +285,8 @@ uma versão nova publicada chega sozinha a todos
 convite → nick → entrar → enviar mensagem → o outro receber → reabrir → ver o histórico
  +
 convite de recuperação → mesmo usuário, mesmo histórico
+ +
+formatar o Windows → entra direto, sem convite novo
  +
 publicador nativo igual ou melhor que o caminho IPC na medição
 (ou decisão documentada de manter o IPC)
@@ -347,7 +367,7 @@ feedback; entra só o que mantiver a base simples.
 ## Administração
 
 * papéis `usuário` e `administrador`;
-* expulsar usuário e revogar seus tokens;
+* expulsar usuário e desvincular seus dispositivos;
 * listar e revogar convites.
 
 ## Chat
@@ -410,11 +430,13 @@ A01 — Convite válido
 A02 — Convite inválido
 A03 — Convite expirado
 A04 — Convite de recuperação
-A05 — Token revogado
-A06 — API indisponível
-A07 — LiveKit indisponível
-A08 — Navegação texto + voz
-A09 — Atualização automática
+A05 — Dispositivo desvinculado
+A06 — Reinstalação do Windows
+A07 — Hardware com UUID inválido
+A08 — API indisponível
+A09 — LiveKit indisponível
+A10 — Navegação texto + voz
+A11 — Atualização automática
 ```
 
 ## Infraestrutura
@@ -551,7 +573,7 @@ v0.2
 08. Auto-update
 09. UI nova
 10. Banco
-11. Convites + token de dispositivo
+11. Convites + identidade do dispositivo
 12. Convite de recuperação
 13. Chat real + WebSocket
 14. Publicador nativo + medição
