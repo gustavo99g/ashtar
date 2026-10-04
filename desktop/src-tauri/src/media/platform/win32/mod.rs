@@ -6,6 +6,8 @@
 
 pub mod audio_capture;
 pub mod sources;
+pub mod window_capture;
 
 pub use audio_capture::spawn_audio_capture;
 pub use sources::{monitor_details, window_details};
+pub use window_capture::{prepare_window_capture_thread, window_state};

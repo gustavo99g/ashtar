@@ -1,14 +1,16 @@
 //! Captura de vídeo de uma janela ou tela com o `DesktopCapturer` do libwebrtc.
 //!
-//! Não passa por `platform/`: o `DesktopCapturer` já é a camada de plataforma
-//! (existe no Windows e no Linux), então este código é comum.
+//! Código comum, com duas ajudas da plataforma (`platform::`) para janelas:
+//! - `prepare_window_capture_thread`: com COM na thread, o libwebrtc captura janelas pelo WGC em
+//!   vez do GDI, ~3× mais rápido numa janela 4K (ADR 0008). As telas não precisam de COM.
+//! - `window_state`: o WGC não avisa quando a janela fecha, então o laço confere a cada volta.
 //!
 //! - Taxa controlada por deadline: um frame por intervalo, sem acumular atraso.
 //! - Com o `FrameGate` do sink fechado, não captura (nada de trabalho jogado fora).
 //! - Conversão para I420 respeitando o stride do frame; redução para caber na
 //!   caixa do preset, sem nunca ampliar, sempre com dimensões pares.
-//! - Fonte fechada encerra com `SourceClosed`. Fonte só indisponível (janela
-//!   minimizada) mantém a captura, reenviando o último frame.
+//! - Fonte fechada encerra com `SourceClosed`. Janela minimizada não é capturada:
+//!   a captura continua, reenviando o último frame.
 
 use livekit::webrtc::native::yuv_helper::argb_to_i420;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -17,14 +19,14 @@ use std::thread;
 use std::time::{Duration, Instant};
 use tracing::{info, warn};
 
-use livekit::webrtc::desktop_capturer::{self as dc, DesktopFrame};
-use livekit::webrtc::video_frame::I420Buffer;
-
+use super::platform;
 use super::sources::SourceRef;
 use crate::error::AppError;
 use crate::media::{
     spawn_capture, CaptureHandle, CapturedFrame, EndReason, OnEnd, SinkStatus, VideoSink,
 };
+use livekit::webrtc::desktop_capturer::{self as dc, DesktopFrame};
+use livekit::webrtc::video_frame::I420Buffer;
 
 /// Menor lado aceito, tanto de um frame capturado quanto da caixa máxima.
 const MIN_SIDE: u32 = 16;
@@ -70,6 +72,17 @@ impl VideoCaptureConfig {
     fn frame_interval(&self) -> Duration {
         Duration::from_secs(1) / self.fps
     }
+}
+
+/// Estado de uma janela sendo capturada, conferido a cada volta do laço.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WindowState {
+    /// Existe e não está minimizada.
+    Visible,
+    /// Existe, mas está minimizada: não há o que capturar.
+    Minimized,
+    /// Não existe mais (fechou).
+    Gone,
 }
 
 /// Tamanho final de um frame `width` × `height` para caber na caixa, mantendo a proporção.
@@ -146,7 +159,13 @@ fn open_capturer(
     config: VideoCaptureConfig,
 ) -> Result<(dc::DesktopCapturer, mpsc::Receiver<Grab>), AppError> {
     let (kind, id) = match config.source {
-        SourceRef::Window(id) => (dc::DesktopCaptureSourceType::Window, id),
+        SourceRef::Window(id) => {
+            // Com COM, o libwebrtc captura a janela pelo WGC; sem, cai no GDI (ADR 0008).
+            platform::prepare_window_capture_thread();
+            (dc::DesktopCaptureSourceType::Window, id)
+        }
+        // Telas não precisam de COM: com e sem COM, a tela 4K deu o mesmo fps e carregou as mesmas
+        // DLLs (ADR 0008). Por isso só as janelas ganham a preparação acima.
         SourceRef::Monitor(id) => (dc::DesktopCaptureSourceType::Screen, id),
     };
 
@@ -234,6 +253,12 @@ fn run(
 ) -> EndReason {
     let (SourceRef::Window(id) | SourceRef::Monitor(id)) = config.source;
 
+    // `Some(id)` só para janelas: telas não têm estado a conferir.
+    let window = match config.source {
+        SourceRef::Window(id) => Some(id),
+        SourceRef::Monitor(_) => None,
+    };
+
     let gate = sink.gate();
     let interval = config.frame_interval();
     let started = Instant::now();
@@ -264,7 +289,18 @@ fn run(
             next = now + interval;
         }
         let timestamp_us = started.elapsed().as_micros() as i64;
-        capturer.capture_frame();
+
+        // O WGC não avisa quando a janela fecha (provavelmente porque a thread não tem laço de
+        // mensagens) e, com ela minimizada, só repetiria o último frame. Então conferimos nós
+        // mesmos, a cada volta.
+        let state = window.map_or(WindowState::Visible, platform::window_state);
+
+        match state {
+            WindowState::Gone => return EndReason::SourceClosed,
+            WindowState::Minimized => {}
+            WindowState::Visible => capturer.capture_frame(),
+        }
+
         match grabs.try_recv() {
             Ok(Grab::Frame(buffer)) => {
                 if let Some(since) = failing_since.take() {

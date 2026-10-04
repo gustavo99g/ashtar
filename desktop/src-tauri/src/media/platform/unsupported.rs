@@ -7,6 +7,7 @@
 
 use crate::error::AppError;
 use crate::media::sources::{MonitorInfo, WindowDetails};
+use crate::media::video_capture::WindowState;
 use crate::media::{audio::AudioTarget, AudioSink, CaptureHandle, OnEnd};
 
 /// Sempre `Some`, com os campos vazios: sem implementacao de plataforma,
@@ -37,4 +38,13 @@ pub fn spawn_audio_capture(
     _on_end: OnEnd,
 ) -> Result<CaptureHandle, AppError> {
     Err(AppError::Unsupported("captura de áudio"))
+}
+
+/// Não faz nada: sem implementação de plataforma, não há o que preparar.
+pub fn prepare_window_capture_thread() {}
+
+/// Sempre `Visible`: sem implementação de plataforma, não sabemos. Uma janela fechada ainda
+/// encerra a captura pelo caminho de falhas do `DesktopCapturer`.
+pub fn window_state(_id: u64) -> WindowState {
+    WindowState::Visible
 }
