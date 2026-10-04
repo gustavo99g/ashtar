@@ -51,10 +51,6 @@ A decisão foi condicionada a um teste de correção, que passou:
   aqui:** durante a captura ele não carrega `GraphicsCapture.dll` nem as DLLs do driver da GPU (que o
   `windows-capture` carrega), e uma janela minimizada devolve frames 1×1 sem erro. Por inferência, ele
   usa o GDI, que copia pela CPU.
-  A causa provável é a thread de vídeo não ter o COM inicializado, o que faz o `IsWgcSupported` falhar.
-  Teste: com `wasapi::initialize_mta()` antes de criar o capturer, a janela 4K sobe de ~14 para ~43 fps.
-  Mas há efeitos colaterais medidos (a tela 4K cai de 60 para ~47 fps e o `SourceClosed` deixa de
-  disparar quando a janela fecha), registrados em `NOTES.md`; a mudança não foi aplicada ao código. O
-  jogo em si não foi medido. A revisão desta decisão (inicializar o COM, ou uma captura de janela própria
-  com o WGC) fica para o plano seguinte. Nesta fase a decisão continua valendo: tela e janela
-  funcionam, só que abaixo de 60 fps em janelas grandes.
+  A causa era a thread de vídeo não ter o COM inicializado, o que fazia o libwebrtc cair no GDI para
+  janelas. A correção, as alternativas e as consequências estão no [ADR 0008](0008-captura-de-janelas-pelo-wgc.md).
+  O jogo em si não foi medido. Esta decisão (captura de vídeo só com o `DesktopCapturer`) continua valendo.

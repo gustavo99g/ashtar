@@ -16,7 +16,7 @@ funcionalidade nova de voz, e suporte a Linux e web (ver decisão 14 para os cui
 |---|---|---|
 | 1 | Preparação | Concluída |
 | 2 | Esqueleto do Rust | Concluída |
-| 3 | Captura desacoplada do destino | Em andamento (passos 0 a 8 concluídos) |
+| 3 | Captura desacoplada do destino | Em andamento (passos 0 a 9 concluídos) |
 | 4 | Contrato entre Rust e React | Pendente |
 | 5 | Frontend | Pendente |
 | 6 | Verificação | Pendente |
@@ -48,6 +48,11 @@ pipeline contra outro. O caminho WGC lia `frame.buffer()` (cópia GPU→memória
 na taxa do monitor, fazia duas cópias em resolução cheia por frame (inclusive dos descartados) e mandava
 RGBA pelo IPC (~3,7 MB/frame a 720p, contra ~1,4 MB em I420). Se o `DesktopCapturer` um dia falhar, um
 WGC ajustado (leitura só dos frames aceitos, envio em I420) volta a ser opção real.
+
+**Janelas pelo WGC do libwebrtc, telas no DXGI (passo 9, ADR 0008).** A captura de janelas caía no GDI
+(~14 fps numa janela 4K) porque a thread de captura não tinha COM, e o libwebrtc só escolhe o WGC com COM.
+Hoje a thread de captura de janela inicializa o COM; a de tela não, para seguir no DXGI. A captura própria
+com a `windows-capture`, que esta decisão deixava como alternativa, não foi necessária.
 
 ### 2. Listagem de fontes vem do `DesktopCapturer`
 
@@ -131,7 +136,8 @@ sessão (id não bate) e não emite nada.
 Código específico do Windows fica em `media/platform/win32/`, atrás de `#[cfg(target_os = "windows")]`.
 Em qualquer outro sistema, `media/platform/unsupported.rs` fornece as mesmas funções, retornando valores
 padrão ou `AppError::Unsupported`. **Regra:** só os pontos de entrada comuns (`media/sources.rs`,
-`media/audio.rs`) chamam `platform::`; o resto do código nunca usa `platform::win32` diretamente.
+`media/audio.rs`, `media/video_capture.rs`) chamam `platform::`; o resto do código nunca usa
+`platform::win32` diretamente.
 
 A pasta se chama `win32` (e não `windows`) para evitar conflito de nome com a crate `windows`.
 
@@ -248,6 +254,7 @@ src-tauri/src/media/
     └── win32/
         ├── mod.rs
         ├── audio_capture.rs
+        ├── window_capture.rs  # COM da thread de janela + estado da janela (ADR 0008)
         └── sources/
             ├── mod.rs
             ├── gdi.rs
@@ -412,6 +419,25 @@ falha do áudio desfaz o vídeo, falha do vídeo não deixa sessão, parada e AC
 fim do vídeo encerra a sessão, queda do áudio mantém o vídeo, `ack` não espera um início lento, soltar o
 manager para as capturas, e o portão do ACK (só a própria sessão o apaga; iniciar sem portão apaga o
 antigo). A verificação de ponta a ponta, com o app, é na Etapa 4.
+
+### Passo 9: janelas pelo WGC do libwebrtc — concluído
+
+Descoberto durante a medição do Passo 6 (`NOTES.md`): a captura de janelas do `DesktopCapturer` caía no
+GDI (~14 fps numa janela 4K) porque a thread de captura não tinha COM, e o libwebrtc só escolhe o WGC se
+`IsWgcSupported` passar, o que exige COM (ADR 0008).
+
+- `platform::prepare_window_capture_thread`: inicializa o COM (MTA) na thread de captura **só para
+  janelas**; telas ficam sem COM, no DXGI (a tela 4K cairia de 54–60 para 43–50 fps com o WGC).
+- `platform::window_state`: `IsWindow`/`IsIconic`, conferido a cada volta do laço. Com o WGC o fim da
+  janela não gera erro, então sem isso o `SourceClosed` deixava de disparar. Janela que sumiu encerra a
+  captura; minimizada não chama o `capture_frame` e reenvia o último frame.
+- Implementados em `platform/win32/window_capture.rs`; em `unsupported.rs` ficam como no-op e `Visible`.
+
+Testes: `janela_invalida_nao_existe` (automático) e `janela_em_foco_esta_visivel` (ignorado, precisa de área
+de trabalho real). Não há teste automático da escolha do capturer: o Rust não expõe qual foi instanciado.
+Validado à mão, em release: janela 4K do Brave de ~14 para ~46–52 fps (chegou a 60 com a imagem estável);
+tela 4K a 60 fps; janela fechada encerra com `SourceClosed`; janela minimizada cai para ~2 fps (reenvios) e
+volta a 60 ao restaurar, sem nenhum `WARN`.
 
 ### Critério de pronto da Etapa 3
 
