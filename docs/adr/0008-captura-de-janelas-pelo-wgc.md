@@ -22,23 +22,35 @@ Evidências (2026-10-01, build de release):
 
 O mecanismo exato (WinRT exigindo COM) é a leitura do código do libwebrtc; o que foi medido é o efeito.
 
-Medições com o Brave maximizado no monitor 4K (3840×2088), vídeo tocando, e a tela 4K inteira:
+Janela 4K (Brave maximizado no monitor 4K, 3840×2088, vídeo tocando):
 
-| Captura | Janela 4K | Tela 4K |
+| Captura | Janela 4K |
+|---|---|
+| libwebrtc sem COM (GDI) | ~14 fps |
+| libwebrtc com COM (WGC) | ~35–52 fps (44–47 na rodada final) |
+| WGC direto (`windows-capture`) | ~48 fps |
+
+Com o WGC, uma janela fechada deixa de gerar erro: numa janela descartável fechada, o fps ficou em 60 por
+mais ~18 s sem nenhum aviso, e o `SourceClosed` nunca disparou.
+
+**Telas.** O `webrtc-sys` também pede o WGC para telas, então se esperava que o COM as afetasse. Uma
+primeira medição parecia confirmar (a tela 4K caía de 54–60 para 43–50 fps com COM), mas o conteúdo da tela
+não estava controlado. Medida de novo na tela 4K, com e sem COM e com o mesmo conteúdo:
+
+| Conteúdo na tela 4K | Sem COM | Com COM |
 |---|---|---|
-| libwebrtc sem COM (GDI na janela, DXGI na tela) | ~14 fps | 54–60 fps |
-| libwebrtc com COM (WGC) | ~35–52 fps (varia com o conteúdo) | 43–50 fps |
-| WGC direto (`windows-capture`) | ~48 fps | — |
+| vídeo tocando (Brave) | 43–53 fps | 43–53 fps |
+| editor de código, imagem parada | 59–60 fps | 60 fps |
 
-Com COM em todas as threads, a janela melhora e a tela 4K piora, porque o `webrtc-sys` também liga o WGC
-para telas. Além disso, com o WGC uma janela fechada deixa de gerar erro: numa janela descartável fechada, o
-fps ficou em 60 por mais ~18 s sem nenhum aviso, e o `SourceClosed` nunca disparou.
+O fps da tela depende do conteúdo, e o COM não muda nada: nem o fps, nem as DLLs carregadas
+(`GraphicsCapture.dll` e `dcomp.dll` não carregam no modo tela, com ou sem COM). A tela não passa pelo WGC
+nesta configuração. Qual capturer ela usa de fato não foi determinado; presumir DXGI seria só hipótese.
 
 ## Decisão
 
-A thread de captura de uma **janela** inicializa o COM (MTA) antes de criar o `DesktopCapturer`; a thread de
-captura de uma **tela** não. Assim janelas usam o WGC e telas seguem no DXGI. A inicialização fica atrás de
-`platform::prepare_window_capture_thread`.
+A thread de captura de uma **janela** inicializa o COM (MTA) antes de criar o `DesktopCapturer`, atrás de
+`platform::prepare_window_capture_thread`. A de **tela** não o faz: o COM não muda nada nela, então ela não
+é tocada.
 
 O laço de captura confere o estado de uma janela a cada volta (`IsWindow` e `IsIconic`, em
 `platform/win32/window_capture.rs`, exposto como `platform::window_state`): se a janela sumiu, a captura
@@ -47,8 +59,10 @@ encerra com `SourceClosed`; se está minimizada, não chama o `capture_frame` e 
 ## Alternativas consideradas
 
 - **Captura própria de janelas com o `windows-capture`.** Mais código (captura, conversão, ciclo de vida)
-  para um ganho pequeno sobre esta decisão: ~48 fps contra ~35–52 fps com o WGC do libwebrtc.
-- **COM também nas telas.** Mais simples (uma regra só), mas a tela 4K cai de 54–60 para 43–50 fps.
+  para um ganho pequeno sobre esta decisão: ~48 fps contra ~44–47 fps com o WGC do libwebrtc.
+- **COM também nas telas.** Seria uma regra só e, pelas medições, equivale à escolhida: não muda o fps nem
+  as DLLs carregadas. Não foi adotada porque mudaria as telas sem ganho mensurável. Se uma versão futura do
+  libwebrtc passar a mandar as telas para o WGC quando há COM, esta alternativa precisa ser reavaliada.
 - **Laço de mensagens na thread de captura**, para receber o aviso de janela fechada do próprio WGC. Mais
   complexo que o `IsWindow`, que já resolve com duas chamadas baratas por volta.
 
@@ -56,11 +70,10 @@ encerra com `SourceClosed`; se está minimizada, não chama o `capture_frame` e 
 
 - **A escolha do capturer depende do COM e não tem teste automático.** O Rust não expõe qual capturer o
   libwebrtc instanciou (não há `capturer_id` nem equivalente na crate `libwebrtc` nem no `webrtc-sys`).
-  Quem protege a decisão são as medições manuais: `captura_uma_janela` (janela 4K bem acima de 14 fps) e
-  `captura_uma_tela` (tela 4K perto de 60 fps). Vale repeti-las ao atualizar as crates `livekit` e
-  `libwebrtc`, porque uma mudança na escolha interna do capturer só apareceria no fps.
-- **Dependência da thread por captura.** As telas só ficam sem COM porque cada captura roda numa thread nova
-  (ADR 0005). Uma thread reaproveitada vazaria o COM de uma janela para uma tela.
+  Quem protege a decisão são as medições manuais, sempre com o mesmo conteúdo: `captura_uma_janela` (janela
+  4K bem acima de 14 fps) e, como sinal mais direto, conferir se `GraphicsCapture.dll` está carregada
+  durante a captura de uma janela. O fps de `captura_uma_tela` **não** serve para isso, porque depende do
+  conteúdo. Vale repetir ao atualizar as crates `livekit` e `libwebrtc`.
 - **Janela parada repete o último frame a cada volta, com a conversão inteira.** O `updated_region` do
   libwebrtc não chega ao Rust (a crate não o expõe), então não dá para pular a conversão quando nada mudou.
   Era assim com o GDI também. Expor a região exigiria mexer no `webrtc-sys`.
@@ -68,5 +81,5 @@ encerra com `SourceClosed`; se está minimizada, não chama o `capture_frame` e 
   resolução cheia somam mais que os 16,7 ms de um frame. Isso fica para o publicador nativo.
 - **Jogos em tela cheia exclusiva podem não ser capturáveis como janela.** O contorno é compartilhar a tela.
   Conteúdo com DRM sai preto também no WGC (ADR 0002).
-- **Sinais para rever a decisão:** o fps de janela voltar para perto de 14 (o libwebrtc voltou ao GDI), ou
-  o da tela 4K cair para perto de 45 (a tela passou a ir pelo WGC mesmo sem COM).
+- **Sinal para rever a decisão:** o fps de janela voltar para perto de 14, ou `GraphicsCapture.dll` deixar
+  de carregar durante a captura de uma janela (o libwebrtc voltou ao GDI).

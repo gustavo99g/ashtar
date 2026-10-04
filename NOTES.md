@@ -215,11 +215,12 @@ some de fato quando o código legado for substituído por ela.
   quedas até 10). Medido em release, sem IPC, só com o `LogVideoSink`.
 
   **Resolvido no passo 9** (COM na thread de captura de janela → WGC do libwebrtc; ADR 0008). Medido
-  depois, em release: janela 4K do Brave de ~14 para ~35–52 fps (varia com o conteúdo; chegou a 60 quando
-  a imagem estabilizou); tela 4K a 60 fps (sem COM, segue no DXGI); janela fechada encerra com
-  `SourceClosed`; janela minimizada repete o último frame (~2 fps). **Janela 4K a 60 fps continua para o
-  plano do publicador nativo** (reduzir na GPU antes de copiar). As medições abaixo são de antes da
-  correção.
+  depois, em release: janela 4K do Brave de ~14 para ~44–52 fps (varia com o conteúdo; chegou a 60 quando
+  a imagem estabilizou); janela fechada encerra com `SourceClosed`; janela minimizada repete o último
+  frame (~2 fps). A tela 4K deu o mesmo fps com e sem COM (43–53 com vídeo tocando, ~60 com o editor
+  parado) e não carrega o WGC nem com COM: o fps da tela depende do conteúdo. **Janela 4K a 60 fps
+  continua para o plano do publicador nativo** (reduzir na GPU antes de copiar). As medições abaixo são
+  de antes da correção.
 
   **Pelo libwebrtc (`DesktopCapturer`), por etapa** (cada janela com um conteúdo diferente, de cadência
   desconhecida; uma rodada por fonte, com outros programas abertos):

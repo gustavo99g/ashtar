@@ -49,10 +49,10 @@ na taxa do monitor, fazia duas cópias em resolução cheia por frame (inclusive
 RGBA pelo IPC (~3,7 MB/frame a 720p, contra ~1,4 MB em I420). Se o `DesktopCapturer` um dia falhar, um
 WGC ajustado (leitura só dos frames aceitos, envio em I420) volta a ser opção real.
 
-**Janelas pelo WGC do libwebrtc, telas no DXGI (passo 9, ADR 0008).** A captura de janelas caía no GDI
-(~14 fps numa janela 4K) porque a thread de captura não tinha COM, e o libwebrtc só escolhe o WGC com COM.
-Hoje a thread de captura de janela inicializa o COM; a de tela não, para seguir no DXGI. A captura própria
-com a `windows-capture`, que esta decisão deixava como alternativa, não foi necessária.
+**Janelas pelo WGC do libwebrtc (passo 9, ADR 0008).** A captura de janelas caía no GDI (~14 fps numa
+janela 4K) porque a thread de captura não tinha COM, e o libwebrtc só escolhe o WGC com COM. Hoje a thread
+de captura de janela inicializa o COM; a de tela não precisa (medido: o COM não muda nada nas telas). A
+captura própria com a `windows-capture`, que esta decisão deixava como alternativa, não foi necessária.
 
 ### 2. Listagem de fontes vem do `DesktopCapturer`
 
@@ -427,7 +427,7 @@ GDI (~14 fps numa janela 4K) porque a thread de captura não tinha COM, e o libw
 `IsWgcSupported` passar, o que exige COM (ADR 0008).
 
 - `platform::prepare_window_capture_thread`: inicializa o COM (MTA) na thread de captura **só para
-  janelas**; telas ficam sem COM, no DXGI (a tela 4K cairia de 54–60 para 43–50 fps com o WGC).
+  janelas**. As telas não precisam: com e sem COM a tela 4K deu o mesmo fps e as mesmas DLLs carregadas.
 - `platform::window_state`: `IsWindow`/`IsIconic`, conferido a cada volta do laço. Com o WGC o fim da
   janela não gera erro, então sem isso o `SourceClosed` deixava de disparar. Janela que sumiu encerra a
   captura; minimizada não chama o `capture_frame` e reenvia o último frame.
@@ -435,9 +435,10 @@ GDI (~14 fps numa janela 4K) porque a thread de captura não tinha COM, e o libw
 
 Testes: `janela_invalida_nao_existe` (automático) e `janela_em_foco_esta_visivel` (ignorado, precisa de área
 de trabalho real). Não há teste automático da escolha do capturer: o Rust não expõe qual foi instanciado.
-Validado à mão, em release: janela 4K do Brave de ~14 para ~46–52 fps (chegou a 60 com a imagem estável);
-tela 4K a 60 fps; janela fechada encerra com `SourceClosed`; janela minimizada cai para ~2 fps (reenvios) e
-volta a 60 ao restaurar, sem nenhum `WARN`.
+Validado à mão, em release: janela 4K do Brave de ~14 para ~44–47 fps (chegou a 60 com a imagem estável);
+janela fechada encerra com `SourceClosed`; janela minimizada cai para ~2 fps (reenvios) e volta ao normal
+ao restaurar, sem nenhum `WARN`; tela principal (1080p) a 60 fps. A tela 4K deu o mesmo fps com e sem COM
+(43–53 com vídeo tocando, ~60 com o editor parado), então o COM não foi aplicado a elas.
 
 ### Critério de pronto da Etapa 3
 
