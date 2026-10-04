@@ -3,7 +3,7 @@
 Aplicação privada de comunicação para uma única comunidade, inspirada no Discord.
 
 > O nome do projeto é provisório.
-> Status atual: **v0.1 — Vertical Slice** (em andamento)
+> Status atual: **v0.1 — Teste com o grupo** (em andamento)
 
 ## Funcionalidades
 
@@ -129,36 +129,24 @@ A primeira versão deve ser simples e voltada para aproximadamente 5–10 usuár
 ## Roadmap
 
 ```text
-v0.1  → Vertical slice
-        Tauri + React + Axum + LiveKit
-        Chat mockado + voz + screen share
+v0.1  → Teste com o grupo
+        Voz + screen share reorganizado, liberado como teste
+        (Cloudflare Tunnel + LiveKit Cloud)
 
-v0.2  → Identidade
-        Login + sessão + convites
+v0.2  → Comunidade
+        Auto-update + UI nova + convites sem senha + chat real + publicador nativo
 
-v0.3  → Chat real
-        Persistência + mensagens + tempo real
+v0.3  → Uso diário
+        Canais + presença + não lidas + confiabilidade
 
-v0.4  → Produto integrado
-        Canais + chat + voz + screen share
+v0.4  → Refinamentos guiados pelo uso
+        Administração + chat e voz avançados
 
-v0.5  → Confiabilidade
-        Reconexão + estados de erro + dispositivos
-
-v0.6  → Segurança
-        Permissões + administração básica
-
-v0.7  → Chat avançado
-        Editar + excluir + responder + reações + anexos
-
-v0.8  → Voz avançada
-        Múltiplas salas + refinamentos
-
-v0.9  → Release Candidate
-        Testes + estabilidade + preparação para uso real
+v0.5  → Release Candidate
+        Testes + estabilidade
 
 v1.0  → Primeira versão estável
-        Uso privado com 5–10 usuários
+        O grupo usa o app como ferramenta principal
 ```
 
 O detalhamento do roadmap fica em [`docs/roadmap.md`](docs/roadmap.md).
@@ -197,7 +185,8 @@ URL, a chave e o segredo do LiveKit no `.env`.
 ## Status
 
 Em desenvolvimento, na **v0.1**. O foco atual é a reorganização do compartilhamento de tela em uma
-estrutura definitiva, detalhada em [`ARCHITECTURE.md`](ARCHITECTURE.md).
+estrutura definitiva, detalhada em [`ARCHITECTURE.md`](ARCHITECTURE.md), seguida da liberação do app
+para o grupo como teste.
 
 ## Licença
 
