@@ -16,7 +16,7 @@ funcionalidade nova de voz, e suporte a Linux e web (ver decisão 14 para os cui
 |---|---|---|
 | 1 | Preparação | Concluída |
 | 2 | Esqueleto do Rust | Concluída |
-| 3 | Captura desacoplada do destino | Em andamento (passos 0 a 7 concluídos) |
+| 3 | Captura desacoplada do destino | Em andamento (passos 0 a 8 concluídos) |
 | 4 | Contrato entre Rust e React | Pendente |
 | 5 | Frontend | Pendente |
 | 6 | Verificação | Pendente |
@@ -372,7 +372,7 @@ da mensagem, vaga do portão (ocupa, fecha, reabre com o ACK, volta se o envio f
 por pacote, pacote vazio ignorado). Teste ignorado que precisa de áudio tocando:
 `captura_o_sistema_pelo_ipc`. A verificação de ponta a ponta, com o webview de verdade, é na Etapa 4.
 
-### Passo 8: `session.rs` — pendente
+### Passo 8: `session.rs` — concluído
 
 Um `ScreenShareManager` substitui `ScreenShareTestState` e `ScreenShareAudioState`:
 
@@ -381,14 +381,37 @@ struct Session {
     id: u64,
     video: CaptureHandle,
     audio: Option<CaptureHandle>,
-    gate: Option<FrameGate>,
+}
+
+struct AckGate {            // guardado à parte, num Mutex próprio
+    session_id: u64,
+    gate: FrameGate,
 }
 ```
 
-- Início atômico (decisão 6), dentro de `spawn_blocking`.
-- Encerramento por `SessionEvent` e regra de emissão (decisão 8).
-- Política de falha do áudio (decisão 7).
+O portão do ACK fica fora da `Session`, num `Mutex` próprio, para o `ack` não esperar o lock do estado,
+que o início da sessão segura durante a inicialização das capturas (medido: com um início de 600 ms, o
+`ack` esperava 500 ms; isso pararia uma thread do runtime async). Ordem dos locks: estado primeiro, depois
+o do ACK, nunca o contrário. Um `try_lock` foi descartado porque descartaria ACKs da sessão atual quando
+houvesse disputa com o `stop`, e o `FrameGate` perderia uma vaga para sempre.
+
+- Início atômico (decisão 6), dentro de `spawn_blocking`: se o áudio falha, o vídeo já iniciado é parado.
+- Encerramento por `SessionEvent` e regra de emissão (decisão 8): quem remove a sessão avisa, e só uma vez.
+- Política de falha do áudio (decisão 7): o fim do áudio sozinho não derruba o vídeo.
 - Parar: remover a sessão, emitir o evento e fazer `stop_and_join` dos handles em `spawn_blocking`.
+  Idempotente; pedidos de parada e ACKs de sessões antigas são ignorados (decisão 13).
+- O manager não conhece o Tauri: avisa pelo `on_event` que recebeu no `new`, com um `ShareEvent`
+  (`Ended { session_id, reason }` ou `AudioEnded { session_id, reason }`), e os comandos da Etapa 4
+  transformam isso em `screen-share-ended` e `screen-share-audio-ended`.
+- `Drop` no manager: solta a sessão ativa (os handles só pedem a parada, sem bloquear). Sem isso a
+  `Session` ficaria presa no estado compartilhado que a thread de eventos segura, e as capturas nunca
+  parariam. Não emite eventos.
+
+Testes (com uma captura falsa sobre o `spawn_capture` de verdade): início e parada, início duplo recusado,
+falha do áudio desfaz o vídeo, falha do vídeo não deixa sessão, parada e ACK de sessão antiga ignorados,
+fim do vídeo encerra a sessão, queda do áudio mantém o vídeo, `ack` não espera um início lento, soltar o
+manager para as capturas, e o portão do ACK (só a própria sessão o apaga; iniciar sem portão apaga o
+antigo). A verificação de ponta a ponta, com o app, é na Etapa 4.
 
 ### Critério de pronto da Etapa 3
 

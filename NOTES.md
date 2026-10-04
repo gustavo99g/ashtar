@@ -124,6 +124,8 @@ some de fato quando o código legado for substituído por ela.
       próprio processo. Resolve quando os comandos novos a usarem (Etapa 4).
 - [ ] Parar e iniciar em seguida pode falhar com "já existe uma captura ativa", porque o slot só é
       liberado quando a thread percebe a parada. Resolve com o `session.rs` (remover a sessão na hora).
+      **Base pronta:** o `ScreenShareManager::stop` remove a sessão na hora, antes de esperar as threads, e
+      um novo início já funciona (testado). Resolve quando os comandos novos o usarem (Etapa 4).
 - [ ] Áudio da captura é enviado ao frontend serializado como JSON (via `Channel<Vec<u8>>`) em vez de
       bytes crus (`InvokeResponseBody::Raw`).
       **Base pronta:** `IpcAudioSink` envia os f32 como `InvokeResponseBody::Raw`. Resolve quando os
@@ -135,9 +137,15 @@ some de fato quando o código legado for substituído por ela.
 - [ ] Início de sessão (vídeo + áudio) não é atômico: se o áudio falha depois do vídeo já ter subido, a
       limpeza da metade que subiu fica a cargo do JavaScript — origem de vazamentos observados.
       Resolve com o `session.rs` (`PLAN.md`, decisão 6).
+      **Base pronta:** `ScreenShareManager::start_with` sobe o vídeo e depois o áudio; se o áudio falha, o
+      vídeo já iniciado é parado e o erro volta (testado). Resolve quando os comandos novos o usarem
+      (Etapa 4).
 - [ ] Comportamento indefinido quando o app de origem do áudio fecha. **Decidido:** o vídeo continua e o
       evento `screen-share-audio-ended` é emitido (`PLAN.md`, decisão 7). Registrar na Etapa 6 se o
       WASAPI reporta erro ou só para de entregar pacotes.
+      **Base pronta:** o `ScreenShareManager` descarta o handle de áudio, avisa `ShareEvent::AudioEnded` e
+      mantém o vídeo (testado com uma captura falsa). Resolve quando os comandos novos o usarem (Etapa 4).
+      A verificação com o WASAPI de verdade continua pendente.
 
 ## Frontend
 
