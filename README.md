@@ -134,15 +134,19 @@ v0.1  → Teste com o grupo
         (Cloudflare Tunnel + LiveKit Cloud)
 
 v0.2  → Comunidade
-        Auto-update + UI nova + convites sem senha + chat real + publicador nativo
+        Auto-update + UI nova + convites sem senha + chat real
+        + LiveKit na VPS + publicador nativo
 
-v0.3  → Uso diário
-        Canais + presença + não lidas + confiabilidade
+v0.3  → Transmissões múltiplas
+        Várias transmissões simultâneas + experiência de quem assiste
 
-v0.4  → Refinamentos guiados pelo uso
-        Administração + chat e voz avançados
+v0.4  → Uso diário
+        Canais + presença + notificações + confiabilidade + bandeja + atalhos
 
-v0.5  → Release Candidate
+v0.5  → Social e refinamentos
+        Perfil + mensagens e ligações privadas + chat avançado + moderação
+
+v0.6  → Release Candidate
         Testes + estabilidade
 
 v1.0  → Primeira versão estável
@@ -159,13 +163,11 @@ etapas, sem custo fixo até que o uso justifique:
 ```text
 Desenvolvimento local
         ↓
-Testes com usuários reais
+Teste com o grupo (v0.1)
   • API pelo Cloudflare Tunnel
   • mídia pelo LiveKit Cloud (plano gratuito)
         ↓
-Avaliação
-        ↓
-VPS com LiveKit próprio, quando o uso ficar regular
+VPS com LiveKit próprio (v0.2)
 ```
 
 **API pelo Cloudflare Tunnel.** O túnel nomeado é gratuito e exige uma conta na Cloudflare e um domínio
@@ -178,8 +180,9 @@ forem atingidos, novas conexões falham até o início do mês seguinte. Como es
 algumas noites de chamada por mês com o grupo inteiro, e perto de 10 horas de compartilhamento de tela
 assistido por quatro pessoas. Acompanhe o consumo no painel do LiveKit Cloud.
 
-**VPS.** Quando os limites do plano gratuito começarem a apertar, o servidor do LiveKit (que é
-gratuito e de código aberto) passa a rodar numa VPS. Para o código, a troca é só de configuração: a
+**VPS.** Na v0.2, o servidor do LiveKit (que é gratuito e de código aberto) passa a rodar numa VPS,
+pré-requisito das transmissões múltiplas da v0.3; se os limites do plano gratuito apertarem antes, a
+migração é antecipada. A VPS é escolhida pelo tráfego de saída incluso, não só pela CPU. Para o código, a troca é só de configuração: a
 URL, a chave e o segredo do LiveKit no `.env`.
 
 ## Status
