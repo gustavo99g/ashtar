@@ -134,19 +134,28 @@ v0.1  → Teste com o grupo
         (Cloudflare Tunnel + LiveKit Cloud)
 
 v0.2  → Comunidade
-        Auto-update + UI nova + convites sem senha + chat real
-        + LiveKit na VPS + publicador nativo
+        Entregue em partes: auto-update → servidor na VPS → convites sem senha
+        → supressão de ruído → UI nova → chat real → publicador nativo
 
-v0.3  → Transmissões múltiplas
+v0.3  → Conversas privadas
+        Mensagens e ligações privadas + não lidas + bandeja
+
+v0.4  → Transmissões múltiplas
         Várias transmissões simultâneas + experiência de quem assiste
 
-v0.4  → Uso diário
-        Canais + presença + notificações + confiabilidade + bandeja + atalhos
+v0.5  → Canais e presença
+        Múltiplos canais e salas + status + menções + sons da voz
 
-v0.5  → Social e refinamentos
-        Perfil + mensagens e ligações privadas + chat avançado + moderação
+v0.6  → Confiabilidade e configurações
+        Reconexão + estados + tela de configurações + atalhos globais
 
-v0.6  → Release Candidate
+v0.7  → Perfil e chat avançado
+        Nick e foto + anexos + editar, responder, reagir + busca
+
+v0.8  → Atividade, moderação e refinamentos
+        "Jogando X" + administração + refinos do screen share
+
+v0.9  → Release Candidate
         Testes + estabilidade
 
 v1.0  → Primeira versão estável
@@ -167,7 +176,7 @@ Teste com o grupo (v0.1)
   • API pelo Cloudflare Tunnel
   • mídia pelo LiveKit Cloud (plano gratuito)
         ↓
-VPS com LiveKit próprio (v0.2)
+VPS com LiveKit, API e banco (v0.2)
 ```
 
 **API pelo Cloudflare Tunnel.** O túnel nomeado é gratuito e exige uma conta na Cloudflare e um domínio
@@ -180,10 +189,11 @@ forem atingidos, novas conexões falham até o início do mês seguinte. Como es
 algumas noites de chamada por mês com o grupo inteiro, e perto de 10 horas de compartilhamento de tela
 assistido por quatro pessoas. Acompanhe o consumo no painel do LiveKit Cloud.
 
-**VPS.** Na v0.2, o servidor do LiveKit (que é gratuito e de código aberto) passa a rodar numa VPS,
-pré-requisito das transmissões múltiplas da v0.3; se os limites do plano gratuito apertarem antes, a
-migração é antecipada. A VPS é escolhida pelo tráfego de saída incluso, não só pela CPU. Para o código, a troca é só de configuração: a
-URL, a chave e o segredo do LiveKit no `.env`.
+**VPS.** Na v0.2, o servidor do LiveKit (que é gratuito e de código aberto), a API e o banco passam a
+rodar numa VPS própria. O LiveKit próprio é pré-requisito das transmissões múltiplas da v0.4, e a API e
+o banco deixam de depender de um computador pessoal ligado. Se os limites do plano gratuito apertarem
+antes, a migração é antecipada. A VPS é escolhida pelo tráfego de saída incluso, não só pela CPU. Para
+o código do LiveKit, a troca é só de configuração: a URL, a chave e o segredo no `.env`.
 
 ## Status
 
