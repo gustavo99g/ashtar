@@ -151,15 +151,31 @@ some de fato quando o código legado for substituído por ela.
 
 - [ ] Publicação de vídeo no LiveKit sem `videoEncoding` nem `contentHint` explícitos (o preset padrão de
       compartilhamento de tela limita o encoder a 15 fps).
+      **Base pronta:** `IpcScreenShare` publica com `videoEncoding` (bitrate e fps do preset), `contentHint`
+      e `degradationPreference` de `presets.ts`. Resolve quando o provider/UI usar o controller (Etapa 5.5).
 - [ ] Publicação de áudio sem `AudioPresets.musicHighQualityStereo` e sem `dtx: false`.
+      **Base pronta:** a trilha de áudio é publicada com `musicHighQualityStereo`, `dtx: false` e
+      `forceStereo`. Resolve quando o provider/UI usar o controller (Etapa 5.5).
 - [ ] Cópia extra desnecessária de buffer no handler de frame de vídeo.
+      **Base pronta:** o `VideoFrame` é criado direto de uma view sobre o buffer recebido; a única cópia é a
+      do próprio `VideoFrame`. Resolve quando o provider/UI usar o controller (Etapa 5.5).
 - [ ] Sem proteção contra início duplo do compartilhamento (cliques rápidos/repetidos).
+      **Base pronta:** `IpcScreenShare` reserva a sessão antes de qualquer `await` e ignora `start` enquanto
+      existir uma (inclusive durante o teardown). Resolve quando o provider/UI usar o controller (Etapa 5.5).
 - [ ] `screenShareAudioRef` só é atribuído depois do `publishTrack` do áudio: se a publicação falhar, o
       cleanup não encontra o áudio e a captura no Rust continua rodando.
+      **Base pronta:** as trilhas entram em `session.published` antes do `publishTrack`, então o teardown
+      as encontra mesmo se a publicação falhar, e o teardown também chama `screenShareStop`. Resolve quando
+      o provider/UI usar o controller (Etapa 5.5).
 - [ ] `ScreenShareAudio.stop()` não é robusto: se `stopScreenShareAudio` lançar erro, o worklet e o
       `AudioContext` não são liberados; chamar `stop()` duas vezes lança erro no `context.close()`.
+      **Base pronta:** `ScreenShareAudio.close()` é idempotente e nunca rejeita, e não depende de nenhuma
+      chamada ao Rust. Resolve quando o provider/UI usar o controller (Etapa 5.5).
 - [ ] `AudioWorkletProcessor` aloca dentro de `process()` e não implementa um jitter buffer de verdade
       (sem acúmulo inicial, sem descarte de amostras antigas) — causa estalos/latência variável.
+      **Base pronta:** `jitter-buffer.worklet.js` com anel pré-alocado de 1 s, acúmulo inicial de 50 ms,
+      descarte acima de 150 ms e nada alocado no `process()`. Falta validar o áudio num build de release:
+      no build de produção o worklet vira uma URL `data:`.
 - [ ] Deafen só cancela a assinatura das trilhas existentes no momento do clique: quem entra depois é
       ouvido. `RoomAudioRenderer` não usa `muted={isDeafened}`, e o undeafen não restaura o mute anterior.
 - [ ] Sem tratamento de `Reconnecting`/`Reconnected` do LiveKit na UI.
@@ -172,6 +188,8 @@ some de fato quando o código legado for substituído por ela.
       Resolve junto com o `RoomContext` e os hooks do LiveKit.
 - [ ] Sem escuta do evento `screen-share-audio-ended`: ao receber, despublicar a trilha de áudio e avisar
       o usuário.
+      **Base pronta:** `IpcScreenShare` escuta `screen-share-audio-ended`, despublica a trilha de áudio e
+      passa o estado para `audio: "lost"`. Falta a UI avisar o usuário.
 
 ## Para verificar na Etapa 6
 

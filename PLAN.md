@@ -509,6 +509,8 @@ src/features/
 │   └── useVoice.ts
 └── screen-share/
     ├── controller.ts          # interface ScreenShareController e ScreenShareState
+    ├── presets.ts             # textos e configuração do encoder de cada preset
+    ├── useScreenShareState.ts # estado do controller como hook (useSyncExternalStore)
     ├── ipc/
     │   ├── IpcScreenShare.ts
     │   ├── ScreenShareAudio.ts
