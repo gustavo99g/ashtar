@@ -17,7 +17,7 @@ funcionalidade nova de voz, e suporte a Linux e web (ver decisão 14 para os cui
 | 1 | Preparação | Concluída |
 | 2 | Esqueleto do Rust | Concluída |
 | 3 | Captura desacoplada do destino | Em andamento (passos 0 a 9 concluídos) |
-| 4 | Contrato entre Rust e React | Pendente |
+| 4 | Contrato entre Rust e React | Em andamento (4.1 e 4.2 prontos no Rust) |
 | 5 | Frontend | Pendente |
 | 6 | Verificação | Pendente |
 
@@ -204,6 +204,9 @@ O compartilhamento oferece três presets, nomeados pelo uso na interface:
   de ida e volta de um frame. Os ~43 fps medidos com N = 3 indicam ~70 ms de ida e volta (em dev). Para
   sustentar 60 fps, o tempo precisa cair para menos de 50 ms ou N precisa subir; por isso o limite do
   `FrameGate` faz parte da configuração de cada preset.
+- **Valores do `FrameGate` por preset** (`media/quality.rs`): 5 frames em trânsito nos presets de 60 fps e 3
+  no `1080p30`. Com os ~70 ms de ida e volta medidos, isso dá no máximo ~71 e ~43 fps, acima dos 60 e 30 fps
+  de cada preset (um teste confere isso). Os 70 ms são de dev e do caminho antigo: remedir com o caminho novo.
 - 1080p60 e resoluções acima (4K) ficam fora desta versão. Dependem do publicador nativo com encoder por
   hardware (ver ADR 0007) e pesam no plano gratuito do LiveKit Cloud.
 
@@ -447,7 +450,7 @@ ao restaurar, sem nenhum `WARN`; tela principal (1080p) a 60 fps. A tela 4K deu 
   ponta a ponta acontece na Etapa 4.
 - O app continua funcionando pelo `legacy/`.
 
-## Etapa 4: contrato entre Rust e React — pendente
+## Etapa 4: contrato entre Rust e React — em andamento
 
 ### 4.1 Comandos (`commands/screen_share.rs`, todos `async`)
 
