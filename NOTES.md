@@ -176,20 +176,43 @@ some de fato quando o código legado for substituído por ela.
       **Base pronta:** `jitter-buffer.worklet.js` com anel pré-alocado de 1 s, acúmulo inicial de 50 ms,
       descarte acima de 150 ms e nada alocado no `process()`. Falta validar o áudio num build de release:
       no build de produção o worklet vira uma URL `data:`.
-- [ ] Deafen só cancela a assinatura das trilhas existentes no momento do clique: quem entra depois é
+- [x] Deafen só cancela a assinatura das trilhas existentes no momento do clique: quem entra depois é
       ouvido. `RoomAudioRenderer` não usa `muted={isDeafened}`, e o undeafen não restaura o mute anterior.
-- [ ] Sem tratamento de `Reconnecting`/`Reconnected` do LiveKit na UI.
-- [ ] Sem `dispose()` chamado no cleanup do efeito nem no evento `Disconnected` — captura pode continuar
+      **Resolvido:** o `VoiceProvider` usa `RoomAudioRenderer muted={isDeafened}` (vale também para quem
+      entra depois) e restaura o mute anterior ao sair do deafen; `deafen` e `undeafen` ignoram a chamada
+      repetida. A prop `muted` é `@alpha` na biblioteca. Ainda não testado com outros participantes.
+- [x] Sem tratamento de `Reconnecting`/`Reconnected` do LiveKit na UI.
+      **Resolvido:** o provider expõe o estado `reconnecting` e a UI mostra um aviso e o rótulo
+      "Reconectando...". Uma reconexão de verdade ainda não foi testada.
+- [x] Sem `dispose()` chamado no cleanup do efeito nem no evento `Disconnected` — captura pode continuar
       rodando depois de trocar de canal ou sair da sala.
-- [ ] Árvore de componentes não está envolvida por `RoomContext`, então hooks do LiveKit não funcionam
+      **Resolvido:** o `VoiceProvider` chama `controller.dispose()` no cleanup do efeito (antes do
+      `disconnect`) e no `Disconnected`. **Em aberto:** quando a sala cai sozinha, o `voiceChannelId`
+      continua no store; falta decidir se o app sai do canal ou tenta de novo.
+- [x] Árvore de componentes não está envolvida por `RoomContext`, então hooks do LiveKit não funcionam
       de forma idiomática nos componentes filhos.
-- [ ] `ActiveSpeakersChanged` recria o array de participantes e o `value` do contexto não é memorizado:
+      **Resolvido:** o `VoiceProvider` envolve a árvore com `RoomContext`, e os componentes usam os hooks
+      do LiveKit (`useParticipants`, `useTracks`, `useIsSpeaking`).
+- [x] `ActiveSpeakersChanged` recria o array de participantes e o `value` do contexto não é memorizado:
       todos os consumidores do `VoiceContext` re-renderizam várias vezes por segundo durante uma conversa.
       Resolve junto com o `RoomContext` e os hooks do LiveKit.
+      **Resolvido:** o `value` do contexto é memorizado, e os participantes vêm do `useParticipants`, com
+      cada card calculando o próprio `isSpeaking` (`useIsSpeaking`).
 - [ ] Sem escuta do evento `screen-share-audio-ended`: ao receber, despublicar a trilha de áudio e avisar
       o usuário.
       **Base pronta:** `IpcScreenShare` escuta `screen-share-audio-ended`, despublica a trilha de áudio e
       passa o estado para `audio: "lost"`. Falta a UI avisar o usuário.
+- [ ] `requestVoiceToken` (`features/voice/VoiceProvider.tsx`) usa a URL fixa `http://127.0.0.1:3000` e uma
+      identidade falsa nova a cada entrada (`idiot-<uuid>`), e o `fetch` não tem timeout. A v0.1 pede URL da
+      API configurável por ambiente, nome escolhido na primeira abertura, id por instalação e código de
+      acesso (`docs/roadmap.md`).
+- [ ] Código do frontend sem uso, a remover junto com o `legacy/` (Etapa 4.4): `providers/voiceProvider.tsx`,
+      `hooks/useVoice.tsx`, `components/voice/screenSharePicker` e `components/shareText`. Ainda importam o
+      `Channel` do Tauri direto, o que contradiz o `ARCHITECTURE.md` (o `commands.ts` seria o único); a regra
+      do ESLint só restringe o `invoke`.
+- [ ] A UI de voz é provisória e o botão de compartilhar saiu do `UserPanel`: até o `SourcePicker` (5.6)
+      existir, não há como iniciar um compartilhamento. A trava de uma transmissão por vez (botão desabilitado
+      quando outra pessoa transmite) precisa voltar junto com ele.
 
 ## Para verificar na Etapa 6
 
