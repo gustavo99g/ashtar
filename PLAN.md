@@ -522,7 +522,13 @@ src/features/
 export type ScreenShareState =
   | { status: "idle" }
   | { status: "starting" }
-  | { status: "active"; sessionId: number; source: CaptureSource }
+  | {
+      status: "active";
+      sessionId: number;
+      source: CaptureSource;
+      /** `lost`: o áudio caiu sozinho e o vídeo continua (decisão 7). */
+      audio: "off" | "on" | "lost";
+    }
   | { status: "error"; kind: string; message: string };
 ```
 
