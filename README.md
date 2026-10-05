@@ -114,14 +114,15 @@ Os detalhes estão em [`ARCHITECTURE.md`](ARCHITECTURE.md), e os motivos das pri
 
 ## Prioridade
 
-A prioridade é chegar ao funcionamento básico o mais rápido possível:
+O uso principal do aplicativo é o compartilhamento de tela, e a mídia é a parte tecnicamente mais
+incerta, por isso vem primeiro:
 
 ```text
-Chat
+Voz + Screen Share
   ↓
-Voz
+Comunidade (identidade + chat)
   ↓
-Screen Share
+Recursos secundários
 ```
 
 A primeira versão deve ser simples e voltada para aproximadamente 5–10 usuários.
@@ -188,24 +189,26 @@ para a mídia, que trafega por UDP.
 forem atingidos, novas conexões falham até o início do mês seguinte. Acompanhe o consumo no painel do
 LiveKit Cloud.
 
-Estimativa para um grupo de 5 pessoas (bitrates típicos de screen share, ainda não medidos no app):
+Estimativa para um grupo de 5 pessoas, com os bitrates iniciais dos presets do app (pontos de partida da
+decisão 16 do [`PLAN.md`](PLAN.md), ainda não medidos):
 
-| Transmissão | Tráfego com 4 pessoas assistindo | Horas no plano gratuito |
-|---|---|---|
-| 720p30 (~1,5 Mbps) | ~2,7 GB/h | ~18 h |
-| 1080p30 (~3 Mbps) | ~5,4 GB/h | ~9 h |
-| 1080p60 (~5 Mbps) | ~9 GB/h | ~5,5 h |
+| Preset | Bitrate inicial | Tráfego com 4 pessoas assistindo | Horas no plano gratuito |
+|---|---|---|---|
+| 720p60 | 3–4 Mbps | ~5,4–7,2 GB/h | ~7–9 h |
+| 900p60 | 4–5 Mbps | ~7,2–9 GB/h | ~6–7 h |
+| 1080p30 | 4–5 Mbps | ~7,2–9 GB/h | ~6–7 h |
 
 Os minutos acabam num ritmo parecido: 5 pessoas por 3 horas gastam 900 minutos, cerca de 5 noites por
 mês. Com o publicador nativo (v0.2.6), quem transmite abre uma segunda conexão e conta como dois
 participantes. Ou seja, o plano gratuito comporta algumas noites de teste, não um mês de uso.
 
 O plano pago seguinte inclui 150.000 minutos e 250 GB, com excedente de US$ 0,12/GB. Com uso intenso
-(4 noites por semana, 3 horas, 1080p60, 4 pessoas assistindo), seriam uns 470 GB por mês, cerca de
-US$ 26 de excedente além da mensalidade. O limite que aperta é sempre o tráfego, nunca os minutos.
+(4 noites por semana, 3 horas, um preset de 5 Mbps, 4 pessoas assistindo), seriam uns 470 GB por mês,
+cerca de US$ 26 de excedente além da mensalidade. O limite que aperta é sempre o tráfego, nunca os
+minutos.
 
-Durante o teste da v0.1, um preset mais leve (720p ou 1080p30) estica a cota, e o consumo de uma noite
-real (GB e minutos) deve ser anotado: é o número que confirma o dimensionamento da VPS.
+Durante o teste da v0.1, o preset mais leve (720p60) estica a cota, e o consumo de uma noite real (GB e
+minutos) deve ser anotado: é o número que confirma o dimensionamento da VPS.
 
 **VPS.** Na v0.2.1, o servidor do LiveKit (que é gratuito e de código aberto), a API e o banco passam a
 rodar numa VPS própria. O LiveKit próprio é pré-requisito das transmissões múltiplas da v0.4, e a API e
