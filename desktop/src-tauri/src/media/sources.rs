@@ -135,4 +135,33 @@ mod tests {
             );
         }
     }
+
+    #[test]
+    fn serializa_no_formato_do_frontend() {
+        let source = CaptureSource {
+            source: SourceRef::Monitor(0),
+            title: "Tela 1 (principal)".into(),
+            process_id: None,
+            icon: None,
+            monitor: Some(MonitorInfo {
+                x: 0,
+                y: 0,
+                width: 1920,
+                height: 1080,
+                is_primary: true,
+            }),
+        };
+
+        let json = serde_json::to_value(&source).unwrap();
+        assert_eq!(
+            json,
+            serde_json::json!({
+                "source": { "kind": "monitor", "id": 0 },
+                "title": "Tela 1 (principal)",
+                "processId": null,
+                "icon": null,
+                "monitor": { "x": 0, "y": 0, "width": 1920, "height": 1080, "isPrimary": true }
+            })
+        );
+    }
 }

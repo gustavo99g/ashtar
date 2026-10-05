@@ -10,6 +10,7 @@
 // parte do FFI do projeto mora em `media::platform::win32`.
 #![warn(clippy::undocumented_unsafe_blocks)]
 
+mod commands;
 mod error;
 mod legacy;
 mod media;
@@ -24,6 +25,7 @@ use legacy::commands::screen_share::{
     test_list_webrtc_windows, test_livekit_window_capture, ScreenSharePreviewState,
     ScreenShareVideoState,
 };
+use tauri::Manager;
 
 use crate::legacy::screen_share::ScreenShareTestState;
 
@@ -35,6 +37,10 @@ pub fn run() {
     );
 
     tauri::Builder::default()
+        .setup(|app| {
+            app.manage(commands::screen_share::create_manager(app.handle()));
+            Ok(())
+        })
         .manage(ScreenShareAudioState::default())
         .manage(ScreenSharePreviewState::default())
         .manage(ScreenShareVideoState::default())
@@ -53,7 +59,11 @@ pub fn run() {
             test_list_webrtc_windows,
             test_livekit_window_capture,
             ack_livekit_window_capture,
-            stop_livekit_window_capture
+            stop_livekit_window_capture,
+            commands::screen_share::list_capture_sources,
+            commands::screen_share::ipc_screen_share_start,
+            commands::screen_share::ipc_screen_share_ack,
+            commands::screen_share::screen_share_stop,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
