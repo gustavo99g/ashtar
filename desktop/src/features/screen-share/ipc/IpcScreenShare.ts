@@ -165,19 +165,23 @@ export class IpcScreenShare implements ScreenShareController {
 			session.generator.contentHint = preset.contentHint;
 
 			session.published.push(session.generator);
+
 			await this.room.localParticipant.publishTrack(session.generator, {
 				source: Track.Source.ScreenShare,
 				name: "screen-share",
 				stream: "screen-share",
-				videoEncoding: {
+				screenShareEncoding: {
 					maxBitrate: preset.maxBitrate,
 					maxFramerate: preset.maxFramerate,
 				},
 				degradationPreference: preset.degradationPreference,
+				videoCodec: preset.videoCodec,
+				simulcast: false,
 			});
 
 			if (session.audio) {
 				session.published.push(session.audio.track);
+
 				await this.room.localParticipant.publishTrack(session.audio.track, {
 					source: Track.Source.ScreenShareAudio,
 					name: "screen-share-audio",

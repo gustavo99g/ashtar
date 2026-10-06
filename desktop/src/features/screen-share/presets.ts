@@ -18,6 +18,7 @@ export interface QualityPreset {
 	maxBitrate: number;
 	/** Igual ao `fps` do mesmo preset em `media/quality.rs`. */
 	maxFramerate: number;
+	videoCodec: "vp8" | "h264" | "vp9" | "av1" | "h265";
 	/** O que o encoder preserva quando a banda aperta: fluidez ou nitidez. */
 	contentHint: "motion" | "detail";
 	degradationPreference: RTCDegradationPreference;
@@ -29,6 +30,7 @@ export const QUALITY_PRESETS = {
 		spec: "720p · 60",
 		description: "Para jogos e vídeos: prioriza a fluidez.",
 		maxBitrate: 3_500_000,
+		videoCodec: "vp8",
 		maxFramerate: 60,
 		contentHint: "motion",
 		degradationPreference: "maintain-framerate",
@@ -38,7 +40,8 @@ export const QUALITY_PRESETS = {
 		spec: "900p · 60",
 		description:
 			"Mais nitidez sem perder fluidez. Exige mais do computador e da conexão.",
-		maxBitrate: 4_500_000,
+		maxBitrate: 8_000_000,
+		videoCodec: "vp8",
 		maxFramerate: 60,
 		contentHint: "motion",
 		degradationPreference: "maintain-framerate",
@@ -47,7 +50,8 @@ export const QUALITY_PRESETS = {
 		label: "Nitidez",
 		spec: "1080p · 30",
 		description: "Para código e documentos: prioriza a leitura do texto.",
-		maxBitrate: 4_500_000,
+		maxBitrate: 8_000_000,
+		videoCodec: "vp8",
 		maxFramerate: 30,
 		contentHint: "detail",
 		degradationPreference: "maintain-resolution",
