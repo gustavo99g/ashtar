@@ -1,22 +1,15 @@
-import { VideoTrack } from "@livekit/components-react";
-import { type Participant, Track } from "livekit-client";
+import { type TrackReference, VideoTrack } from "@livekit/components-react";
 
 interface ScreenShareViewProps {
-	participant: Participant;
+	trackRef: TrackReference;
 }
 
-const ScreenShareView = ({ participant }: ScreenShareViewProps) => {
-	const publication = participant.getTrackPublication(Track.Source.ScreenShare);
+const ScreenShareView = ({ trackRef }: ScreenShareViewProps) => {
+  const { participant, publication } = trackRef;
 
-	if (!publication?.isSubscribed || !publication.videoTrack) {
+	if (!publication.isSubscribed || !publication.videoTrack) {
 		return null;
 	}
-
-	const trackRef = {
-		participant,
-		publication,
-		source: Track.Source.ScreenShare,
-	};
 
 	return (
 		<div className="h-full min-h-0 w-full overflow-hidden rounded-lg bg-black relative">

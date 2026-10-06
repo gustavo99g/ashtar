@@ -1,10 +1,9 @@
 import { Button } from "@/components/ui/button";
-import useVoice from "@/hooks/useVoice";
+import { useVoice } from "@/features/voice/useVoice";
 
 const VoiceControls = () => {
 	const {
-		// voiceChannelId,
-		// isConnected,
+
 		isMuted,
 		isDeafened,
 		mute,
