@@ -31,7 +31,6 @@ fast_image_resize = "6.1.0"    # sai com o legacy
 image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
 base64 = "0.23.1"
 livekit = "0.9.1"
-
 windows-sys = { version = "0.61.2", features = [
     "Win32_Foundation",
     "Win32_UI_WindowsAndMessaging",
@@ -41,6 +40,6 @@ windows-sys = { version = "0.61.2", features = [
     "Win32_System_Threading"
 ] }
 
-
 [profile.dev.package.image]
+
 opt-level = 3
