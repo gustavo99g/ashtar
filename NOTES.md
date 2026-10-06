@@ -155,35 +155,40 @@ some de fato quando o código legado for substituído por ela.
 
 ## Frontend
 
-- [ ] Publicação de vídeo no LiveKit sem `videoEncoding` nem `contentHint` explícitos (o preset padrão de
+- [x] Publicação de vídeo no LiveKit sem `videoEncoding` nem `contentHint` explícitos (o preset padrão de
       compartilhamento de tela limita o encoder a 15 fps).
-      **Base pronta:** `IpcScreenShare` publica com `screenShareEncoding` (bitrate e fps do preset),
+      **Resolvido:** `IpcScreenShare` publica com `screenShareEncoding` (bitrate e fps do preset),
       `videoCodec`, `simulcast: false`, `contentHint` e `degradationPreference` de `presets.ts`. Atenção: para
       tracks de tela o LiveKit usa só o `screenShareEncoding` (o padrão é 2,5 Mbps a 15 fps) e ignora o
-      `videoEncoding`. Falta testar de ponta a ponta pela UI.
-- [ ] Publicação de áudio sem `AudioPresets.musicHighQualityStereo` e sem `dtx: false`.
-      **Base pronta:** a trilha de áudio é publicada com `musicHighQualityStereo`, `dtx: false` e
-      `forceStereo`. Resolve quando o provider/UI usar o controller (Etapa 5.5).
-- [ ] Cópia extra desnecessária de buffer no handler de frame de vídeo.
-      **Base pronta:** o `VideoFrame` é criado direto de uma view sobre o buffer recebido; a única cópia é a
-      do próprio `VideoFrame`. Resolve quando o provider/UI usar o controller (Etapa 5.5).
-- [ ] Sem proteção contra início duplo do compartilhamento (cliques rápidos/repetidos).
-      **Base pronta:** `IpcScreenShare` reserva a sessão antes de qualquer `await` e ignora `start` enquanto
-      existir uma (inclusive durante o teardown). Resolve quando o provider/UI usar o controller (Etapa 5.5).
-- [ ] `screenShareAudioRef` só é atribuído depois do `publishTrack` do áudio: se a publicação falhar, o
+      `videoEncoding`. Testado de ponta a ponta em 05 e 06/10/2026, em release (ADR 0009).
+- [x] Publicação de áudio sem `AudioPresets.musicHighQualityStereo` e sem `dtx: false`.
+      **Resolvido:** a trilha de áudio é publicada com `musicHighQualityStereo`, `dtx: false` e
+      `forceStereo`; o provider usa o controller (Etapa 5.5).
+- [x] Cópia extra desnecessária de buffer no handler de frame de vídeo.
+      **Resolvido:** o `VideoFrame` é criado direto de uma view sobre o buffer recebido; a única cópia é a
+      do próprio `VideoFrame`; o provider usa o controller (Etapa 5.5).
+- [x] Sem proteção contra início duplo do compartilhamento (cliques rápidos/repetidos).
+      **Resolvido:** `IpcScreenShare` reserva a sessão antes de qualquer `await` e ignora `start` enquanto
+      existir uma (inclusive durante o teardown); o provider usa o controller (Etapa 5.5). Falta o teste de
+      20 inícios e paradas seguidos (Etapa 6, item 1).
+- [x] `screenShareAudioRef` só é atribuído depois do `publishTrack` do áudio: se a publicação falhar, o
       cleanup não encontra o áudio e a captura no Rust continua rodando.
-      **Base pronta:** as trilhas entram em `session.published` antes do `publishTrack`, então o teardown
-      as encontra mesmo se a publicação falhar, e o teardown também chama `screenShareStop`. Resolve quando
-      o provider/UI usar o controller (Etapa 5.5).
-- [ ] `ScreenShareAudio.stop()` não é robusto: se `stopScreenShareAudio` lançar erro, o worklet e o
+      **Resolvido:** as trilhas entram em `session.published` antes do `publishTrack`, então o teardown
+      as encontra mesmo se a publicação falhar, e o teardown também chama `screenShareStop`; o provider usa
+      o controller (Etapa 5.5).
+- [x] `ScreenShareAudio.stop()` não é robusto: se `stopScreenShareAudio` lançar erro, o worklet e o
       `AudioContext` não são liberados; chamar `stop()` duas vezes lança erro no `context.close()`.
-      **Base pronta:** `ScreenShareAudio.close()` é idempotente e nunca rejeita, e não depende de nenhuma
-      chamada ao Rust. Resolve quando o provider/UI usar o controller (Etapa 5.5).
+      **Resolvido:** `ScreenShareAudio.close()` é idempotente e nunca rejeita, e não depende de nenhuma
+      chamada ao Rust; o provider usa o controller (Etapa 5.5).
 - [ ] `AudioWorkletProcessor` aloca dentro de `process()` e não implementa um jitter buffer de verdade
       (sem acúmulo inicial, sem descarte de amostras antigas) — causa estalos/latência variável.
       **Base pronta:** `jitter-buffer.worklet.js` com anel pré-alocado de 1 s, acúmulo inicial de 50 ms,
-      descarte acima de 150 ms e nada alocado no `process()`. Falta validar o áudio num build de release:
-      no build de produção o worklet vira uma URL `data:`.
+      descarte acima de 150 ms e nada alocado no `process()`. Falta validar o áudio num app empacotado
+      (`tauri build`): o `vite build` embute o worklet como URL `data:text/javascript;base64,...` (3.728 bytes,
+      abaixo do limite de 4 KB de inline do Vite; a CSP do app é `null`), e não se sabe se o WebView2 aceita
+      `audioWorklet.addModule` com ela. As estatísticas do buffer só saem em `import.meta.env.DEV`, então os
+      testes de 05 e 06/10 provavelmente rodaram com o frontend em modo dev (inferência). Se falhar, servir o
+      worklet como arquivo (`public/`).
 - [x] Deafen só cancela a assinatura das trilhas existentes no momento do clique: quem entra depois é
       ouvido. `RoomAudioRenderer` não usa `muted={isDeafened}`, e o undeafen não restaura o mute anterior.
       **Resolvido:** o `VoiceProvider` usa `RoomAudioRenderer muted={isDeafened}` (vale também para quem
@@ -206,22 +211,26 @@ some de fato quando o código legado for substituído por ela.
       Resolve junto com o `RoomContext` e os hooks do LiveKit.
       **Resolvido:** o `value` do contexto é memorizado, e os participantes vêm do `useParticipants`, com
       cada card calculando o próprio `isSpeaking` (`useIsSpeaking`).
-- [ ] Sem escuta do evento `screen-share-audio-ended`: ao receber, despublicar a trilha de áudio e avisar
+- [x] Sem escuta do evento `screen-share-audio-ended`: ao receber, despublicar a trilha de áudio e avisar
       o usuário.
-      **Base pronta:** `IpcScreenShare` escuta `screen-share-audio-ended`, despublica a trilha de áudio e
-      passa o estado para `audio: "lost"`. Falta a UI avisar o usuário.
-- [ ] `requestVoiceToken` (`features/voice/VoiceProvider.tsx`) usa a URL fixa `http://127.0.0.1:3000` e uma
-      identidade falsa nova a cada entrada (`idiot-<uuid>`), e o `fetch` não tem timeout. A v0.1 pede URL da
-      API configurável por ambiente, nome escolhido na primeira abertura, id por instalação e código de
-      acesso (`docs/roadmap.md`).
+      **Resolvido:** `IpcScreenShare` escuta `screen-share-audio-ended`, despublica a trilha de áudio e
+      passa o estado para `audio: "lost"`, e `components/voice/main` mostra "O áudio parou. O vídeo continua
+      sendo transmitido." Ainda não visto acontecendo com um app de verdade (Etapa 6, item 5).
+- [ ] `requestVoiceToken` (`features/voice/VoiceProvider.tsx`) usa uma identidade falsa nova a cada entrada
+      (`idiot-<uuid>`), e o `fetch` não tem timeout. A v0.1 pede nome escolhido na primeira abertura, id por
+      instalação e código de acesso (`docs/roadmap.md`).
+      **Resolvido nesta parte:** a URL da API vem de `VITE_API_URL` (`lib/config.ts`), gravada no build. Em
+      desenvolvimento, sem a variável, usa `http://127.0.0.1:3000`; num app gerado ela é obrigatória. A API
+      só escuta em `127.0.0.1:3000` (`api/src/main.rs`): para outras máquinas é preciso encaminhar a porta.
 - [x] Código do frontend sem uso: `providers/voiceProvider.tsx`, `hooks/useVoice.tsx`,
       `components/voice/screenSharePicker`, `components/shareText` e `lib/audio`, mais os wrappers legados
       do `commands.ts`. **Resolvido:** removidos na Etapa 4.4. Com eles saiu a contradição com o
       `ARCHITECTURE.md`: hoje só o `commands.ts` importa `@tauri-apps/api`. A regra do ESLint ainda só
       restringe o `invoke` (não o `Channel` nem o `listen`); estendê-la ficou pendente.
-- [ ] O seletor (`SourcePicker`) e a trava de uma transmissão por vez (`ScreenShareButton`) existem, mas o
-      início de um compartilhamento pela UI ainda não foi testado de ponta a ponta. A trava só considera
-      tracks já assinados e não impede duas pessoas de iniciarem ao mesmo tempo. A UI de voz é provisória.
+- [ ] O seletor (`SourcePicker`) e a trava de uma transmissão por vez (`ScreenShareButton`) existem e foram
+      usados nos testes de 05 e 06/10 (ADR 0009). A trava só considera tracks já assinados e não impede duas
+      pessoas de iniciarem ao mesmo tempo; o erro de início não tem como ser dispensado. A UI de voz é
+      provisória.
 - [ ] Janelas minimizadas não aparecem no seletor. Não é bug nosso: o libwebrtc as descarta da lista
       (`IsIconic`) e também não as captura, e o `CaptureSource` só sai dessa lista (medido: o `start` de uma
       janela minimizada devolve `SourceNotFound`). O seletor recarrega a lista a cada 2 s (ao fim de cada
