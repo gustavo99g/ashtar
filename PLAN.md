@@ -583,7 +583,8 @@ seletor será do sistema (decisão 14). O desenho de referência está no canvas
 5. Fechar o programa cujo áudio está sendo capturado; o vídeo continua. Registrar o comportamento real
    do áudio (evento de fim ou só silêncio).
 6. Deafen e alguém novo entra no canal: não deve ser ouvido. Mute, deafen, undeafen: o microfone
-   continua mutado.
+   continua mutado. Deafen e depois
+   clicar em desmutar: o deafen sai e o microfone volta.
 7. As janelas do próprio app não aparecem no seletor.
 8. Compartilhar um jogo por duas horas com o app minimizado, com alguém assistindo, em build de release;
    anotar CPU, memória e picotes, separadamente para os três presets. Registrar fps, maior intervalo
