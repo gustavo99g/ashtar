@@ -220,6 +220,12 @@ some de fato quando o código legado for substituído por ela.
 - [ ] O seletor (`SourcePicker`) e a trava de uma transmissão por vez (`ScreenShareButton`) existem, mas o
       início de um compartilhamento pela UI ainda não foi testado de ponta a ponta. A trava só considera
       tracks já assinados e não impede duas pessoas de iniciarem ao mesmo tempo. A UI de voz é provisória.
+- [ ] Janelas minimizadas não aparecem no seletor. Não é bug nosso: o libwebrtc as descarta da lista
+      (`IsIconic`) e também não as captura, e o `CaptureSource` só sai dessa lista (medido: o `start` de uma
+      janela minimizada devolve `SourceNotFound`). O seletor recarrega a lista a cada 2 s (ao fim de cada
+      pedido, sem acumular), então uma janela restaurada aparece sem reabrir. Adiado: lista própria com
+      `EnumWindows`, selo "Minimizada" e restauração da janela ao escolher (contraria a decisão 2 do PLAN).
+      A lista leva ~95 ms com 4 janelas (release), por causa dos ícones: remedir com muitas janelas.
 - [ ] Os textos dos presets (`presets.ts`) prometem mais fluidez do que o medido em jogo: o Equilibrado ("sem
       perder fluidez") ficou em 25–34 fps e o Nitidez em 18–25 fps, abaixo dos 30 do próprio nome (ADR 0009).
 - [ ] A divisão do `capture_frame` em readback, redução e conversão (ADR 0009) vem de uma instrumentação que
