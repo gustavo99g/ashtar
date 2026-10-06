@@ -19,6 +19,7 @@ import {
 } from "react";
 import type { ScreenShareController } from "@/features/screen-share/controller";
 import { IpcScreenShare } from "@/features/screen-share/ipc/IpcScreenShare";
+import { apiUrl } from "@/lib/config";
 import { useNavigationStore } from "@/stores/navigation";
 
 export type VoiceConnectionState =
@@ -58,7 +59,7 @@ export const VoiceContext = createContext<VoiceContextValue | null>(null);
 async function requestVoiceToken(channelId: string) {
 	const random = crypto.randomUUID();
 
-	const res = await fetch("http://127.0.0.1:3000/api/voice/join", {
+	const res = await fetch(apiUrl("/api/voice/join"), {
 		method: "POST",
 		headers: { "Content-Type": "application/json" },
 		body: JSON.stringify({

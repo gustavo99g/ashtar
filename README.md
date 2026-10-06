@@ -60,6 +60,10 @@ discord-like/
 Copie o `.env.example` para `.env` e preencha as variáveis do LiveKit (URL do servidor, chave e
 segredo). Para o servidor local em modo de desenvolvimento, a chave é `devkey` e o segredo é `secret`.
 
+`VITE_API_URL` é a URL da API que o app desktop chama (sem barra final). Em desenvolvimento, sem ela, o
+app usa `http://127.0.0.1:3000`; num app gerado com `tauri build`, ela é obrigatória. O valor é gravado no
+build: mudou, reinicie o `tauri dev` ou gere o app de novo.
+
 ### 2. LiveKit
 
 Baixe o `livekit-server` na [página de releases](https://github.com/livekit/livekit/releases) e rode
