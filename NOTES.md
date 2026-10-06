@@ -83,6 +83,11 @@ some de fato quando o código legado for substituído por ela.
       do libyuv (mais rápido e mais legível para texto).
       **Base pronta:** `to_i420` converte em resolução cheia e reduz com o `scale` do I420 só quando o
       frame passa da caixa do preset (`fit_in_box`).
+      **Medido (2026-10-05/06, release):** a premissa de que isso é "mais rápido" não se confirmou. No 1080p
+      o `scale` custa 5–10 ms, cerca de metade do `capture_frame`, e a conversão de cor só 2–3 ms. A causa não
+      foi isolada (uma hipótese, não verificada, é o filtro do `scale`; o legado usava `Nearest`). Próximo
+      teste: reduzir em BGRA antes de converter, com o `fast_image_resize`, que por isso não sai ainda com o
+      `legacy/` (ADR 0009).
 - [ ] Timestamps a partir de `SystemTime` (relógio de parede, pode pular). Usar `Instant`.
       **Base pronta:** `video_capture.rs` usa `Instant`, contado desde o início da captura.
 - [ ] Loop de captura não trata "fonte fechada": quando a janela compartilhada é fechada, o capturer passa
@@ -151,8 +156,10 @@ some de fato quando o código legado for substituído por ela.
 
 - [ ] Publicação de vídeo no LiveKit sem `videoEncoding` nem `contentHint` explícitos (o preset padrão de
       compartilhamento de tela limita o encoder a 15 fps).
-      **Base pronta:** `IpcScreenShare` publica com `videoEncoding` (bitrate e fps do preset), `contentHint`
-      e `degradationPreference` de `presets.ts`. Resolve quando o provider/UI usar o controller (Etapa 5.5).
+      **Base pronta:** `IpcScreenShare` publica com `screenShareEncoding` (bitrate e fps do preset),
+      `videoCodec`, `simulcast: false`, `contentHint` e `degradationPreference` de `presets.ts`. Atenção: para
+      tracks de tela o LiveKit usa só o `screenShareEncoding` (o padrão é 2,5 Mbps a 15 fps) e ignora o
+      `videoEncoding`. Falta testar de ponta a ponta pela UI.
 - [ ] Publicação de áudio sem `AudioPresets.musicHighQualityStereo` e sem `dtx: false`.
       **Base pronta:** a trilha de áudio é publicada com `musicHighQualityStereo`, `dtx: false` e
       `forceStereo`. Resolve quando o provider/UI usar o controller (Etapa 5.5).
@@ -210,9 +217,14 @@ some de fato quando o código legado for substituído por ela.
       `hooks/useVoice.tsx`, `components/voice/screenSharePicker` e `components/shareText`. Ainda importam o
       `Channel` do Tauri direto, o que contradiz o `ARCHITECTURE.md` (o `commands.ts` seria o único); a regra
       do ESLint só restringe o `invoke`.
-- [ ] A UI de voz é provisória e o botão de compartilhar saiu do `UserPanel`: até o `SourcePicker` (5.6)
-      existir, não há como iniciar um compartilhamento. A trava de uma transmissão por vez (botão desabilitado
-      quando outra pessoa transmite) precisa voltar junto com ele.
+- [ ] O seletor (`SourcePicker`) e a trava de uma transmissão por vez (`ScreenShareButton`) existem, mas o
+      início de um compartilhamento pela UI ainda não foi testado de ponta a ponta. A trava só considera
+      tracks já assinados e não impede duas pessoas de iniciarem ao mesmo tempo. A UI de voz é provisória.
+- [ ] Os textos dos presets (`presets.ts`) prometem mais fluidez do que o medido em jogo: o Equilibrado ("sem
+      perder fluidez") ficou em 25–34 fps e o Nitidez em 18–25 fps, abaixo dos 30 do próprio nome (ADR 0009).
+- [ ] A divisão do `capture_frame` em readback, redução e conversão (ADR 0009) vem de uma instrumentação que
+      não está no repositório: os logs de tempo por etapa foram removidos (estão no commit `d418b00`). Para
+      repetir a medição, recolocar os logs ou deixar um cronômetro permanente no target `perf`.
 
 ## Para verificar na Etapa 6
 
@@ -240,8 +252,10 @@ some de fato quando o código legado for substituído por ela.
   1. **Redução na GPU antes de copiar para a memória**, para janelas em 4K cheio: readback (~7 ms) mais
      conversão (~10 ms) somam ~17 ms, mais que os 16,7 ms de um frame a 60 fps. Combina com o encoder
      por hardware, que também põe a GPU no caminho.
-  2. **O publicador em si**, que tira o teto do `FrameGate`/ACK no caminho IPC (~43 fps, estimado na
-     decisão 16 do `PLAN.md` com o caminho antigo, em dev; vale remedir após o Passo 7).
+  2. **O publicador em si.** O teto de ~43 fps do ACK era de dev e do caminho antigo; em release ele não
+     aparece (envio de ~0,1 ms por frame, e `max_in_flight` maior não ganhou nada; ADR 0009). O ganho do
+     publicador não é tirar esse teto, e sim abrir caminho para o encoder por hardware e para a redução
+     na GPU.
 
   Uma terceira peça, a captura própria de janelas com o `windows-capture`, estava prevista e **deixou de
   ser necessária**: o atraso das janelas vinha de o libwebrtc cair no GDI por falta de COM na thread, e o
@@ -262,6 +276,14 @@ some de fato quando o código legado for substituído por ela.
   parado) e não carrega o WGC nem com COM: o fps da tela depende do conteúdo. **Janela 4K a 60 fps
   continua para o plano do publicador nativo** (reduzir na GPU antes de copiar). As medições abaixo são
   de antes da correção.
+
+  **Ponta a ponta (2026-10-05/06, release, emissor e espectador na mesma máquina, com jogo rodando):** a
+  janela no monitor 1080p chega da captura a 30–60 fps conforme o preset e o conteúdo, e o espectador recebe
+  25–50 fps no Movimento e no Equilibrado e 18–25 fps no Nitidez (no LoL); a janela no 4K fica em 25–35 fps
+  em qualquer preset. No 1080p, cerca de metade do `capture_frame` é o readback (5–10 ms) e metade é o
+  `scale` do `to_i420`. O encoder (VP8, sem simulcast) deixou de ser o limite. Tabelas e a comparação com o
+  H.264 e o simulcast no [ADR 0009](docs/adr/0009-codec-e-bitrate-do-compartilhamento.md) e no "Registro de
+  desempenho" do `PLAN.md`.
 
   **Pelo libwebrtc (`DesktopCapturer`), por etapa** (cada janela com um conteúdo diferente, de cadência
   desconhecida; uma rodada por fonte, com outros programas abertos):

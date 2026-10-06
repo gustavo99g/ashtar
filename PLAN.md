@@ -189,24 +189,27 @@ gerados.
 
 O compartilhamento oferece três presets, nomeados pelo uso na interface:
 
-| Preset | Valor no contrato | Caixa máxima | fps | Bitrate inicial | Dica ao encoder |
+| Preset | Valor no contrato | Caixa máxima | fps | Bitrate máximo | Dica ao encoder |
 |---|---|---|---|---|---|
-| Movimento | `720p60` | 1280×720 | 60 | 3 a 4 Mbps | `contentHint "motion"`, `maintain-framerate` |
-| Equilibrado | `900p60` | 1600×900 | 60 | 4 a 5 Mbps | `contentHint "motion"`, `maintain-framerate` |
-| Nitidez | `1080p30` | 1920×1080 | 30 | 4 a 5 Mbps | `contentHint "detail"`, `maintain-resolution` |
+| Movimento | `720p60` | 1280×720 | 60 | 3,5 Mbps | `contentHint "motion"`, `maintain-framerate` |
+| Equilibrado | `900p60` | 1600×900 | 60 | 8 Mbps | `contentHint "motion"`, `maintain-framerate` |
+| Nitidez | `1080p30` | 1920×1080 | 30 | 8 Mbps | `contentHint "detail"`, `maintain-resolution` |
 
 - A imagem é reduzida para caber na **caixa** do preset (largura e altura), mantendo a proporção, e
   nunca é ampliada. Janelas de proporção livre (altas e estreitas, por exemplo) também respeitam o limite.
 - A dica ao encoder define o que é sacrificado quando a banda aperta: nos presets de 60 fps cai a
   resolução, no de 1080p30 cai o fps e o texto continua legível.
-- Os bitrates são pontos de partida, a ajustar depois de testes reais.
+- Os bitrates são tetos do encoder (`maxBitrate` em `presets.ts`, onde ficam os valores atuais) e pontos
+  de partida, a ajustar depois de testes reais.
 - **Teto do ACK no caminho IPC:** com no máximo N frames em trânsito, o fps máximo é N dividido pelo tempo
-  de ida e volta de um frame. Os ~43 fps medidos com N = 3 indicam ~70 ms de ida e volta (em dev). Para
-  sustentar 60 fps, o tempo precisa cair para menos de 50 ms ou N precisa subir; por isso o limite do
-  `FrameGate` faz parte da configuração de cada preset.
+  de ida e volta de um frame. Os ~43 fps medidos com N = 3 indicam ~70 ms de ida e volta, **em dev e com o
+  caminho antigo**. Em release, com o caminho novo, esse teto não aparece: o envio até o webview custa
+  ~0,1 ms por frame e `max_in_flight` 8 no Equilibrado não ganhou nada (ADR 0009). O limite do `FrameGate`
+  continua sendo configuração de cada preset.
 - **Valores do `FrameGate` por preset** (`media/quality.rs`): 5 frames em trânsito nos presets de 60 fps e 3
   no `1080p30`. Com os ~70 ms de ida e volta medidos, isso dá no máximo ~71 e ~43 fps, acima dos 60 e 30 fps
-  de cada preset (um teste confere isso). Os 70 ms são de dev e do caminho antigo: remedir com o caminho novo.
+  de cada preset (um teste confere isso). Os 70 ms são de dev e do caminho antigo; em release o ACK não
+  mostrou limitar o fps (ver acima).
 - 1080p60 e resoluções acima (4K) ficam fora desta versão. Dependem do publicador nativo com encoder por
   hardware (ver ADR 0007) e pesam no plano gratuito do LiveKit Cloud.
 
@@ -492,6 +495,9 @@ cancelar a escuta. Adicionar `"Unsupported"` e `"Internal"` ao `AppErrorKind`, s
 Os comandos e o código de `legacy/` saem quando o `IpcScreenShare` (Etapa 5) estiver usando os comandos
 novos. Junto saem as dependências `windows-capture` e `fast_image_resize`.
 
+**Exceção:** o `fast_image_resize` só sai depois de testar "reduzir em BGRA antes de converter para I420"
+(ADR 0009), que o usaria.
+
 **Exceção:** a medição do WGC direto (crate `windows-capture`) já foi feita e está no `NOTES.md`, no item
 da queda de fps em janelas. O teste `mede_o_wgc_de_uma_janela`, em `legacy/screen_share/windows.rs`, é a
 única forma de repetir essa comparação; ele e a dependência `windows-capture` saem junto com o
@@ -515,7 +521,9 @@ src/features/
     │   ├── IpcScreenShare.ts
     │   ├── ScreenShareAudio.ts
     │   └── jitter-buffer.worklet.js
-    └── SourcePicker.tsx
+    ├── SourcePicker.tsx       # seletor de fonte, qualidade e áudio
+    ├── ScreenShareButton.tsx  # botão de compartilhar/parar; abre o seletor
+    └── monitorLayout.ts       # disposição das telas no seletor
 ```
 
 ### 5.2 Contrato
@@ -540,7 +548,7 @@ chama `dispose()` quando a sala cai ou o usuário troca de canal.
 ### 5.3 `IpcScreenShare`
 
 Recebe o `Room`; concentra o generator, o `ScreenShareAudio`, os ACKs, a escuta dos dois eventos e o
-teardown. Correções: `videoEncoding`, `contentHint` e `degradationPreference` de acordo com o preset
+teardown. Correções: `screenShareEncoding`, `contentHint` e `degradationPreference` de acordo com o preset
 (decisão 16);
 `AudioPresets.musicHighQualityStereo` e `dtx: false` no áudio; sem cópia extra no handler de frame;
 proteção contra início duplo; ao receber `screen-share-audio-ended`, despublicar a trilha de áudio.
@@ -594,11 +602,26 @@ captura.
 |---|---|---|---|
 | Janela parada, caminho IPC | dev | ~43 fps | Limitado pela ida e volta do ACK; sem controle de taxa |
 | Jogo, caminho IPC | dev | ~18–20 fps, quedas até 10 | Investigação pendente com o target `perf` |
+| Captura, janela 1080p, vídeo (Movimento) | release | 53–60 fps | fps que chegam da captura |
+| Captura, janela 1080p, jogo (Movimento) | release | 35–55 fps | |
+| Captura, janela 1080p (Equilibrado) | release | ~40–55 fps | |
+| Captura, janela 1080p (Nitidez) | release | 30 fps | o teto do preset |
+| Captura, janela 4K (qualquer preset) | release | 25–35 fps | ~55% conversão + redução, ~45% readback |
+| Jogo (LoL), 1080p, Movimento | release | 29–50 fps (quase sempre > 35) | VP8 3,5 Mbps; o que o espectador recebe |
+| Jogo (LoL), 1080p, Equilibrado | release | 25–34 fps (perto de 30) | VP8 8 Mbps, 900p |
+| Jogo (LoL), 1080p, Nitidez | release | 18–25 fps | VP8 8 Mbps, 1080p; em outro jogo, 15–27 fps |
+| Envio pelo IPC até o webview | release | ~0,1 ms por frame | não é gargalo |
+
+Medições de 05 e 06/10/2026, emissor e espectador na mesma máquina e com um jogo rodando (provavelmente um
+piso do que se vê com o espectador em outro computador). As linhas em release substituem as de dev como
+referência. Detalhes, incluindo H.264 e simulcast, no [ADR 0009](docs/adr/0009-codec-e-bitrate-do-compartilhamento.md).
 
 ## Próximos passos (fora deste plano)
 
 - Publicador nativo em Rust (conexão `{user_id}:screen`) e medição lado a lado com o caminho IPC.
-- Investigação do fps com jogos (tempo do `capture_frame`, conversão, IPC).
+- Fps com jogos: a investigação mostrou que o limite é a captura (ADR 0009). Continuação: reduzir em BGRA
+  antes de converter para I420, captura própria reduzindo na GPU antes do readback, e H.264 por hardware
+  (o campo `videoCodec` do preset já está pronto para trocar).
 - Miniaturas no seletor: `get_source_thumbnail` por pedido (cards visíveis, concorrência limitada,
   atualização a cada 3 s, data URL); preview ao vivo da fonte selecionada via `PreviewSink` (480 px,
   5 fps, desenhado num canvas).

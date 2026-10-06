@@ -43,3 +43,7 @@ alternativa possa ser implementada ao lado e comparada.
   mas pode mudar.
 - **Critério de revisão:** a medição lado a lado com o publicador nativo, numa versão seguinte. Se ele
   sustentar 1080p60 com CPU aceitável, esta decisão é substituída e o caminho IPC é removido.
+- **Medição do caminho IPC (2026-10-05/06, release; [ADR 0009](0009-codec-e-bitrate-do-compartilhamento.md)):**
+  o envio até o webview custa ~0,1 ms por frame e não é o gargalo: o fps depende da captura. O H.264 do
+  WebView2 nessa máquina é o OpenH264, em software, e o VP8 aguenta melhor. A pergunta do encoder por
+  hardware continua aberta para o publicador nativo, que usa a crate `livekit`.

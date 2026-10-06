@@ -78,7 +78,9 @@ encerra com `SourceClosed`; se está minimizada, não chama o `capture_frame` e 
   libwebrtc não chega ao Rust (a crate não o expõe), então não dá para pular a conversão quando nada mudou.
   Era assim com o GDI também. Expor a região exigiria mexer no `webrtc-sys`.
 - **Janela 4K a 60 fps ainda depende de reduzir na GPU.** O readback (~7 ms) mais a conversão (~10 ms) em
-  resolução cheia somam mais que os 16,7 ms de um frame. Isso fica para o publicador nativo.
+  resolução cheia somam mais que os 16,7 ms de um frame. Isso fica para o publicador nativo. Ponta a ponta,
+  com o encoder, um jogo e o espectador na mesma máquina, uma janela 4K ficou em 25–35 fps em qualquer
+  preset ([ADR 0009](0009-codec-e-bitrate-do-compartilhamento.md)).
 - **Jogos em tela cheia exclusiva podem não ser capturáveis como janela.** O contorno é compartilhar a tela.
   Conteúdo com DRM sai preto também no WGC (ADR 0002).
 - **Sinal para rever a decisão:** o fps de janela voltar para perto de 14, ou `GraphicsCapture.dll` deixar
