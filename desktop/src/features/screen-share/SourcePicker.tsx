@@ -58,6 +58,9 @@ function toAudioMode(
 	return { mode: choice };
 }
 
+/** Intervalo entre o fim de uma atualização da lista de fontes e o pedido seguinte. */
+const SOURCES_REFRESH_MS = 2000;
+
 export function SourcePicker({
 	controller,
 	channelName,
@@ -69,25 +72,46 @@ export function SourcePicker({
 	const [quality, setQuality] = useState<Quality>(DEFAULT_QUALITY);
 	const [audio, setAudio] = useState<AudioChoice>("application");
 
+	// Recarrega a lista enquanto o seletor está aberto, para uma janela restaurada ou aberta agora
+	// aparecer sem reabrir. O próximo pedido só é agendado quando o anterior termina (cada um leva
+	// ~100 ms com poucas janelas, por causa dos ícones), então eles nunca se acumulam. Janelas
+	// minimizadas continuam fora: o libwebrtc não as lista nem as captura.
 	useEffect(() => {
 		let cancelled = false;
+		let timer: ReturnType<typeof setTimeout> | undefined;
 
-		controller.listSources().then(
-			(sources) => {
-				if (!cancelled) setLoaded({ status: "ready", sources });
-			},
-			(error: unknown) => {
-				if (cancelled) return;
-				const message =
-					typeof error === "object" && error !== null && "message" in error
-						? String(error.message)
-						: String(error);
-				setLoaded({ status: "error", message });
-			},
-		);
+		function schedule() {
+			if (!cancelled) timer = setTimeout(load, SOURCES_REFRESH_MS);
+		}
+
+		function load() {
+			controller.listSources().then(
+				(sources) => {
+					if (cancelled) return;
+					setLoaded({ status: "ready", sources });
+					schedule();
+				},
+				(error: unknown) => {
+					if (cancelled) return;
+					// Uma falha numa atualização não derruba a lista que já está na tela.
+					setLoaded((current) => {
+						if (current.status === "ready") return current;
+						const message =
+							typeof error === "object" && error !== null && "message" in error
+								? String(error.message)
+								: String(error);
+						return { status: "error", message };
+					});
+					schedule();
+				},
+			);
+		}
+
+		load();
 
 		return () => {
 			cancelled = true;
+			clearTimeout(timer);
 		};
 	}, [controller]);
 
