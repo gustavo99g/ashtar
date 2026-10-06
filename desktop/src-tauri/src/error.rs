@@ -21,6 +21,8 @@ pub enum AppError {
     #[error("erro interno: {0}")]
     Internal(String),
     #[error("recurso não suportado nesta plataforma: {0}")]
+    // Só é construída fora do Windows (`media/platform/unsupported.rs`).
+    #[cfg_attr(windows, allow(dead_code))]
     Unsupported(&'static str),
 }
 

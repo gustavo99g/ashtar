@@ -9,7 +9,7 @@ fn init_tracing() {
     use tracing_subscriber::{fmt, EnvFilter};
 
     // O crate da lib se chama `desktop_lib` (veja `[lib] name` no Cargo.toml),
-    // não `desktop` — é onde vive praticamente todo o código (legacy/, media/
+    // não `desktop` — é onde vive praticamente todo o código (commands/, media/
     // etc). O binário em si (`main.rs`) usa o target `desktop`.
     let default = if cfg!(debug_assertions) {
         "info,desktop=debug,desktop_lib=debug"

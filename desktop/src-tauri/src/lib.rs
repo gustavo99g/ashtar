@@ -1,8 +1,6 @@
 //! Ponto de entrada da lib do app desktop (`desktop_lib`, ver `[lib] name` no
-//! `Cargo.toml`). Registra os comandos Tauri e o estado gerenciado; hoje só
-//! os comandos legados (`legacy::commands::*`) estão ligados ao
-//! `invoke_handler!` — `media/` ainda não tem comandos novos (Etapa 4 do
-//! `PLAN.md`).
+//! `Cargo.toml`). Registra os comandos Tauri (em `commands/`) e o estado
+//! gerenciado (o `ScreenShareManager`, criado no `setup`).
 //!
 //! Learn more about Tauri commands at <https://tauri.app/develop/calling-rust/>
 
@@ -12,22 +10,9 @@
 
 mod commands;
 mod error;
-mod legacy;
 mod media;
 
-use legacy::commands::audio::{
-    start_screen_share_audio, stop_screen_share_audio, ScreenShareAudioState,
-};
-use legacy::commands::screen_share::{
-    ack_livekit_window_capture, list_screen_share_monitors, list_screen_share_windows,
-    start_monitor_preview, start_screen_share_video, start_window_preview,
-    stop_all_screen_share_previews, stop_livekit_window_capture, stop_screen_share_video,
-    test_list_webrtc_windows, test_livekit_window_capture, ScreenSharePreviewState,
-    ScreenShareVideoState,
-};
 use tauri::Manager;
-
-use crate::legacy::screen_share::ScreenShareTestState;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -41,25 +26,8 @@ pub fn run() {
             app.manage(commands::screen_share::create_manager(app.handle()));
             Ok(())
         })
-        .manage(ScreenShareAudioState::default())
-        .manage(ScreenSharePreviewState::default())
-        .manage(ScreenShareVideoState::default())
-        .manage(ScreenShareTestState::default())
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
-            start_screen_share_audio,
-            stop_screen_share_audio,
-            list_screen_share_monitors,
-            list_screen_share_windows,
-            start_window_preview,
-            start_monitor_preview,
-            start_screen_share_video,
-            stop_screen_share_video,
-            stop_all_screen_share_previews,
-            test_list_webrtc_windows,
-            test_livekit_window_capture,
-            ack_livekit_window_capture,
-            stop_livekit_window_capture,
             commands::screen_share::list_capture_sources,
             commands::screen_share::ipc_screen_share_start,
             commands::screen_share::ipc_screen_share_ack,

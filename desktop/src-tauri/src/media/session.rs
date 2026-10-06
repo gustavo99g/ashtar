@@ -1,7 +1,6 @@
 //! `ScreenShareManager`: a sessão de compartilhamento (vídeo + áudio opcional).
 //!
-//! Substitui o `ScreenShareTestState` e o `ScreenShareAudioState` do `legacy/`.
-//! Os comandos (Etapa 4) chamam este módulo. Ele não conhece o Tauri: avisa o
+//! Os comandos (`commands/screen_share.rs`) chamam este módulo. Ele não conhece o Tauri: avisa o
 //! fim de uma sessão chamando o `on_event` que recebeu no `new`, e os comandos
 //! transformam isso em eventos para o frontend.
 //!

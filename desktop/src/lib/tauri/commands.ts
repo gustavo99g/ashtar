@@ -3,10 +3,9 @@
  * deve importar `invoke` de `@tauri-apps/api/core` diretamente — a regra
  * `no-restricted-imports` do ESLint garante isso (ver eslint.config.js).
  *
- * Cada comando Tauri ganha um wrapper tipado aqui. Comandos legados (em
- * `src-tauri/src/legacy`) ainda rejeitam a Promise com uma `string`; o
- * `call()` normaliza isso para o mesmo formato de `AppError` que os
- * comandos novos (Etapa 2.2 do PLAN.md) já devolvem.
+ * Cada comando Tauri ganha um wrapper tipado aqui. Os comandos rejeitam a Promise com um `AppError`
+ * (Etapa 2.2 do PLAN.md); o `call()` converte qualquer outra rejeição (por exemplo, um erro do próprio
+ * Tauri, que chega como `string`) para o mesmo formato.
  */
 import { Channel, type InvokeArgs, invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
@@ -45,7 +44,7 @@ async function call<T>(command: string, args?: InvokeArgs): Promise<T> {
 			throw error;
 		}
 
-		// Comandos legados rejeitam com string.
+		// Rejeição que não é um `AppError` (ex.: erro do próprio Tauri, que chega como string).
 		throw {
 			kind: "Internal",
 			message: String(error),
@@ -54,154 +53,7 @@ async function call<T>(command: string, args?: InvokeArgs): Promise<T> {
 }
 
 // ---------------------------------------------------------------------------
-// Fontes de captura (janelas e monitores) e preview
-// ---------------------------------------------------------------------------
-
-export interface WindowSource {
-	id: number;
-	title: string;
-	process_id: number;
-	icon: string | null;
-}
-
-export interface MonitorSource {
-	id: number;
-	name: string;
-	x: number;
-	y: number;
-	width: number;
-	height: number;
-	is_primary: boolean;
-}
-
-export type ScreenShareSelection =
-	| {
-			type: "window";
-			source: WindowSource;
-	  }
-	| {
-			type: "monitor";
-			source: MonitorSource;
-	  };
-
-export type PreviewSourceType = "window" | "monitor";
-
-export interface WindowPreviewFrame {
-	source_id: number;
-	source_type: PreviewSourceType;
-	mime_type: string;
-	data: number[];
-}
-
-export function listScreenShareWindows() {
-	return call<WindowSource[]>("list_screen_share_windows");
-}
-
-export function listScreenShareMonitors() {
-	return call<MonitorSource[]>("list_screen_share_monitors");
-}
-
-export function startWindowPreview(
-	sourceId: number,
-	onFrame: (frame: WindowPreviewFrame) => void,
-) {
-	const channel = new Channel<WindowPreviewFrame>();
-
-	channel.onmessage = onFrame;
-
-	return call<void>("start_window_preview", {
-		sourceId,
-		channel,
-	});
-}
-
-export function startMonitorPreview(
-	sourceId: number,
-	onFrame: (frame: WindowPreviewFrame) => void,
-) {
-	const channel = new Channel<WindowPreviewFrame>();
-
-	channel.onmessage = onFrame;
-
-	return call<void>("start_monitor_preview", {
-		sourceId,
-		channel,
-	});
-}
-
-export function stopAllScreenSharePreviews() {
-	return call<void>("stop_all_screen_share_previews");
-}
-
-export function testListWebrtcWindows() {
-	return call<void>("test_list_webrtc_windows");
-}
-
-// ---------------------------------------------------------------------------
-// Captura de vídeo (DesktopCapturer)
-// ---------------------------------------------------------------------------
-
-export function startLivekitWindowCapture(
-	sourceId: number,
-	channel: Channel<ArrayBuffer>,
-) {
-	return call<number>("test_livekit_window_capture", {
-		sourceId,
-		channel,
-	});
-}
-
-export function ackLivekitWindowCapture(captureId: number) {
-	return call<void>("ack_livekit_window_capture", {
-		captureId,
-	});
-}
-
-export function stopLivekitWindowCapture(captureId: number) {
-	return call<void>("stop_livekit_window_capture", {
-		captureId,
-	});
-}
-
-// ---------------------------------------------------------------------------
-// Captura de áudio
-// ---------------------------------------------------------------------------
-
-export type ScreenShareAudioOptions =
-	| {
-			mode: "application";
-			processId: number;
-	  }
-	| {
-			mode: "system";
-			processId: number;
-	  };
-
-export function startScreenShareAudio(
-	options: ScreenShareAudioOptions,
-	onChunk: (chunk: number[]) => void,
-) {
-	const channel = new Channel<number[]>();
-
-	channel.onmessage = (chunk) => {
-		onChunk(chunk);
-	};
-
-	return call<number>("start_screen_share_audio", {
-		channel,
-		processId: options.processId,
-		application: options.mode === "application",
-	});
-}
-
-export function stopScreenShareAudio(captureId: number) {
-	return call<void>("stop_screen_share_audio", {
-		captureId,
-	});
-}
-
-// ---------------------------------------------------------------------------
-// Compartilhamento de tela (comandos novos, Etapa 4)
+// Compartilhamento de tela (Etapa 4)
 // Espelha `media/sources.rs`, `media/audio.rs`, `media/quality.rs` e
 // `commands/screen_share.rs`. Mudou lá, muda aqui.
 // ---------------------------------------------------------------------------
