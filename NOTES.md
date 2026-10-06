@@ -20,7 +20,7 @@ some de fato quando o código legado for substituído por ela.
       vazia (`RUST_LOG=`) como filtro válido e vazio, suprimindo todo log (até `error!`) sem cair no
       fallback. Corrigido em `main.rs` tratando "ausente" e "vazia" como o mesmo caso. De brinde,
       corrigido também o nome de crate errado no filtro padrão (`desktop` → `desktop_lib`, que é o
-      nome real da lib no Cargo.toml e onde vive o `legacy/`). Também faltava `info!` de ciclo de
+      nome real da lib no Cargo.toml e onde vivia o `legacy/`). Também faltava `info!` de ciclo de
       vida na captura de vídeo (`DesktopCapturer`) — só o áudio tinha, porque o código original só
       tinha `println!` de início/fim no áudio. Confirmado end-to-end com `RUST_LOG=info,desktop_lib=debug,perf=debug`:
       início/fim de vídeo e áudio em `info!`, formato do stream em `debug!`, métricas de `perf` a cada
@@ -35,8 +35,9 @@ some de fato quando o código legado for substituído por ela.
 - [ ] Nenhuma garantia de que uma thread de captura esquecida realmente para (sem `Drop` no handle).
       **Base pronta:** `CaptureHandle` com `Drop` que pede a parada. Resolve quando as capturas migrarem
       para `spawn_capture` (Etapa 3, passos 5 e 6).
-- [ ] Código legado com declarações FFI à mão e dependências que saem com ele (`windows-capture`,
-      `fast_image_resize`). Resolve na remoção do `legacy/` (Etapa 4.4).
+- [x] Código legado com declarações FFI à mão e dependências que saem com ele (`windows-capture`,
+      `fast_image_resize`). **Resolvido:** o `legacy/` foi removido (Etapa 4.4), com o `windows-capture`. O
+      `fast_image_resize` ficou no `Cargo.toml`, sem uso, para o teste do item do resize (mais abaixo).
 
 ## Rust — listagem de fontes
 
@@ -59,15 +60,15 @@ some de fato quando o código legado for substituído por ela.
 
 ## Rust — captura de vídeo
 
-- [ ] Dois pipelines de captura de vídeo coexistem: `windows_capture` (WGC) e `DesktopCapturer`.
+- [x] Dois pipelines de captura de vídeo coexistem: `windows_capture` (WGC) e `DesktopCapturer`.
       **Decisão confirmada:** consolidar em `DesktopCapturer` (ver `PLAN.md`, decisão 1). O teste de
       correção passou: Chrome com vídeo, janela parada (frames continuam chegando) e jogo. O WGC não foi
       descartado por limitação técnica dele; o teste inicial comparou pipelines diferentes.
-      **Falta:** remover o WGC junto com o `legacy/` (Etapa 4.4).
-- [ ] Captura de vídeo e áudio acopladas ao destino (`Channel<InvokeResponseBody>`); não dá para trocar
-      por outro sink sem duplicar a captura. **Base pronta:** traits `VideoSink`/`AudioSink`, a captura de
+      **Resolvido:** o WGC (`windows-capture`) saiu junto com o `legacy/` (Etapa 4.4); resta um pipeline.
+- [x] Captura de vídeo e áudio acopladas ao destino (`Channel<InvokeResponseBody>`); não dá para trocar
+      por outro sink sem duplicar a captura. **Resolvido:** traits `VideoSink`/`AudioSink`, a captura de
       áudio e de vídeo sobre eles e os sinks do IPC (`IpcVideoSink`, `IpcAudioSink`); os passos 5 a 7 da
-      Etapa 3 estão concluídos. Some quando os comandos novos substituírem o `legacy/` (Etapa 4.4).
+      Etapa 3 estão concluídos, e o app usa só os comandos novos desde a remoção do `legacy/` (Etapa 4.4).
 - [ ] Loop de captura sem controle de taxa: chama `capture_frame` o mais rápido que o ACK permite
       (~43 fps com a tela parada), gastando CPU com frames idênticos. Corrigir com agendamento por
       deadline no `video_capture.rs`.
@@ -78,16 +79,16 @@ some de fato quando o código legado for substituído por ela.
       **Base pronta:** `to_i420` passa `frame.stride()` ao libyuv, e o empacotamento do `IpcVideoSink`
       descarta o padding (testado com stride maior que a largura). A conversão BGRA → I420 não tem teste
       automático do stride, porque não dá para montar um `DesktopFrame` num teste.
-- [ ] Resize em BGRA com `fast_image_resize` e `ResizeAlg::Nearest`, precedido de `frame.data().to_vec()`
-      (cópia do frame inteiro em resolução cheia). Substituir por conversão para I420 seguida do `scale`
-      do libyuv (mais rápido e mais legível para texto).
+- [ ] Redução da imagem no caminho do IPC. O legado reduzia em BGRA com `fast_image_resize` e
+      `ResizeAlg::Nearest`, depois de copiar o frame inteiro (`frame.data().to_vec()`); isso saiu com o
+      `legacy/`. O caminho novo converte para I420 e reduz com o `scale` do libyuv (mais legível para texto).
       **Base pronta:** `to_i420` converte em resolução cheia e reduz com o `scale` do I420 só quando o
       frame passa da caixa do preset (`fit_in_box`).
       **Medido (2026-10-05/06, release):** a premissa de que isso é "mais rápido" não se confirmou. No 1080p
       o `scale` custa 5–10 ms, cerca de metade do `capture_frame`, e a conversão de cor só 2–3 ms. A causa não
       foi isolada (uma hipótese, não verificada, é o filtro do `scale`; o legado usava `Nearest`). Próximo
-      teste: reduzir em BGRA antes de converter, com o `fast_image_resize`, que por isso não sai ainda com o
-      `legacy/` (ADR 0009).
+      teste: reduzir em BGRA antes de converter, com o `fast_image_resize`, que por isso continua no
+      `Cargo.toml`, sem uso desde a remoção do `legacy/` (ADR 0009).
 - [ ] Timestamps a partir de `SystemTime` (relógio de parede, pode pular). Usar `Instant`.
       **Base pronta:** `video_capture.rs` usa `Instant`, contado desde o início da captura.
 - [ ] Loop de captura não trata "fonte fechada": quando a janela compartilhada é fechada, o capturer passa
@@ -213,10 +214,11 @@ some de fato quando o código legado for substituído por ela.
       identidade falsa nova a cada entrada (`idiot-<uuid>`), e o `fetch` não tem timeout. A v0.1 pede URL da
       API configurável por ambiente, nome escolhido na primeira abertura, id por instalação e código de
       acesso (`docs/roadmap.md`).
-- [ ] Código do frontend sem uso, a remover junto com o `legacy/` (Etapa 4.4): `providers/voiceProvider.tsx`,
-      `hooks/useVoice.tsx`, `components/voice/screenSharePicker` e `components/shareText`. Ainda importam o
-      `Channel` do Tauri direto, o que contradiz o `ARCHITECTURE.md` (o `commands.ts` seria o único); a regra
-      do ESLint só restringe o `invoke`.
+- [x] Código do frontend sem uso: `providers/voiceProvider.tsx`, `hooks/useVoice.tsx`,
+      `components/voice/screenSharePicker`, `components/shareText` e `lib/audio`, mais os wrappers legados
+      do `commands.ts`. **Resolvido:** removidos na Etapa 4.4. Com eles saiu a contradição com o
+      `ARCHITECTURE.md`: hoje só o `commands.ts` importa `@tauri-apps/api`. A regra do ESLint ainda só
+      restringe o `invoke` (não o `Channel` nem o `listen`); estendê-la ficou pendente.
 - [ ] O seletor (`SourcePicker`) e a trava de uma transmissão por vez (`ScreenShareButton`) existem, mas o
       início de um compartilhamento pela UI ainda não foi testado de ponta a ponta. A trava só considera
       tracks já assinados e não impede duas pessoas de iniciarem ao mesmo tempo. A UI de voz é provisória.
@@ -303,7 +305,7 @@ some de fato quando o código legado for substituído por ela.
   | Janela 3854×2105 (4K) | 8,1 Mpx | ~65 ms | ~10,5 ms | ~16 |
 
   **WGC direto, sem o libwebrtc** (crate `windows-capture` do `legacy/`, teste
-  `mede_o_wgc_de_uma_janela`; `readback` = `frame.buffer()`, a cópia GPU→memória), janelas de 3840×2088:
+  `mede_o_wgc_de_uma_janela`, hoje só no commit `90338d7`; `readback` = `frame.buffer()`, a cópia GPU→memória), janelas de 3840×2088:
 
   | Janela | Conteúdo | Frames que chegam | Readback |
   |---|---|---|---|
@@ -326,8 +328,8 @@ some de fato quando o código legado for substituído por ela.
   Como o `capture_frame` é síncrono, ele limita o fps do laço (fps ≈ 1000 / `capture_frame_ms`). Uma
   captura própria com o `windows-capture` custaria readback + conversão: ~5 ms até ~2,5 Mpx e ~17 ms em 4K
   cheio (não cabe em CPU; só reduzindo na GPU antes de copiar). Depois do passo 9 a captura própria deixou
-  de ser necessária (ADR 0008). O teste `mede_o_wgc_de_uma_janela` fica em
-  `legacy/screen_share/windows.rs` até a Etapa 4.4, junto com o `windows-capture`; é a única forma de
+  de ser necessária (ADR 0008). O teste `mede_o_wgc_de_uma_janela` saiu com o
+  `legacy/` (Etapa 4.4), junto com o `windows-capture`; está no commit `90338d7` e é a única forma de
   repetir a comparação com o WGC direto.
 
   Limitações: as rodadas do libwebrtc e do WGC direto foram feitas uma depois da outra, não ao mesmo

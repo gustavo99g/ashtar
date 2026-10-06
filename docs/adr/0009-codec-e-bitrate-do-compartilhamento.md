@@ -94,8 +94,8 @@ preset (`presets.ts`), pronto para trocar. O limite de frames em trânsito do `F
 - **Contorno para quem quiser mais fps hoje:** compartilhar a tela em vez da janela, ou usar um preset de
   resolução menor.
 - **Melhorias que ficam para o publicador nativo (fora da Etapa 5):**
-  - reduzir em BGRA antes de converter para I420 (com o `fast_image_resize`, que por isso não deve sair com
-    o `legacy/` até esta medição);
+  - reduzir em BGRA antes de converter para I420 (com o `fast_image_resize`, que por isso
+    continua no `Cargo.toml`, sem uso desde a remoção do `legacy/`);
   - captura própria, reduzindo na GPU antes do readback;
   - H.264 de hardware, trocando o `videoCodec` do preset;
   - a pergunta do encoder por hardware do ADR 0007 continua aberta para a crate `livekit`.

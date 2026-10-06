@@ -24,7 +24,7 @@ formato em toda mensagem proposta ao usuário, mesmo antes da confirmação.
 Documentada em [docs/rust-code-documentation.md](docs/rust-code-documentation.md): `//!` de modulo
 (papel/quem usa/regras), secao `# Bloqueia` em funcoes que nao podem rodar no runtime async,
 `// SAFETY:` em todo `unsafe`, e `#![warn(clippy::undocumented_unsafe_blocks)]` cobrando isso.
-Aplicada hoje em `media/` e nos arquivos-raiz; `legacy/` ainda nao.
+Aplicada em `media/`, `commands/` e nos arquivos-raiz.
 
 ## Onde ficam as decisões técnicas
 

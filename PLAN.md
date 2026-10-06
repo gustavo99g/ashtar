@@ -17,7 +17,7 @@ funcionalidade nova de voz, e suporte a Linux e web (ver decisão 14 para os cui
 | 1 | Preparação | Concluída |
 | 2 | Esqueleto do Rust | Concluída |
 | 3 | Captura desacoplada do destino | Em andamento (passos 0 a 9 concluídos) |
-| 4 | Contrato entre Rust e React | Em andamento (4.1 e 4.2 prontos no Rust) |
+| 4 | Contrato entre Rust e React | Concluída |
 | 5 | Frontend | Pendente |
 | 6 | Verificação | Pendente |
 
@@ -223,7 +223,7 @@ O compartilhamento oferece três presets, nomeados pelo uso na interface:
 ## Etapa 2: esqueleto do Rust — concluída
 
 - Código do protótipo movido, sem mudanças de lógica, para `src-tauri/src/legacy/`. Continua sendo o
-  que o app usa até as Etapas 4 e 5.
+  que o app usava até as Etapas 4 e 5 (removido na Etapa 4.4).
 - `error.rs` com `AppError` e teste de serialização.
 - `tracing` inicializado com `EnvFilter` (padrão `info,<crate>=debug` em dev), hook de panic que registra
   o nome da thread, e threads nomeadas. Métricas de desempenho no target `perf`
@@ -451,9 +451,9 @@ ao restaurar, sem nenhum `WARN`; tela principal (1080p) a 60 fps. A tela 4K deu 
 - Passos 4 a 6 validados com os sinks de diagnóstico.
 - Ciclo de vida da sessão validado com um comando temporário de teste, se desejado; a verificação de
   ponta a ponta acontece na Etapa 4.
-- O app continua funcionando pelo `legacy/`.
+- O app continuava funcionando pelo `legacy/` (removido na Etapa 4.4).
 
-## Etapa 4: contrato entre Rust e React — em andamento
+## Etapa 4: contrato entre Rust e React — concluída
 
 ### 4.1 Comandos (`commands/screen_share.rs`, todos `async`)
 
@@ -490,19 +490,20 @@ Wrappers para os comandos novos, tipos `CaptureSource`, `SourceRef`, `StartOptio
 funções `onScreenShareEnded(callback)` e `onScreenShareAudioEnded(callback)` que retornam a função de
 cancelar a escuta. Adicionar `"Unsupported"` e `"Internal"` ao `AppErrorKind`, se ainda não estiverem.
 
-### 4.4 Remoção do legado
+### 4.4 Remoção do legado — concluída
 
-Os comandos e o código de `legacy/` saem quando o `IpcScreenShare` (Etapa 5) estiver usando os comandos
-novos. Junto saem as dependências `windows-capture` e `fast_image_resize`.
+O `legacy/` (comandos, estado e captura do protótipo), o código do frontend que só ele usava (o provider
+e o hook de voz antigos, o seletor antigo, o `shareText` e `lib/audio`) e os wrappers legados do
+`commands.ts` foram removidos, junto com a dependência `windows-capture`. O `lib.rs` registra só os
+quatro comandos novos.
 
-**Exceção:** o `fast_image_resize` só sai depois de testar "reduzir em BGRA antes de converter para I420"
-(ADR 0009), que o usaria.
+**Exceção:** o `fast_image_resize` continua no `Cargo.toml`, sem uso, até testar "reduzir em BGRA antes de
+converter para I420" (ADR 0009), que o usaria.
 
-**Exceção:** a medição do WGC direto (crate `windows-capture`) já foi feita e está no `NOTES.md`, no item
-da queda de fps em janelas. O teste `mede_o_wgc_de_uma_janela`, em `legacy/screen_share/windows.rs`, é a
-única forma de repetir essa comparação; ele e a dependência `windows-capture` saem junto com o
-`legacy/`, a não ser que o plano do publicador nativo decida usá-los como base de uma captura própria
-de janelas. Nesse caso, mantê-los.
+**O teste do WGC direto saiu.** A medição (crate `windows-capture`) está no `NOTES.md`, no item da queda de
+fps em janelas. O teste `mede_o_wgc_de_uma_janela`, que a repetia, estava em `legacy/screen_share/windows.rs`
+e ficou no commit `90338d7` (o último antes da remoção). Se o plano do publicador nativo decidir usar o WGC
+como base de uma captura própria de janelas, é de lá que se recupera.
 
 ## Etapa 5: frontend — pendente
 

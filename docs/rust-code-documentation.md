@@ -5,8 +5,7 @@ quebrar sem perceber (threads que não podem bloquear o runtime async, handles q
 `Drop`, `unsafe` por todo lado no Win32). A convenção abaixo existe para que essas regras fiquem
 escritas perto do código que as protege, não só na cabeça de quem escreveu.
 
-Aplicada hoje em `media/` e nos arquivos-raiz (`error.rs`, `lib.rs`, `main.rs`). Ainda não foi
-aplicada em `legacy/`, que é código do protótipo candidato a remoção (ver `PLAN.md`/`NOTES.md`).
+Aplicada em `media/`, `commands/` e nos arquivos-raiz (`error.rs`, `lib.rs`, `main.rs`).
 
 ## 1. `//!` no topo de cada módulo: o "porquê" e as regras
 

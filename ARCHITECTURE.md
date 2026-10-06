@@ -4,11 +4,6 @@ Este documento é o mapa do projeto: o que existe, onde fica e quais regras atra
 Ele descreve só o que muda raramente. Os motivos das decisões estão em [`docs/adr/`](docs/adr/),
 e as regras de cada módulo estão no comentário `//!` no topo dele.
 
-> **Estado atual (v0.1):** a captura está sendo migrada do código do protótipo, em
-> `desktop/src-tauri/src/legacy/`, para a estrutura descrita aqui. Módulos marcados com
-> *(em construção)* ainda não substituíram o equivalente do `legacy/`. Quando a migração terminar,
-> esta nota e a pasta `legacy/` saem.
-
 ## Visão geral
 
 Um clone do Discord para desktop, pensado para uma única comunidade de 5 a 10 pessoas: servidores,
@@ -61,7 +56,7 @@ flowchart LR
 - **`error.rs`**: o `AppError`, único tipo de erro devolvido ao frontend, serializado como
   `{ kind, message }`.
 - **`commands/`**: a fronteira com o frontend. Os comandos só recebem argumentos, delegam ao
-  `media/` e convertem o resultado. Nenhuma lógica de captura mora aqui. *(em construção)*
+  `media/` e convertem o resultado. Nenhuma lógica de captura mora aqui.
 - **`media/`**: tudo que envolve captura.
   - **`mod.rs`**: só declarações e reexportações; o resto do código usa `crate::media::X`.
   - **`sink.rs`**: o frame capturado e os traits `VideoSink` e `AudioSink`, que desacoplam a
@@ -72,14 +67,14 @@ flowchart LR
   - **`sources.rs`**: os tipos das fontes (`SourceRef`, `CaptureSource`) e a listagem, que vem do
     `DesktopCapturer` e é complementada pela plataforma
     ([ADR 0003](docs/adr/0003-listagem-de-fontes.md)).
-  - **`audio.rs`**: o `AudioMode` e a entrada comum da captura de áudio. *(em construção)*
+  - **`audio.rs`**: o `AudioMode` e a entrada comum da captura de áudio.
   - **`diagnostics.rs`**: sinks que só registram no log o que recebem, para testar capturas isoladas.
   - **`video_capture.rs`**: captura de vídeo com o `DesktopCapturer`, controle de taxa e conversão
-    para I420 ([ADR 0002](docs/adr/0002-captura-com-desktopcapturer.md)). *(em construção)*
+    para I420 ([ADR 0002](docs/adr/0002-captura-com-desktopcapturer.md)).
   - **`ipc_sink.rs`**: os sinks que enviam frames e áudio ao webview. Temporário
-    ([ADR 0007](docs/adr/0007-envio-ao-livekit-pelo-webview.md)). *(em construção)*
+    ([ADR 0007](docs/adr/0007-envio-ao-livekit-pelo-webview.md)).
   - **`session.rs`**: o `ScreenShareManager`, que agrupa vídeo e áudio de um compartilhamento
-    ([ADR 0006](docs/adr/0006-encerramento-da-sessao-por-eventos.md)). *(em construção)*
+    ([ADR 0006](docs/adr/0006-encerramento-da-sessao-por-eventos.md)).
   - **`platform/`**: tudo que é específico de um sistema operacional
     ([ADR 0004](docs/adr/0004-estrutura-por-plataforma.md)).
     - **`win32/`**: Windows. Em `sources/`, a extração de ícones, os detalhes de janelas e o
@@ -87,16 +82,14 @@ flowchart LR
       fica em `audio_capture.rs`.
     - **`unsupported.rs`**: as mesmas funções para qualquer outro sistema, devolvendo valores padrão
       ou `AppError::Unsupported`.
-- **`legacy/`**: o código do protótipo, ainda em uso até o fim da migração. Não recebe mudanças
-  além de correções urgentes.
 
 ### Frontend do app (`desktop/src/`)
 
 - **`lib/tauri/commands.ts`**: o único arquivo que importa `@tauri-apps/api`. Tem os tipos do
   contrato (`AppError`, `CaptureSource`, `SourceRef`) e um wrapper tipado por comando e evento.
-- **`features/voice/`**: a conexão com a sala do LiveKit, mute e deafen. *(em construção)*
+- **`features/voice/`**: a conexão com a sala do LiveKit, mute e deafen.
 - **`features/screen-share/`**: a interface `ScreenShareController` e suas implementações; hoje, a
-  `IpcScreenShare`, que recebe os dados do Rust e os publica no LiveKit. *(em construção)*
+  `IpcScreenShare`, que recebe os dados do Rust e os publica no LiveKit.
 
 ### API (`api/`)
 
