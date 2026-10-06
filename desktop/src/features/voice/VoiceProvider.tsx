@@ -222,7 +222,13 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 			isMuted,
 			isDeafened,
 			mute: () => setMicrophone(false),
-			unmute: () => setMicrophone(true),
+			unmute: async () => {
+				// O deafen muta o microfone sozinho, então a pessoa vê "mutado" e clica para desmutar:
+				// como no Discord, isso também tira o deafen. Sem tirá-lo, o microfone ficaria aberto
+				// com o áudio da sala ainda desligado.
+				if (isDeafened) setIsDeafened(false);
+				await setMicrophone(true);
+			},
 			deafen: async () => {
 				// Um segundo deafen gravaria "mutado" (efeito do primeiro) como o estado anterior.
 				if (isDeafened) return;
