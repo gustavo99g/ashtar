@@ -147,6 +147,54 @@ mod tests {
         capture_for(AudioMode::System, 10);
     }
 
+    /// Mede o nível (RMS) do que o loopback entrega para um alvo, para comparar exclusão e inclusão.
+    struct RmsSink(Arc<std::sync::Mutex<(f64, u64)>>);
+
+    impl AudioSink for RmsSink {
+        fn push(&mut self, samples: &[f32]) -> crate::media::SinkStatus {
+            let mut guard = self.0.lock().unwrap();
+            for s in samples {
+                guard.0 += f64::from(*s) * f64::from(*s);
+            }
+            guard.1 += samples.len() as u64;
+            crate::media::SinkStatus::Continue
+        }
+    }
+
+    fn rms_for(target: AudioTarget, seconds: u64) -> f64 {
+        let acc = Arc::new(std::sync::Mutex::new((0.0_f64, 0_u64)));
+        let handle =
+            platform::spawn_audio_capture(target, RmsSink(Arc::clone(&acc)), Box::new(|_| {}))
+                .expect("a captura deveria iniciar");
+        std::thread::sleep(Duration::from_secs(seconds));
+        handle.stop_and_join();
+        let (sum, n) = *acc.lock().unwrap();
+        if n == 0 {
+            0.0
+        } else {
+            (sum / n as f64).sqrt()
+        }
+    }
+
+    /// Confere se excluir a raiz de um Chromium tira o áudio dele do loopback do sistema.
+    ///
+    /// Como rodar: abra um Chromium (ou o app) tocando áudio, ache o PID do processo raiz (o
+    /// `browser`, sem `--type=` na linha de comando) e rode com `EXCLUDE_PID=<pid>`. Vale a
+    /// comparação: "tudo menos o Chromium" deve ficar perto do ruído de fundo, bem abaixo de
+    /// "tudo menos este teste", que inclui o Chromium. O PID inexistente `99999` mede só o fundo.
+    #[test]
+    #[ignore = "diagnóstico: precisa de EXCLUDE_PID (raiz de um Chromium tocando áudio)"]
+    fn mede_a_exclusao_de_um_chromium() {
+        let pid: u32 = std::env::var("EXCLUDE_PID").unwrap().parse().unwrap();
+        let own = std::process::id();
+        let todos_menos_o_chromium = rms_for(AudioTarget::SystemExcept(pid), 5);
+        let todos_menos_este_teste = rms_for(AudioTarget::SystemExcept(own), 5);
+        let so_o_chromium = rms_for(AudioTarget::Process(pid), 5);
+        println!("RMS tudo menos o Chromium ({pid}): {todos_menos_o_chromium:.5}");
+        println!("RMS tudo menos este teste ({own}):  {todos_menos_este_teste:.5}");
+        println!("RMS so o Chromium ({pid}):          {so_o_chromium:.5}");
+    }
+
     #[test]
     #[ignore = "precisa de CAPTURE_PID com o PID de um programa tocando áudio"]
     fn captura_um_aplicativo() {
