@@ -1,5 +1,5 @@
-import { type Participant, Track } from "livekit-client";
-import useVoice from "@/hooks/useVoice";
+import { useIsSpeaking, useParticipants } from "@livekit/components-react"
+import { type Participant, Track } from "livekit-client"
 
 function getGridClass(count: number) {
 	if (count <= 1) {
@@ -29,7 +29,7 @@ interface ParticipantsProps {
 }
 
 const Participants = ({ compact = false }: ParticipantsProps) => {
-	const { participants } = useVoice();
+	const participants = useParticipants()
 	return (
 		<div
 			className={[
@@ -59,6 +59,7 @@ function ParticipantCard({
 	participant,
 	compact = true,
 }: ParticipantCardProps) {
+  const isSpeaking = useIsSpeaking(participant)
 	const name = participant.name || participant.identity;
 	const isMuted = !participant.isMicrophoneEnabled;
 
@@ -75,7 +76,7 @@ function ParticipantCard({
 				"bg-surface-alt",
 				"transition-colors",
 				compact ? "h-30 w-44" : "",
-				participant.isSpeaking ? "ring-2 ring-online" : "",
+				isSpeaking ? "ring-2 ring-online" : "",
 			].join(" ")}
 		>
 			<div className="flex flex-col items-center gap-2">
@@ -85,7 +86,7 @@ function ParticipantCard({
 						"bg-accent  font-semibold text-inverse",
 						"transition-all",
 						compact ? "size-10 text-xl" : "size-24 text-3xl",
-						participant.isSpeaking ? "ring-4 ring-online/30" : "",
+						isSpeaking ? "ring-4 ring-online/30" : "",
 					].join(" ")}
 				>
 					{name?.charAt(0).toUpperCase()}

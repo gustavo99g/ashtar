@@ -2,64 +2,107 @@
 
 Roadmap funcional do projeto até a primeira versão estável.
 
-O foco é chegar o mais rápido possível a uma aplicação utilizável por uma única comunidade de aproximadamente 5–10 pessoas, sem tentar reproduzir todos os recursos do Discord.
+O uso principal do aplicativo é o **compartilhamento de tela** entre um grupo de aproximadamente 5–10
+pessoas. O foco é colocar o aplicativo nas mãos desse grupo o mais cedo possível e deixar o uso real
+decidir as prioridades, sem tentar reproduzir todos os recursos do Discord.
 
 ---
 
 # Visão geral
 
 ```text
-v0.1  → Vertical Slice
-        Chat mockado + Voz + Screen Share
+v0.1  → Teste com o grupo
+        Voz + Screen Share reorganizado, liberado como teste
         ↓
-v0.2  → Identidade e acesso
-        Login + Sessão + Convites
+v0.2  → Comunidade
+        Auto-update + servidor na VPS + convites + supressão de ruído
+        + UI nova + chat real + publicador nativo
         ↓
-v0.3  → Chat real
-        Persistência + Mensagens + Tempo real
+v0.3  → Conversas privadas
+        Mensagens e ligações privadas + não lidas + bandeja
         ↓
-v0.4  → Produto integrado
-        Canais + Chat + Voz + Screen Share
+v0.4  → Transmissões múltiplas
+        Várias transmissões simultâneas + experiência de quem assiste
         ↓
-v0.5  → Confiabilidade
-        Reconexão + Estados + Dispositivos
+v0.5  → Canais e presença
+        Múltiplos canais e salas + status + menções + sons da voz
         ↓
-v0.6  → Segurança e administração básica
+v0.6  → Confiabilidade e configurações
+        Reconexão + estados + tela de configurações + atalhos globais
         ↓
-v0.7  → Experiência de chat
+v0.7  → Perfil e chat avançado
+        Nick e foto + anexos + editar, responder, reagir + busca
         ↓
-v0.8  → Experiência de voz
+v0.8  → Atividade, moderação e refinamentos
+        "Jogando X" + administração + refinos do screen share
         ↓
 v0.9  → Release Candidate
         ↓
 v1.0  → Primeira versão estável
 ```
 
+Depois da v0.2, cada versão tem um tema só. A ordem da v0.3 em diante pode ser trocada se o uso real
+mostrar que a falta de algum item incomoda mais que a de outro.
+
 ## Princípios do roadmap
+
+### Uso real cedo
+
+O grupo passa a usar o aplicativo ao fim da v0.1, ainda como teste. O que acontecer no uso real
+(qualidade da transmissão, quedas de rede, consumo do LiveKit, problemas de instalação) decide a
+ordem do que vem depois.
 
 ### Prioridade por risco
 
-As partes tecnicamente mais incertas devem ser validadas primeiro.
+A mídia é a parte tecnicamente mais incerta e o motivo do aplicativo existir, por isso vem primeiro.
 
 ```text
-Voz
+Voz + Screen Share
  ↓
-Screen Share
- ↓
-Chat real
+Comunidade (identidade + chat)
  ↓
 Recursos secundários
 ```
 
-### Vertical slice antes de infraestrutura completa
+### Entregas em partes
 
-A primeira versão deve provar que o fluxo principal funciona antes de investir em autenticação, banco, administração ou recursos avançados.
+A partir da v0.2.0, com o auto-update pronto, toda versão é entregue em partes (`v0.X.Y`): cada parte
+chega ao grupo assim que fica pronta, passando antes pelo canal beta. Ninguém espera uma versão inteira
+para receber uma melhoria.
+
+### Correções fora de ordem
+
+Correções de bug e de segurança não esperam a vez na ordem das entregas: saem assim que ficam prontas,
+pelo auto-update, passando pelo canal beta. A ordem das entregas vale para funcionalidades.
+
+### Numeração das versões
+
+O último número da versão do app junta a entrega e a correção: **entrega × 10 + correção**. A entrega
+v0.2.N sai como versão `0.2.N0`, e cada correção dela soma 1 no último dígito.
+
+```text
+0.2.0            entrega v0.2.0 (base de entrega)
+0.2.1, 0.2.2…    correções da v0.2.0
+0.2.10           entrega v0.2.1 (UI nova)
+0.2.11…          correções da v0.2.1
+0.2.60           entrega v0.2.6 (servidor)
+0.3.0            próxima versão do roadmap
+```
+
+O formato segue o semver, que o Tauri e o updater exigem (sem zero à esquerda: `0.2.01` não é válido). O
+limite é de 9 correções por entrega. Os nomes do roadmap (v0.2.1, v0.2.2…) continuam sendo os das
+entregas; o `CHANGELOG.md` diz o que entrou em cada versão.
+
+### Cada item em uma versão só
+
+As versões são organizadas por entrega, não por tema. Um item aparece em uma única versão; quando ele
+precisa de refinamento depois, o refinamento é um item novo e com nome próprio.
 
 ### Evitar complexidade prematura
 
 Não implementar uma funcionalidade apenas porque aplicações semelhantes possuem.
 
-Cada etapa deve aproximar o projeto de uma aplicação realmente utilizável.
+Cada etapa deve aproximar o projeto de uma aplicação realmente utilizável pelo grupo.
 
 ### Um produto, dois projetos
 
@@ -76,103 +119,89 @@ O `api` é o backend Rust/Axum.
 
 ---
 
-# v0.1 — Vertical Slice
+# v0.1 — Teste com o grupo
 
 ## Objetivo
 
-Validar rapidamente a tecnologia principal e o fluxo de mídia entre usuários.
+Terminar a reorganização do compartilhamento de tela e liberar o aplicativo para o grupo como teste,
+para ver o comportamento real o mais rápido possível.
 
-O resultado desejado é conseguir abrir o aplicativo em duas ou mais máquinas e conversar por voz e compartilhar tela.
-
-O chat ainda pode ser completamente mockado.
+Esta versão é descartável do ponto de vista do usuário: não há contas nem histórico a preservar, e a
+atualização para a v0.2 será uma reinstalação manual.
 
 ## Desktop
 
 ### Base
 
-* Tauri funcionando;
-* React + TypeScript;
-* Vite;
-* estrutura inicial de componentes;
-* App Shell;
-* navegação visual.
-
-### Chat
-
-* canal de texto `general`;
-* mensagens mockadas;
-* Message;
-* Message Actions;
-* Message More Menu;
-* Message Composer;
-* estado visual de hover;
-* scroll de mensagens.
-
-Não haverá persistência.
+* Tauri + React + TypeScript + Vite;
+* App Shell e navegação visual;
+* chat mockado do protótipo, sem trabalho novo.
 
 ### Voz
 
 * integração com LiveKit;
 * entrada em uma sala fixa;
 * exibição de participantes;
-* microfone;
-* mute;
-* deafen;
+* microfone, mute e deafen;
 * saída da sala;
 * reconexão básica.
 
 ### Screen Share
 
-* iniciar compartilhamento;
-* parar compartilhamento;
-* receber transmissão;
+* reorganização do compartilhamento de tela (Etapas 3 a 6 do [`plans/v0.1-reorganizacao.md`](plans/v0.1-reorganizacao.md));
+* iniciar, parar e receber transmissão;
 * exibir participante que está compartilhando;
-* limite inicial de uma transmissão simultânea.
+* áudio da fonte escolhida, quando disponível;
+* limite de uma transmissão simultânea.
 
-### Áudio
+## Liberação para teste
 
-* receber áudio dos participantes;
-* mute;
-* suporte ao áudio associado ao screen share quando disponibilizado pela fonte escolhida.
+O mínimo para o aplicativo funcionar fora da rede local sem quebrar:
+
+* build do Windows (instalador sem assinatura de código; o SmartScreen vai pedir confirmação);
+* URL da API configurável por ambiente;
+* identidade provisória: cada entrada gera um id aleatório novo (`idiot-<uuid>`), o que evita colisão no
+  LiveKit; o nome escolhido e o id por instalação ficam para a v0.2.2;
+* ~~código de acesso compartilhado, conferido pela API antes de emitir o token do LiveKit~~:
+  **adiado para a v0.2.0**, que já tem auto-update e não exige redistribuir o executável; a identidade da
+  v0.2.2 o substitui. Até lá, quem descobrir a URL da API consegue tokens e consome a cota;
+* ~~logs em arquivo~~: **adiado para a v0.2.0**, junto com a base de entrega.
+
+O grupo já recebeu o executável desta versão (2026-10-06); os dois itens adiados foram decididos
+depois disso, para não exigir uma nova distribuição manual antes do auto-update.
 
 ## API
 
-### Base
+* `/health`;
+* geração de token do LiveKit (sem proteção até a v0.2.0);
+* chaves do LiveKit somente no backend;
+* exposta pelo Tailscale Funnel, com URL fixa (`*.ts.net`); o túnel rápido da Cloudflare foi usado
+  enquanto o Funnel não publicava o nome.
 
-* Rust;
-* Tokio;
-* Axum;
-* configuração por ambiente;
-* `/health`.
+## Infraestrutura
 
-### LiveKit
+API pelo **Tailscale Funnel** e mídia pelo **LiveKit Cloud** (plano gratuito). Ver
+[README.md](../README.md).
 
-* geração temporária de token;
-* URL do LiveKit configurável;
-* API key e secret somente no backend.
-
-O endpoint será restrito ao modo de desenvolvimento.
+O consumo do LiveKit Cloud é acompanhado desde o primeiro dia: o uso principal (screen share
+assistido por várias pessoas) é justamente o que mais consome a cota.
 
 ## Fora do escopo
 
-* login real;
-* cadastro real;
-* convites reais;
-* SQLite;
-* PostgreSQL;
-* histórico de mensagens;
-* WebSocket próprio;
-* múltiplas comunidades;
+* auto-update;
+* contas, convites e sessão;
+* banco de dados;
+* chat real;
+* publicador nativo;
+* LiveKit em VPS;
 * câmera;
-* permissões completas;
-* administração;
-* deploy definitivo.
+* múltiplas salas.
 
 ## Critérios de conclusão
 
-A etapa estará concluída quando:
-
 ```text
+Etapa 6 de docs/plans/v0.1-reorganizacao.md
+ +
 M01 — Dois participantes
 M02 — Microfone
 M03 — Screen Share
@@ -180,296 +209,474 @@ M04 — Screen Share + áudio
 M05 — Terceiro participante
 M06 — Reentrada
 M07 — Reconexão
+ +
+uma noite de uso real com o grupo, pela internet
 ```
 
-forem validados com sucesso.
+## O que observar durante o teste
+
+* qualidade percebida da transmissão (fps, picotes, atraso);
+* falhas de conexão e reconexão;
+* consumo da cota do LiveKit Cloud;
+* tráfego gerado por uma noite de uso, para dimensionar a VPS da v0.2;
+* problemas de instalação.
+
+Essas observações decidem a prioridade do publicador nativo dentro da v0.2 e se a migração para a VPS
+precisa ser antecipada.
 
 ---
 
-# v0.2 — Identidade e acesso
+# v0.2 — Comunidade
 
 ## Objetivo
 
-Substituir o ambiente de desenvolvimento anônimo por identidade real.
+Transformar o teste em um aplicativo de uso contínuo: atualizações automáticas, a interface definitiva,
+identidade, publicador nativo, chat real e servidor próprio.
 
-## API
+## Entregas
 
-### Usuários
-
-* modelo de usuário;
-* criação de usuário;
-* consulta de usuário;
-* atualização de perfil básico.
-
-### Autenticação
-
-* cadastro;
-* login;
-* logout;
-* senha;
-* sessão;
-* expiração de sessão;
-* renovação de sessão, se necessária.
-
-### Convites
-
-* criar convite;
-* gerar código;
-* validar convite;
-* registrar uso;
-* impedir reutilização;
-* expiração;
-* revogação.
-
-### Autorização
-
-* somente usuários autorizados acessam a comunidade;
-* somente usuários autorizados recebem token LiveKit.
-
-## Desktop
-
-* tela de login;
-* tela de cadastro;
-* fluxo de convite;
-* persistência da sessão;
-* logout;
-* carregamento do usuário atual;
-* estados de erro;
-* estados de carregamento.
-
-## Critérios de conclusão
+A v0.2 é entregue em partes. Depois da v0.2.0, cada parte chega ao grupo pelo auto-update assim que fica
+pronta, passando antes pelo canal beta. Cada entrega sai como versão `0.2.N0` (ver "Numeração das
+versões"), e cada uma ganha um plano detalhado próprio antes de começar.
 
 ```text
-Convite
- ↓
-Cadastro
- ↓
-Login
- ↓
-Sessão
- ↓
-Acesso à comunidade
- ↓
-Token LiveKit autorizado
+v0.2.0  Base de entrega       auto-update + pipeline + canal beta + versão mínima + logs
+v0.2.1  UI nova
+v0.2.2  Identidade            convites + identidade do dispositivo + permissões + banco
+v0.2.3  Publicador nativo
+v0.2.4  Chat real
+v0.2.5  Áudio                 supressão de ruído e cancelamento de eco
+v0.2.6  Servidor              VPS (LiveKit, API e banco) + domínio + backup + alerta
 ```
 
-Tudo deve funcionar sem depender de usuários mockados.
+A ordem segue três regras: a base de entrega vem primeiro, porque faz todo o resto chegar sozinho; a UI
+nova vem antes de qualquer tela nova (identidade e chat), para que nada seja construído duas vezes; e o
+publicador nativo vem antes do chat, por ser o maior risco técnico que sobrou da mídia. O servidor próprio
+fica por último: até lá, o LiveKit Cloud e o computador de casa (com o Tailscale Funnel) bastam, ao custo
+de uma migração do banco na v0.2.6. A v0.2.5 (áudio) é pequena e independente e pode sair antes, se o ruído ou o eco começarem a incomodar.
 
 ---
 
-# v0.3 — Chat real
+### v0.2.0 — Base de entrega
 
-## Objetivo
+A instalação da v0.2.0 é a última reinstalação manual.
 
-Transformar o chat mockado em comunicação persistente.
-
-## Persistência
-
-Implementar o armazenamento necessário para:
-
-* usuários;
-* sessões;
-* convites;
-* canais;
-* mensagens.
-
-O banco escolhido para esta fase deverá ser definido antes da implementação da persistência.
-
-## Mensagens
-
-* enviar;
-* receber;
-* persistir;
-* carregar histórico;
-* ordenar por data;
-* paginação ou carregamento incremental;
-* estado de envio;
-* tratamento de erro.
-
-## Tempo real
-
-Adicionar comunicação em tempo real para eventos da aplicação.
-
-Eventos iniciais:
+* updater do Tauri;
+* **pipeline de release no GitHub Actions**: roda os testes, o lint e o typecheck (`cargo test`,
+  `cargo clippy`, checagens do desktop), bloqueia o release se algo falhar, e então compila, assina e
+  publica a versão (ex.: GitHub Releases), sem passos manuais;
+* assinatura dos pacotes de atualização;
+* **canal beta**: uma versão nova vai primeiro para você (e quem mais quiser testar) e só depois para
+  todos, para que um bug não chegue ao grupo inteiro de uma vez;
+* **versão mínima suportada**: a API recusa clientes antigos com uma mensagem pedindo a atualização,
+  para que uma mudança de protocolo nunca deixe alguém com o aplicativo quebrado sem explicação;
+* **"O que há de novo"**: uma janela curta com as mudanças, mostrada na primeira abertura depois de
+  cada atualização;
+* **logs em arquivo** (adiado da v0.1): o `tracing` grava também num arquivo na pasta de dados do app,
+  com rotação, para investigar problemas na máquina de cada um;
+* **código de acesso provisório** (adiado da v0.1): o app manda um código fixo, embutido no build, e a API
+  só emite o token do LiveKit com ele. Não protege contra quem tem o executável, só contra quem descobre a
+  URL; fica até a identidade da v0.2.2. Com o auto-update, deixou de exigir redistribuição manual.
 
 ```text
-message.created
-message.updated
-message.deleted
-presence.changed
+uma versão nova passa pelo canal beta e depois chega sozinha a todos
+ +
+um teste falhando bloqueia o release
+ +
+cliente antigo recusado com pedido de atualização
 ```
 
-O WebSocket próprio será usado para eventos do aplicativo.
+### v0.2.1 — UI nova
 
-A mídia continuará utilizando LiveKit.
+Refazer a interface a partir do novo protótipo, antes da identidade e do chat, para que as telas de
+convite, de nick e de conversa sejam construídas uma única vez em cima da interface definitiva.
 
-## Desktop
+Precisa de um plano próprio antes de começar, feito a partir do protótipo: telas, componentes,
+navegação e o que muda na UI de voz e de compartilhamento (que hoje é provisória). Os itens de UI que a
+v0.1 deixou (seletor de fontes, trava de uma transmissão por vez, textos dos presets) estão no
+`BACKLOG.md`.
 
-* substituir mensagens mockadas;
-* conectar Message Composer à API;
-* atualização automática do histórico;
-* tratamento de mensagens em envio;
-* tratamento de falhas;
+* **nick guardado no computador:** um campo para cada pessoa escolher o nome que aparece na sala, salvo
+  localmente, no lugar do `Idiota-<uuid>`. A v0.2.2 aproveita esse valor como o nick inicial da identidade.
+
+### v0.2.2 — Identidade, convites e permissões
+
+As telas de convite e de escolha do nick já nascem na UI nova da v0.2.1.
+
+**Banco de dados.** A identidade é o primeiro dado que precisa durar, então o banco entra aqui, rodando
+junto da API no computador que a hospeda (o servidor próprio só vem na v0.2.6):
+
+* banco escolhido antes da implementação (ADR), com migrações;
+* backup automático, copiado para fora do computador (ex.: Cloudflare R2): a partir daqui há dados reais
+  do grupo;
+* a escolha considera a migração para a VPS na v0.2.6: com SQLite, a migração é copiar um arquivo; com
+  PostgreSQL, um dump e um restore.
+
+A v0.1 entra com uma identidade aleatória nova a cada entrada (`idiot-<uuid>`, nome `Idiota-<uuid>`); a
+identidade do dispositivo, com o nome escolhido pela pessoa, a substitui aqui.
+
+Sem senha. O convite é a única forma de entrar, e a identidade vem do próprio computador, para que
+formatar o Windows não exija nada.
+
+```text
+convite
+ ↓
+escolha do nick
+ ↓
+desktop calcula a identidade do dispositivo
+ ↓
+API cria o usuário e vincula o dispositivo a ele
+ ↓
+aberturas seguintes entram direto, inclusive depois de formatar
+```
+
+**Identidade do dispositivo**
+
+* calculada a partir do hardware: hash do UUID da BIOS e do serial da placa-mãe, junto com uma
+  constante do aplicativo. O serial real nunca sai do computador;
+* sobrevive a reinstalações do Windows; muda só com a troca da placa-mãe;
+* no banco fica só o hash do valor recebido;
+* **valores inválidos são rejeitados**: placas baratas e máquinas virtuais costumam ter UUID ou serial
+  genérico (`FFFFFFFF-FFFF-...`, `00000000-...`, "To be filled by O.E.M."), o que faria duas pessoas
+  terem a mesma identidade. Nesses casos o desktop usa um token aleatório gerado pela API e guardado no
+  cofre de credenciais do Windows, que se perde ao formatar.
+
+A identidade do dispositivo é um identificador fixo, não um segredo que possa ser trocado. A URL da API
+é pública desde a v0.1 (Tailscale Funnel), então a proteção não vem dela: para se passar por alguém, seria
+preciso conhecer o hash do hardware daquela pessoa, que nunca sai do computador dela. Para um grupo
+pequeno, o risco é aceito; se o valor vazar, o administrador desvincula o dispositivo e envia um convite
+de recuperação.
+
+**Usuários e convites**
+
+* o usuário tem um id interno estável; o nick é escolhido ao entrar e é só o nome de exibição (a troca
+  de nick entra na v0.7, junto com a foto);
+* convite de uso único, com expiração e revogação;
+* **convite de recuperação**: para troca de placa-mãe, troca de computador ou perda do token aleatório,
+  o administrador gera um convite vinculado ao usuário existente. Ao usar o convite, o dispositivo novo
+  é vinculado ao mesmo usuário, com o mesmo histórico, e o vínculo antigo é removido;
+* o primeiro administrador é criado por configuração ou comando da API;
+* fecha o acesso à API: substitui o código de acesso provisório da v0.2.0; token do LiveKit só para
+  usuários autenticados;
+* o nick guardado no computador desde a v0.2.1 vira o nick inicial na tela de escolha.
+
+**Permissões mínimas**
+
+Dois papéis: `membro` e `administrador`.
+
+| Ação | Membro | Administrador |
+|---|---|---|
+| Convidar gente nova | sim | sim |
+| Gerar convite de recuperação | não | sim |
+| Desvincular dispositivo | não | sim |
+
+As ações de administrador ficam disponíveis por comando da API ou por uma tela simples; a tela de
+administração completa entra na v0.8.
+
+Decisões a registrar em ADR antes de implementar: o cálculo exato da identidade do dispositivo e a lista
+de valores inválidos, se um usuário pode ter mais de um dispositivo ao mesmo tempo, e a validade dos
+convites.
+
+**Segurança mínima**
+
+* **token do LiveKit montado pelo backend**: identidade e nick vêm do banco, nunca do cliente, e o
+  token não permite ao participante trocar o próprio nome ou metadados dentro da sala;
+* rate limiting no uso de convites;
+* validação de entrada;
+* testes de integração da API para convites, identidade do dispositivo e permissões, rodando no
+  pipeline.
+
+```text
+convite → nick → entrar na sala de voz
+ +
+convite de recuperação → mesmo usuário
+ +
+formatar o Windows → entra direto, sem convite novo
+ +
+sem identidade válida → nenhum token do LiveKit
+```
+
+### v0.2.3 — Publicador nativo
+
+* publicação do vídeo direto do Rust (conexão `{user_id}:screen`), sem passar pelo WebView;
+* medição lado a lado com o caminho IPC, usando como linha de base a Etapa 6 de `docs/plans/v0.1-reorganizacao.md` e o teste da
+  v0.1.
+
+Vem antes do chat porque é a parte de maior risco técnico que sobrou da mídia, e o motivo do aplicativo
+existir. Roda ainda no LiveKit Cloud: a VPS só chega na v0.2.6.
+
+```text
+publicador nativo igual ou melhor que o caminho IPC na medição
+(ou decisão documentada de manter o IPC)
+```
+
+### v0.2.4 — Chat real
+
+* enviar, receber e persistir mensagens;
+* histórico ordenado e carregamento incremental;
+* estado de envio e tratamento de erro;
+* WebSocket próprio para eventos do aplicativo (`message.created`, `message.updated`,
+  `message.deleted`, `presence.changed`); a mídia continua no LiveKit;
 * reconexão do canal de eventos.
 
-## Critérios de conclusão
-
-Dois usuários devem conseguir:
+Até a v0.2.6, o histórico fica no banco do computador que hospeda a API: com ele desligado, não há chat
+nem histórico.
 
 ```text
-abrir o canal
-↓
-enviar mensagem
-↓
-o outro receber
-↓
-fechar e reabrir
-↓
-ver o histórico
+enviar mensagem → o outro receber → fechar e reabrir → ver o histórico
+```
+
+### v0.2.5 — Supressão de ruído e cancelamento de eco
+
+Entrega pequena e independente; pode sair em qualquer ponto da v0.2, inclusive junto de outra.
+
+* supressão de ruído, cancelamento de eco e controle automático de ganho do microfone, pelos filtros
+  do próprio WebView (opções de captura do `livekit-client`);
+* ligados por padrão, com opção de desligar (o `livekit-client` 2.22 já pede os filtros por padrão, então
+  falta a opção e conferir no WebView2, com `getSettings()`, se foram aplicados);
+* o eco de quem assiste a uma tela inteira compartilhada **não espera esta entrega**: é um bug que o grupo
+  já sentiu e sai como correção, fora de ordem (ver "Correções fora de ordem"). O modo "Todo o sistema"
+  exclui o PID do app, o que não cobre o WebView2 quando há duas instâncias abertas; a correção é excluir o
+  processo-navegador real do WebView2 (`BrowserProcessId`). Evidências e hipóteses no `BACKLOG.md`;
+* se o filtro do WebView não bastar, avaliar um filtro mais forte (ex.: RNNoise num worklet de áudio).
+
+```text
+microfone sem ruído de teclado nem eco de quem usa caixa de som
+```
+
+### v0.2.6 — Servidor
+
+Todo o servidor passa para uma VPS própria. A mídia sai do LiveKit Cloud, pré-requisito das transmissões
+múltiplas da v0.4, e a API e o banco saem do seu computador, para que o aplicativo não caia quando ele
+desligar ou reiniciar. Fica por último na v0.2: até aqui, o LiveKit Cloud e o computador de casa bastam
+para o grupo. Pode ser antecipado se a cota do LiveKit Cloud apertar.
+
+**Gatilho para antecipar:** se o consumo de minutos de participante de um mês passar de ~60% dos 5.000 do
+plano gratuito, esta entrega passa à frente (ou o plano pago seguinte cobre o mês). O teste de 2026-10-06
+mostrou que o limite que aperta primeiro são os minutos, não o tráfego (~2 GB numa tarde com até 4
+pessoas). O publicador nativo (v0.2.3) faz quem transmite abrir uma segunda conexão e contar como dois
+participantes, o que acelera esse consumo.
+
+O desktop só conhece a URL da API. A URL, a chave e o segredo do LiveKit ficam no servidor, e a URL do
+LiveKit chega ao desktop pela própria API.
+
+**Domínio e troca de URL.** O LiveKit próprio precisa de um domínio com certificado HTTPS (para o `wss://`
+e o TURN), então o domínio é comprado aqui. A URL da API muda do Tailscale Funnel para o domínio, e o app
+instalado tem a URL antiga gravada no build. A ordem é: publicar uma versão com a URL nova, manter as duas
+respondendo até todos atualizarem e só então desligar a antiga.
+
+* LiveKit, API e banco na mesma VPS (ex.: Docker Compose);
+* a API exposta direto na VPS, com HTTPS no domínio próprio (sem túnel);
+* VPS escolhida pelo **tráfego de saída incluso**, não só pela CPU: uma noite de screen share assistido
+  por várias pessoas pode gerar dezenas de GB;
+* TURN configurado, para quem estiver atrás de redes restritivas;
+* segredos de produção configurados uma única vez no servidor, fora do repositório;
+* banco migrado do computador de casa para a VPS (escolhido na v0.2.2);
+* backup automático continua fora da VPS (ex.: Cloudflare R2), para que não se perca junto com ela;
+* **alerta de servidor fora do ar**: um monitor externo gratuito chama o `/health` e avisa no celular.
+
+```text
+voz, screen share e chat funcionando pela VPS, com o seu computador desligado
+ +
+histórico do chat e usuários migrados, sem perda
+ +
+restauração do backup testada uma vez
+ +
+servidor desligado → alerta no celular
 ```
 
 ---
 
-# v0.4 — Produto integrado
+# v0.3 — Conversas privadas
 
 ## Objetivo
 
-Unir identidade, chat e mídia em uma aplicação coerente.
+Mensagens e ligações privadas entre duas pessoas, com o mínimo de notificações e de aplicativo em
+segundo plano que elas exigem.
+
+## Mensagens privadas
+
+* conversa entre duas pessoas, tratada como um canal com dois membros, reaproveitando o chat da v0.2;
+* primeira permissão por canal do projeto: a API garante que só os dois leiam o histórico, e o
+  WebSocket só envia os eventos para eles, com testes de integração no pipeline;
+* as mensagens ficam em texto puro no banco, legíveis por quem administra o servidor. Isso é comunicado
+  ao grupo; criptografia ponta a ponta fica fora do escopo.
+
+## Não lidas e notificações
+
+O mínimo para uma mensagem privada não passar despercebida, valendo também para o canal da v0.2:
+
+* indicador de mensagens não lidas;
+* notificação de mensagem nova.
+
+## Aplicativo em segundo plano
+
+* ícone na bandeja: fechar a janela não sai da sala de voz e continua recebendo mensagens e ligações;
+* iniciar com o Windows (opcional).
+
+## Ligações privadas
+
+* uma sala do LiveKit por conversa privada, com token só para os dois;
+* screen share na ligação, igual ao da sala de voz;
+* tocar, aceitar, recusar, tempo limite e chamada perdida;
+* toca com a janela fechada, pelo aplicativo na bandeja; a notificação tem os botões Aceitar e
+  Recusar (verificar se o plugin de notificação do Tauri dá suporte a botões no Windows; se não der,
+  uma janela própria pequena e sempre no topo);
+* quem liga nunca vê "ocupado": a ligação toca normalmente, mesmo que a outra pessoa esteja numa sala;
+* **histórico de chamadas na conversa**: "ligação de 42 min", "chamada perdida", com um botão para ligar
+  de volta.
+
+**Ligação recebida estando numa sala**, como no Discord:
+
+```text
+toque + notificação com nome e foto de quem liga, com Aceitar e Recusar
+ ↓
+a conversa privada aparece no topo da lista, já aberta no canto
+ ↓
+Aceitar      → sai da sala → entra na ligação
+Recusar      → continua na sala; quem ligou vê "recusada"
+sem resposta → chamada perdida registrada na conversa
+```
+
+* a pessoa fica conectada a uma única sala de voz por vez, nunca à sala e à ligação ao mesmo tempo;
+* se ela estiver transmitindo a tela na sala, o botão Aceitar avisa que a transmissão será encerrada;
+* o toque é mais baixo enquanto a pessoa está numa sala, para não atrapalhar a conversa;
+* ao desligar, a pessoa não volta sozinha para a sala: a tela da ligação encerrada oferece um botão
+  "voltar para a sala";
+* a partir da v0.5, com o status "não perturbe", a ligação mostra só a notificação visual, sem som.
+
+## Critérios de conclusão
+
+```text
+mensagem privada → só os dois leem
+ +
+janela fechada → notificação de mensagem nova pela bandeja
+ +
+ligação privada com a janela fechada → tocar, aceitar, recusar e chamada perdida
+ +
+screen share dentro da ligação privada
+ +
+ligação recebida estando numa sala → aceitar → sair da sala e entrar na ligação
+```
+
+---
+
+# v0.4 — Transmissões múltiplas
+
+## Objetivo
+
+Permitir que mais de uma pessoa compartilhe a tela ao mesmo tempo, com uma boa experiência para quem
+assiste. Depende do publicador nativo e do LiveKit na VPS, ambos da v0.2.
+
+## Transmissões
+
+* várias transmissões simultâneas na mesma sala, com limite configurável;
+* **assinatura seletiva**: quem assiste só recebe a transmissão que abriu, nunca todas
+  automaticamente. Sem isso, o tráfego da VPS cresce com cada transmissão de cada participante;
+* indicador "ao vivo" ao lado de quem está transmitindo, na lista da sala.
+
+## Experiência de quem assiste
+
+* escolher qual transmissão assistir e trocar entre elas;
+* tela cheia;
+* janela destacada (pop-out);
+* volume do áudio da transmissão separado do volume da voz da pessoa;
+* indicador de quem está assistindo cada transmissão.
+
+## Critérios de conclusão
+
+```text
+duas transmissões simultâneas
+ +
+quatro pessoas assistindo, trocando entre elas
+ +
+uma noite inteira sem picotes
+ +
+tráfego e CPU da VPS medidos e dentro do plano contratado
+```
+
+---
+
+# v0.5 — Canais e presença
+
+## Objetivo
+
+Sair da sala e do canal únicos e mostrar quem está fazendo o quê.
 
 ## Canais
 
-### Texto
-
-* múltiplos canais;
-* seleção;
-* estado ativo;
-* histórico por canal.
-
-### Voz
-
-* múltiplas salas;
-* seleção;
-* entrada;
-* saída;
-* indicação de conexão.
-
-## Estado independente de texto e voz
-
-A conexão de voz não depende do canal de texto selecionado.
-
-Exemplo:
+* múltiplos canais de texto, com histórico por canal;
+* múltiplas salas de voz;
+* conexão de voz independente do canal de texto selecionado.
 
 ```text
-Canal de texto:
-# general
-
-Canal de voz conectado:
-🔊 General
-```
-
-Ao trocar para:
-
-```text
-# development
-```
-
-o usuário continua conectado à sala:
-
-```text
-🔊 General
+Canal de texto:          # development
+Canal de voz conectado:  🔊 General
 ```
 
 ## Presença
 
-* online;
-* offline;
-* conectado à voz;
-* participantes da sala.
+* status online, ausente, não perturbe e invisível, com ausente automático por inatividade;
+* "não perturbe" silencia as notificações; ligações privadas aparecem só como notificação visual, sem
+  som;
+* quem está em cada sala de voz;
+* indicador "digitando...";
+* menções (`@nick`), que notificam mesmo em canal silenciado;
+* silenciar canal;
+* notificação "fulano começou a transmitir", para quem não está na sala.
 
-## Integração
+## Voz
 
-O aplicativo deve permitir:
-
-```text
-Chat
- +
-Voice
- +
-Screen Share
- +
-Identity
-```
-
-sem fluxos quebrados.
+* sons de entrada e saída de pessoas na sala;
+* speaking indicator;
+* volume por usuário.
 
 ## Critérios de conclusão
 
-Um usuário deve conseguir:
-
 ```text
-login
+trocar de canal de texto
  ↓
-abrir chat
+entrar em voz e continuar navegando pelo chat
  ↓
-enviar mensagem
+trocar de sala de voz
  ↓
-entrar em voz
+ser mencionado num canal silenciado → receber a notificação
  ↓
-continuar navegando pelo chat
- ↓
-compartilhar tela
- ↓
-sair da voz
+ficar inativo → status muda para ausente
 ```
 
 ---
 
-# v0.5 — Confiabilidade
+# v0.6 — Confiabilidade e configurações
 
 ## Objetivo
 
-Resolver falhas comuns antes de aumentar o escopo funcional.
+Deixar o aplicativo confiável e ajustável para uso todos os dias.
 
-## API
+## Configurações
 
-* tratamento consistente de erros;
-* timeouts;
-* logs;
-* validação de entrada;
-* respostas previsíveis;
-* tratamento de indisponibilidade.
+* tela de configurações única: dispositivos, atalhos, notificações e áudio (supressão de ruído da
+  v0.2), para que as opções novas das próximas versões tenham um lugar fixo;
+* seleção de microfone e saída;
+* teste de microfone.
 
-## Desktop
+## Atalhos globais
 
-### Sessão
+* mute e push-to-talk, funcionando com um jogo em foco;
+* configuráveis na tela de configurações.
 
-* recuperação de sessão;
-* sessão expirada;
-* retorno ao login quando necessário.
+## Confiabilidade
 
-### API
+* tratamento consistente de erros e timeouts na API;
+* API indisponível: tentativa de reconexão e feedback visual;
+* reconexão e recuperação do LiveKit (voz e screen share);
+* sessão inválida: volta para a tela de convite;
+* dispositivos: microfone desconectado, saída indisponível, troca de dispositivo;
+* **indicador de qualidade da conexão** por participante (ping e perda de pacotes), para saber se um
+  picote vem da rede de quem transmite ou de quem assiste;
+* botão "enviar logs", que manda os logs recentes para a API, sem precisar procurar a pasta.
 
-* API indisponível;
-* tentativa de reconexão;
-* feedback visual.
-
-### LiveKit
-
-* reconexão;
-* saída involuntária;
-* recuperação;
-* atualização do estado da conexão.
-
-### Dispositivos
-
-* microfone desconectado;
-* dispositivo de saída indisponível;
-* troca de dispositivo;
-* recuperação após reconexão.
-
-## Estados de interface
-
-Implementar claramente:
+Estados de interface:
 
 ```text
 default
@@ -484,146 +691,88 @@ reconnecting
 
 ## Critérios de conclusão
 
-Uma falha curta de API ou rede não deve deixar o cliente preso em um estado inconsistente.
+```text
+usar o push-to-talk com um jogo em foco
+ +
+trocar o microfone pela tela de configurações, sem sair da voz
+ +
+desconectar o microfone → aviso e recuperação ao reconectar
+ +
+queda de rede curta → recuperação sem estado inconsistente
+```
 
 ---
 
-# v0.6 — Segurança e administração básica
+# v0.7 — Perfil e chat avançado
 
 ## Objetivo
 
-Tornar a comunidade privada adequada para uso real.
+Perfil personalizável e um chat completo para o dia a dia.
 
-## Convites
+## Perfil e armazenamento de arquivos
 
-* revogar;
-* expirar;
-* impedir uso múltiplo;
-* impedir criação abusiva.
+* troca de nick e foto de perfil, na mesma tela (dentro da tela de configurações da v0.6);
+* a troca chega a todos em tempo real (evento `user.updated`) e aparece também na sala de voz;
+* armazenamento de arquivos (disco da API ou um storage como o Cloudflare R2), montado uma vez para a
+  foto e para os anexos do chat;
+* redimensionamento das imagens;
+* arquivos incluídos no backup.
 
-## Usuários
+## Chat
 
-* expulsar;
-* bloquear acesso;
-* invalidar sessões.
-
-## Permissões
-
-Implementar somente o necessário para uma comunidade pequena.
-
-Exemplos:
-
-```text
-usuário comum
-administrador
-```
-
-Não criar um sistema complexo de cargos nesta etapa.
-
-## Segurança
-
-* proteção dos endpoints;
-* autorização;
-* validação;
-* rate limiting;
-* armazenamento seguro de segredos;
-* logs relevantes;
-* nunca expor segredo do LiveKit ao desktop.
+* editar, excluir e copiar mensagem;
+* responder;
+* reações;
+* anexos básicos, incluindo colar imagem com Ctrl+V;
+* preview de links;
+* markdown básico: negrito, itálico, código e spoiler;
+* mensagens fixadas;
+* busca simples de mensagens (busca de texto do próprio banco).
 
 ## Critérios de conclusão
 
-Um usuário sem autorização não consegue:
-
 ```text
-acessar dados protegidos
-emitir token LiveKit
-entrar na comunidade
+trocar nick e foto → todos veem na hora, no chat e na voz
+ +
+colar um print com Ctrl+V → o outro vê a imagem
+ +
+editar, responder e reagir a mensagens
+ +
+encontrar uma mensagem antiga pela busca
 ```
 
 ---
 
-# v0.7 — Experiência de chat
+# v0.8 — Atividade, moderação e refinamentos
 
 ## Objetivo
 
-Melhorar o chat depois que a infraestrutura estiver estável.
+Fechar os recursos antes do Release Candidate. A lista é um ponto de partida reordenado pelo feedback
+do grupo, e entra só o que mantiver a base simples.
 
-## Mensagens
+## Atividade
 
-Adicionar gradualmente:
-
-* editar mensagem;
-* excluir mensagem;
-* copiar mensagem;
-* responder;
-* reações;
-* links;
-* anexos básicos.
-
-## Interface
-
-* melhorias de agrupamento;
-* estados de mensagens;
-* feedback de envio;
-* melhorias de scroll;
-* estados vazios;
-* mensagens de erro.
-
-## Critério
-
-Esses recursos devem entrar somente se a base do chat continuar simples e consistente.
-
-Não adicionar funcionalidades que dificultem a manutenção sem benefício claro para o grupo inicial.
-
----
-
-# v0.8 — Experiência de voz
-
-## Objetivo
-
-Refinar a experiência de voz depois de a camada de mídia estar comprovadamente funcionando.
-
-## Salas
-
-* múltiplas salas;
-* troca de sala;
-* estado de conexão;
-* participantes.
-
-## Áudio
-
-* seleção de microfone;
-* seleção de saída;
-* teste de microfone;
-* volume;
-* tratamento de dispositivo desconectado.
-
-## Participantes
-
-* speaking indicator;
-* mute;
-* deafen;
-* estados de conexão.
+* **"Jogando X"**: o aplicativo detecta o jogo aberto e mostra ao lado do nick, reaproveitando a
+  listagem de processos e janelas do screen share;
+* lista de jogos reconhecidos mantida pelo próprio projeto, com opção de esconder a atividade.
 
 ## Screen Share
 
-* iniciar;
-* parar;
-* participante que compartilha;
-* tratamento de transmissão existente;
-* comportamento ao entrar/sair;
-* limite de transmissão configurado.
+* miniaturas e preview no seletor de fontes;
+* aviso de conteúdo protegido (frames pretos por vários segundos);
+* presets de qualidade expostos na interface.
 
-## Reconexão
+## Moderação
 
-Refinar a recuperação de:
+* tela de administração no aplicativo;
+* listar e revogar convites;
+* expulsar usuário e desvincular seus dispositivos;
+* na voz: mutar alguém, tirar da sala e encerrar uma transmissão (operações da API de servidor do
+  LiveKit).
 
-```text
-voz
-screen share
-participantes
-dispositivos
-```
+## Critério
+
+O grupo usa o aplicativo no lugar de outras ferramentas sem pedir nada essencial que falte.
 
 ---
 
@@ -631,16 +780,13 @@ dispositivos
 
 ## Objetivo
 
-Parar de adicionar funcionalidades e preparar a primeira versão para uso real.
+Parar de adicionar funcionalidades e estabilizar.
 
 ## Estabilidade
 
 * corrigir bugs;
 * eliminar estados inconsistentes;
-* revisar fluxos principais;
-* revisar mensagens de erro;
-* revisar carregamentos;
-* revisar reconexão.
+* revisar mensagens de erro, carregamentos e reconexão.
 
 ## Testes
 
@@ -654,46 +800,38 @@ M04 — Screen Share + áudio
 M05 — Terceiro participante
 M06 — Reentrada
 M07 — Reconexão
+M08 — Duas transmissões simultâneas
+M09 — Ligação privada
+M10 — Supressão de ruído e cancelamento de eco
 ```
 
 ### Aplicação
 
 ```text
-A01 — Cadastro
-A02 — Login
-A03 — Logout
-A04 — Convite válido
-A05 — Convite inválido
-A06 — Convite expirado
-A07 — Sessão expirada
+A01 — Convite válido
+A02 — Convite inválido
+A03 — Convite expirado
+A04 — Convite de recuperação
+A05 — Dispositivo desvinculado
+A06 — Reinstalação do Windows
+A07 — Hardware com UUID inválido
 A08 — API indisponível
 A09 — LiveKit indisponível
 A10 — Navegação texto + voz
+A11 — Atualização automática
+A12 — Cliente abaixo da versão mínima
+A13 — Mensagem privada
+A14 — Troca de nick e foto
+A15 — Menção em canal silenciado
+A16 — Ligação recebida estando numa sala
+A17 — Versão no canal beta antes de todos
 ```
-
-## Build
-
-* build do Windows;
-* instalação;
-* atualização da versão;
-* configuração de ambiente;
-* configuração de produção.
 
 ## Infraestrutura
 
-A primeira tentativa será utilizando **Cloudflare Tunnel** para expor os serviços necessários a partir do ambiente disponível.
-
-A avaliação deverá considerar:
-
-* estabilidade;
-* latência;
-* conectividade;
-* limitações;
-* praticidade;
-* experiência dos usuários;
-* manutenção.
-
-Somente depois dessa avaliação será decidido se uma VPS é necessária.
+* configuração de produção revisada;
+* restauração do backup testada (banco e arquivos), a partir da cópia fora da VPS;
+* tráfego e custo da VPS revisados com o uso real.
 
 ---
 
@@ -701,16 +839,16 @@ Somente depois dessa avaliação será decidido se uma VPS é necessária.
 
 ## Objetivo
 
-Disponibilizar a primeira versão realmente utilizável para aproximadamente 5–10 amigos.
+O grupo usa o aplicativo como ferramenta principal por algumas semanas seguidas sem precisar voltar a
+outra.
 
 ## Identidade
 
 ```text
-✓ cadastro por convite
-✓ login
-✓ logout
-✓ sessão
-✓ perfil básico
+✓ entrada por convite, sem senha
+✓ convite de recuperação
+✓ perfil com nick e foto
+✓ status e "Jogando X"
 ```
 
 ## Chat
@@ -718,61 +856,84 @@ Disponibilizar a primeira versão realmente utilizável para aproximadamente 5�
 ```text
 ✓ canais de texto
 ✓ histórico
-✓ envio
 ✓ tempo real
-✓ edição
-✓ exclusão
-✓ ações básicas
+✓ não lidas
+✓ edição e exclusão
+✓ menções
+✓ anexos e colar imagem
+✓ mensagens privadas
 ```
 
 ## Voz
 
 ```text
-✓ canais de voz
-✓ entrar
-✓ sair
-✓ mute
-✓ deafen
+✓ salas de voz
+✓ mute e deafen
+✓ supressão de ruído e cancelamento de eco
+✓ atalhos globais e push-to-talk
 ✓ participantes
+✓ ligações privadas, com histórico de chamadas
 ✓ reconexão
 ```
 
 ## Screen Share
 
 ```text
-✓ compartilhar tela
-✓ receber tela
+✓ compartilhar e receber tela
 ✓ áudio quando disponível
-✓ limite de transmissão
+✓ várias transmissões simultâneas
+✓ publicador nativo (ou IPC, se a medição decidir)
 ```
 
 ## Comunidade
 
 ```text
 ✓ uma comunidade
-✓ convites
 ✓ acesso privado
 ✓ presença
-✓ permissões básicas
+✓ membro e administrador
+✓ moderação
 ```
 
 ## Cliente
 
 ```text
 ✓ aplicação desktop Tauri
-✓ interface consistente
-✓ estados de erro
-✓ estados de carregamento
+✓ auto-update e versão mínima
+✓ "O que há de novo"
+✓ bandeja
+✓ tela de configurações
+✓ estados de erro e carregamento
 ✓ reconexão
 ```
 
 ## Infraestrutura
 
 ```text
-✓ acesso remoto validado
-✓ HTTPS/WSS quando necessário
+✓ LiveKit, API e banco em VPS própria
+✓ HTTPS/WSS
 ✓ configuração de produção
-✓ backup definido
+✓ backup fora da VPS, com restauração testada
+✓ alerta de servidor fora do ar
+✓ pipeline de release com canal beta
+```
+
+---
+
+# Infraestrutura ao longo das versões
+
+```text
+v0.1    API pelo Tailscale Funnel
+        mídia pelo LiveKit Cloud (plano gratuito), consumo acompanhado
+        ↓
+v0.2.2  banco junto da API, no computador de casa
+        backup fora do computador (ex.: Cloudflare R2)
+        ↓
+v0.2.6  LiveKit, API e banco em VPS própria, com domínio
+        alerta de servidor fora do ar
+        (antecipado se a cota do LiveKit Cloud apertar)
+        ↓
+v0.4    VPS dimensionada para várias transmissões
 ```
 
 ---
@@ -783,73 +944,80 @@ Funcionalidades que podem ser avaliadas posteriormente:
 
 ```text
 - cliente web;
+- suporte a Linux;
 - câmera;
 - aplicativo mobile;
 - múltiplas comunidades;
+- grupos privados (mensagens privadas com mais de duas pessoas);
+- criptografia ponta a ponta das mensagens privadas;
 - bots;
-- threads avançadas;
+- threads;
 - emojis personalizados;
 - busca avançada;
-- sistema elaborado de cargos;
-- administração avançada;
-- notificações desktop avançadas;
-- múltiplas transmissões simultâneas;
+- sistema elaborado de cargos e permissões por canal;
+- assinatura de código do instalador (elimina o aviso do SmartScreen);
+- soundboard;
+- clipes (salvar os últimos segundos de uma transmissão);
 ```
 
-Nenhuma delas é necessária para validar o produto principal.
+Nenhuma delas é necessária para o uso principal do grupo.
 
 ---
 
 # Ordem prática de implementação
 
-Apesar do roadmap conter várias fases, a execução inicial deve ser ainda mais direta:
-
 ```text
-01. Tauri + React
-02. App Shell
-03. Chat mockado
-04. API /health
-05. LiveKit
-06. Token temporário
-07. Voice
-08. Screen Share
-09. Teste entre máquinas
-10. Corrigir problemas de mídia
+v0.1
+01. Etapas 4 a 6 de docs/plans/v0.1-reorganizacao.md
+02. Build do Windows + URL configurável
+03. Código de acesso na API (adiado para a v0.2.0)
+04. Logs em arquivo (adiado para a v0.2.0)
+05. Tailscale Funnel + LiveKit Cloud
+06. Noite de teste com o grupo
 
-11. Login
-12. Cadastro
-13. Convites
-14. Sessão
+v0.2
+07. v0.2.0 Auto-update + pipeline com testes + canal beta + versão mínima + "O que há de novo"
+    + logs em arquivo + código de acesso provisório
+08. v0.2.1 UI nova
+09. v0.2.2 Convites + identidade do dispositivo + permissões + segurança mínima + banco
+10. v0.2.3 Publicador nativo + medição
+11. v0.2.4 Chat real + WebSocket
+12. v0.2.5 Supressão de ruído e cancelamento de eco
+13. v0.2.6 VPS (LiveKit, API e banco) + domínio + migração + alerta
 
-15. Banco
-16. Mensagens reais
-17. WebSocket
-18. Presença
+v0.3
+14. Mensagens privadas
+15. Não lidas + notificações + bandeja
+16. Ligações privadas + histórico de chamadas
 
-19. Integração completa
-20. Reconexão
-21. Segurança
-22. Refinamentos
-23. Release Candidate
-24. v1.0
+v0.4
+17. Transmissões múltiplas + assinatura seletiva
+18. Experiência de quem assiste
+
+v0.5
+19. Canais e salas
+20. Status + digitando + menções + silenciar canal
+21. Sons, speaking indicator e volume por usuário
+
+v0.6
+22. Tela de configurações + atalhos globais
+23. Confiabilidade + qualidade da conexão + enviar logs
+
+v0.7
+24. Perfil + armazenamento de arquivos
+25. Chat avançado + busca
+
+v0.8
+26. "Jogando X"
+27. Refinos do screen share
+28. Moderação
+
+v0.9
+29. Release Candidate
+
+v1.0
 ```
 
 A regra principal do desenvolvimento é:
 
-> **Não avançar para infraestrutura complexa enquanto o fluxo principal ainda não estiver validado.**
-
-O objetivo inicial é chegar rapidamente ao seguinte:
-
-```text
-Usuário A ───────┐
-                 ├── comunidade
-Usuário B ───────┤
-                 │
-Usuário C ───────┘
-
-✓ chat
-✓ voz
-✓ screen share
-```
-
-Depois disso, o projeto pode crescer com segurança.
+> **O uso real decide a próxima prioridade.**

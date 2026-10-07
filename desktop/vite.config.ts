@@ -14,10 +14,25 @@ export default defineConfig(async () => ({
 		},
 	},
 
+	// O .env fica na raiz do monorepo (compartilhado com a api/), não em
+	// desktop/. Só variáveis com prefixo VITE_ chegam ao código do
+	// browser; o resto (segredos da api/) não aparece pro webview.
+	envDir: path.resolve(__dirname, ".."),
+
 	// Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
 	//
 	// 1. prevent Vite from obscuring rust errors
 	clearScreen: false,
+
+	// O scanner de optimizeDeps varre o projeto atrás de HTML pra achar
+	// dependências, e isso não é afetado por `server.watch.ignored` (abaixo).
+	// Sem restringir as entradas, ele acaba entrando em
+	// `src-tauri/target/doc` (milhares de .html gerados pelo `cargo doc`)
+	// e estoura o limite de arquivos abertos do SO (EMFILE).
+	optimizeDeps: {
+		entries: ["index.html"],
+	},
+
 	// 2. tauri expects a fixed port, fail if that port is not available
 	server: {
 		port: 1420,

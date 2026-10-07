@@ -1,293 +1,229 @@
-use std::{
-    collections::HashMap,
-    sync::{
-        atomic::{AtomicBool, AtomicU64, Ordering},
-        Arc, Mutex,
+//! Comandos do compartilhamento de tela (Etapa 4 do `docs/plans/v0.1-reorganizacao.md`).
+//!
+//! O prefixo `ipc_` marca o que é específico do caminho atual (frames pelo
+//! IPC do Tauri). `list_capture_sources`, `screen_share_stop` e os eventos de
+//! fim também vão servir ao publicador nativo.
+
+use std::sync::Arc;
+
+use serde::{Deserialize, Serialize};
+use tauri::{
+    ipc::{Channel, InvokeResponseBody},
+    AppHandle, Emitter, State,
+};
+use tracing::{info, warn};
+
+use crate::{
+    error::AppError,
+    media::{
+        audio::AudioMode,
+        ipc_sink::{IpcAudioSink, IpcVideoSink},
+        quality::Quality,
+        session::{ScreenShareManager, ShareEvent},
+        sources::{self, CaptureSource, SourceRef},
+        video_capture::VideoCaptureConfig,
+        EndReason, FrameGate,
     },
-    thread,
 };
 
-use livekit::webrtc::video_source::{native::NativeVideoSource, VideoResolution};
-use tauri::ipc::{Channel, InvokeResponseBody};
+use super::run_blocking;
 
-use crate::screen_share::{
-    test_capture_window,
-    windows::{
-        list_monitors, list_windows, stream_monitor_preview, stream_screen_share_video,
-        stream_window_preview, ScreenShareVideoSource,
-    },
-    CaptureControl, MonitorSource, ScreenShareTestState, WindowPreviewFrame, WindowSource,
-};
-
-pub struct ScreenSharePreviewState {
-    previews: Arc<Mutex<HashMap<String, Arc<AtomicBool>>>>,
+/// O que o frontend escolheu no seletor (argumento de `ipc_screen_share_start`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct StartOptions {
+    pub source: SourceRef,
+    pub quality: Quality,
+    pub audio: AudioMode,
 }
 
-pub struct ScreenShareVideoState {
-    stop: Arc<Mutex<Option<Arc<AtomicBool>>>>,
+/// Nome do evento de fim da sessão (contrato com o frontend, `docs/plans/v0.1-reorganizacao.md` 4.2).
+pub const SCREEN_SHARE_ENDED: &str = "screen-share-ended";
+/// Nome do evento de fim só do áudio (contrato com o frontend, `docs/plans/v0.1-reorganizacao.md` 4.2).
+pub const SCREEN_SHARE_AUDIO_ENDED: &str = "screen-share-audio-ended";
+
+/// Motivo do fim, como o frontend recebe.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum EndedReason {
+    Stopped,
+    SourceClosed,
+    Error,
 }
 
-impl Default for ScreenShareVideoState {
-    fn default() -> Self {
+/// Payload de `screen-share-ended` e `screen-share-audio-ended`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ShareEndedPayload {
+    pub session_id: u64,
+    pub reason: EndedReason,
+    /// Só em `Error`: a descrição do que falhou.
+    pub message: Option<String>,
+}
+
+impl ShareEndedPayload {
+    fn new(session_id: u64, reason: EndReason) -> Self {
+        let (reason, message) = match reason {
+            EndReason::Stopped => (EndedReason::Stopped, None),
+            EndReason::SourceClosed => (EndedReason::SourceClosed, None),
+            EndReason::Error(message) => (EndedReason::Error, Some(message)),
+        };
+
         Self {
-            stop: Arc::new(Mutex::new(None)),
+            session_id,
+            reason,
+            message,
         }
     }
 }
 
-impl Default for ScreenSharePreviewState {
-    fn default() -> Self {
-        Self {
-            previews: Arc::new(Mutex::new(HashMap::new())),
-        }
-    }
-}
-
-fn start_preview(
-    state: &ScreenSharePreviewState,
-    key: String,
-    stop: Arc<AtomicBool>,
-) -> Result<(), String> {
-    let mut previews = state
-        .previews
-        .lock()
-        .map_err(|_| "Falha ao acessar previews".to_string())?;
-
-    if let Some(previous) = previews.insert(key, Arc::clone(&stop)) {
-        previous.store(true, Ordering::Relaxed);
-    }
-
-    Ok(())
-}
-
-#[tauri::command]
-pub fn start_window_preview(
-    state: tauri::State<'_, ScreenSharePreviewState>,
-    source_id: u64,
-    channel: Channel<WindowPreviewFrame>,
-) -> Result<(), String> {
-    let stop = Arc::new(AtomicBool::new(false));
-
-    start_preview(&state, format!("window:{source_id}"), Arc::clone(&stop))?;
-
-    let previews = Arc::clone(&state.previews);
-    let key = format!("window:{source_id}");
-
-    std::thread::spawn(move || {
-        match crate::screen_share::windows::capture_window_snapshot(source_id) {
-            Ok(frame) => {
-                if let Err(error) = channel.send(frame) {
-                    eprintln!("Erro ao enviar snapshot inicial: {error}");
-
-                    if let Ok(mut previews) = previews.lock() {
-                        previews.remove(&key);
-                    }
-
-                    return;
-                }
-            }
-
-            Err(error) => {
-                eprintln!("Snapshot inicial indisponível para {source_id}: {error}");
-            }
-        }
-
-        if let Err(error) = stream_window_preview(source_id, channel, Arc::clone(&stop)) {
-            eprintln!("Erro no preview da janela: {error}");
-        }
-
-        if let Ok(mut previews) = previews.lock() {
-            previews.remove(&key);
-        }
-    });
-    Ok(())
-}
-
-#[tauri::command]
-pub fn start_monitor_preview(
-    state: tauri::State<'_, ScreenSharePreviewState>,
-    source_id: u64,
-    channel: Channel<WindowPreviewFrame>,
-) -> Result<(), String> {
-    let stop = Arc::new(AtomicBool::new(false));
-
-    start_preview(&state, format!("monitor:{source_id}"), Arc::clone(&stop))?;
-
-    let previews = Arc::clone(&state.previews);
-    let key = format!("monitor:{source_id}");
-
-    thread::spawn(move || {
-        if let Err(error) = stream_monitor_preview(source_id, channel, Arc::clone(&stop)) {
-            eprintln!("Erro no preview do monitor: {error}");
-        }
-
-        if let Ok(mut previews) = previews.lock() {
-            previews.remove(&key);
-        }
-    });
-
-    Ok(())
-}
-
-#[tauri::command]
-pub fn start_screen_share_video(
-    state: tauri::State<'_, ScreenShareVideoState>,
-    source_type: String,
-    source_id: u64,
-    channel: Channel<InvokeResponseBody>,
-) -> Result<(), String> {
-    let source = match source_type.as_str() {
-        "window" => ScreenShareVideoSource::Window(source_id),
-
-        "monitor" => ScreenShareVideoSource::Monitor(source_id),
-
-        _ => {
-            return Err("Tipo de fonte inválido.".to_string());
-        }
+/// Traduz um evento do manager para o evento Tauri correspondente.
+fn emit_share_event(app: &AppHandle, event: ShareEvent) {
+    let (name, payload) = match event {
+        ShareEvent::Ended { session_id, reason } => (
+            SCREEN_SHARE_ENDED,
+            ShareEndedPayload::new(session_id, reason),
+        ),
+        ShareEvent::AudioEnded { session_id, reason } => (
+            SCREEN_SHARE_AUDIO_ENDED,
+            ShareEndedPayload::new(session_id, reason),
+        ),
     };
 
-    let stop = Arc::new(AtomicBool::new(false));
+    info!(
+        event = name,
+        session_id = payload.session_id,
+        reason = ?payload.reason,
+        "emitindo fim do compartilhamento"
+    );
 
-    {
-        let mut active = state
-            .stop
-            .lock()
-            .map_err(|_| "Falha ao acessar estado.".to_string())?;
-
-        if active.is_some() {
-            return Err("Já existe um screen share ativo.".to_string());
-        }
-
-        *active = Some(Arc::clone(&stop));
+    if let Err(error) = app.emit(name, payload) {
+        warn!(event = name, %error, "falha ao emitir evento para o frontend");
     }
-
-    let state_stop = Arc::clone(&state.stop);
-
-    std::thread::spawn(move || {
-        let result = stream_screen_share_video(source, channel, stop);
-
-        if let Err(error) = result {
-            eprintln!("Erro no screen share: {error}");
-        }
-
-        if let Ok(mut active) = state_stop.lock() {
-            *active = None;
-        }
-    });
-
-    Ok(())
 }
 
-#[tauri::command]
-pub fn stop_all_screen_share_previews(
-    state: tauri::State<'_, ScreenSharePreviewState>,
-) -> Result<(), String> {
-    let mut previews = state
-        .previews
-        .lock()
-        .map_err(|_| "Falha ao acessar previews".to_string())?;
-
-    for stop in previews.values() {
-        stop.store(true, Ordering::Relaxed);
-    }
-
-    previews.clear();
-
-    Ok(())
+/// Cria o manager do compartilhamento, ligado aos eventos do Tauri.
+/// Chamado uma vez, no `setup` do app.
+pub fn create_manager(app: &AppHandle) -> Arc<ScreenShareManager> {
+    let app = app.clone();
+    Arc::new(ScreenShareManager::new(move |event| {
+        emit_share_event(&app, event);
+    }))
 }
 
+// ============================================================================
+// Comandos
+// ============================================================================
+
+/// Lista as janelas e telas que dá para compartilhar, com título, ícone e geometria.
+///
+/// A enumeração e a extração de ícones bloqueiam, por isso rodam em [`run_blocking`].
 #[tauri::command]
-pub fn stop_screen_share_video(
-    state: tauri::State<'_, ScreenShareVideoState>,
-) -> Result<(), String> {
-    let mut active = state
-        .stop
-        .lock()
-        .map_err(|_| "Falha ao acessar estado.".to_string())?;
-
-    if let Some(stop) = active.take() {
-        stop.store(true, Ordering::Relaxed);
-    }
-
-    Ok(())
+pub async fn list_capture_sources() -> Result<Vec<CaptureSource>, AppError> {
+    run_blocking(sources::list_capture_sources).await
 }
 
+/// Inicia um compartilhamento pelo caminho IPC. Só responde depois que o
+/// vídeo e, se pedido, o áudio inicializaram (início atômico, decisão 6).
 #[tauri::command]
-pub fn list_screen_share_windows() -> Result<Vec<WindowSource>, String> {
-    list_windows()
-}
+pub async fn ipc_screen_share_start(
+    manager: State<'_, Arc<ScreenShareManager>>,
+    options: StartOptions,
+    video: Channel<InvokeResponseBody>,
+    audio: Channel<InvokeResponseBody>,
+) -> Result<u64, AppError> {
+    let manager = Arc::clone(manager.inner());
+    let preset = options.quality.preset();
 
-#[tauri::command]
-pub fn list_screen_share_monitors() -> Result<Vec<MonitorSource>, String> {
-    list_monitors()
-}
-
-// WEBRTC LIVEKIT
-
-#[tauri::command]
-pub fn test_list_webrtc_windows() -> Result<(), String> {
-    crate::screen_share::list_webrtc_windows()
-}
-
-#[tauri::command]
-pub fn test_livekit_window_capture(
-    state: tauri::State<'_, ScreenShareTestState>,
-    source_id: u64,
-    channel: Channel<InvokeResponseBody>,
-) -> Result<u64, String> {
-    let capture_id = state.next_id.fetch_add(1, Ordering::Relaxed);
-
-    let control = CaptureControl {
-        in_flight: Arc::new(AtomicU64::new(0)),
-        stop: Arc::new(AtomicBool::new(false)),
-        captured: Arc::new(AtomicU64::new(0)),
-        dropped: Arc::new(AtomicU64::new(0)),
-        sent: Arc::new(AtomicU64::new(0)),
+    let video_config = VideoCaptureConfig {
+        source: options.source,
+        max_width: preset.max_width,
+        max_height: preset.max_height,
+        fps: preset.fps,
     };
 
-    state
-        .captures
-        .lock()
-        .unwrap()
-        .insert(capture_id, control.clone());
+    let video_sink = IpcVideoSink::new(video, FrameGate::new(preset.max_in_flight));
+    let audio_sink = IpcAudioSink::new(audio);
 
-    tauri::async_runtime::spawn_blocking(move || {
-        let result = test_capture_window(source_id, channel, control);
-
-        if let Err(error) = result {
-            eprintln!("Captura {capture_id} encerrada: {error}");
-        }
-    });
-
-    Ok(capture_id)
+    run_blocking(move || manager.start(video_config, video_sink, options.audio, audio_sink)).await
 }
 
+/// Confirma que o frontend terminou de processar um frame (libera o `FrameGate`).
+/// Ids de sessões encerradas são ignorados: frames em trânsito ainda geram ACKs.
 #[tauri::command]
-pub fn ack_livekit_window_capture(
-    state: tauri::State<'_, ScreenShareTestState>,
-    capture_id: u64,
-) -> Result<(), String> {
-    let captures = state.captures.lock().unwrap();
-
-    let control = captures
-        .get(&capture_id)
-        .ok_or_else(|| format!("Captura {capture_id} não encontrada."))?;
-
-    control.in_flight.fetch_sub(1, Ordering::AcqRel);
-
+pub async fn ipc_screen_share_ack(
+    manager: State<'_, Arc<ScreenShareManager>>,
+    session_id: u64,
+) -> Result<(), AppError> {
+    manager.ack(session_id);
     Ok(())
 }
 
+/// Encerra o compartilhamento. Idempotente: um id que já acabou não é erro.
 #[tauri::command]
-pub fn stop_livekit_window_capture(
-    state: tauri::State<'_, ScreenShareTestState>,
-    capture_id: u64,
-) -> Result<(), String> {
-    let mut captures = state.captures.lock().unwrap();
+pub async fn screen_share_stop(
+    manager: State<'_, Arc<ScreenShareManager>>,
+    session_id: u64,
+) -> Result<(), AppError> {
+    let manager = Arc::clone(manager.inner());
+    run_blocking(move || manager.stop(session_id)).await
+}
 
-    if let Some(control) = captures.remove(&capture_id) {
-        control.stop.store(true, Ordering::Release);
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn le_as_opcoes_enviadas_pelo_frontend() {
+        let json = r#"{
+            "source": { "kind": "window", "id": 123 },
+            "quality": "720p60",
+            "audio": { "mode": "application", "processId": 456 }
+        }"#;
+
+        let options: StartOptions = serde_json::from_str(json).unwrap();
+        assert_eq!(
+            options,
+            StartOptions {
+                source: SourceRef::Window(123),
+                quality: Quality::Motion,
+                audio: AudioMode::Application { process_id: 456 },
+            }
+        );
     }
 
-    Ok(())
+    #[test]
+    fn recusa_campo_desconhecido() {
+        let json = r#"{
+            "source": { "kind": "monitor", "id": 0 },
+            "quality": "1080p30",
+            "audio": { "mode": "off" },
+            "fps": 60
+        }"#;
+
+        assert!(serde_json::from_str::<StartOptions>(json).is_err());
+    }
+
+    #[test]
+    fn payload_no_formato_do_frontend() {
+        let payload = ShareEndedPayload::new(7, EndReason::Error("a janela sumiu".into()));
+        assert_eq!(
+            serde_json::to_value(&payload).unwrap(),
+            serde_json::json!({ "sessionId": 7, "reason": "error", "message": "a janela sumiu" })
+        );
+
+        let payload = ShareEndedPayload::new(7, EndReason::SourceClosed);
+        assert_eq!(
+            serde_json::to_value(&payload).unwrap(),
+            serde_json::json!({ "sessionId": 7, "reason": "sourceClosed", "message": null })
+        );
+    }
+
+    #[test]
+    fn nomes_dos_eventos_seguem_o_contrato() {
+        // O frontend escuta estes nomes (`docs/plans/v0.1-reorganizacao.md`, 4.2). Mudar um lado sem o outro quebra em
+        // silêncio: o evento sairia, e ninguém o ouviria.
+        assert_eq!(SCREEN_SHARE_ENDED, "screen-share-ended");
+        assert_eq!(SCREEN_SHARE_AUDIO_ENDED, "screen-share-audio-ended");
+    }
 }
