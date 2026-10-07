@@ -1,14 +1,14 @@
 # Plano — v0.2.0: base de entrega
 
 Primeira entrega da v0.2 (`docs/roadmap.md`). Monta o caminho para que toda versão seguinte chegue sozinha
-ao grupo: atualização automática, pipeline de release, canal beta, versão mínima, "O que há de novo" e logs
-em arquivo. O plano da fase anterior está arquivado em
+ao grupo: atualização automática, pipeline de release, canal beta, versão mínima, "O que há de novo", logs
+em arquivo e um código de acesso provisório na API. O plano da fase anterior está arquivado em
 [`docs/plans/v0.1-reorganizacao.md`](docs/plans/v0.1-reorganizacao.md).
 
 **Objetivo desta fase:** a v0.2.0 é a **última instalação manual**. Depois dela, uma versão nova publicada
 passa pelo canal beta e chega a todos sem ninguém baixar nada.
 
-**Fora do escopo:** VPS e banco (v0.2.1), identidade e convites (v0.2.2), qualquer mudança de mídia ou de UI
+**Fora do escopo:** UI nova (v0.2.1), identidade, convites e banco (v0.2.2), VPS (v0.2.6), qualquer mudança de mídia ou de UI
 além do necessário para atualizar, assinatura de código do instalador (o SmartScreen continua avisando).
 
 ## Progresso
@@ -20,7 +20,7 @@ além do necessário para atualizar, assinatura de código do instalador (o Smar
 | 3 | CI | Pendente |
 | 4 | Updater no app | Pendente |
 | 5 | Pipeline de release | Pendente |
-| 6 | Versão mínima | Pendente |
+| 6 | Versão mínima e código de acesso | Pendente |
 | 7 | "O que há de novo" | Pendente |
 | 8 | Verificação | Pendente |
 
@@ -45,7 +45,7 @@ pública, sem token. Os releases vão para um repositório público só de distr
 de acesso restrito a esse repositório (segredo do Actions).
 
 Alternativas descartadas: tornar o repositório principal público (decisão do dono, não técnica) e o
-Cloudflare R2 (bom, mas acrescenta uma conta e um serviço antes da v0.2.1; pode substituir depois sem
+Cloudflare R2 (bom, mas acrescenta uma conta e um serviço antes da v0.2.2, quando o R2 entra para o backup; pode substituir depois sem
 mudar o app, só o endpoint).
 
 ### 3. Canais estável e beta pelos releases do GitHub
@@ -70,6 +70,10 @@ Como toda versão passa pelo beta antes, o beta nunca fica atrás do estável.
 O `tauri.conf.json` passa a ler a versão do `desktop/package.json` (`"version": "../package.json"`). O
 pipeline só publica se a tag (`v0.2.0`) for igual a essa versão. O `Cargo.toml` do desktop não é usado
 para a versão do app.
+
+A numeração segue o roadmap ("Numeração das versões"): o último número é **entrega × 10 + correção**. Esta
+entrega sai como `0.2.0`; correções dela, como `0.2.1` a `0.2.9`; a UI nova, como `0.2.10`. O pipeline
+recusa versões fora do semver (por exemplo, `0.2.01`).
 
 ### 5. Instalador NSIS por usuário, sem MSI
 
@@ -122,7 +126,20 @@ atualizações para quem já instalou: todos teriam de reinstalar manualmente.
 - Um botão "Abrir pasta de logs" (plugin `opener`, que já existe) para o amigo mandar o arquivo. O envio
   automático ("enviar logs") continua na v0.6.
 
-### 11. CI enxuto por causa dos minutos
+### 11. Código de acesso provisório
+
+Adiado da v0.1 e substituído pela identidade na v0.2.2.
+
+- O app manda `X-Access-Code` em toda chamada à API, com um valor embutido no build (`VITE_ACCESS_CODE`,
+  vindo de um segredo do repositório no pipeline).
+- A API lê `ACCESS_CODE` do ambiente. Sem a variável, não confere nada; com ela, código errado ou ausente
+  recebe **401** com `{ kind: "access_denied", message }`.
+- Protege contra quem descobre a URL do Funnel (que aparece nos logs públicos de certificados), não contra
+  quem tem o executável: o código pode ser extraído dele. Para o grupo, basta.
+- Como o app da v0.1 não manda o código, `ACCESS_CODE` é ligada junto com a versão mínima, depois que todos
+  estiverem na v0.2.0.
+
+### 12. CI enxuto por causa dos minutos
 
 Repositório privado: 2.000 min/mês grátis, com runners Windows contando em dobro.
 
@@ -151,7 +168,7 @@ o botão abre a pasta.
 
 ## Etapa 3: CI — pendente
 
-Workflow `ci.yml` (decisão 11).
+Workflow `ci.yml` (decisão 12).
 
 **Pronto quando:** um pull request com um teste quebrado fica vermelho.
 
@@ -182,12 +199,14 @@ Promoção para o estável: desmarcar o pre-release no GitHub (manual, de propó
 **Pronto quando:** `git tag v0.2.0 && git push --tags` termina com o instalador e o `latest.json`
 publicados, sem nenhum passo manual.
 
-## Etapa 6: versão mínima — pendente
+## Etapa 6: versão mínima e código de acesso — pendente
 
-Decisão 8: cabeçalho no `apiUrl`/`fetch` do app, conferência na API, mensagem no app.
+Decisões 8 e 11: os dois cabeçalhos (`X-App-Version` e `X-Access-Code`) num só ponto do app (o `fetch` da
+API), a conferência na API e as mensagens no app.
 
 **Pronto quando:** com `MIN_CLIENT_VERSION=0.2.1`, um app 0.2.0 recebe a mensagem de atualização em vez do
-erro genérico; sem a variável, nada muda.
+erro genérico; com `ACCESS_CODE` definido, uma chamada sem o código recebe 401 e o app recebe o token
+normalmente; sem as variáveis, nada muda.
 
 ## Etapa 7: "O que há de novo" — pendente
 
@@ -203,7 +222,7 @@ Decisão 9.
    estável.
 3. Atualização durante uma chamada: o aviso aparece, mas o app não reinicia sozinho.
 4. Uma versão com teste quebrado não é publicada.
-5. Cliente abaixo da versão mínima recebe a mensagem.
+5. Cliente abaixo da versão mínima recebe a mensagem; chamada sem o código de acesso é recusada.
 6. "O que há de novo" aparece uma vez depois de atualizar.
 7. Logs do dia existem na pasta e o botão abre a pasta.
 8. Cópia de segurança da chave privada conferida (consegue assinar a partir dela).

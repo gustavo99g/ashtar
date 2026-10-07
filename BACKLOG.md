@@ -12,23 +12,13 @@ Ao resolver um item, apague-o daqui e registre o resultado no ADR ou no commit.
 - [ ] O `fetch` do token (`requestVoiceToken`) não tem timeout: com a API fora do ar (túnel caído), o app
       pode ficar em "conectando" por bastante tempo. Sem destino definido.
 
-## v0.2.2 — Identidade, convites e permissões
+## Correções fora de ordem
 
-- [ ] O código de acesso da API (item 03 da v0.1 no `docs/roadmap.md`) não existe: `api/src/routes/voice.rs`
-      emite o token para qualquer chamada que chegue à URL, e quem a descobrir consome a cota do LiveKit.
-      **Adiado da v0.1 para a v0.2.2** (2026-10-07): a identidade do dispositivo fecha o acesso de vez, e um
-      código no app exigiria redistribuir o executável. Risco aceito até lá, com a URL fixa do Tailscale
-      Funnel (`*.ts.net`, que aparece nos logs públicos de certificados).
-
-- [ ] Identidade falsa nova a cada entrada (`idiot-<uuid>`, nome `Idiota-<uuid>`): sem nome escolhido nem id
-      por instalação. **Adiado para a v0.2.2** (identidade do dispositivo, `docs/roadmap.md`). Até lá, o id
-      aleatório por entrada evita colisão no LiveKit, mas ninguém mantém o mesmo nome entre sessões.
-
-## v0.2.3 — Supressão de ruído e cancelamento de eco
+Bugs que saem assim que ficarem prontos, pelo auto-update, sem esperar a entrega da ordem.
 
 - [ ] Eco no compartilhamento da tela inteira com "Todo o sistema". Num teste com amigos (2026-10-06), um
       amigo compartilhou o monitor e quem assistia ouviu a própria voz; só mutar o próprio microfone
-      parava. **Adiado para a v0.2** (v0.2.3 do `docs/roadmap.md`).
+      parava. **Correção fora de ordem** ("Correções fora de ordem" no `docs/roadmap.md`): sai assim que ficar pronta, sem esperar a v0.2.5.
       **Evidências (medidas nesta máquina; o teste do Brave rodou no perfil de debug, a árvore do app foi vista no
       executável de release):**
       - O código exclui o PID do app (`std::process::id()`) com `EXCLUDE_TARGET_PROCESS_TREE`; conferido na
@@ -54,12 +44,12 @@ Ao resolver um item, apague-o daqui e registre o resultado no ADR ou no commit.
       `commands/screen_share.rs`. O teste `mede_a_exclusao_de_um_chromium` (ignorado) repete a medição com
       qualquer Chromium tocando áudio (`EXCLUDE_PID=<pid da raiz>`).
 
-## v0.2.4 — UI nova
+## v0.2.1 — UI nova
 
 - [ ] O seletor (`SourcePicker`) e a trava de uma transmissão por vez (`ScreenShareButton`) existem e foram
       usados nos testes de 05 e 06/10 (ADR 0009). A trava só considera tracks já assinados e não impede duas
       pessoas de iniciarem ao mesmo tempo; o erro de início não tem como ser dispensado. A UI de voz é
-      provisória. **Adiado para a UI nova (v0.2.4).**
+      provisória. **Adiado para a UI nova (v0.2.1).**
 - [ ] Janelas minimizadas não aparecem no seletor. Não é bug nosso: o libwebrtc as descarta da lista
       (`IsIconic`) e também não as captura, e o `CaptureSource` só sai dessa lista (medido: o `start` de uma
       janela minimizada devolve `SourceNotFound`). O seletor recarrega a lista a cada 2 s (ao fim de cada
@@ -67,9 +57,16 @@ Ao resolver um item, apague-o daqui e registre o resultado no ADR ou no commit.
       `EnumWindows`, selo "Minimizada" e restauração da janela ao escolher (contraria a decisão 2 do PLAN).
       A lista leva ~95 ms com 4 janelas (release), por causa dos ícones: remedir com muitas janelas.
 - [ ] Os textos dos presets (`presets.ts`) prometem mais fluidez do que o medido em jogo: o Equilibrado ("sem
-      perder fluidez") ficou em 25–34 fps e o Nitidez em 18–25 fps, abaixo dos 30 do próprio nome (ADR 0009). **Adiado para a UI nova (v0.2.4).**
+      perder fluidez") ficou em 25–34 fps e o Nitidez em 18–25 fps, abaixo dos 30 do próprio nome (ADR 0009). **Adiado para a UI nova (v0.2.1).**
 
-## v0.2.6 — Publicador nativo e medição
+## v0.2.2 — Identidade, convites e permissões
+
+- [ ] Identidade falsa nova a cada entrada (`idiot-<uuid>`, nome `Idiota-<uuid>`): sem nome escolhido nem id
+      por instalação. **Adiado para a v0.2.2** (identidade do dispositivo, `docs/roadmap.md`). A UI nova (v0.2.1)
+      já traz um nick guardado no computador, que a v0.2.2 aproveita; até lá, o id aleatório por entrada evita
+      colisão no LiveKit.
+
+## v0.2.3 — Publicador nativo e medição
 
 - [ ] Redução da imagem no caminho do IPC. O legado reduzia em BGRA com `fast_image_resize` e
       `ResizeAlg::Nearest`, depois de copiar o frame inteiro (`frame.data().to_vec()`); isso saiu com o
@@ -81,13 +78,13 @@ Ao resolver um item, apague-o daqui e registre o resultado no ADR ou no commit.
       foi isolada (uma hipótese, não verificada, é o filtro do `scale`; o legado usava `Nearest`). Próximo
       teste: reduzir em BGRA antes de converter, com o `fast_image_resize`, que por isso continua no
       `Cargo.toml`, sem uso desde a remoção do `legacy/` (ADR 0009).
-      **Adiado para o publicador nativo (v0.2.6):** é um experimento de otimização, não um defeito.
+      **Adiado para o publicador nativo (v0.2.3):** é um experimento de otimização, não um defeito.
 - [ ] A divisão do `capture_frame` em readback, redução e conversão (ADR 0009) vem de uma instrumentação que
       não está no repositório: os logs de tempo por etapa foram removidos (estão no commit `d418b00`). Para
       repetir a medição, recolocar os logs ou deixar um cronômetro permanente no target `perf`.
-      **Adiado para a v0.2.6**, junto das medições do publicador nativo.
+      **Adiado para a v0.2.3**, junto das medições do publicador nativo.
 - [ ] Linha de base de desempenho em build de release, separada para os três presets de qualidade
-      (decisão 16 de `docs/plans/v0.1-reorganizacao.md`). **Adiado para a v0.2.6:** só existe o fps por preset em jogo (ADR 0009); faltam
+      (decisão 16 de `docs/plans/v0.1-reorganizacao.md`). **Adiado para a v0.2.3:** só existe o fps por preset em jogo (ADR 0009); faltam
       CPU, memória e o histograma de intervalos entre frames, que o publicador nativo vai precisar para comparar.
 - [ ] Publicador de vídeo/áudio nativo em Rust (fica para o próximo plano). Ele precisa de duas peças:
   1. **Redução na GPU antes de copiar para a memória**, para janelas em 4K cheio: readback (~7 ms) mais

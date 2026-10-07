@@ -70,6 +70,29 @@ A partir da v0.2.0, com o auto-update pronto, toda versão é entregue em partes
 chega ao grupo assim que fica pronta, passando antes pelo canal beta. Ninguém espera uma versão inteira
 para receber uma melhoria.
 
+### Correções fora de ordem
+
+Correções de bug e de segurança não esperam a vez na ordem das entregas: saem assim que ficam prontas,
+pelo auto-update, passando pelo canal beta. A ordem das entregas vale para funcionalidades.
+
+### Numeração das versões
+
+O último número da versão do app junta a entrega e a correção: **entrega × 10 + correção**. A entrega
+v0.2.N sai como versão `0.2.N0`, e cada correção dela soma 1 no último dígito.
+
+```text
+0.2.0            entrega v0.2.0 (base de entrega)
+0.2.1, 0.2.2…    correções da v0.2.0
+0.2.10           entrega v0.2.1 (UI nova)
+0.2.11…          correções da v0.2.1
+0.2.60           entrega v0.2.6 (servidor)
+0.3.0            próxima versão do roadmap
+```
+
+O formato segue o semver, que o Tauri e o updater exigem (sem zero à esquerda: `0.2.01` não é válido). O
+limite é de 9 correções por entrega. Os nomes do roadmap (v0.2.1, v0.2.2…) continuam sendo os das
+entregas; o `CHANGELOG.md` diz o que entrou em cada versão.
+
 ### Cada item em uma versão só
 
 As versões são organizadas por entrega, não por tema. Um item aparece em uma única versão; quando ele
@@ -140,8 +163,8 @@ O mínimo para o aplicativo funcionar fora da rede local sem quebrar:
 * identidade provisória: cada entrada gera um id aleatório novo (`idiot-<uuid>`), o que evita colisão no
   LiveKit; o nome escolhido e o id por instalação ficam para a v0.2.2;
 * ~~código de acesso compartilhado, conferido pela API antes de emitir o token do LiveKit~~:
-  **adiado para a v0.2.2**, em que a identidade do dispositivo fecha o acesso de vez. Até lá, quem
-  descobrir a URL da API consegue tokens e consome a cota;
+  **adiado para a v0.2.0**, que já tem auto-update e não exige redistribuir o executável; a identidade da
+  v0.2.2 o substitui. Até lá, quem descobrir a URL da API consegue tokens e consome a cota;
 * ~~logs em arquivo~~: **adiado para a v0.2.0**, junto com a base de entrega.
 
 O grupo já recebeu o executável desta versão (2026-10-06); os dois itens adiados foram decididos
@@ -150,7 +173,7 @@ depois disso, para não exigir uma nova distribuição manual antes do auto-upda
 ## API
 
 * `/health`;
-* geração de token do LiveKit (sem proteção até a v0.2.2);
+* geração de token do LiveKit (sem proteção até a v0.2.0);
 * chaves do LiveKit somente no backend;
 * exposta pelo Tailscale Funnel, com URL fixa (`*.ts.net`); o túnel rápido da Cloudflare foi usado
   enquanto o Funnel não publicava o nome.
@@ -207,27 +230,30 @@ precisa ser antecipada.
 
 ## Objetivo
 
-Transformar o teste em um aplicativo de uso contínuo: atualizações automáticas, servidor próprio,
-identidade, chat real e a interface definitiva.
+Transformar o teste em um aplicativo de uso contínuo: atualizações automáticas, a interface definitiva,
+identidade, publicador nativo, chat real e servidor próprio.
 
 ## Entregas
 
 A v0.2 é entregue em partes. Depois da v0.2.0, cada parte chega ao grupo pelo auto-update assim que fica
-pronta, passando antes pelo canal beta.
+pronta, passando antes pelo canal beta. Cada entrega sai como versão `0.2.N0` (ver "Numeração das
+versões"), e cada uma ganha um plano detalhado próprio antes de começar.
 
 ```text
-v0.2.0  Base de entrega       auto-update + pipeline + canal beta + versão mínima
-v0.2.1  Servidor              VPS (LiveKit, API e banco) + backup + alerta
-v0.2.2  Identidade            convites + identidade do dispositivo + permissões
-v0.2.3  Áudio                 supressão de ruído e cancelamento de eco
-v0.2.4  UI nova
-v0.2.5  Chat real
-v0.2.6  Publicador nativo
+v0.2.0  Base de entrega       auto-update + pipeline + canal beta + versão mínima + logs
+v0.2.1  UI nova
+v0.2.2  Identidade            convites + identidade do dispositivo + permissões + banco
+v0.2.3  Publicador nativo
+v0.2.4  Chat real
+v0.2.5  Áudio                 supressão de ruído e cancelamento de eco
+v0.2.6  Servidor              VPS (LiveKit, API e banco) + domínio + backup + alerta
 ```
 
-As três primeiras têm prioridade alta e seguem esta ordem: a base de entrega faz todo o resto chegar
-sozinho; o servidor faz o banco nascer no lugar definitivo, sem migrar dados depois; e a identidade
-fecha o acesso, que até ali depende do código compartilhado da v0.1.
+A ordem segue três regras: a base de entrega vem primeiro, porque faz todo o resto chegar sozinho; a UI
+nova vem antes de qualquer tela nova (identidade e chat), para que nada seja construído duas vezes; e o
+publicador nativo vem antes do chat, por ser o maior risco técnico que sobrou da mídia. O servidor próprio
+fica por último: até lá, o LiveKit Cloud e o computador de casa (com o Tailscale Funnel) bastam, ao custo
+de uma migração do banco na v0.2.6. A v0.2.5 (áudio) é pequena e independente e pode sair antes, se o ruído ou o eco começarem a incomodar.
 
 ---
 
@@ -247,7 +273,10 @@ A instalação da v0.2.0 é a última reinstalação manual.
 * **"O que há de novo"**: uma janela curta com as mudanças, mostrada na primeira abertura depois de
   cada atualização;
 * **logs em arquivo** (adiado da v0.1): o `tracing` grava também num arquivo na pasta de dados do app,
-  com rotação, para investigar problemas na máquina de cada um.
+  com rotação, para investigar problemas na máquina de cada um;
+* **código de acesso provisório** (adiado da v0.1): o app manda um código fixo, embutido no build, e a API
+  só emite o token do LiveKit com ele. Não protege contra quem tem o executável, só contra quem descobre a
+  URL; fica até a identidade da v0.2.2. Com o auto-update, deixou de exigir redistribuição manual.
 
 ```text
 uma versão nova passa pelo canal beta e depois chega sozinha a todos
@@ -257,38 +286,31 @@ um teste falhando bloqueia o release
 cliente antigo recusado com pedido de atualização
 ```
 
-### v0.2.1 — Servidor
+### v0.2.1 — UI nova
 
-Todo o servidor passa para uma VPS própria. A mídia sai do LiveKit Cloud, pré-requisito das transmissões
-múltiplas da v0.4, e a API e o banco saem do seu computador, para que o aplicativo não caia quando ele
-desligar ou reiniciar.
+Refazer a interface a partir do novo protótipo, antes da identidade e do chat, para que as telas de
+convite, de nick e de conversa sejam construídas uma única vez em cima da interface definitiva.
 
-O desktop só conhece a URL da API. A URL, a chave e o segredo do LiveKit ficam no servidor, e a URL do
-LiveKit chega ao desktop pela própria API. Com um domínio fixo para a API, a mudança de servidor não
-exige nenhuma atualização do aplicativo.
+Precisa de um plano próprio antes de começar, feito a partir do protótipo: telas, componentes,
+navegação e o que muda na UI de voz e de compartilhamento (que hoje é provisória). Os itens de UI que a
+v0.1 deixou (seletor de fontes, trava de uma transmissão por vez, textos dos presets) estão no
+`BACKLOG.md`.
 
-* LiveKit, API e banco na mesma VPS (ex.: Docker Compose);
-* o Cloudflare Tunnel pode continuar na frente da API, rodando na VPS;
-* VPS escolhida pelo **tráfego de saída incluso**, não só pela CPU: uma noite de screen share assistido
-  por várias pessoas pode gerar dezenas de GB;
-* TURN configurado, para quem estiver atrás de redes restritivas;
-* segredos de produção configurados uma única vez no servidor, fora do repositório;
-* banco escolhido antes da implementação (ADR), com migrações;
-* backup automático, copiado para fora da VPS (ex.: Cloudflare R2), para que não se perca junto com ela;
-* **alerta de servidor fora do ar**: um monitor externo gratuito chama o `/health` e avisa no celular.
-
-```text
-voz e screen share funcionando pela VPS, com o seu computador desligado
- +
-restauração do backup testada uma vez
- +
-servidor desligado → alerta no celular
-```
+* **nick guardado no computador:** um campo para cada pessoa escolher o nome que aparece na sala, salvo
+  localmente, no lugar do `Idiota-<uuid>`. A v0.2.2 aproveita esse valor como o nick inicial da identidade.
 
 ### v0.2.2 — Identidade, convites e permissões
 
-As telas de convite e de escolha do nick já seguem o estilo do protótipo novo, para não serem refeitas
-na v0.2.4.
+As telas de convite e de escolha do nick já nascem na UI nova da v0.2.1.
+
+**Banco de dados.** A identidade é o primeiro dado que precisa durar, então o banco entra aqui, rodando
+junto da API no computador que a hospeda (o servidor próprio só vem na v0.2.6):
+
+* banco escolhido antes da implementação (ADR), com migrações;
+* backup automático, copiado para fora do computador (ex.: Cloudflare R2): a partir daqui há dados reais
+  do grupo;
+* a escolha considera a migração para a VPS na v0.2.6: com SQLite, a migração é copiar um arquivo; com
+  PostgreSQL, um dump e um restore.
 
 A v0.1 entra com uma identidade aleatória nova a cada entrada (`idiot-<uuid>`, nome `Idiota-<uuid>`); a
 identidade do dispositivo, com o nome escolhido pela pessoa, a substitui aqui.
@@ -319,9 +341,11 @@ aberturas seguintes entram direto, inclusive depois de formatar
   terem a mesma identidade. Nesses casos o desktop usa um token aleatório gerado pela API e guardado no
   cofre de credenciais do Windows, que se perde ao formatar.
 
-A identidade do dispositivo é um identificador fixo, não um segredo que possa ser trocado. Para um grupo
-pequeno, com a URL da API privada, o risco é aceito; se ela vazar, o administrador desvincula o
-dispositivo e envia um convite de recuperação.
+A identidade do dispositivo é um identificador fixo, não um segredo que possa ser trocado. A URL da API
+é pública desde a v0.1 (Tailscale Funnel), então a proteção não vem dela: para se passar por alguém, seria
+preciso conhecer o hash do hardware daquela pessoa, que nunca sai do computador dela. Para um grupo
+pequeno, o risco é aceito; se o valor vazar, o administrador desvincula o dispositivo e envia um convite
+de recuperação.
 
 **Usuários e convites**
 
@@ -332,8 +356,9 @@ dispositivo e envia um convite de recuperação.
   o administrador gera um convite vinculado ao usuário existente. Ao usar o convite, o dispositivo novo
   é vinculado ao mesmo usuário, com o mesmo histórico, e o vínculo antigo é removido;
 * o primeiro administrador é criado por configuração ou comando da API;
-* fecha o acesso à API: até aqui ela emite token para qualquer chamada (o código de acesso da v0.1 foi
-  adiado para cá e é substituído por esta identidade); token do LiveKit só para usuários autenticados.
+* fecha o acesso à API: substitui o código de acesso provisório da v0.2.0; token do LiveKit só para
+  usuários autenticados;
+* o nick guardado no computador desde a v0.2.1 vira o nick inicial na tela de escolha.
 
 **Permissões mínimas**
 
@@ -371,29 +396,21 @@ formatar o Windows → entra direto, sem convite novo
 sem identidade válida → nenhum token do LiveKit
 ```
 
-### v0.2.3 — Supressão de ruído e cancelamento de eco
+### v0.2.3 — Publicador nativo
 
-Entrega pequena e independente; pode sair em qualquer ponto da v0.2, inclusive junto de outra.
+* publicação do vídeo direto do Rust (conexão `{user_id}:screen`), sem passar pelo WebView;
+* medição lado a lado com o caminho IPC, usando como linha de base a Etapa 6 de `docs/plans/v0.1-reorganizacao.md` e o teste da
+  v0.1.
 
-* supressão de ruído, cancelamento de eco e controle automático de ganho do microfone, pelos filtros
-  do próprio WebView (opções de captura do `livekit-client`);
-* ligados por padrão, com opção de desligar (o `livekit-client` 2.22 já pede os filtros por padrão, então
-  falta a opção e conferir no WebView2, com `getSettings()`, se foram aplicados);
-* o eco de quem assiste a uma tela inteira compartilhada: o modo "Todo o sistema" exclui o PID do app, o
-  que não cobre o WebView2 quando há duas instâncias abertas; excluir o processo-navegador real do WebView2
-  (`BrowserProcessId`). Evidências e hipóteses no `BACKLOG.md`;
-* se o filtro do WebView não bastar, avaliar um filtro mais forte (ex.: RNNoise num worklet de áudio).
+Vem antes do chat porque é a parte de maior risco técnico que sobrou da mídia, e o motivo do aplicativo
+existir. Roda ainda no LiveKit Cloud: a VPS só chega na v0.2.6.
 
 ```text
-microfone sem ruído de teclado nem eco de quem usa caixa de som
+publicador nativo igual ou melhor que o caminho IPC na medição
+(ou decisão documentada de manter o IPC)
 ```
 
-### v0.2.4 — UI nova
-
-Refazer a interface a partir do novo protótipo, antes do chat, para que o chat seja construído uma
-única vez em cima da interface definitiva.
-
-### v0.2.5 — Chat real
+### v0.2.4 — Chat real
 
 * enviar, receber e persistir mensagens;
 * histórico ordenado e carregamento incremental;
@@ -402,22 +419,70 @@ Refazer a interface a partir do novo protótipo, antes do chat, para que o chat 
   `message.deleted`, `presence.changed`); a mídia continua no LiveKit;
 * reconexão do canal de eventos.
 
+Até a v0.2.6, o histórico fica no banco do computador que hospeda a API: com ele desligado, não há chat
+nem histórico.
+
 ```text
 enviar mensagem → o outro receber → fechar e reabrir → ver o histórico
 ```
 
-### v0.2.6 — Publicador nativo
+### v0.2.5 — Supressão de ruído e cancelamento de eco
 
-* publicação do vídeo direto do Rust (conexão `{user_id}:screen`), sem passar pelo WebView;
-* medição lado a lado com o caminho IPC, usando como linha de base a Etapa 6 de `docs/plans/v0.1-reorganizacao.md` e o teste da
-  v0.1.
+Entrega pequena e independente; pode sair em qualquer ponto da v0.2, inclusive junto de outra.
 
-Se o teste da v0.1 mostrar que a qualidade da transmissão é o principal problema, esta entrega passa à
-frente da UI nova e do chat.
+* supressão de ruído, cancelamento de eco e controle automático de ganho do microfone, pelos filtros
+  do próprio WebView (opções de captura do `livekit-client`);
+* ligados por padrão, com opção de desligar (o `livekit-client` 2.22 já pede os filtros por padrão, então
+  falta a opção e conferir no WebView2, com `getSettings()`, se foram aplicados);
+* o eco de quem assiste a uma tela inteira compartilhada **não espera esta entrega**: é um bug que o grupo
+  já sentiu e sai como correção, fora de ordem (ver "Correções fora de ordem"). O modo "Todo o sistema"
+  exclui o PID do app, o que não cobre o WebView2 quando há duas instâncias abertas; a correção é excluir o
+  processo-navegador real do WebView2 (`BrowserProcessId`). Evidências e hipóteses no `BACKLOG.md`;
+* se o filtro do WebView não bastar, avaliar um filtro mais forte (ex.: RNNoise num worklet de áudio).
 
 ```text
-publicador nativo igual ou melhor que o caminho IPC na medição
-(ou decisão documentada de manter o IPC)
+microfone sem ruído de teclado nem eco de quem usa caixa de som
+```
+
+### v0.2.6 — Servidor
+
+Todo o servidor passa para uma VPS própria. A mídia sai do LiveKit Cloud, pré-requisito das transmissões
+múltiplas da v0.4, e a API e o banco saem do seu computador, para que o aplicativo não caia quando ele
+desligar ou reiniciar. Fica por último na v0.2: até aqui, o LiveKit Cloud e o computador de casa bastam
+para o grupo. Pode ser antecipado se a cota do LiveKit Cloud apertar.
+
+**Gatilho para antecipar:** se o consumo de minutos de participante de um mês passar de ~60% dos 5.000 do
+plano gratuito, esta entrega passa à frente (ou o plano pago seguinte cobre o mês). O teste de 2026-10-06
+mostrou que o limite que aperta primeiro são os minutos, não o tráfego (~2 GB numa tarde com até 4
+pessoas). O publicador nativo (v0.2.3) faz quem transmite abrir uma segunda conexão e contar como dois
+participantes, o que acelera esse consumo.
+
+O desktop só conhece a URL da API. A URL, a chave e o segredo do LiveKit ficam no servidor, e a URL do
+LiveKit chega ao desktop pela própria API.
+
+**Domínio e troca de URL.** O LiveKit próprio precisa de um domínio com certificado HTTPS (para o `wss://`
+e o TURN), então o domínio é comprado aqui. A URL da API muda do Tailscale Funnel para o domínio, e o app
+instalado tem a URL antiga gravada no build. A ordem é: publicar uma versão com a URL nova, manter as duas
+respondendo até todos atualizarem e só então desligar a antiga.
+
+* LiveKit, API e banco na mesma VPS (ex.: Docker Compose);
+* a API exposta direto na VPS, com HTTPS no domínio próprio (sem túnel);
+* VPS escolhida pelo **tráfego de saída incluso**, não só pela CPU: uma noite de screen share assistido
+  por várias pessoas pode gerar dezenas de GB;
+* TURN configurado, para quem estiver atrás de redes restritivas;
+* segredos de produção configurados uma única vez no servidor, fora do repositório;
+* banco migrado do computador de casa para a VPS (escolhido na v0.2.2);
+* backup automático continua fora da VPS (ex.: Cloudflare R2), para que não se perca junto com ela;
+* **alerta de servidor fora do ar**: um monitor externo gratuito chama o `/health` e avisa no celular.
+
+```text
+voz, screen share e chat funcionando pela VPS, com o seu computador desligado
+ +
+histórico do chat e usuários migrados, sem perda
+ +
+restauração do backup testada uma vez
+ +
+servidor desligado → alerta no celular
 ```
 
 ---
@@ -858,14 +923,17 @@ outra.
 # Infraestrutura ao longo das versões
 
 ```text
-v0.1  API pelo Tailscale Funnel
-      mídia pelo LiveKit Cloud (plano gratuito), consumo acompanhado
+v0.1    API pelo Tailscale Funnel
+        mídia pelo LiveKit Cloud (plano gratuito), consumo acompanhado
         ↓
-v0.2  LiveKit, API e banco em VPS própria
-      backup fora da VPS + alerta de servidor fora do ar
-      (antecipado se a cota apertar durante o teste)
+v0.2.2  banco junto da API, no computador de casa
+        backup fora do computador (ex.: Cloudflare R2)
         ↓
-v0.4  VPS dimensionada para várias transmissões
+v0.2.6  LiveKit, API e banco em VPS própria, com domínio
+        alerta de servidor fora do ar
+        (antecipado se a cota do LiveKit Cloud apertar)
+        ↓
+v0.4    VPS dimensionada para várias transmissões
 ```
 
 ---
@@ -902,20 +970,20 @@ Nenhuma delas é necessária para o uso principal do grupo.
 v0.1
 01. Etapas 4 a 6 de docs/plans/v0.1-reorganizacao.md
 02. Build do Windows + URL configurável
-03. Código de acesso na API (adiado para a v0.2.2)
+03. Código de acesso na API (adiado para a v0.2.0)
 04. Logs em arquivo (adiado para a v0.2.0)
 05. Tailscale Funnel + LiveKit Cloud
 06. Noite de teste com o grupo
 
 v0.2
 07. v0.2.0 Auto-update + pipeline com testes + canal beta + versão mínima + "O que há de novo"
-    + logs em arquivo
-08. v0.2.1 VPS (LiveKit, API e banco) + backup externo + alerta
-09. v0.2.2 Convites + identidade do dispositivo + permissões + segurança mínima
-10. v0.2.3 Supressão de ruído e cancelamento de eco
-11. v0.2.4 UI nova
-12. v0.2.5 Chat real + WebSocket
-13. v0.2.6 Publicador nativo + medição
+    + logs em arquivo + código de acesso provisório
+08. v0.2.1 UI nova
+09. v0.2.2 Convites + identidade do dispositivo + permissões + segurança mínima + banco
+10. v0.2.3 Publicador nativo + medição
+11. v0.2.4 Chat real + WebSocket
+12. v0.2.5 Supressão de ruído e cancelamento de eco
+13. v0.2.6 VPS (LiveKit, API e banco) + domínio + migração + alerta
 
 v0.3
 14. Mensagens privadas
