@@ -137,8 +137,8 @@ O mínimo para o aplicativo funcionar fora da rede local sem quebrar:
 
 * build do Windows (instalador sem assinatura de código; o SmartScreen vai pedir confirmação);
 * URL da API configurável por ambiente;
-* nome escolhido na primeira abertura e id único gerado por instalação, para que duas pessoas nunca
-  usem a mesma identidade no LiveKit;
+* identidade provisória: cada entrada gera um id aleatório novo (`idiot-<uuid>`), o que evita colisão no
+  LiveKit; o nome escolhido e o id por instalação ficam para a v0.2.2;
 * código de acesso compartilhado, conferido pela API antes de emitir o token do LiveKit, para que
   quem descobrir a URL do túnel não consuma a cota;
 * logs em arquivo, para investigar problemas na máquina de cada um.
@@ -283,6 +283,9 @@ servidor desligado → alerta no celular
 As telas de convite e de escolha do nick já seguem o estilo do protótipo novo, para não serem refeitas
 na v0.2.4.
 
+A v0.1 entra com uma identidade aleatória nova a cada entrada (`idiot-<uuid>`, nome `Idiota-<uuid>`); a
+identidade do dispositivo, com o nome escolhido pela pessoa, a substitui aqui.
+
 Sem senha. O convite é a única forma de entrar, e a identidade vem do próprio computador, para que
 formatar o Windows não exija nada.
 
@@ -370,7 +373,7 @@ Entrega pequena e independente; pode sair em qualquer ponto da v0.2, inclusive j
   falta a opção e conferir no WebView2, com `getSettings()`, se foram aplicados);
 * o eco de quem assiste a uma tela inteira compartilhada: o modo "Todo o sistema" exclui o PID do app, o
   que não cobre o WebView2 quando há duas instâncias abertas; excluir o processo-navegador real do WebView2
-  (`BrowserProcessId`). Evidências e hipóteses no `NOTES.md`;
+  (`BrowserProcessId`). Evidências e hipóteses no `BACKLOG.md`;
 * se o filtro do WebView não bastar, avaliar um filtro mais forte (ex.: RNNoise num worklet de áudio).
 
 ```text
@@ -891,50 +894,49 @@ Nenhuma delas é necessária para o uso principal do grupo.
 v0.1
 01. Etapas 4 a 6 do PLAN.md
 02. Build do Windows + URL configurável
-03. Nome + id por instalação
-04. Código de acesso na API
-05. Logs em arquivo
-06. Cloudflare Tunnel + LiveKit Cloud
-07. Noite de teste com o grupo
+03. Código de acesso na API
+04. Logs em arquivo
+05. Cloudflare Tunnel + LiveKit Cloud
+06. Noite de teste com o grupo
 
 v0.2
-08. v0.2.0 Auto-update + pipeline com testes + canal beta + versão mínima + "O que há de novo"
-09. v0.2.1 VPS (LiveKit, API e banco) + backup externo + alerta
-10. v0.2.2 Convites + identidade do dispositivo + permissões + segurança mínima
-11. v0.2.3 Supressão de ruído e cancelamento de eco
-12. v0.2.4 UI nova
-13. v0.2.5 Chat real + WebSocket
-14. v0.2.6 Publicador nativo + medição
+07. v0.2.0 Auto-update + pipeline com testes + canal beta + versão mínima + "O que há de novo"
+08. v0.2.1 VPS (LiveKit, API e banco) + backup externo + alerta
+09. v0.2.2 Convites + identidade do dispositivo + permissões + segurança mínima
+10. v0.2.3 Supressão de ruído e cancelamento de eco
+11. v0.2.4 UI nova
+12. v0.2.5 Chat real + WebSocket
+13. v0.2.6 Publicador nativo + medição
 
 v0.3
-15. Mensagens privadas
-16. Não lidas + notificações + bandeja
-17. Ligações privadas + histórico de chamadas
+14. Mensagens privadas
+15. Não lidas + notificações + bandeja
+16. Ligações privadas + histórico de chamadas
 
 v0.4
-18. Transmissões múltiplas + assinatura seletiva
-19. Experiência de quem assiste
+17. Transmissões múltiplas + assinatura seletiva
+18. Experiência de quem assiste
 
 v0.5
-20. Canais e salas
-21. Status + digitando + menções + silenciar canal
-22. Sons, speaking indicator e volume por usuário
+19. Canais e salas
+20. Status + digitando + menções + silenciar canal
+21. Sons, speaking indicator e volume por usuário
 
 v0.6
-23. Tela de configurações + atalhos globais
-24. Confiabilidade + qualidade da conexão + enviar logs
+22. Tela de configurações + atalhos globais
+23. Confiabilidade + qualidade da conexão + enviar logs
 
 v0.7
-25. Perfil + armazenamento de arquivos
-26. Chat avançado + busca
+24. Perfil + armazenamento de arquivos
+25. Chat avançado + busca
 
 v0.8
-27. "Jogando X"
-28. Refinos do screen share
-29. Moderação
+26. "Jogando X"
+27. Refinos do screen share
+28. Moderação
 
 v0.9
-30. Release Candidate
+29. Release Candidate
 
 v1.0
 ```

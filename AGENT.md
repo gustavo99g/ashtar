@@ -32,11 +32,12 @@ Aplicada em `media/`, `commands/` e nos arquivos-raiz.
   screen share, "v0.1"), com as decisões já tomadas registradas no topo.
 - [`NOTES.md`](NOTES.md) — checklist dos problemas conhecidos do protótipo, o que já foi resolvido
   e o que foi conscientemente adiado.
+- [`BACKLOG.md`](BACKLOG.md) — o que a fase anterior adiou, agrupado pela versão que deve recebê-lo.
 
 ### Raiz vs. `docs/`
 
 - **Raiz** = documentos de trabalho, estado atual da fase em andamento: `README.md`, `AGENT.md`,
-  `PLAN.md`, `NOTES.md`. Mudam a cada tarefa, ficam visiveis assim que alguem abre o repo.
+  `PLAN.md`, `NOTES.md`, `BACKLOG.md`. Mudam a cada tarefa, ficam visiveis assim que alguem abre o repo.
 - **`docs/`** = referencia/convencao, o que vale independente da fase (`commit-convention.md`,
   `rust-code-documentation.md`). Editado com pouca frequencia, consultado quando surge a duvida
   ("qual o padrao de commit?", "como documento unsafe aqui?").

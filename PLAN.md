@@ -16,10 +16,10 @@ funcionalidade nova de voz, e suporte a Linux e web (ver decisão 14 para os cui
 |---|---|---|
 | 1 | Preparação | Concluída |
 | 2 | Esqueleto do Rust | Concluída |
-| 3 | Captura desacoplada do destino | Em andamento (passos 0 a 9 concluídos) |
+| 3 | Captura desacoplada do destino | Concluída |
 | 4 | Contrato entre Rust e React | Concluída |
-| 5 | Frontend | Pendente |
-| 6 | Verificação | Pendente |
+| 5 | Frontend | Concluída |
+| 6 | Verificação | Concluída |
 
 ---
 
@@ -236,7 +236,7 @@ O compartilhamento oferece três presets, nomeados pelo uso na interface:
 **Lembrete de medição:** números de desempenho só valem em build de release; em dev o código próprio
 roda sem otimização.
 
-## Etapa 3: captura desacoplada do destino — em andamento
+## Etapa 3: captura desacoplada do destino — concluída
 
 A captura não pode saber se os dados vão para o IPC ou para o LiveKit.
 
@@ -505,7 +505,7 @@ fps em janelas. O teste `mede_o_wgc_de_uma_janela`, que a repetia, estava em `le
 e ficou no commit `90338d7` (o último antes da remoção). Se o plano do publicador nativo decidir usar o WGC
 como base de uma captura própria de janelas, é de lá que se recupera.
 
-## Etapa 5: frontend — pendente
+## Etapa 5: frontend — concluída
 
 ### 5.1 Estrutura
 
@@ -573,7 +573,7 @@ a partir do `MonitorInfo`), com os ícones vindos do Rust; os três presets de q
 com a descrição do selecionado; e a escolha de áudio. Escrito sabendo que, em algumas plataformas, o
 seletor será do sistema (decisão 14). O desenho de referência está no canvas de telas.
 
-## Etapa 6: verificação — pendente
+## Etapa 6: verificação — concluída
 
 1. Iniciar e parar o compartilhamento 20 vezes seguidas, inclusive clicando rápido; a memória do app
    volta ao patamar inicial.
@@ -591,6 +591,16 @@ seletor será do sistema (decisão 14). O desenho de referência está no canvas
    anotar CPU, memória e picotes, separadamente para os três presets. Registrar fps, maior intervalo
    entre frames e quantos intervalos passaram de 20, 34 e 50 ms, não só a média. Antes, confirmar a
    taxa real da fonte (um vídeo a 30 fps nunca vai medir 60). É a linha de base do plano seguinte.
+9. Gerar o app com `tauri build` e conferir o áudio do compartilhamento: no build de produção o worklet
+   vira uma URL `data:`, e não se sabe se o WebView2 a aceita (ver `NOTES.md`).
+
+**Resultado (2026-10-06):** o dono do projeto testou com amigos, num app gerado com `tauri build` (`.msi` e
+`-setup.exe` de 06/10), e deu a lista como concluída, com a exceção do eco no compartilhamento da tela
+inteira (adiado para a v0.2.3). É um relato: não há registro por item. O item 8 ficou sem as medições pedidas
+(CPU, memória e intervalos acima de 20, 34 e 50 ms); o que existe é o fps por preset em jogo (ADR 0009).
+A linha de base de desempenho está no `BACKLOG.md`, adiada para a v0.2.6.
+
+**Fase concluída (2026-10-06).** O que foi adiado está no `BACKLOG.md`.
 
 **Critério de pronto da fase:** todos os itens do `NOTES.md` resolvidos ou conscientemente adiados, a
 lista acima passando, e o provider sem nenhuma referência direta a generator, worklet ou comandos de
@@ -619,6 +629,8 @@ piso do que se vê com o espectador em outro computador). As linhas em release s
 referência. Detalhes, incluindo H.264 e simulcast, no [ADR 0009](docs/adr/0009-codec-e-bitrate-do-compartilhamento.md).
 
 ## Próximos passos (fora deste plano)
+
+O detalhe e as evidências de cada item adiado estão no `BACKLOG.md`.
 
 - Publicador nativo em Rust (conexão `{user_id}:screen`) e medição lado a lado com o caminho IPC.
 - Fps com jogos: a investigação mostrou que o limite é a captura (ADR 0009). Continuação: reduzir em BGRA

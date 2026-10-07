@@ -3,8 +3,13 @@
 Lista de verificação para a fase "reorganização + correções" (Etapas 1-6 do `PLAN.md`).
 Cada item deve ser resolvido ou conscientemente adiado (marcar como tal) antes de fechar a fase.
 
+**Fase concluída (2026-10-06).** Os itens adiados aparecem abaixo como concluídos, com um ponteiro; o texto
+completo e as evidências foram para o [`BACKLOG.md`](BACKLOG.md).
+
 Convenção: **Base pronta** indica que a peça nova que resolve o problema já existe, mas o problema só
 some de fato quando o código legado for substituído por ela.
+
+Um item adiado de propósito é marcado como concluído e leva **Adiado** com o destino (versão ou etapa).
 
 ## Rust — infraestrutura
 
@@ -29,12 +34,12 @@ some de fato quando o código legado for substituído por ela.
       achando que a captura estava ativa. **Resolvido em duas partes:** hook de panic com o nome da thread
       (Etapa 2) e `EndGuard` no `spawn_capture`, que encerra a captura com `EndReason::Error` mesmo em
       panic (Etapa 3, passo 2).
-- [ ] Erros de comando são `String` livre; frontend não consegue diferenciar casos (ex. "fonte fechada")
-      sem comparar texto de mensagem. **Base pronta:** `AppError` com `{ kind, message }` e `isAppError`
-      no `commands.ts`. Resolve de vez quando os comandos novos (Etapa 4) substituírem os legados.
-- [ ] Nenhuma garantia de que uma thread de captura esquecida realmente para (sem `Drop` no handle).
-      **Base pronta:** `CaptureHandle` com `Drop` que pede a parada. Resolve quando as capturas migrarem
-      para `spawn_capture` (Etapa 3, passos 5 e 6).
+- [x] Erros de comando são `String` livre; frontend não consegue diferenciar casos (ex. "fonte fechada")
+      sem comparar texto de mensagem. **Resolvido:** `AppError` com `{ kind, message }` e `isAppError`
+      no `commands.ts`; todos os comandos novos devolvem `AppError` e o `legacy/` saiu (Etapa 4.4).
+- [x] Nenhuma garantia de que uma thread de captura esquecida realmente para (sem `Drop` no handle).
+      **Resolvido:** `CaptureHandle` com `Drop` que pede a parada; as capturas de vídeo e de áudio rodam
+      sobre `spawn_capture`, e soltar o manager para as capturas (teste `soltar_o_manager_para_as_capturas`).
 - [x] Código legado com declarações FFI à mão e dependências que saem com ele (`windows-capture`,
       `fast_image_resize`). **Resolvido:** o `legacy/` foi removido (Etapa 4.4), com o `windows-capture`. O
       `fast_image_resize` ficou no `Cargo.toml`, sem uso, para o teste do item do resize (mais abaixo).
@@ -53,10 +58,11 @@ some de fato quando o código legado for substituído por ela.
       `None` para o PID do próprio processo. Verificação com o app rodando na Etapa 6, item 7.
 - [x] Declarações FFI feitas à mão no `sources.rs`. **Resolvido:** código novo de listagem usa
       `windows-sys`, com guards RAII (`ScreenDc`, `GdiObject`) e teste de vazamento de objetos GDI.
-- [ ] Ids de monitor: o protótipo usava `HMONITOR`, mas o `DesktopCapturer` identifica telas pelo índice
+- [x] Ids de monitor: o protótipo usava `HMONITOR`, mas o `DesktopCapturer` identifica telas pelo índice
       do `EnumDisplayDevicesW`. **Implementado:** monitores vêm do `DesktopCapturer` e são enriquecidos
-      pelo nome do dispositivo (`monitor.rs`), com teste ignorado de mapeamento. **Falta:** confirmar com
-      dois monitores conectados antes de marcar como resolvido.
+      pelo nome do dispositivo (`monitor.rs`), com teste ignorado de mapeamento. **Confirmado** com dois
+      monitores nesta máquina: `imprime_fontes` lista a Tela 1 (principal, 1080p em 0,0) e a Tela 2
+      (3840×2160 em x=1920, y=-183), e capturar o id 1 entrega os 3840×2160 da segunda tela.
 
 ## Rust — captura de vídeo
 
@@ -69,116 +75,85 @@ some de fato quando o código legado for substituído por ela.
       por outro sink sem duplicar a captura. **Resolvido:** traits `VideoSink`/`AudioSink`, a captura de
       áudio e de vídeo sobre eles e os sinks do IPC (`IpcVideoSink`, `IpcAudioSink`); os passos 5 a 7 da
       Etapa 3 estão concluídos, e o app usa só os comandos novos desde a remoção do `legacy/` (Etapa 4.4).
-- [ ] Loop de captura sem controle de taxa: chama `capture_frame` o mais rápido que o ACK permite
+- [x] Loop de captura sem controle de taxa: chama `capture_frame` o mais rápido que o ACK permite
       (~43 fps com a tela parada), gastando CPU com frames idênticos. Corrigir com agendamento por
       deadline no `video_capture.rs`.
-      **Base pronta:** `video_capture.rs` com deadline (um frame por intervalo, sem acumular atraso) e
-      respeito ao `FrameGate`. Resolve quando os comandos novos o usarem (Etapa 4).
-- [ ] Conversão para I420 ignora o stride do frame (assume `width * 4`), o que pode inclinar a imagem
+      **Resolvido:** `video_capture.rs` com deadline (um frame por intervalo, sem acumular atraso) e
+      respeito ao `FrameGate`. Nos testes de 05 e 06/10 o Nitidez parou nos 30 fps do preset (ADR 0009).
+- [x] Conversão para I420 ignora o stride do frame (assume `width * 4`), o que pode inclinar a imagem
       quando a textura tem padding no fim das linhas.
-      **Base pronta:** `to_i420` passa `frame.stride()` ao libyuv, e o empacotamento do `IpcVideoSink`
+      **Resolvido:** `to_i420` passa `frame.stride()` ao libyuv, e o empacotamento do `IpcVideoSink`
       descarta o padding (testado com stride maior que a largura). A conversão BGRA → I420 não tem teste
-      automático do stride, porque não dá para montar um `DesktopFrame` num teste.
-- [ ] Redução da imagem no caminho do IPC. O legado reduzia em BGRA com `fast_image_resize` e
-      `ResizeAlg::Nearest`, depois de copiar o frame inteiro (`frame.data().to_vec()`); isso saiu com o
-      `legacy/`. O caminho novo converte para I420 e reduz com o `scale` do libyuv (mais legível para texto).
-      **Base pronta:** `to_i420` converte em resolução cheia e reduz com o `scale` do I420 só quando o
-      frame passa da caixa do preset (`fit_in_box`).
-      **Medido (2026-10-05/06, release):** a premissa de que isso é "mais rápido" não se confirmou. No 1080p
-      o `scale` custa 5–10 ms, cerca de metade do `capture_frame`, e a conversão de cor só 2–3 ms. A causa não
-      foi isolada (uma hipótese, não verificada, é o filtro do `scale`; o legado usava `Nearest`). Próximo
-      teste: reduzir em BGRA antes de converter, com o `fast_image_resize`, que por isso continua no
-      `Cargo.toml`, sem uso desde a remoção do `legacy/` (ADR 0009).
-- [ ] Timestamps a partir de `SystemTime` (relógio de parede, pode pular). Usar `Instant`.
-      **Base pronta:** `video_capture.rs` usa `Instant`, contado desde o início da captura.
-- [ ] Loop de captura não trata "fonte fechada": quando a janela compartilhada é fechada, o capturer passa
+      automático do stride, porque não dá para montar um `DesktopFrame` num teste; nenhuma imagem inclinada
+      foi relatada nos testes de 05 e 06/10.
+- [x] Redução da imagem no caminho do IPC.
+      **Adiado** para a v0.2.6; texto completo e evidências no `BACKLOG.md`.
+- [x] Timestamps a partir de `SystemTime` (relógio de parede, pode pular). Usar `Instant`.
+      **Resolvido:** `video_capture.rs` usa `Instant`, contado desde o início da captura.
+- [x] Loop de captura não trata "fonte fechada": quando a janela compartilhada é fechada, o capturer passa
       a retornar erro em todo frame e o log cresce indefinidamente. Corrigir com ~30 erros consecutivos →
       `EndReason::SourceClosed`.
-      **Base pronta:** para janelas, o `window_state` (`IsWindow`/`IsIconic`) é conferido a cada volta e a
+      **Resolvido:** para janelas, o `window_state` (`IsWindow`/`IsIconic`) é conferido a cada volta e a
       captura encerra com `SourceClosed` quando a janela some; o WGC do libwebrtc não avisa (ADR 0008).
       Para telas, 1 s de falhas seguidas dispara a conferência da lista de fontes do capturer; se a fonte
       sumiu, encerra com `SourceClosed` (critério diferente dos ~30 erros do plano inicial, para não
-      confundir janela fechada com minimizada).
-- [ ] `in_flight` do caminho IPC é um contador sem sinal que pode dar a volta com um ACK duplicado,
-      fechando o portão para sempre. **Base pronta:** `FrameGate` com decremento que para no zero.
+      confundir janela fechada com minimizada). Teste: `fonte_fechada_encerra_a_sessao`; a UI voltar a
+      `idle` é o item 4 da Etapa 6.
+- [x] `in_flight` do caminho IPC é um contador sem sinal que pode dar a volta com um ACK duplicado,
+      fechando o portão para sempre. **Resolvido:** `FrameGate` com decremento que para no zero.
       O `IpcVideoSink` usa o `FrameGate` e entra nele (`enter`) antes do envio, o que evita perder uma vaga
-      quando o ACK chega antes de o `send` terminar; se o envio falha, a vaga volta. Continua faltando o
-      `ipc_screen_share_ack` ignorar ACKs de sessões antigas (Etapa 4).
+      quando o ACK chega antes de o `send` terminar; se o envio falha, a vaga volta. O
+      `ScreenShareManager::ack` ignora ACKs de sessões antigas (teste `ignora_parada_e_ack_de_sessao_antiga`).
 
 ## Rust — captura de áudio
 
-- [ ] Captura de áudio (WASAPI) usa polling em vez de modo por eventos.
-      **Base pronta:** `audio_capture.rs` usa o modo por eventos. Resolve quando os comandos novos a
-      usarem (Etapa 4).
-- [ ] Buffer de captura de 20 ms, apertado demais: qualquer atraso da thread perde amostras. Usar 100 ms
+- [x] Captura de áudio (WASAPI) usa polling em vez de modo por eventos.
+      **Resolvido:** `audio_capture.rs` usa o modo por eventos (`EventsShared`).
+- [x] Buffer de captura de 20 ms, apertado demais: qualquer atraso da thread perde amostras. Usar 100 ms
       (em captura compartilhada, buffer maior não adiciona latência).
-      **Base pronta:** buffer de 100 ms em `audio_capture.rs`. Resolve quando os comandos novos a usarem
-      (Etapa 4).
-- [ ] Flag de silêncio (`AUDCLNT_BUFFERFLAGS_SILENT`) ignorada: o conteúdo desses pacotes deve ser zerado.
-      **Base pronta:** pacotes marcados como silenciosos chegam ao sink como zeros. Resolve quando os
-      comandos novos a usarem (Etapa 4).
-- [ ] Sem log de descontinuidade (glitch/drop) na captura de áudio.
-      **Base pronta:** `warn!` quando o WASAPI sinaliza descontinuidade. Resolve quando os comandos novos
-      a usarem (Etapa 4).
-- [ ] Inicialização da captura de áudio não é determinística no lado do chamador: erros de inicialização
-      aparecem depois do comando já ter retornado sucesso. **Base pronta:** `spawn_capture` com
-      `ReadySignal` (dispensa o oneshot do `tokio`).
-- [ ] Modo de áudio `System` recebe `process_id` do frontend para decidir o que excluir; deveria usar
+      **Resolvido:** buffer de 100 ms em `audio_capture.rs`.
+- [x] Flag de silêncio (`AUDCLNT_BUFFERFLAGS_SILENT`) ignorada: o conteúdo desses pacotes deve ser zerado.
+      **Resolvido:** pacotes marcados como silenciosos chegam ao sink como zeros.
+- [x] Sem log de descontinuidade (glitch/drop) na captura de áudio.
+      **Resolvido:** `warn!` quando o WASAPI sinaliza descontinuidade.
+- [x] Inicialização da captura de áudio não é determinística no lado do chamador: erros de inicialização
+      aparecem depois do comando já ter retornado sucesso. **Resolvido:** `spawn_capture` com
+      `ReadySignal` (dispensa o oneshot do `tokio`); o `start` só responde depois de a captura iniciar.
+- [x] Modo de áudio `System` recebe `process_id` do frontend para decidir o que excluir; deveria usar
       `std::process::id()` automaticamente. `AudioMode` passa para o formato com tag (`PLAN.md`,
       decisão 3).
-      **Base pronta:** `spawn_audio_capture` usa `std::process::id()` no modo `System` e recusa capturar o
-      próprio processo. Resolve quando os comandos novos a usarem (Etapa 4).
-- [ ] Eco no compartilhamento da tela inteira com "Todo o sistema". Num teste com amigos (2026-10-06), um
-      amigo compartilhou o monitor e quem assistia ouviu a própria voz; só mutar o próprio microfone
-      parava. Fica para a v0.2 (v0.2.3 do `docs/roadmap.md`).
-      **Evidências (medidas nesta máquina; o teste do Brave rodou no perfil de debug, a árvore do app foi vista no
-      executável de release):**
-      - O código exclui o PID do app (`std::process::id()`) com `EXCLUDE_TARGET_PROCESS_TREE`; conferido na
-        crate `wasapi` (`include_tree = false`).
-      - Com uma instância, o WebView2 do app é todo descendente do `desktop.exe`: o `browser` é filho dele;
-        renderer, GPU, rede e armazenamento, filhos do `browser`.
-      - Um Brave isolado tocando um tom (mesma arquitetura de áudio do WebView2, com o
-        `audio.mojom.AudioService` filho da raiz): excluir a raiz funciona. RMS 0,0022 com o tom excluído,
-        contra 0,0021 de fundo sem tom e 0,0046 com o tom incluído.
-      - **Com duas instâncias do app abertas há um só conjunto de processos do WebView2, e ele pertence à
-        primeira** (a pasta de dados é a mesma, `%LOCALAPPDATA%\gustavo99g\EBWebView`). Com `desktop.exe` 25504
-        e 2436, os dois renderizadores ficaram sob o 25504 e nada sob o 2436. Para a segunda instância,
-        excluir o próprio PID não exclui nenhum processo do WebView2: a chamada entra no loopback.
-      **Não verificado:** se o amigo tinha duas instâncias (ou um WebView2 remanescente de uma execução
-      anterior) abertas. Outra explicação possível é o eco acústico (a voz sai da caixa de som e volta pelo
-      microfone dele); mutar o próprio microfone resolveria nos dois casos, então isso não distingue. Teste
-      para separar: o amigo compartilha com "Sem áudio"; se o eco continuar, vem do microfone dele. Também
-      não se observou o processo de áudio do WebView2 do próprio app tocando.
-      **Ideia de correção (não implementada):** excluir o processo-navegador real do WebView2
-      (`ICoreWebView2::BrowserProcessId`, obtido pelo `with_webview` do Tauri; existe no webview2-com 0.38.2)
-      em vez do PID do app, caindo no PID do app se não for possível obtê-lo. Assim a segunda instância
-      exclui a árvore do navegador que ela de fato usa. Mexe na assinatura do `start` do manager e em
-      `commands/screen_share.rs`. O teste `mede_a_exclusao_de_um_chromium` (ignorado) repete a medição com
-      qualquer Chromium tocando áudio (`EXCLUDE_PID=<pid da raiz>`).
-- [ ] Parar e iniciar em seguida pode falhar com "já existe uma captura ativa", porque o slot só é
+      **Resolvido:** `spawn_audio_capture` usa `std::process::id()` no modo `System` e recusa capturar o
+      próprio processo. Atenção: o PID do app não cobre o WebView2 de uma segunda instância (item do eco,
+      logo abaixo).
+- [x] Eco no compartilhamento da tela inteira com "Todo o sistema".
+      **Adiado** para a v0.2.3; texto completo e evidências no `BACKLOG.md`.
+- [x] Parar e iniciar em seguida pode falhar com "já existe uma captura ativa", porque o slot só é
       liberado quando a thread percebe a parada. Resolve com o `session.rs` (remover a sessão na hora).
-      **Base pronta:** o `ScreenShareManager::stop` remove a sessão na hora, antes de esperar as threads, e
-      um novo início já funciona (testado). Resolve quando os comandos novos o usarem (Etapa 4).
-- [ ] Áudio da captura é enviado ao frontend serializado como JSON (via `Channel<Vec<u8>>`) em vez de
+      **Resolvido:** o `ScreenShareManager::stop` remove a sessão na hora, antes de esperar as threads, e
+      um novo início já funciona (teste `recusa_inicio_duplo_e_libera_na_hora_da_parada`). O teste de
+      20 inícios e paradas seguidos (Etapa 6, item 1) foi dado como concluído pelo dono, sem registro.
+- [x] Áudio da captura é enviado ao frontend serializado como JSON (via `Channel<Vec<u8>>`) em vez de
       bytes crus (`InvokeResponseBody::Raw`).
-      **Base pronta:** `IpcAudioSink` envia os f32 como `InvokeResponseBody::Raw`. Resolve quando os
-      comandos novos o usarem (Etapa 4).
-- [ ] Imports e dependência do `hound` sem uso. (Verificar se já saiu na Etapa 2.)
+      **Resolvido:** `IpcAudioSink` envia os f32 como `InvokeResponseBody::Raw`.
+- [x] Imports e dependência do `hound` sem uso. **Resolvido:** não há referência a `hound` no `Cargo.toml`
+      nem em `src/`.
 
 ## Rust — sessão
 
-- [ ] Início de sessão (vídeo + áudio) não é atômico: se o áudio falha depois do vídeo já ter subido, a
+- [x] Início de sessão (vídeo + áudio) não é atômico: se o áudio falha depois do vídeo já ter subido, a
       limpeza da metade que subiu fica a cargo do JavaScript — origem de vazamentos observados.
       Resolve com o `session.rs` (`PLAN.md`, decisão 6).
-      **Base pronta:** `ScreenShareManager::start_with` sobe o vídeo e depois o áudio; se o áudio falha, o
-      vídeo já iniciado é parado e o erro volta (testado). Resolve quando os comandos novos o usarem
-      (Etapa 4).
-- [ ] Comportamento indefinido quando o app de origem do áudio fecha. **Decidido:** o vídeo continua e o
+      **Resolvido:** `ScreenShareManager::start_with` sobe o vídeo e depois o áudio; se o áudio falha, o
+      vídeo já iniciado é parado e o erro volta (teste `falha_do_audio_desfaz_o_video`).
+- [x] Comportamento indefinido quando o app de origem do áudio fecha. **Decidido:** o vídeo continua e o
       evento `screen-share-audio-ended` é emitido (`PLAN.md`, decisão 7). Registrar na Etapa 6 se o
       WASAPI reporta erro ou só para de entregar pacotes.
       **Base pronta:** o `ScreenShareManager` descarta o handle de áudio, avisa `ShareEvent::AudioEnded` e
-      mantém o vídeo (testado com uma captura falsa). Resolve quando os comandos novos o usarem (Etapa 4).
-      A verificação com o WASAPI de verdade continua pendente.
+      mantém o vídeo (testado com uma captura falsa); o app já usa os comandos novos. A verificação com o
+      WASAPI de verdade: o dono testou (Etapa 6, item 5) e a transmissão continuou, como decidido. Não foi
+      registrado se o WASAPI devolveu erro ou só parou de entregar pacotes. Pelo código, só o erro de leitura
+      encerra a captura de áudio e dispara `screen-share-audio-ended` (um timeout de espera só reconfere o
+      `stop`): se foi só silêncio, a UI continua dizendo que há áudio.
 
 ## Frontend
 
@@ -196,8 +171,8 @@ some de fato quando o código legado for substituído por ela.
       do próprio `VideoFrame`; o provider usa o controller (Etapa 5.5).
 - [x] Sem proteção contra início duplo do compartilhamento (cliques rápidos/repetidos).
       **Resolvido:** `IpcScreenShare` reserva a sessão antes de qualquer `await` e ignora `start` enquanto
-      existir uma (inclusive durante o teardown); o provider usa o controller (Etapa 5.5). Falta o teste de
-      20 inícios e paradas seguidos (Etapa 6, item 1).
+      existir uma (inclusive durante o teardown); o provider usa o controller (Etapa 5.5). O teste de
+      20 inícios e paradas seguidos (Etapa 6, item 1) foi dado como concluído pelo dono, sem registro.
 - [x] `screenShareAudioRef` só é atribuído depois do `publishTrack` do áudio: se a publicação falhar, o
       cleanup não encontra o áudio e a captura no Rust continua rodando.
       **Resolvido:** as trilhas entram em `session.published` antes do `publishTrack`, então o teardown
@@ -207,7 +182,7 @@ some de fato quando o código legado for substituído por ela.
       `AudioContext` não são liberados; chamar `stop()` duas vezes lança erro no `context.close()`.
       **Resolvido:** `ScreenShareAudio.close()` é idempotente e nunca rejeita, e não depende de nenhuma
       chamada ao Rust; o provider usa o controller (Etapa 5.5).
-- [ ] `AudioWorkletProcessor` aloca dentro de `process()` e não implementa um jitter buffer de verdade
+- [x] `AudioWorkletProcessor` aloca dentro de `process()` e não implementa um jitter buffer de verdade
       (sem acúmulo inicial, sem descarte de amostras antigas) — causa estalos/latência variável.
       **Base pronta:** `jitter-buffer.worklet.js` com anel pré-alocado de 1 s, acúmulo inicial de 50 ms,
       descarte acima de 150 ms e nada alocado no `process()`. Falta validar o áudio num app empacotado
@@ -215,7 +190,9 @@ some de fato quando o código legado for substituído por ela.
       abaixo do limite de 4 KB de inline do Vite; a CSP do app é `null`), e não se sabe se o WebView2 aceita
       `audioWorklet.addModule` com ela. As estatísticas do buffer só saem em `import.meta.env.DEV`, então os
       testes de 05 e 06/10 provavelmente rodaram com o frontend em modo dev (inferência). Se falhar, servir o
-      worklet como arquivo (`public/`).
+      worklet como arquivo (`public/`). **Resolvido (relato do dono, 2026-10-06):** o app gerado com
+      `tauri build` foi usado nos testes com amigos, e o áudio do compartilhamento chegou a quem assistia (foi
+      assim que o eco apareceu), então o worklet `data:` funcionou no WebView2. Sem registro mais detalhado.
 - [x] Deafen só cancela a assinatura das trilhas existentes no momento do clique: quem entra depois é
       ouvido. `RoomAudioRenderer` não usa `muted={isDeafened}`, e o undeafen não restaura o mute anterior.
       **Resolvido:** o `VoiceProvider` usa `RoomAudioRenderer muted={isDeafened}` (vale também para quem
@@ -243,41 +220,40 @@ some de fato quando o código legado for substituído por ela.
       **Resolvido:** `IpcScreenShare` escuta `screen-share-audio-ended`, despublica a trilha de áudio e
       passa o estado para `audio: "lost"`, e `components/voice/main` mostra "O áudio parou. O vídeo continua
       sendo transmitido." Ainda não visto acontecendo com um app de verdade (Etapa 6, item 5).
-- [ ] `requestVoiceToken` (`features/voice/VoiceProvider.tsx`) usa uma identidade falsa nova a cada entrada
-      (`idiot-<uuid>`), e o `fetch` não tem timeout. A v0.1 pede nome escolhido na primeira abertura, id por
-      instalação e código de acesso (`docs/roadmap.md`).
-      **Resolvido nesta parte:** a URL da API vem de `VITE_API_URL` (`lib/config.ts`), gravada no build. Em
+- [x] `requestVoiceToken` (`features/voice/VoiceProvider.tsx`) usava a URL fixa `http://127.0.0.1:3000`.
+      **Resolvido:** a URL da API vem de `VITE_API_URL` (`lib/config.ts`), gravada no build. Em
       desenvolvimento, sem a variável, usa `http://127.0.0.1:3000`; num app gerado ela é obrigatória. A API
       só escuta em `127.0.0.1:3000` (`api/src/main.rs`): para outras máquinas é preciso encaminhar a porta.
+- [x] Identidade falsa nova a cada entrada (`idiot-<uuid>`).
+      **Adiado** para a v0.2.2; texto completo e evidências no `BACKLOG.md`.
+- [x] O `fetch` do token não tem timeout.
+      **Adiado** para o resto da v0.1; texto completo e evidências no `BACKLOG.md`.
+- [x] O código de acesso da API não existe.
+      **Adiado** para o resto da v0.1; texto completo e evidências no `BACKLOG.md`.
 - [x] Código do frontend sem uso: `providers/voiceProvider.tsx`, `hooks/useVoice.tsx`,
       `components/voice/screenSharePicker`, `components/shareText` e `lib/audio`, mais os wrappers legados
       do `commands.ts`. **Resolvido:** removidos na Etapa 4.4. Com eles saiu a contradição com o
       `ARCHITECTURE.md`: hoje só o `commands.ts` importa `@tauri-apps/api`. A regra do ESLint ainda só
       restringe o `invoke` (não o `Channel` nem o `listen`); estendê-la ficou pendente.
-- [ ] O seletor (`SourcePicker`) e a trava de uma transmissão por vez (`ScreenShareButton`) existem e foram
-      usados nos testes de 05 e 06/10 (ADR 0009). A trava só considera tracks já assinados e não impede duas
-      pessoas de iniciarem ao mesmo tempo; o erro de início não tem como ser dispensado. A UI de voz é
-      provisória.
-- [ ] Janelas minimizadas não aparecem no seletor. Não é bug nosso: o libwebrtc as descarta da lista
-      (`IsIconic`) e também não as captura, e o `CaptureSource` só sai dessa lista (medido: o `start` de uma
-      janela minimizada devolve `SourceNotFound`). O seletor recarrega a lista a cada 2 s (ao fim de cada
-      pedido, sem acumular), então uma janela restaurada aparece sem reabrir. Adiado: lista própria com
-      `EnumWindows`, selo "Minimizada" e restauração da janela ao escolher (contraria a decisão 2 do PLAN).
-      A lista leva ~95 ms com 4 janelas (release), por causa dos ícones: remedir com muitas janelas.
-- [ ] Os textos dos presets (`presets.ts`) prometem mais fluidez do que o medido em jogo: o Equilibrado ("sem
-      perder fluidez") ficou em 25–34 fps e o Nitidez em 18–25 fps, abaixo dos 30 do próprio nome (ADR 0009).
-- [ ] A divisão do `capture_frame` em readback, redução e conversão (ADR 0009) vem de uma instrumentação que
-      não está no repositório: os logs de tempo por etapa foram removidos (estão no commit `d418b00`). Para
-      repetir a medição, recolocar os logs ou deixar um cronômetro permanente no target `perf`.
+- [x] Seletor e trava de uma transmissão por vez: limitações.
+      **Adiado** para a v0.2.4; texto completo e evidências no `BACKLOG.md`.
+- [x] Janelas minimizadas não aparecem no seletor.
+      **Adiado** para a v0.2.4; texto completo e evidências no `BACKLOG.md`.
+- [x] Os textos dos presets prometem mais fluidez do que o medido.
+      **Adiado** para a v0.2.4; texto completo e evidências no `BACKLOG.md`.
+- [x] A divisão do `capture_frame` não tem instrumentação no repositório.
+      **Adiado** para a v0.2.6; texto completo e evidências no `BACKLOG.md`.
 
 ## Para verificar na Etapa 6
 
-- [ ] Comportamento com o app minimizado: frames de vídeo e blocos de áudio passam pela thread principal
+- [x] Comportamento com o app minimizado: frames de vídeo e blocos de áudio passam pela thread principal
       do webview, que o WebView2 pode desacelerar. Se degradar, testar `additionalBrowserArgs` com
       `--disable-background-timer-throttling --disable-renderer-backgrounding
       --disable-backgrounding-occluded-windows` (mantendo os argumentos padrão do Tauri).
-- [ ] Linha de base de desempenho em build de release, separada para os três presets de qualidade
-      (decisão 16 do PLAN.md).
+      **Resolvido (relato do dono, 2026-10-06):** nenhuma degradação foi relatada nos testes com amigos; não
+      houve medição, então os argumentos acima não foram necessários até agora.
+- [x] Linha de base de desempenho em release, por preset.
+      **Adiado** para a v0.2.6; texto completo e evidências no `BACKLOG.md`.
 
 ## Limitações conhecidas (não são bugs)
 
@@ -290,26 +266,8 @@ some de fato quando o código legado for substituído por ela.
 - `MediaStreamTrackGenerator` é uma API não padronizada do Chromium; funciona no WebView2 hoje, mas pode
   mudar. O publicador nativo do próximo plano elimina essa dependência.
 
-## Fora do escopo desta fase (adiado conscientemente)
+## Queda de fps em janelas (resolvido, com as medições)
 
-- Publicador de vídeo/áudio nativo em Rust (fica para o próximo plano). Ele precisa de duas peças:
-  1. **Redução na GPU antes de copiar para a memória**, para janelas em 4K cheio: readback (~7 ms) mais
-     conversão (~10 ms) somam ~17 ms, mais que os 16,7 ms de um frame a 60 fps. Combina com o encoder
-     por hardware, que também põe a GPU no caminho.
-  2. **O publicador em si.** O teto de ~43 fps do ACK era de dev e do caminho antigo; em release ele não
-     aparece (envio de ~0,1 ms por frame, e `max_in_flight` maior não ganhou nada; ADR 0009). O ganho do
-     publicador não é tirar esse teto, e sim abrir caminho para o encoder por hardware e para a redução
-     na GPU.
-
-  Uma terceira peça, a captura própria de janelas com o `windows-capture`, estava prevista e **deixou de
-  ser necessária**: o atraso das janelas vinha de o libwebrtc cair no GDI por falta de COM na thread, e o
-  passo 9 corrigiu isso (ver o item da queda de fps em janelas, abaixo, e o ADR 0008).
-
-  Pontos para observar depois do passo 9: janela parada custa uma conversão por volta, mesmo sem mudança
-  (expor o `updated_region` exigiria mexer no `webrtc-sys`); jogos em tela cheia exclusiva podem não ser
-  capturáveis como janela (o contorno é compartilhar a tela); conteúdo com DRM sai preto também no WGC.
-- Medição/comparação de desempenho estruturada (fica para o próximo plano; a Etapa 6 só coleta a
-  linha de base).
 - Queda de fps na captura de **janelas** (antes registrada como "queda com jogos": ~18–20 fps em dev,
   quedas até 10). Medido em release, sem IPC, só com o `LogVideoSink`.
 
@@ -373,9 +331,7 @@ some de fato quando o código legado for substituído por ela.
   em 3 execuções e a causa não foi identificada. Os logs de tempo por etapa (`capture_frame` e
   conversão, target `perf`) foram usados nessa medição e depois removidos do código; estão no commit
   `d418b00` (`video_capture.rs`), caso seja preciso repetir.
-- Miniaturas no seletor de fontes. Enquanto isso, o seletor mostra só ícones. Pontos do código de preview
-  do protótipo a corrigir quando voltarem ao escopo: previews enviados como `Vec<u8>` em JSON e uma
-  sessão WGC aberta por janela.
-- Aviso de possível conteúdo protegido (frames totalmente pretos por vários segundos).
-- Suporte a Linux (risco principal: WebRTC no WebKitGTK) e versão web.
-- Qualquer funcionalidade nova de voz além do que já existe.
+
+## Adiado para a próxima etapa
+
+Tudo que foi adiado conscientemente ao fechar esta fase está no [`BACKLOG.md`](BACKLOG.md).
