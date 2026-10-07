@@ -190,5 +190,6 @@ Os logs usam o `tracing`, configurado pela variável `RUST_LOG`. Em dev, o padr�
 | O que esta função faz e o que não posso fazer com ela? | `///`, com as seções `# Bloqueia` e `# Panics` |
 | Por que este `unsafe` é seguro? | `// SAFETY:` acima do bloco |
 | O que está sendo feito agora? | `PLAN.md` e `NOTES.md` da versão atual |
+| O que foi feito nas fases anteriores? | `docs/plans/` |
 
 Documentação é atualizada no mesmo commit da mudança que a afeta.

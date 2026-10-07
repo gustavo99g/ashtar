@@ -1,5 +1,5 @@
 /**
- * Presets de qualidade do compartilhamento (decisão 16 do PLAN.md).
+ * Presets de qualidade do compartilhamento (decisão 16 do docs/plans/v0.1-reorganizacao.md).
  *
  * O Rust recebe só a chave (`720p60`...) e decide a caixa máxima, o fps da captura e o limite do
  * `FrameGate` (`media/quality.rs`). Daqui saem os textos do seletor e a configuração do encoder

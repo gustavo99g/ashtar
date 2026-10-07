@@ -1,6 +1,6 @@
 //! `CapturedFrame` e os traits que a captura usa para entregar dados, sem
 //! saber se o destino é o IPC ou um publicador nativo (decisão 12 do
-//! `PLAN.md`). `push` recebe `&CapturedFrame`/`&[f32]` (referência, não
+//! `docs/plans/v0.1-reorganizacao.md`). `push` recebe `&CapturedFrame`/`&[f32]` (referência, não
 //! posse), para permitir reenviar o último frame e, no futuro, um `TeeSink`
 //! que alimenta publicador e preview ao mesmo tempo sem copiar.
 

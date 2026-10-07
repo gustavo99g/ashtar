@@ -89,7 +89,7 @@ preset (`presets.ts`), pronto para trocar. O limite de frames em trânsito do `F
   aceitável; vale reavaliar se o teste real mostrar espectadores com conexão fraca.
 - **As descrições dos presets prometem mais do que o medido em jogo:** o Equilibrado ("sem perder fluidez")
   ficou em 25–34 fps e o Nitidez em 18–25 fps, abaixo dos 30 do próprio nome.
-- **O teto de ~43 fps do IPC (decisão 16 do `PLAN.md`) não aparece em release.** O envio custa ~0,1 ms por
+- **O teto de ~43 fps do IPC (decisão 16 de `docs/plans/v0.1-reorganizacao.md`) não aparece em release.** O envio custa ~0,1 ms por
   frame e `max_in_flight` maior não ganhou nada; aqueles ~43 fps eram de dev e do caminho antigo.
 - **Contorno para quem quiser mais fps hoje:** compartilhar a tela em vez da janela, ou usar um preset de
   resolução menor.

@@ -64,7 +64,7 @@ fn capturer_sources(kind: dc::DesktopCaptureSourceType) -> Result<Vec<(u64, Stri
 /// Lista os monitores e janelas que podem ser compartilhados.
 ///
 /// O DesktopCapturer eh a fonte da verdade de quais fontes existem e de
-/// seus ids (decisao 2 do PLAN.md); a plataforma so complementa cada item
+/// seus ids (decisao 2 do docs/plans/v0.1-reorganizacao.md); a plataforma so complementa cada item
 /// (PID, icone, geometria do monitor). Uma janela que a plataforma decide
 /// esconder (window_details devolvendo None) simplesmente nao entra na lista.
 ///

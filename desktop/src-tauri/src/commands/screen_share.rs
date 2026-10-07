@@ -1,4 +1,4 @@
-//! Comandos do compartilhamento de tela (Etapa 4 do `PLAN.md`).
+//! Comandos do compartilhamento de tela (Etapa 4 do `docs/plans/v0.1-reorganizacao.md`).
 //!
 //! O prefixo `ipc_` marca o que é específico do caminho atual (frames pelo
 //! IPC do Tauri). `list_capture_sources`, `screen_share_stop` e os eventos de
@@ -37,9 +37,9 @@ pub struct StartOptions {
     pub audio: AudioMode,
 }
 
-/// Nome do evento de fim da sessão (contrato com o frontend, `PLAN.md` 4.2).
+/// Nome do evento de fim da sessão (contrato com o frontend, `docs/plans/v0.1-reorganizacao.md` 4.2).
 pub const SCREEN_SHARE_ENDED: &str = "screen-share-ended";
-/// Nome do evento de fim só do áudio (contrato com o frontend, `PLAN.md` 4.2).
+/// Nome do evento de fim só do áudio (contrato com o frontend, `docs/plans/v0.1-reorganizacao.md` 4.2).
 pub const SCREEN_SHARE_AUDIO_ENDED: &str = "screen-share-audio-ended";
 
 /// Motivo do fim, como o frontend recebe.
@@ -221,7 +221,7 @@ mod tests {
 
     #[test]
     fn nomes_dos_eventos_seguem_o_contrato() {
-        // O frontend escuta estes nomes (`PLAN.md`, 4.2). Mudar um lado sem o outro quebra em
+        // O frontend escuta estes nomes (`docs/plans/v0.1-reorganizacao.md`, 4.2). Mudar um lado sem o outro quebra em
         // silêncio: o evento sairia, e ninguém o ouviria.
         assert_eq!(SCREEN_SHARE_ENDED, "screen-share-ended");
         assert_eq!(SCREEN_SHARE_AUDIO_ENDED, "screen-share-audio-ended");

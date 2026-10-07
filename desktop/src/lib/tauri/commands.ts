@@ -4,7 +4,7 @@
  * `no-restricted-imports` do ESLint garante isso (ver eslint.config.js).
  *
  * Cada comando Tauri ganha um wrapper tipado aqui. Os comandos rejeitam a Promise com um `AppError`
- * (Etapa 2.2 do PLAN.md); o `call()` converte qualquer outra rejeição (por exemplo, um erro do próprio
+ * (Etapa 2.2 do docs/plans/v0.1-reorganizacao.md); o `call()` converte qualquer outra rejeição (por exemplo, um erro do próprio
  * Tauri, que chega como `string`) para o mesmo formato.
  */
 import { Channel, type InvokeArgs, invoke } from "@tauri-apps/api/core";

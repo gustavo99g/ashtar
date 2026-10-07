@@ -125,7 +125,7 @@ atualização para a v0.2 será uma reinstalação manual.
 
 ### Screen Share
 
-* reorganização do compartilhamento de tela (Etapas 3 a 6 do [`PLAN.md`](../PLAN.md));
+* reorganização do compartilhamento de tela (Etapas 3 a 6 do [`plans/v0.1-reorganizacao.md`](plans/v0.1-reorganizacao.md));
 * iniciar, parar e receber transmissão;
 * exibir participante que está compartilhando;
 * áudio da fonte escolhida, quando disponível;
@@ -139,20 +139,25 @@ O mínimo para o aplicativo funcionar fora da rede local sem quebrar:
 * URL da API configurável por ambiente;
 * identidade provisória: cada entrada gera um id aleatório novo (`idiot-<uuid>`), o que evita colisão no
   LiveKit; o nome escolhido e o id por instalação ficam para a v0.2.2;
-* código de acesso compartilhado, conferido pela API antes de emitir o token do LiveKit, para que
-  quem descobrir a URL do túnel não consuma a cota;
-* logs em arquivo, para investigar problemas na máquina de cada um.
+* ~~código de acesso compartilhado, conferido pela API antes de emitir o token do LiveKit~~:
+  **adiado para a v0.2.2**, em que a identidade do dispositivo fecha o acesso de vez. Até lá, quem
+  descobrir a URL da API consegue tokens e consome a cota;
+* ~~logs em arquivo~~: **adiado para a v0.2.0**, junto com a base de entrega.
+
+O grupo já recebeu o executável desta versão (2026-10-06); os dois itens adiados foram decididos
+depois disso, para não exigir uma nova distribuição manual antes do auto-update.
 
 ## API
 
 * `/health`;
-* geração de token do LiveKit, protegida pelo código de acesso;
+* geração de token do LiveKit (sem proteção até a v0.2.2);
 * chaves do LiveKit somente no backend;
-* exposta pelo Cloudflare Tunnel.
+* exposta pelo Tailscale Funnel, com URL fixa (`*.ts.net`); o túnel rápido da Cloudflare foi usado
+  enquanto o Funnel não publicava o nome.
 
 ## Infraestrutura
 
-API pelo **Cloudflare Tunnel** e mídia pelo **LiveKit Cloud** (plano gratuito). Ver
+API pelo **Tailscale Funnel** e mídia pelo **LiveKit Cloud** (plano gratuito). Ver
 [README.md](../README.md).
 
 O consumo do LiveKit Cloud é acompanhado desde o primeiro dia: o uso principal (screen share
@@ -172,7 +177,7 @@ assistido por várias pessoas) é justamente o que mais consome a cota.
 ## Critérios de conclusão
 
 ```text
-Etapa 6 do PLAN.md
+Etapa 6 de docs/plans/v0.1-reorganizacao.md
  +
 M01 — Dois participantes
 M02 — Microfone
@@ -240,7 +245,9 @@ A instalação da v0.2.0 é a última reinstalação manual.
 * **versão mínima suportada**: a API recusa clientes antigos com uma mensagem pedindo a atualização,
   para que uma mudança de protocolo nunca deixe alguém com o aplicativo quebrado sem explicação;
 * **"O que há de novo"**: uma janela curta com as mudanças, mostrada na primeira abertura depois de
-  cada atualização.
+  cada atualização;
+* **logs em arquivo** (adiado da v0.1): o `tracing` grava também num arquivo na pasta de dados do app,
+  com rotação, para investigar problemas na máquina de cada um.
 
 ```text
 uma versão nova passa pelo canal beta e depois chega sozinha a todos
@@ -325,7 +332,8 @@ dispositivo e envia um convite de recuperação.
   o administrador gera um convite vinculado ao usuário existente. Ao usar o convite, o dispositivo novo
   é vinculado ao mesmo usuário, com o mesmo histórico, e o vínculo antigo é removido;
 * o primeiro administrador é criado por configuração ou comando da API;
-* substitui o código de acesso da v0.1: token do LiveKit só para usuários autenticados.
+* fecha o acesso à API: até aqui ela emite token para qualquer chamada (o código de acesso da v0.1 foi
+  adiado para cá e é substituído por esta identidade); token do LiveKit só para usuários autenticados.
 
 **Permissões mínimas**
 
@@ -401,7 +409,7 @@ enviar mensagem → o outro receber → fechar e reabrir → ver o histórico
 ### v0.2.6 — Publicador nativo
 
 * publicação do vídeo direto do Rust (conexão `{user_id}:screen`), sem passar pelo WebView;
-* medição lado a lado com o caminho IPC, usando como linha de base a Etapa 6 do `PLAN.md` e o teste da
+* medição lado a lado com o caminho IPC, usando como linha de base a Etapa 6 de `docs/plans/v0.1-reorganizacao.md` e o teste da
   v0.1.
 
 Se o teste da v0.1 mostrar que a qualidade da transmissão é o principal problema, esta entrega passa à
@@ -850,7 +858,7 @@ outra.
 # Infraestrutura ao longo das versões
 
 ```text
-v0.1  API pelo Cloudflare Tunnel
+v0.1  API pelo Tailscale Funnel
       mídia pelo LiveKit Cloud (plano gratuito), consumo acompanhado
         ↓
 v0.2  LiveKit, API e banco em VPS própria
@@ -892,15 +900,16 @@ Nenhuma delas é necessária para o uso principal do grupo.
 
 ```text
 v0.1
-01. Etapas 4 a 6 do PLAN.md
+01. Etapas 4 a 6 de docs/plans/v0.1-reorganizacao.md
 02. Build do Windows + URL configurável
-03. Código de acesso na API
-04. Logs em arquivo
-05. Cloudflare Tunnel + LiveKit Cloud
+03. Código de acesso na API (adiado para a v0.2.2)
+04. Logs em arquivo (adiado para a v0.2.0)
+05. Tailscale Funnel + LiveKit Cloud
 06. Noite de teste com o grupo
 
 v0.2
 07. v0.2.0 Auto-update + pipeline com testes + canal beta + versão mínima + "O que há de novo"
+    + logs em arquivo
 08. v0.2.1 VPS (LiveKit, API e banco) + backup externo + alerta
 09. v0.2.2 Convites + identidade do dispositivo + permissões + segurança mínima
 10. v0.2.3 Supressão de ruído e cancelamento de eco

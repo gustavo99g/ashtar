@@ -28,21 +28,26 @@ Aplicada em `media/`, `commands/` e nos arquivos-raiz.
 
 ## Onde ficam as decisões técnicas
 
-- [`PLAN.md`](PLAN.md) — plano em andamento (fase atual: reorganização/correções do protótipo de
-  screen share, "v0.1"), com as decisões já tomadas registradas no topo.
-- [`NOTES.md`](NOTES.md) — checklist dos problemas conhecidos do protótipo, o que já foi resolvido
+- [`PLAN.md`](PLAN.md) — plano em andamento (fase atual: v0.2.0, base de entrega), com as decisões
+  já tomadas registradas no topo.
+- [`NOTES.md`](NOTES.md) — checklist dos problemas e pendências da fase atual, o que já foi resolvido
   e o que foi conscientemente adiado.
-- [`BACKLOG.md`](BACKLOG.md) — o que a fase anterior adiou, agrupado pela versão que deve recebê-lo.
+- [`BACKLOG.md`](BACKLOG.md) — o que as fases anteriores adiaram, agrupado pela versão que deve recebê-lo.
+  Ao começar uma fase, os itens dela saem do BACKLOG e entram no `NOTES.md`.
+- [`docs/plans/`](docs/plans/) — planos e notas de fases concluídas, arquivados como estavam ao fechar
+  (`v0.1-reorganizacao.md`, `v0.1-notes.md`).
 
 ### Raiz vs. `docs/`
 
 - **Raiz** = documentos de trabalho, estado atual da fase em andamento: `README.md`, `AGENT.md`,
   `PLAN.md`, `NOTES.md`, `BACKLOG.md`. Mudam a cada tarefa, ficam visiveis assim que alguem abre o repo.
 - **`docs/`** = referencia/convencao, o que vale independente da fase (`commit-convention.md`,
-  `rust-code-documentation.md`). Editado com pouca frequencia, consultado quando surge a duvida
+  `rust-code-documentation.md`), e o arquivo das fases concluidas (`docs/plans/`). Editado com pouca frequencia, consultado quando surge a duvida
   ("qual o padrao de commit?", "como documento unsafe aqui?").
 
-Novo documento de trabalho da fase atual entra na raiz; nova convencao estavel entra em `docs/`.
+Novo documento de trabalho da fase atual entra na raiz; nova convencao estavel entra em `docs/`. Ao
+fechar uma fase, o `PLAN.md` e o `NOTES.md` dela vao para `docs/plans/` com o nome da versao, e a raiz
+recebe os da fase seguinte.
 
 Antes de propor mudanças de arquitetura, checar se já existe uma decisão registrada nesses dois
 arquivos em vez de decidir de novo.

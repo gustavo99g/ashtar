@@ -2,7 +2,7 @@
 //!
 //! Usado por `media::sources::list_capture_sources`. As janelas em si (ids,
 //! titulos) vem do DesktopCapturer — `EnumWindows` saiu do projeto (decisao
-//! 2 do PLAN.md). Os filtros de janela visivel/oculta/ferramenta tambem
+//! 2 do docs/plans/v0.1-reorganizacao.md). Os filtros de janela visivel/oculta/ferramenta tambem
 //! saiam, porque o DesktopCapturer ja aplica filtros equivalentes na lista
 //! dele; se aparecerem janelas que nao deveriam, esses filtros voltam aqui.
 

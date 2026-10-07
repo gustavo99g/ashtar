@@ -136,7 +136,7 @@ A primeira versão deve ser simples e voltada para aproximadamente 5–10 usuár
 ```text
 v0.1  → Teste com o grupo
         Voz + screen share reorganizado, liberado como teste
-        (Cloudflare Tunnel + LiveKit Cloud)
+        (Tailscale Funnel + LiveKit Cloud)
 
 v0.2  → Comunidade
         Entregue em partes: auto-update → servidor na VPS → convites sem senha
@@ -178,15 +178,19 @@ etapas, sem custo fixo até que o uso justifique:
 Desenvolvimento local
         ↓
 Teste com o grupo (v0.1)
-  • API pelo Cloudflare Tunnel
+  • API pelo Tailscale Funnel
   • mídia pelo LiveKit Cloud (plano gratuito)
         ↓
 VPS com LiveKit, API e banco (v0.2)
 ```
 
-**API pelo Cloudflare Tunnel.** O túnel nomeado é gratuito e exige uma conta na Cloudflare e um domínio
-com o DNS gerenciado por ela. Ele só transporta HTTP e WebSocket, por isso serve para a API, mas não
-para a mídia, que trafega por UDP.
+**API pelo Tailscale Funnel.** O Funnel é gratuito no plano pessoal e dá uma URL fixa
+(`https://<máquina>.<rede>.ts.net`) sem exigir domínio próprio: só o computador que roda a API instala o
+Tailscale (`tailscale funnel --bg 3000`). Na primeira vez, o nome público levou um tempo para ser publicado
+no DNS; enquanto isso, o túnel rápido da Cloudflare (`cloudflared tunnel --url http://127.0.0.1:3000`)
+serviu de alternativa, com a ressalva de que a URL muda a cada reinício. Os dois só transportam HTTP e
+WebSocket, por isso servem para a API, mas não para a mídia, que trafega por UDP. Com um domínio próprio
+(necessário de qualquer forma na v0.2.1), o túnel nomeado da Cloudflare também dá uma URL fixa.
 
 **Mídia pelo LiveKit Cloud.** O plano gratuito (Build) inclui, por mês, 5.000 minutos de participante,
 50 GB de dados transferidos e até 100 participantes simultâneos. Os limites são um teto rígido: se

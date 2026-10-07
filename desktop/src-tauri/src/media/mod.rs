@@ -1,5 +1,5 @@
 //! Módulos de captura de mídia (vídeo/áudio), independentes do destino (IPC
-//! hoje, publicador LiveKit nativo depois — decisão 12 do `PLAN.md`).
+//! hoje, publicador LiveKit nativo depois — decisão 12 do `docs/plans/v0.1-reorganizacao.md`).
 //! `sink.rs`, `gate.rs` e `capture.rs` são a base compartilhada por qualquer
 //! captura, em qualquer plataforma; `sources.rs`/`audio.rs` são os pontos de
 //! entrada comuns, e `platform/` escolhe a implementação real (`win32` hoje).

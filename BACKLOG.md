@@ -1,7 +1,7 @@
 # BACKLOG — o que a reorganização deixou para as próximas etapas
 
-Itens adiados ao fechar a reorganização do compartilhamento de tela (Etapas 1 a 6 do `PLAN.md`, concluída em
-2026-10-06). Vieram do `NOTES.md`, com o texto e as evidências originais, e estão sob a versão que deve
+Itens adiados ao fechar a reorganização do compartilhamento de tela (Etapas 1 a 6 de [`docs/plans/v0.1-reorganizacao.md`](docs/plans/v0.1-reorganizacao.md), concluída em
+2026-10-06). Vieram de [`docs/plans/v0.1-notes.md`](docs/plans/v0.1-notes.md), com o texto e as evidências originais, e estão sob a versão que deve
 recebê-los segundo o `docs/roadmap.md`. Os destinos de "Janelas minimizadas", "divisão do `capture_frame`"
 e "linha de base de desempenho" são sugestões desta triagem, não decisões do roadmap.
 
@@ -9,15 +9,16 @@ Ao resolver um item, apague-o daqui e registre o resultado no ADR ou no commit.
 
 ## Resto da v0.1 (fora da reorganização)
 
-Sem versão própria no roadmap além da v0.1; o código de acesso é o item 03 da ordem prática.
-
 - [ ] O `fetch` do token (`requestVoiceToken`) não tem timeout: com a API fora do ar (túnel caído), o app
       pode ficar em "conectando" por bastante tempo. Sem destino definido.
-- [ ] O código de acesso da API (v0.1, `docs/roadmap.md`) não existe: `api/src/routes/voice.rs` emite o token
-      para qualquer chamada que chegue à URL, e quem a descobrir consome a cota do LiveKit. Sem destino
-      definido.
 
 ## v0.2.2 — Identidade, convites e permissões
+
+- [ ] O código de acesso da API (item 03 da v0.1 no `docs/roadmap.md`) não existe: `api/src/routes/voice.rs`
+      emite o token para qualquer chamada que chegue à URL, e quem a descobrir consome a cota do LiveKit.
+      **Adiado da v0.1 para a v0.2.2** (2026-10-07): a identidade do dispositivo fecha o acesso de vez, e um
+      código no app exigiria redistribuir o executável. Risco aceito até lá, com a URL fixa do Tailscale
+      Funnel (`*.ts.net`, que aparece nos logs públicos de certificados).
 
 - [ ] Identidade falsa nova a cada entrada (`idiot-<uuid>`, nome `Idiota-<uuid>`): sem nome escolhido nem id
       por instalação. **Adiado para a v0.2.2** (identidade do dispositivo, `docs/roadmap.md`). Até lá, o id
@@ -86,7 +87,7 @@ Sem versão própria no roadmap além da v0.1; o código de acesso é o item 03 
       repetir a medição, recolocar os logs ou deixar um cronômetro permanente no target `perf`.
       **Adiado para a v0.2.6**, junto das medições do publicador nativo.
 - [ ] Linha de base de desempenho em build de release, separada para os três presets de qualidade
-      (decisão 16 do PLAN.md). **Adiado para a v0.2.6:** só existe o fps por preset em jogo (ADR 0009); faltam
+      (decisão 16 de `docs/plans/v0.1-reorganizacao.md`). **Adiado para a v0.2.6:** só existe o fps por preset em jogo (ADR 0009); faltam
       CPU, memória e o histograma de intervalos entre frames, que o publicador nativo vai precisar para comparar.
 - [ ] Publicador de vídeo/áudio nativo em Rust (fica para o próximo plano). Ele precisa de duas peças:
   1. **Redução na GPU antes de copiar para a memória**, para janelas em 4K cheio: readback (~7 ms) mais
@@ -99,7 +100,7 @@ Sem versão própria no roadmap além da v0.1; o código de acesso é o item 03 
 
   Uma terceira peça, a captura própria de janelas com o `windows-capture`, estava prevista e **deixou de
   ser necessária**: o atraso das janelas vinha de o libwebrtc cair no GDI por falta de COM na thread, e o
-  passo 9 corrigiu isso (ver o item da queda de fps em janelas, no `NOTES.md`, e o ADR 0008).
+  passo 9 corrigiu isso (ver o item da queda de fps em janelas, em `docs/plans/v0.1-notes.md`, e o ADR 0008).
 
   Pontos para observar depois do passo 9: janela parada custa uma conversão por volta, mesmo sem mudança
   (expor o `updated_region` exigiria mexer no `webrtc-sys`); jogos em tela cheia exclusiva podem não ser

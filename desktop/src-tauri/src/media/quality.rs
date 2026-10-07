@@ -1,4 +1,4 @@
-//! Presets de qualidade do compartilhamento (decisão 16 do `PLAN.md`).
+//! Presets de qualidade do compartilhamento (decisão 16 do `docs/plans/v0.1-reorganizacao.md`).
 //!
 //! O frontend manda só o nome (`"720p60"`). Aqui ele vira o que o Rust
 //! precisa: a caixa máxima e o fps da captura, e quantos frames podem estar

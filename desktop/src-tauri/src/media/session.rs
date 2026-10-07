@@ -7,7 +7,7 @@
 //! Garantias:
 //!
 //! - início atômico: ou o vídeo e o áudio pedido sobem, ou nada fica rodando
-//!   (decisão 6 do `PLAN.md`);
+//!   (decisão 6 do `docs/plans/v0.1-reorganizacao.md`);
 //! - o aviso de fim de uma sessão sai exatamente uma vez, dado por quem
 //!   removeu a sessão (decisão 8, ADR 0006);
 //! - o fim do áudio sozinho não derruba o vídeo (decisão 7);
