@@ -366,7 +366,11 @@ Entrega pequena e independente; pode sair em qualquer ponto da v0.2, inclusive j
 
 * supressão de ruído, cancelamento de eco e controle automático de ganho do microfone, pelos filtros
   do próprio WebView (opções de captura do `livekit-client`);
-* ligados por padrão, com opção de desligar;
+* ligados por padrão, com opção de desligar (o `livekit-client` 2.22 já pede os filtros por padrão, então
+  falta a opção e conferir no WebView2, com `getSettings()`, se foram aplicados);
+* o eco de quem assiste a uma tela inteira compartilhada: o modo "Todo o sistema" exclui o PID do app, o
+  que não cobre o WebView2 quando há duas instâncias abertas; excluir o processo-navegador real do WebView2
+  (`BrowserProcessId`). Evidências e hipóteses no `NOTES.md`;
 * se o filtro do WebView não bastar, avaliar um filtro mais forte (ex.: RNNoise num worklet de áudio).
 
 ```text

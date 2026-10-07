@@ -128,6 +128,33 @@ some de fato quando o código legado for substituído por ela.
       decisão 3).
       **Base pronta:** `spawn_audio_capture` usa `std::process::id()` no modo `System` e recusa capturar o
       próprio processo. Resolve quando os comandos novos a usarem (Etapa 4).
+- [ ] Eco no compartilhamento da tela inteira com "Todo o sistema". Num teste com amigos (2026-10-06), um
+      amigo compartilhou o monitor e quem assistia ouviu a própria voz; só mutar o próprio microfone
+      parava. Fica para a v0.2 (v0.2.3 do `docs/roadmap.md`).
+      **Evidências (medidas nesta máquina; o teste do Brave rodou no perfil de debug, a árvore do app foi vista no
+      executável de release):**
+      - O código exclui o PID do app (`std::process::id()`) com `EXCLUDE_TARGET_PROCESS_TREE`; conferido na
+        crate `wasapi` (`include_tree = false`).
+      - Com uma instância, o WebView2 do app é todo descendente do `desktop.exe`: o `browser` é filho dele;
+        renderer, GPU, rede e armazenamento, filhos do `browser`.
+      - Um Brave isolado tocando um tom (mesma arquitetura de áudio do WebView2, com o
+        `audio.mojom.AudioService` filho da raiz): excluir a raiz funciona. RMS 0,0022 com o tom excluído,
+        contra 0,0021 de fundo sem tom e 0,0046 com o tom incluído.
+      - **Com duas instâncias do app abertas há um só conjunto de processos do WebView2, e ele pertence à
+        primeira** (a pasta de dados é a mesma, `%LOCALAPPDATA%\gustavo99g\EBWebView`). Com `desktop.exe` 25504
+        e 2436, os dois renderizadores ficaram sob o 25504 e nada sob o 2436. Para a segunda instância,
+        excluir o próprio PID não exclui nenhum processo do WebView2: a chamada entra no loopback.
+      **Não verificado:** se o amigo tinha duas instâncias (ou um WebView2 remanescente de uma execução
+      anterior) abertas. Outra explicação possível é o eco acústico (a voz sai da caixa de som e volta pelo
+      microfone dele); mutar o próprio microfone resolveria nos dois casos, então isso não distingue. Teste
+      para separar: o amigo compartilha com "Sem áudio"; se o eco continuar, vem do microfone dele. Também
+      não se observou o processo de áudio do WebView2 do próprio app tocando.
+      **Ideia de correção (não implementada):** excluir o processo-navegador real do WebView2
+      (`ICoreWebView2::BrowserProcessId`, obtido pelo `with_webview` do Tauri; existe no webview2-com 0.38.2)
+      em vez do PID do app, caindo no PID do app se não for possível obtê-lo. Assim a segunda instância
+      exclui a árvore do navegador que ela de fato usa. Mexe na assinatura do `start` do manager e em
+      `commands/screen_share.rs`. O teste `mede_a_exclusao_de_um_chromium` (ignorado) repete a medição com
+      qualquer Chromium tocando áudio (`EXCLUDE_PID=<pid da raiz>`).
 - [ ] Parar e iniciar em seguida pode falhar com "já existe uma captura ativa", porque o slot só é
       liberado quando a thread percebe a parada. Resolve com o `session.rs` (remover a sessão na hora).
       **Base pronta:** o `ScreenShareManager::stop` remove a sessão na hora, antes de esperar as threads, e
