@@ -10,6 +10,8 @@ passa pelo canal beta e chega a todos sem ninguém baixar nada.
 
 **Fora do escopo:** UI nova (v0.2.1), identidade, convites e banco (v0.2.2), VPS (v0.2.6), qualquer mudança de mídia ou de UI
 além do necessário para atualizar, assinatura de código do instalador (o SmartScreen continua avisando).
+O botão "Abrir pasta de logs" e o interruptor "receber versões beta" também ficam para a UI nova
+(v0.2.1); a marcação de quem recebe o beta, pela API, entra com as permissões da v0.2.2.
 
 ## Progresso
 
@@ -35,6 +37,11 @@ além do necessário para atualizar, assinatura de código do instalador (o Smar
 depois da v0.2.0 quebraria a atualização automática e exigiria outra instalação manual. Como a v0.2.0 já é
 manual, a troca sai de graça. O app da v0.1 não guarda nada que precise migrar.
 
+O desenvolvimento usa outro identificador, **`com.gustavo99g.ashtar.dev`**, num `tauri.dev.conf.json`
+passado com `--config` pelo script de desenvolvimento. Com o mesmo identificador, o `pnpm tauri dev` e o
+Ashtar instalado dividiriam a pasta do WebView2 (o cenário da segunda instância na investigação do eco,
+no `BACKLOG.md`), os logs e o localStorage.
+
 Os nomes internos (crates `desktop`/`desktop_lib`, pasta `desktop/`) não mudam: não aparecem para o usuário.
 
 ### 2. Releases num repositório público separado
@@ -48,13 +55,19 @@ Alternativas descartadas: tornar o repositório principal público (decisão do 
 Cloudflare R2 (bom, mas acrescenta uma conta e um serviço antes da v0.2.2, quando o R2 entra para o backup; pode substituir depois sem
 mudar o app, só o endpoint).
 
-### 3. Canais estável e beta pelos releases do GitHub
+### 3. Canais pelos branches: `dev` é o beta, `main` é o estável
 
-- **Beta:** todo release nasce como *pre-release*. Um release fixo de tag `beta` guarda um único
-  `latest.json`, sobrescrito a cada publicação, apontando para o instalador da versão nova.
-- **Estável:** promover uma versão é desmarcar o *pre-release*. O endpoint
-  `releases/latest/download/latest.json` do GitHub já ignora pre-releases, então quem está no estável
-  passa a ver a versão promovida sem nenhum arquivo extra.
+O trabalho entra por pull request. O `master` é renomeado para `main`.
+
+- **Beta (merge na `dev`):** o pipeline lê a versão do `desktop/package.json`. Se ainda não existe release
+  dessa versão no `ashtar-releases`, ele compila, assina, cria a tag `v<versão>` e publica como
+  *pre-release*, com o seu `latest.json`, e sobrescreve o `latest.json` do release fixo `beta`. Se a
+  versão já existe, só roda o CI. Publicar é subir a versão no pull request.
+- **Estável (merge na `main`):** um job no Ubuntu desmarca o *pre-release* da versão do `package.json` e a
+  marca como *latest*, sem compilar: chega a todos o mesmo instalador testado no beta. Falha se a versão
+  não estiver publicada no beta.
+- O release fixo `beta` é ele mesmo um *pre-release*; senão o `releases/latest` passaria a apontar para ele.
+- A `dev` só recebe o que pode ir para o beta. Trabalho pela metade fica no branch da funcionalidade.
 
 | Canal | Endpoint |
 |---|---|
@@ -62,13 +75,23 @@ mudar o app, só o endpoint).
 | Beta | `https://github.com/gustavo99g/ashtar-releases/releases/download/beta/latest.json` |
 
 O app escolhe o endpoint em tempo de execução (updater builder no Rust, não a lista fixa do
-`tauri.conf.json`) conforme a opção "receber versões beta", guardada localmente e desligada por padrão.
-Como toda versão passa pelo beta antes, o beta nunca fica atrás do estável.
+`tauri.conf.json`). Até a v0.2.2, o canal vem da variável de ambiente `ASHTAR_UPDATE_CHANNEL` (`beta`;
+ausente ou outro valor, estável); por enquanto só o dono do projeto fica no beta. Na v0.2.2 a API passa a
+dizer o canal de cada usuário, marcado só pelo dono. Como toda versão passa pelo beta antes, o beta nunca
+fica atrás do estável.
+
+**Versões diferentes na mesma sala.** Enquanto uma versão está no beta, quem está nele e o grupo usam a
+mesma API e entram nas mesmas chamadas. Toda mudança de contrato é compatível com a versão anterior: a API
+aceita o formato novo e o antigo, o app novo vai ao beta e é promovido, e só depois a API remove o antigo
+(e, se preciso, sobe o `MIN_CLIENT_VERSION`).
+
+**Sem volta de versão.** O updater só instala versões maiores. Uma versão ruim se corrige com outra (um
+revert da 0.2.3 sai como 0.2.4).
 
 ### 4. Uma fonte de versão
 
 O `tauri.conf.json` passa a ler a versão do `desktop/package.json` (`"version": "../package.json"`). O
-pipeline só publica se a tag (`v0.2.0`) for igual a essa versão. O `Cargo.toml` do desktop não é usado
+pipeline cria a tag (`v0.2.0`) a partir dessa versão (decisão 3), no `ashtar-releases`. O `Cargo.toml` do desktop não é usado
 para a versão do app.
 
 A numeração segue o roadmap ("Numeração das versões"): o último número é **entrega × 10 + correção**. Esta
@@ -84,11 +107,14 @@ Windows usa o NSIS. O executável solto da v0.1 não se atualiza; quem o usa ins
 
 ### 6. Atualização sem interromper chamada
 
-- O app verifica ao abrir e depois a cada 3 horas.
-- Achando versão nova, baixa em segundo plano e mostra um aviso discreto: "Atualização pronta —
+- Só no build de release (`cfg(not(debug_assertions))`): o desenvolvimento não se atualiza.
+- A verificação roda no Rust, a partir do `setup`, sem depender do React: uma versão com o frontend
+  quebrado ainda recebe a correção.
+- Verifica ao abrir e depois a cada 3 horas.
+- Achando versão nova, baixa em segundo plano e mostra um aviso mínimo: "Atualização pronta —
   reiniciar".
 - **Nunca reinicia sozinho durante uma chamada.** Se a pessoa não clicar, a atualização é instalada ao
-  fechar o app.
+  fechar o app (`install` no `RunEvent::ExitRequested`, com os bytes já baixados).
 - Falha de rede ao verificar é silenciosa (só log); falha de assinatura ou de instalação aparece como erro.
 
 ### 7. Chave de assinatura do updater
@@ -115,16 +141,19 @@ atualizações para quem já instalou: todos teriam de reinstalar manualmente.
 - O build embute a seção da versão atual. Na primeira abertura depois de mudar de versão, o app mostra uma
   janela curta com ela e guarda a última versão vista.
 - O pipeline usa a mesma seção como texto do release e das notas do `latest.json`.
+- O pipeline recusa publicar se o `CHANGELOG.md` não tiver a seção da versão.
 
 ### 10. Logs em arquivo com rotação
 
 - `tracing-appender` com rotação diária, guardando os 7 arquivos mais recentes, na pasta de logs do app
   (`app_log_dir`, em `%LOCALAPPDATA%\com.gustavo99g.ashtar\logs`).
 - O terminal continua recebendo o mesmo log em desenvolvimento.
-- O hook de panic continua registrado antes de tudo; o arquivo começa a receber logs assim que o caminho é
-  conhecido (no `setup` do Tauri).
-- Um botão "Abrir pasta de logs" (plugin `opener`, que já existe) para o amigo mandar o arquivo. O envio
-  automático ("enviar logs") continua na v0.6.
+- O `tracing` só aceita um subscriber global. O `main.rs` monta o subscriber com uma camada de arquivo
+  vazia (`reload`), e o `setup` a preenche quando o caminho é conhecido. O hook de panic continua
+  registrado antes de tudo. O `WorkerGuard` do `non_blocking` fica no estado do Tauri até o app fechar,
+  senão as últimas linhas se perdem.
+- O botão "Abrir pasta de logs" fica para a UI nova (v0.2.1). Até lá, a pasta é aberta colando o caminho
+  no Explorer. O envio automático ("enviar logs") continua na v0.6.
 
 ### 11. Código de acesso provisório
 
@@ -144,8 +173,9 @@ Adiado da v0.1 e substituído pela identidade na v0.2.2.
 Repositório privado: 2.000 min/mês grátis, com runners Windows contando em dobro.
 
 - **API (Ubuntu), a cada push:** `cargo fmt --check`, `cargo clippy -- -D warnings`, `cargo test`.
-- **Desktop (Windows), em pull request e no pipeline de release:** `cargo clippy` e `cargo test` do
-  `src-tauri`, `pnpm lint` e `tsc`.
+- **Desktop (Windows), em pull request para a `dev` e a `main` e na publicação do beta:** `cargo clippy` e
+  `cargo test` do `src-tauri`, `pnpm lint` e `tsc`.
+- A promoção (merge na `main`) não compila: só o job do Ubuntu da decisão 3.
 - Cache do `cargo` e do `pnpm` nos dois.
 
 ---
@@ -155,16 +185,19 @@ Repositório privado: 2.000 min/mês grátis, com runners Windows contando em do
 - `productName`, `identifier`, título da janela e ícones (ícones definitivos podem esperar a UI nova).
 - Versão lida do `package.json` (decisão 4) e `package.json` em `0.2.0`.
 - `bundle.targets: ["nsis"]`, `installMode: "currentUser"` (decisão 5).
+- `bundle.createUpdaterArtifacts: true`: sem ele o build não gera o `.sig` nem o pacote de atualização.
+- `tauri.dev.conf.json` com o identificador de desenvolvimento e o script que o usa (decisão 1).
 
 **Pronto quando:** `pnpm tauri build` gera `Ashtar_0.2.0_x64-setup.exe`, que instala sem pedir
-administrador, e o app abre com o nome novo.
+administrador, e o app abre com o nome novo; o `pnpm tauri dev` grava em
+`%LOCALAPPDATA%\com.gustavo99g.ashtar.dev`.
 
 ## Etapa 2: logs em arquivo — pendente
 
-Decisão 10. Mover a inicialização do arquivo para o `setup`, manter o hook de panic no início do `main`.
+Decisão 10. Camada de arquivo preenchida no `setup` (`reload`), hook de panic no início do `main`.
 
-**Pronto quando:** num build de release, abrir e entrar numa sala gera o arquivo do dia na pasta de logs, e
-o botão abre a pasta.
+**Pronto quando:** num build de release, abrir e entrar numa sala gera o arquivo do dia na pasta de logs,
+inclusive as últimas linhas antes de fechar.
 
 ## Etapa 3: CI — pendente
 
@@ -176,28 +209,36 @@ Workflow `ci.yml` (decisão 12).
 
 - `tauri-plugin-updater` e `tauri-plugin-process` (reiniciar), com as permissões nas `capabilities`.
 - Chave pública no `tauri.conf.json` (decisão 7).
-- Comandos Rust `check_update(channel)` / `install_update()`, com o endpoint escolhido em tempo de
-  execução (decisão 3).
-- Opção "receber versões beta", guardada localmente.
+- Verificação no Rust a partir do `setup`, só em release, com o endpoint do canal de
+  `ASHTAR_UPDATE_CHANNEL` (decisões 3 e 6).
+- Aviso mínimo "Atualização pronta — reiniciar" no frontend; instalação no `RunEvent::ExitRequested` se a
+  pessoa não clicar.
 - Fluxo da decisão 6, com o estado da chamada consultado antes de reiniciar.
 
-**Pronto quando:** apontando para um manifesto de teste, o app encontra a versão, baixa, confere a
-assinatura e instala ao reiniciar; durante uma chamada, não reinicia sozinho.
+**Pronto quando:** apontando para um release de teste no `ashtar-releases` (o updater exige HTTPS no
+release; o release de teste é apagado depois), o app encontra a versão, baixa, confere a assinatura e
+instala ao reiniciar ou ao fechar; durante uma chamada, não reinicia sozinho; no `pnpm tauri dev`, não
+verifica nada.
 
 ## Etapa 5: pipeline de release — pendente
 
-Workflow `release.yml`, disparado por tag `v*`:
+Workflow `release.yml` (decisão 3):
 
-1. Confere tag = versão do `package.json` (decisão 4).
-2. Roda as checagens do CI.
-3. Compila e assina com o `tauri-action`, com `VITE_API_URL` vindo de uma variável do repositório.
-4. Publica no `ashtar-releases` como pre-release, com o texto da seção do `CHANGELOG.md`.
-5. Sobrescreve o `latest.json` do release `beta`.
+**No merge na `dev`:**
+1. Lê a versão do `package.json`; se o release `v<versão>` já existe no `ashtar-releases`, para aqui.
+2. Confere a seção da versão no `CHANGELOG.md` (decisão 9).
+3. Roda as checagens do CI.
+4. Compila e assina com o `tauri-action`, com `VITE_API_URL` e `VITE_ACCESS_CODE` vindos do repositório.
+5. Publica no `ashtar-releases` como pre-release, com a tag `v<versão>`, o texto do `CHANGELOG.md` e o
+   `latest.json`.
+6. Sobrescreve o `latest.json` do release `beta` (pre-release).
 
-Promoção para o estável: desmarcar o pre-release no GitHub (manual, de propósito).
+**No merge na `main`:** desmarca o pre-release de `v<versão>` e o marca como *latest*; falha se ele não
+existir.
 
-**Pronto quando:** `git tag v0.2.0 && git push --tags` termina com o instalador e o `latest.json`
-publicados, sem nenhum passo manual.
+**Pronto quando:** um merge na `dev` com a versão nova termina com o instalador e os dois `latest.json`
+publicados, sem passo manual; um merge na `dev` sem mudar a versão não publica nada; um merge na `main`
+promove sem compilar.
 
 ## Etapa 6: versão mínima e código de acesso — pendente
 
@@ -218,13 +259,13 @@ Decisão 9.
 ## Etapa 8: verificação — pendente
 
 1. Instalar a v0.2.0 do zero numa máquina sem o app (e numa com o executável da v0.1).
-2. Publicar uma v0.2.1 de teste: chega primeiro a quem está no beta; depois de promovida, a quem está no
-   estável.
+2. Publicar a correção do eco (`BACKLOG.md`, "Correções fora de ordem") como `0.2.1`: chega primeiro a quem
+   está no beta; depois do merge na `main`, a quem está no estável.
 3. Atualização durante uma chamada: o aviso aparece, mas o app não reinicia sozinho.
 4. Uma versão com teste quebrado não é publicada.
 5. Cliente abaixo da versão mínima recebe a mensagem; chamada sem o código de acesso é recusada.
 6. "O que há de novo" aparece uma vez depois de atualizar.
-7. Logs do dia existem na pasta e o botão abre a pasta.
+7. Logs do dia existem na pasta `%LOCALAPPDATA%\com.gustavo99g.ashtar\logs`.
 8. Cópia de segurança da chave privada conferida (consegue assinar a partir dela).
 
 **Critério de pronto da fase:** os critérios da v0.2.0 no `docs/roadmap.md` (versão nova chega sozinha

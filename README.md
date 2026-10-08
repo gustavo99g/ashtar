@@ -1,9 +1,8 @@
-# Discord-like
+# Ashtar
 
-Aplicação privada de comunicação para uma única comunidade, inspirada no Discord.
+Ashtar é uma aplicação privada de comunicação para uma única comunidade, inspirada no Discord.
 
-> O nome do projeto é provisório.
-> Status atual: **v0.1 — Teste com o grupo** (em andamento)
+> Status atual: **v0.2.0 — Distribuição e atualização** (em andamento)
 
 ## Funcionalidades
 
@@ -40,7 +39,7 @@ Não é preciso instalar o Tauri CLI globalmente: o `pnpm tauri` usa o pacote do
 Monorepo com dois projetos:
 
 ```text
-discord-like/
+ashtar/
 ├── desktop/          # app: Tauri + React + TypeScript, com núcleo em Rust
 ├── api/              # backend: Rust + Axum
 ├── docs/
@@ -85,7 +84,7 @@ cargo run
 ```bash
 cd desktop
 pnpm install
-pnpm tauri dev
+pnpm app:dev
 ```
 
 Para ver as métricas de desempenho da captura no terminal, rode com `RUST_LOG=info,perf=debug`.

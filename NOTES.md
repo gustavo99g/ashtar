@@ -22,6 +22,9 @@ conscientemente adiado (marcar como tal) antes de fechar a fase. A lista da fase
 - [ ] **Avisar o grupo** que a v0.2.0 é instalada pelo `-setup.exe` e substitui o executável da v0.1, que
       pode ser apagado.
 
+- [ ] **Renomear `master` para `main`** e passar a trabalhar por pull request (`dev` = beta, `main` =
+      estável, decisão 3).
+
 ## Riscos e cuidados
 
 - [ ] **Chave privada do updater** com cópia de segurança fora do GitHub (decisão 7). Sem ela, nenhuma
@@ -37,3 +40,7 @@ conscientemente adiado (marcar como tal) antes de fechar a fase. A lista da fase
       tokens do LiveKit. Acompanhar o consumo no painel.
 - [ ] **Consumo de minutos do LiveKit Cloud:** se um mês passar de ~60% dos 5.000 minutos, o servidor
       (v0.2.6) passa à frente, ou o plano pago cobre o mês (gatilho no `docs/roadmap.md`).
+- [ ] **Token de publicação no `ashtar-releases`:** se for fine-grained, expira em no máximo um ano.
+      Anotar aqui a data de expiração ao criá-lo; vencido, o pipeline para de publicar.
+- [ ] **Contrato da API durante o beta** (decisão 3): quem está no beta e o grupo usam a mesma API. Mudança
+      de contrato sempre compatível com a versão anterior até a promoção.
