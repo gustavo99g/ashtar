@@ -10,19 +10,24 @@
 
 mod commands;
 mod error;
+pub mod logging;
 mod media;
 
-use tauri::Manager;
+use tauri::{Manager, RunEvent};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
-pub fn run() {
+pub fn run(log_file: logging::LateFile) {
     std::env::set_var(
         "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS",
         "--enable-usermedia-screen-capturing --auto-select-desktop-capture-source=Entire screen",
     );
 
-    tauri::Builder::default()
-        .setup(|app| {
+    let app = tauri::Builder::default()
+        .setup(move |app| {
+            if let Err(error) = logging::attach_file(app.handle(), &log_file) {
+                tracing::error!(%error, "não foi possível abrir o arquivo de log");
+            }
+
             app.manage(commands::screen_share::create_manager(app.handle()));
             Ok(())
         })
@@ -33,6 +38,12 @@ pub fn run() {
             commands::screen_share::ipc_screen_share_ack,
             commands::screen_share::screen_share_stop,
         ])
-        .run(tauri::generate_context!())
+        .build(tauri::generate_context!())
         .expect("error while running tauri application");
+
+    app.run(|app, event| {
+        if let RunEvent::Exit = event {
+            logging::flush(app);
+        }
+    });
 }

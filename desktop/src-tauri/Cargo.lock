@@ -54,6 +54,27 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "330a5ed07fa54e4702c9d6c4174f74427fc0ef6e214bbd677ae50a5099946470"
 
 [[package]]
+name = "ashtar"
+version = "0.0.0"
+dependencies = [
+ "base64 0.23.1",
+ "fast_image_resize",
+ "image",
+ "livekit",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-opener",
+ "thiserror 2.0.20",
+ "tracing",
+ "tracing-appender",
+ "tracing-subscriber",
+ "wasapi",
+ "windows-sys 0.61.2",
+]
+
+[[package]]
 name = "async-broadcast"
 version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -946,27 +967,6 @@ dependencies = [
  "quote",
  "rustc_version",
  "syn 2.0.119",
-]
-
-[[package]]
-name = "desktop"
-version = "0.0.0"
-dependencies = [
- "base64 0.23.1",
- "fast_image_resize",
- "image",
- "livekit",
- "serde",
- "serde_json",
- "tauri",
- "tauri-build",
- "tauri-plugin-opener",
- "thiserror 2.0.20",
- "tracing",
- "tracing-appender",
- "tracing-subscriber",
- "wasapi",
- "windows-sys 0.61.2",
 ]
 
 [[package]]

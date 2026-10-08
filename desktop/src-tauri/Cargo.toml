@@ -1,5 +1,5 @@
 [package]
-name = "desktop"
+name = "ashtar"
 # A versão do app vem do desktop/package.json (tauri.conf.json, "version"). Esta não é usada.
 version = "0.0.0"
 description = "Ashtar"
