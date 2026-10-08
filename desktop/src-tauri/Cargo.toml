@@ -1,8 +1,9 @@
 [package]
 name = "desktop"
-version = "0.1.0"
-description = "A Tauri App"
-authors = ["you"]
+# A versão do app vem do desktop/package.json (tauri.conf.json, "version"). Esta não é usada.
+version = "0.0.0"
+description = "Ashtar"
+authors = ["gustavo99g"]
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -25,6 +26,7 @@ serde_json = "1"
 thiserror = "2"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-appender = "0.2"
 wasapi = "0.24.0"
 fast_image_resize = "6.1.0"    # sem uso desde a saida do legacy; fica para testar reduzir em BGRA antes do I420 (ADR 0009)
 image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
