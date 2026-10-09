@@ -6,7 +6,7 @@ conscientemente adiado (marcar como tal) antes de fechar a fase. A lista da fase
 
 ## Vindos do BACKLOG
 
-- [ ] **Logs em arquivo** (item 04 da v0.1, adiado em 2026-10-07): hoje o `tracing` só escreve no terminal,
+- [ ] **Logs em arquivo** (item 04 da v0.1, adiado em 2026-10-07) — **implementado (Etapa 2), falta verificar no build de release**: o `tracing` só escrevia no terminal,
       e no executável de um amigo não há como ver o que aconteceu. Resolve na Etapa 2.
 
 - [ ] **Código de acesso provisório** (item 03 da v0.1, adiado para cá em 2026-10-07): hoje a API emite o

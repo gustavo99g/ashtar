@@ -17,8 +17,8 @@ O botão "Abrir pasta de logs" e o interruptor "receber versões beta" também f
 
 | Etapa | Descrição | Status |
 |---|---|---|
-| 1 | Identidade do app | Pendente |
-| 2 | Logs em arquivo | Pendente |
+| 1 | Identidade do app | Em andamento (falta `createUpdaterArtifacts` e o build do instalador) |
+| 2 | Logs em arquivo | Implementada (falta verificar no build de release) |
 | 3 | CI | Pendente |
 | 4 | Updater no app | Pendente |
 | 5 | Pipeline de release | Pendente |
@@ -180,7 +180,7 @@ Repositório privado: 2.000 min/mês grátis, com runners Windows contando em do
 
 ---
 
-## Etapa 1: identidade do app — pendente
+## Etapa 1: identidade do app — em andamento
 
 - `productName`, `identifier`, título da janela e ícones (ícones definitivos podem esperar a UI nova).
 - Versão lida do `package.json` (decisão 4) e `package.json` em `0.2.0`.
@@ -192,7 +192,7 @@ Repositório privado: 2.000 min/mês grátis, com runners Windows contando em do
 administrador, e o app abre com o nome novo; o `pnpm tauri dev` grava em
 `%LOCALAPPDATA%\com.gustavo99g.ashtar.dev`.
 
-## Etapa 2: logs em arquivo — pendente
+## Etapa 2: logs em arquivo — implementada, falta verificar
 
 Decisão 10. Camada de arquivo preenchida no `setup` (`reload`), hook de panic no início do `main`.
 
