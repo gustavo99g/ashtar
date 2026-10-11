@@ -1,13 +1,22 @@
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
+import { readFileSync } from "fs";
 import path from "path";
 import { defineConfig } from "vite";
 
 const host = process.env.TAURI_DEV_HOST;
 
+// A versão do app é a do package.json (decisão 4), a mesma que o Tauri usa.
+const appVersion: string = JSON.parse(
+	readFileSync(path.resolve(__dirname, "package.json"), "utf8"),
+).version;
+
 // https://vite.dev/config/
 export default defineConfig(async () => ({
 	plugins: [react(), tailwindcss()],
+	define: {
+		__APP_VERSION__: JSON.stringify(appVersion),
+	},
 	resolve: {
 		alias: {
 			"@": path.resolve(__dirname, "./src"),

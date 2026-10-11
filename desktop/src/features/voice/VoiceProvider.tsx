@@ -19,7 +19,7 @@ import {
 } from "react";
 import type { ScreenShareController } from "@/features/screen-share/controller";
 import { IpcScreenShare } from "@/features/screen-share/ipc/IpcScreenShare";
-import { apiUrl } from "@/lib/config";
+import { apiFetch } from "@/lib/api";
 import { useNavigationStore } from "@/stores/navigation";
 
 export type VoiceConnectionState =
@@ -59,7 +59,7 @@ export const VoiceContext = createContext<VoiceContextValue | null>(null);
 async function requestVoiceToken(channelId: string) {
 	const random = crypto.randomUUID();
 
-	const res = await fetch(apiUrl("/api/voice/join"), {
+	const res = await apiFetch("/api/voice/join", {
 		method: "POST",
 		headers: { "Content-Type": "application/json" },
 		body: JSON.stringify({
@@ -68,10 +68,6 @@ async function requestVoiceToken(channelId: string) {
 			display_name: `Idiota-${random}`,
 		}),
 	});
-
-	if (!res.ok) {
-		throw new Error("Não foi possível entrar no canal de voz.");
-	}
 
 	return (await res.json()) as { token: string; url: string };
 }
