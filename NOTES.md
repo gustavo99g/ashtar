@@ -44,3 +44,7 @@ conscientemente adiado (marcar como tal) antes de fechar a fase. A lista da fase
       Anotar aqui a data de expiração ao criá-lo; vencido, o pipeline para de publicar.
 - [ ] **Contrato da API durante o beta** (decisão 3): quem está no beta e o grupo usam a mesma API. Mudança
       de contrato sempre compatível com a versão anterior até a promoção.
+- [ ] **`ashtar-releases` precisa ter o branch `main` com ao menos um commit** (o pipeline cria as tags com
+      `releaseCommitish: main`). Criar com um README antes da primeira publicação.
+- [ ] **Segredos do pipeline:** `RELEASES_TOKEN`, `TAURI_SIGNING_PRIVATE_KEY`, `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`,
+      `VITE_ACCESS_CODE` (secrets) e `VITE_API_URL` (variável) no repositório principal.
