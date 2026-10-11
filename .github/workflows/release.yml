@@ -2,7 +2,7 @@ name: Release
 
 on:
   push:
-    branches: [dev, main]
+    branches: [dev, main,teste/release]
 
 permissions:
   contents: read
