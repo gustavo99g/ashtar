@@ -12,6 +12,7 @@ mod commands;
 mod error;
 pub mod logging;
 mod media;
+mod updater;
 
 use tauri::{Manager, RunEvent};
 
@@ -23,12 +24,15 @@ pub fn run(log_file: logging::LateFile) {
     );
 
     let app = tauri::Builder::default()
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(move |app| {
             if let Err(error) = logging::attach_file(app.handle(), &log_file) {
                 tracing::error!(%error, "não foi possível abrir o arquivo de log");
             }
 
             app.manage(commands::screen_share::create_manager(app.handle()));
+            app.manage(commands::updater::create_auto_update(app.handle()));
+            updater::spawn_periodic_check(app.handle().clone());
             Ok(())
         })
         .plugin(tauri_plugin_opener::init())
@@ -37,13 +41,16 @@ pub fn run(log_file: logging::LateFile) {
             commands::screen_share::ipc_screen_share_start,
             commands::screen_share::ipc_screen_share_ack,
             commands::screen_share::screen_share_stop,
+            commands::updater::pending_update,
+            commands::updater::install_update,
+            commands::updater::check_for_update
         ])
         .build(tauri::generate_context!())
         .expect("error while running tauri application");
 
-    app.run(|app, event| {
-        if let RunEvent::Exit = event {
-            logging::flush(app);
-        }
+    app.run(|app, event| match event {
+        RunEvent::ExitRequested { .. } => app.state::<updater::AutoUpdate>().install_on_exit(),
+        RunEvent::Exit => logging::flush(app),
+        _ => {}
     });
 }
