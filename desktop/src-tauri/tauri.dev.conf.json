@@ -1,0 +1,13 @@
+{
+	"productName": "Ashtar Dev",
+	"identifier": "com.gustavo99g.ashtar.dev",
+	"app": {
+		"windows": [
+			{
+				"title": "Ashtar (dev)",
+				"width": 800,
+				"height": 600
+			}
+		]
+	}
+}

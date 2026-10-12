@@ -10,7 +10,7 @@ import { VoiceHeader } from "./voiceHeader";
 // }
 
 const Voice = () => {
-	const { room, connectionState } = useVoice();
+	const { room, connectionState, error } = useVoice();
 	return (
 		<section className="flex min-h-0 flex-1 flex-col bg-surface">
 			<VoiceHeader />
@@ -24,9 +24,9 @@ const Voice = () => {
 			{room ? (
 				<VoiceMain />
 			) : (
-				<div className="flex flex-1 items-center justify-center text-sm text-muted">
+				<div className="flex flex-1 items-center justify-center px-6 text-center text-sm text-muted">
 					{connectionState === "error"
-						? "Não foi possível entrar no canal."
+						? (error?.message ?? "Não foi possível entrar no canal.")
 						: "Conectando..."}
 				</div>
 			)}

@@ -59,12 +59,19 @@ Bugs que saem assim que ficarem prontos, pelo auto-update, sem esperar a entrega
 - [ ] Os textos dos presets (`presets.ts`) prometem mais fluidez do que o medido em jogo: o Equilibrado ("sem
       perder fluidez") ficou em 25–34 fps e o Nitidez em 18–25 fps, abaixo dos 30 do próprio nome (ADR 0009). **Adiado para a UI nova (v0.2.1).**
 
+- [ ] Botão "Abrir pasta de logs" e interruptor "receber versões beta", adiados da v0.2.0. Até lá, o canal
+      vem de `ASHTAR_UPDATE_CHANNEL=beta`.
+
 ## v0.2.2 — Identidade, convites e permissões
 
 - [ ] Identidade falsa nova a cada entrada (`idiot-<uuid>`, nome `Idiota-<uuid>`): sem nome escolhido nem id
       por instalação. **Adiado para a v0.2.2** (identidade do dispositivo, `docs/roadmap.md`). A UI nova (v0.2.1)
       já traz um nick guardado no computador, que a v0.2.2 aproveita; até lá, o id aleatório por entrada evita
       colisão no LiveKit.
+
+- [ ] Tela de usuários em que o dono marca quem recebe o beta. A API devolve o canal ao app (substitui a
+      variável `ASHTAR_UPDATE_CHANNEL`), e o app guarda o último valor. Papel de dono ("supremo"), acima de
+      administrador; só ele marca o beta. Detalhar no ADR de permissões.
 
 ## v0.2.3 — Publicador nativo e medição
 

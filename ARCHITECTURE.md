@@ -6,7 +6,7 @@ e as regras de cada módulo estão no comentário `//!` no topo dele.
 
 ## Visão geral
 
-Um clone do Discord para desktop, pensado para uma única comunidade de 5 a 10 pessoas: servidores,
+O Ashtar é um clone do Discord para desktop, pensado para uma única comunidade de 5 a 10 pessoas: servidores,
 canais de texto e canais de voz com compartilhamento de tela. O repositório tem dois projetos:
 
 - **`desktop/`**: o app, feito com Tauri (interface em React num webview, núcleo em Rust);

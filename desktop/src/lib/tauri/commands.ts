@@ -20,7 +20,8 @@ export type AppErrorKind =
 	| "VideoCapture"
 	| "AudioCapture"
 	| "Internal"
-	| "Unsupported";
+	| "Unsupported"
+	| "Update";
 
 export interface AppError {
 	kind: AppErrorKind;
@@ -99,6 +100,14 @@ export interface ScreenShareEnded {
 	message: string | null;
 }
 
+export interface UpdateReady {
+	version: string;
+}
+
+export interface UpdateFailed {
+	message: string;
+}
+
 export function listCaptureSources() {
 	return call<CaptureSource[]>("list_capture_sources");
 }
@@ -159,4 +168,50 @@ export function onScreenShareAudioEnded(
 	return listen<ScreenShareEnded>("screen-share-audio-ended", (event) =>
 		callback(event.payload),
 	);
+}
+
+/** A versão já baixada esperando o "reiniciar", ou `null`. */
+export function pendingUpdate() {
+	return call<string | null>("pending_update");
+}
+
+/** Instala a versão baixada e reinicia o app. Se der certo, não resolve: o app fecha. */
+export function installUpdate() {
+	return call<void>("install_update");
+}
+
+/** Pede uma verificação agora. O resultado chega por `onUpdateReady`/`onUpdateFailed`. */
+export function checkForUpdate() {
+	return call<void>("check_for_update");
+}
+
+export function onUpdateReady(
+	callback: (event: UpdateReady) => void,
+): Promise<UnlistenFn> {
+	return listen<UpdateReady>("update-ready", (event) =>
+		callback(event.payload),
+	);
+}
+
+export function onUpdateFailed(
+	callback: (event: UpdateFailed) => void,
+): Promise<UnlistenFn> {
+	return listen<UpdateFailed>("update-failed", (event) =>
+		callback(event.payload),
+	);
+}
+
+// ---------------------------------------------------------------------------
+// App (Etapa 7 da v0.2.0)
+// Espelha `commands/app.rs`.
+// ---------------------------------------------------------------------------
+
+export interface WhatsNew {
+	version: string;
+	notes: string;
+}
+
+/** A seção do CHANGELOG.md da versão em execução, ou `null`. */
+export function whatsNew() {
+	return call<WhatsNew | null>("whats_new");
 }

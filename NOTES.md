@@ -6,7 +6,7 @@ conscientemente adiado (marcar como tal) antes de fechar a fase. A lista da fase
 
 ## Vindos do BACKLOG
 
-- [ ] **Logs em arquivo** (item 04 da v0.1, adiado em 2026-10-07): hoje o `tracing` só escreve no terminal,
+- [ ] **Logs em arquivo** (item 04 da v0.1, adiado em 2026-10-07) — **implementado (Etapa 2), falta verificar no build de release**: o `tracing` só escrevia no terminal,
       e no executável de um amigo não há como ver o que aconteceu. Resolve na Etapa 2.
 
 - [ ] **Código de acesso provisório** (item 03 da v0.1, adiado para cá em 2026-10-07): hoje a API emite o
@@ -21,6 +21,9 @@ conscientemente adiado (marcar como tal) antes de fechar a fase. A lista da fase
       para a VPS (v0.2.6). Alternativa no código: gerar o token com o `nbf` alguns segundos no passado.
 - [ ] **Avisar o grupo** que a v0.2.0 é instalada pelo `-setup.exe` e substitui o executável da v0.1, que
       pode ser apagado.
+
+- [ ] **Renomear `master` para `main`** e passar a trabalhar por pull request (`dev` = beta, `main` =
+      estável, decisão 3).
 
 ## Riscos e cuidados
 
@@ -37,3 +40,11 @@ conscientemente adiado (marcar como tal) antes de fechar a fase. A lista da fase
       tokens do LiveKit. Acompanhar o consumo no painel.
 - [ ] **Consumo de minutos do LiveKit Cloud:** se um mês passar de ~60% dos 5.000 minutos, o servidor
       (v0.2.6) passa à frente, ou o plano pago cobre o mês (gatilho no `docs/roadmap.md`).
+- [ ] **Token de publicação no `ashtar-releases`:** se for fine-grained, expira em no máximo um ano.
+      Anotar aqui a data de expiração ao criá-lo; vencido, o pipeline para de publicar.
+- [ ] **Contrato da API durante o beta** (decisão 3): quem está no beta e o grupo usam a mesma API. Mudança
+      de contrato sempre compatível com a versão anterior até a promoção.
+- [ ] **`ashtar-releases` precisa ter o branch `main` com ao menos um commit** (o pipeline cria as tags com
+      `releaseCommitish: main`). Criar com um README antes da primeira publicação.
+- [ ] **Segredos do pipeline:** `RELEASES_TOKEN`, `TAURI_SIGNING_PRIVATE_KEY`, `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`,
+      `VITE_ACCESS_CODE` (secrets) e `VITE_API_URL` (variável) no repositório principal.

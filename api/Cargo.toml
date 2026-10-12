@@ -11,3 +11,4 @@ tokio = { version = "1.53.1", features = ["full"] }
 dotenvy = "0.15.7"
 livekit-api = "0.7.1"
 tower-http = { version = "0.7.1", features = ["cors"] }
+semver = "1"

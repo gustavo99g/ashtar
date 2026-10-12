@@ -20,6 +20,8 @@ pub enum AppError {
     AudioCapture(String),
     #[error("erro interno: {0}")]
     Internal(String),
+    #[error("falha na atualização: {0}")]
+    Update(String),
     #[error("recurso não suportado nesta plataforma: {0}")]
     // Só é construída fora do Windows (`media/platform/unsupported.rs`).
     #[cfg_attr(windows, allow(dead_code))]
@@ -35,6 +37,7 @@ impl AppError {
             Self::AudioCapture(_) => "AudioCapture",
             Self::Internal(_) => "Internal",
             Self::Unsupported(_) => "Unsupported",
+            Self::Update(_) => "Update",
         }
     }
 }

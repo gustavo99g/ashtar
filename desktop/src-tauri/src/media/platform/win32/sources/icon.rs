@@ -131,7 +131,7 @@ fn icon_pixels(icon: HICON) -> Option<(u32, u32, Vec<u8>)> {
     header.bmiHeader.biHeight = -height; // negativo = linhas de cima para baixo
     header.bmiHeader.biPlanes = 1;
     header.bmiHeader.biBitCount = 32;
-    header.bmiHeader.biCompression = BI_RGB as u32;
+    header.bmiHeader.biCompression = BI_RGB;
 
     let mut pixels = vec![0u8; (width * height * 4) as usize];
     let dc = ScreenDc::new()?;
@@ -153,12 +153,12 @@ fn icon_pixels(icon: HICON) -> Option<(u32, u32, Vec<u8>)> {
         return None;
     }
     // O Windows entrega BGRA; a biblioteca de imagem espera RGBA.
-    for p in pixels.chunks_exact_mut(4) {
+    for p in pixels.as_chunks_mut::<4>().0 {
         p.swap(0, 2);
     }
     // Ícones antigos não têm transparência e vêm com alfa zero em tudo.
-    if pixels.chunks_exact(4).all(|p| p[3] == 0) {
-        for p in pixels.chunks_exact_mut(4) {
+    if pixels.as_chunks::<4>().0.iter().all(|p| p[3] == 0) {
+        for p in pixels.as_chunks_mut::<4>().0 {
             p[3] = 255;
         }
     }
