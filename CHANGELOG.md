@@ -1,6 +1,6 @@
 # O que há de novo no Ashtar
 
-## 0.1.92
+## 0.2.0
 
 - O app agora se atualiza sozinho. Esta é a última vez que você precisa baixar um instalador.
 - Novo nome: Ashtar. Pode apagar o executável antigo.
