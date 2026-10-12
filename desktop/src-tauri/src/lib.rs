@@ -8,6 +8,7 @@
 // parte do FFI do projeto mora em `media::platform::win32`.
 #![warn(clippy::undocumented_unsafe_blocks)]
 
+mod changelog;
 mod commands;
 mod error;
 pub mod logging;
@@ -43,7 +44,8 @@ pub fn run(log_file: logging::LateFile) {
             commands::screen_share::screen_share_stop,
             commands::updater::pending_update,
             commands::updater::install_update,
-            commands::updater::check_for_update
+            commands::updater::check_for_update,
+            commands::app::whats_new
         ])
         .build(tauri::generate_context!())
         .expect("error while running tauri application");

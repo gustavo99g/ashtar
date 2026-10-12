@@ -200,3 +200,18 @@ export function onUpdateFailed(
 		callback(event.payload),
 	);
 }
+
+// ---------------------------------------------------------------------------
+// App (Etapa 7 da v0.2.0)
+// Espelha `commands/app.rs`.
+// ---------------------------------------------------------------------------
+
+export interface WhatsNew {
+	version: string;
+	notes: string;
+}
+
+/** A seção do CHANGELOG.md da versão em execução, ou `null`. */
+export function whatsNew() {
+	return call<WhatsNew | null>("whats_new");
+}
