@@ -17,14 +17,14 @@ O botão "Abrir pasta de logs" e o interruptor "receber versões beta" também f
 
 | Etapa | Descrição | Status |
 |---|---|---|
-| 1 | Identidade do app | Em andamento (falta `createUpdaterArtifacts` e o build do instalador) |
-| 2 | Logs em arquivo | Implementada (falta verificar no build de release) |
-| 3 | CI | Pendente |
-| 4 | Updater no app | Pendente |
-| 5 | Pipeline de release | Pendente |
-| 6 | Versão mínima e código de acesso | Pendente |
-| 7 | "O que há de novo" | Pendente |
-| 8 | Verificação | Pendente |
+| 1 | Identidade do app | Concluída |
+| 2 | Logs em arquivo | Concluída |
+| 3 | CI | Concluída |
+| 4 | Updater no app | Concluída |
+| 5 | Pipeline de release | Concluída |
+| 6 | Versão mínima e código de acesso | Concluída |
+| 7 | "O que há de novo" | Concluída |
+| 8 | Verificação | Concluída |
 
 ---
 
@@ -180,7 +180,7 @@ Repositório privado: 2.000 min/mês grátis, com runners Windows contando em do
 
 ---
 
-## Etapa 1: identidade do app — em andamento
+## Etapa 1: identidade do app — concluída
 
 - `productName`, `identifier`, título da janela e ícones (ícones definitivos podem esperar a UI nova).
 - Versão lida do `package.json` (decisão 4) e `package.json` em `0.2.0`.
@@ -192,22 +192,23 @@ Repositório privado: 2.000 min/mês grátis, com runners Windows contando em do
 administrador, e o app abre com o nome novo; o `pnpm tauri dev` grava em
 `%LOCALAPPDATA%\com.gustavo99g.ashtar.dev`.
 
-## Etapa 2: logs em arquivo — implementada, falta verificar
+## Etapa 2: logs em arquivo — concluída
 
 Decisão 10. Camada de arquivo preenchida no `setup` (`reload`), hook de panic no início do `main`.
 
 **Pronto quando:** num build de release, abrir e entrar numa sala gera o arquivo do dia na pasta de logs,
 inclusive as últimas linhas antes de fechar.
 
-## Etapa 3: CI — pendente
+## Etapa 3: CI — concluída
 
 Workflow `ci.yml` (decisão 12).
 
 **Pronto quando:** um pull request com um teste quebrado fica vermelho.
 
-## Etapa 4: updater no app — pendente
+## Etapa 4: updater no app — concluída
 
-- `tauri-plugin-updater` e `tauri-plugin-process` (reiniciar), com as permissões nas `capabilities`.
+- `tauri-plugin-updater`. O reinício é feito pelo próprio updater (`install`), então o `tauri-plugin-process`
+  não é necessário; os comandos são próprios, sem permissões extras nas `capabilities`.
 - Chave pública no `tauri.conf.json` (decisão 7).
 - Verificação no Rust a partir do `setup`, só em release, com o endpoint do canal de
   `ASHTAR_UPDATE_CHANNEL` (decisões 3 e 6).
@@ -220,7 +221,7 @@ release; o release de teste é apagado depois), o app encontra a versão, baixa,
 instala ao reiniciar ou ao fechar; durante uma chamada, não reinicia sozinho; no `pnpm tauri dev`, não
 verifica nada.
 
-## Etapa 5: pipeline de release — pendente
+## Etapa 5: pipeline de release — concluída
 
 Workflow `release.yml` (decisão 3):
 
@@ -233,6 +234,9 @@ Workflow `release.yml` (decisão 3):
    `latest.json`.
 6. Sobrescreve o `latest.json` do release `beta` (pre-release).
 
+Se uma execução cair entre a publicação e o passo 6, a versão já existe mas o beta não aponta para ela: o job
+`beta-manifesto` refaz só o apontamento, sem compilar de novo.
+
 **No merge na `main`:** desmarca o pre-release de `v<versão>` e o marca como *latest*; falha se ele não
 existir.
 
@@ -240,7 +244,7 @@ existir.
 publicados, sem passo manual; um merge na `dev` sem mudar a versão não publica nada; um merge na `main`
 promove sem compilar.
 
-## Etapa 6: versão mínima e código de acesso — pendente
+## Etapa 6: versão mínima e código de acesso — concluída
 
 Decisões 8 e 11: os dois cabeçalhos (`X-App-Version` e `X-Access-Code`) num só ponto do app (o `fetch` da
 API), a conferência na API e as mensagens no app.
@@ -249,14 +253,14 @@ API), a conferência na API e as mensagens no app.
 erro genérico; com `ACCESS_CODE` definido, uma chamada sem o código recebe 401 e o app recebe o token
 normalmente; sem as variáveis, nada muda.
 
-## Etapa 7: "O que há de novo" — pendente
+## Etapa 7: "O que há de novo" — concluída
 
 Decisão 9.
 
 **Pronto quando:** depois de atualizar de uma versão para outra, a primeira abertura mostra a seção nova do
 `CHANGELOG.md` uma única vez.
 
-## Etapa 8: verificação — pendente
+## Etapa 8: verificação — concluída
 
 1. Instalar a v0.2.0 do zero numa máquina sem o app (e numa com o executável da v0.1).
 2. Publicar a correção do eco (`BACKLOG.md`, "Correções fora de ordem") como `0.2.1`: chega primeiro a quem
