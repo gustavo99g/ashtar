@@ -83,7 +83,7 @@ v0.2.N sai como versão `0.2.N0`, e cada correção dela soma 1 no último dígi
 ```text
 0.2.0            entrega v0.2.0 (base de entrega)
 0.2.1, 0.2.2…    correções da v0.2.0
-0.2.10           entrega v0.2.1 (UI nova)
+0.2.10           entrega v0.2.1 (identidade)
 0.2.11…          correções da v0.2.1
 0.2.60           entrega v0.2.6 (servidor)
 0.3.0            próxima versão do roadmap
@@ -161,10 +161,10 @@ O mínimo para o aplicativo funcionar fora da rede local sem quebrar:
 * build do Windows (instalador sem assinatura de código; o SmartScreen vai pedir confirmação);
 * URL da API configurável por ambiente;
 * identidade provisória: cada entrada gera um id aleatório novo (`idiot-<uuid>`), o que evita colisão no
-  LiveKit; o nome escolhido e o id por instalação ficam para a v0.2.2;
+  LiveKit; o nome escolhido e o id por instalação ficam para a v0.2.1;
 * ~~código de acesso compartilhado, conferido pela API antes de emitir o token do LiveKit~~:
   **adiado para a v0.2.0**, que já tem auto-update e não exige redistribuir o executável; a identidade da
-  v0.2.2 o substitui. Até lá, quem descobrir a URL da API consegue tokens e consome a cota;
+  v0.2.1 o substitui. Até lá, quem descobrir a URL da API consegue tokens e consome a cota;
 * ~~logs em arquivo~~: **adiado para a v0.2.0**, junto com a base de entrega.
 
 O grupo já recebeu o executável desta versão (2026-10-06); os dois itens adiados foram decididos
@@ -241,17 +241,18 @@ versões"), e cada uma ganha um plano detalhado próprio antes de começar.
 
 ```text
 v0.2.0  Base de entrega       auto-update + pipeline + canal beta + versão mínima + logs
-v0.2.1  UI nova
-v0.2.2  Identidade            convites + identidade do dispositivo + permissões + banco
+v0.2.1  Identidade            convites + identidade do dispositivo + permissões + banco (sem mudança visível)
+v0.2.2  UI nova               passa a usar as rotas da identidade
 v0.2.3  Publicador nativo
 v0.2.4  Chat real
 v0.2.5  Áudio                 supressão de ruído e cancelamento de eco
 v0.2.6  Servidor              VPS (LiveKit, API e banco) + domínio + backup + alerta
 ```
 
-A ordem segue três regras: a base de entrega vem primeiro, porque faz todo o resto chegar sozinho; a UI
-nova vem antes de qualquer tela nova (identidade e chat), para que nada seja construído duas vezes; e o
-publicador nativo vem antes do chat, por ser o maior risco técnico que sobrou da mídia. O servidor próprio
+A ordem segue três regras: a base de entrega vem primeiro, porque faz todo o resto chegar sozinho; a
+identidade vem antes da UI nova, e a UI nova antes de qualquer tela nova (convite, nick e chat), para que
+nada seja construído duas vezes (a v0.2.1 e a v0.2.2 são uma entrega conjunta: a primeira não muda nada do
+que o grupo vê, e a segunda mostra tudo); e o publicador nativo vem antes do chat, por ser o maior risco técnico que sobrou da mídia. O servidor próprio
 fica por último: até lá, o LiveKit Cloud e o computador de casa (com o Tailscale Funnel) bastam, ao custo
 de uma migração do banco na v0.2.6. A v0.2.5 (áudio) é pequena e independente e pode sair antes, se o ruído ou o eco começarem a incomodar.
 
@@ -276,7 +277,7 @@ A instalação da v0.2.0 é a última reinstalação manual.
   com rotação, para investigar problemas na máquina de cada um;
 * **código de acesso provisório** (adiado da v0.1): o app manda um código fixo, embutido no build, e a API
   só emite o token do LiveKit com ele. Não protege contra quem tem o executável, só contra quem descobre a
-  URL; fica até a identidade da v0.2.2. Com o auto-update, deixou de exigir redistribuição manual.
+  URL; fica até a identidade da v0.2.1. Com o auto-update, deixou de exigir redistribuição manual.
 
 ```text
 uma versão nova passa pelo canal beta e depois chega sozinha a todos
@@ -286,22 +287,12 @@ um teste falhando bloqueia o release
 cliente antigo recusado com pedido de atualização
 ```
 
-### v0.2.1 — UI nova
+### v0.2.1 — Identidade, convites e permissões
 
-Refazer a interface a partir do novo protótipo, antes da identidade e do chat, para que as telas de
-convite, de nick e de conversa sejam construídas uma única vez em cima da interface definitiva.
-
-Precisa de um plano próprio antes de começar, feito a partir do protótipo: telas, componentes,
-navegação e o que muda na UI de voz e de compartilhamento (que hoje é provisória). Os itens de UI que a
-v0.1 deixou (seletor de fontes, trava de uma transmissão por vez, textos dos presets) estão no
-`BACKLOG.md`.
-
-* **nick guardado no computador:** um campo para cada pessoa escolher o nome que aparece na sala, salvo
-  localmente, no lugar do `Idiota-<uuid>`. A v0.2.2 aproveita esse valor como o nick inicial da identidade.
-
-### v0.2.2 — Identidade, convites e permissões
-
-As telas de convite e de escolha do nick já nascem na UI nova da v0.2.1.
+A v0.2.1 e a v0.2.2 formam uma entrega conjunta. Esta parte entrega o banco, as rotas da API e o comando de
+administração, sem mudar nada do que o grupo vê: o app continua entrando pela rota antiga, com o código de
+acesso provisório. As telas de convite e de escolha do nick nascem na UI nova da v0.2.2, que passa a usar as
+rotas novas e então desliga o código de acesso.
 
 **Banco de dados.** A identidade é o primeiro dado que precisa durar, então o banco entra aqui, rodando
 junto da API no computador que a hospeda (o servidor próprio só vem na v0.2.6):
@@ -313,7 +304,7 @@ junto da API no computador que a hospeda (o servidor próprio só vem na v0.2.6)
   PostgreSQL, um dump e um restore.
 
 A v0.1 entra com uma identidade aleatória nova a cada entrada (`idiot-<uuid>`, nome `Idiota-<uuid>`); a
-identidade do dispositivo, com o nome escolhido pela pessoa, a substitui aqui.
+identidade do dispositivo, com o nome escolhido pela pessoa, a substitui, junto com a UI nova da v0.2.2.
 
 Sem senha. O convite é a única forma de entrar, e a identidade vem do próprio computador, para que
 formatar o Windows não exija nada.
@@ -356,9 +347,10 @@ de recuperação.
   o administrador gera um convite vinculado ao usuário existente. Ao usar o convite, o dispositivo novo
   é vinculado ao mesmo usuário, com o mesmo histórico, e o vínculo antigo é removido;
 * o primeiro administrador é criado por configuração ou comando da API;
-* fecha o acesso à API: substitui o código de acesso provisório da v0.2.0; token do LiveKit só para
-  usuários autenticados;
-* o nick guardado no computador desde a v0.2.1 vira o nick inicial na tela de escolha.
+* fecha o acesso à API: substitui o código de acesso provisório da v0.2.0, quando a UI nova da v0.2.2 passa
+  a usar as rotas; token do LiveKit só para usuários autenticados;
+* o nick é escolhido na tela de convite da UI nova (v0.2.2); até lá, o convite e a recuperação saem pelo
+  comando de administração.
 
 **Permissões mínimas**
 
@@ -395,6 +387,21 @@ formatar o Windows → entra direto, sem convite novo
  +
 sem identidade válida → nenhum token do LiveKit
 ```
+
+### v0.2.2 — UI nova
+
+Refazer a interface a partir do novo protótipo, depois da identidade (v0.2.1) e antes do chat, para que as
+telas de convite, de nick e de conversa sejam construídas uma única vez em cima da interface definitiva. É
+aqui que o grupo passa a ver a identidade: a UI nova usa as rotas de convite e de sessão da v0.2.1 e desliga
+o código de acesso provisório.
+
+Precisa de um plano próprio antes de começar, feito a partir do protótipo: telas, componentes,
+navegação e o que muda na UI de voz e de compartilhamento (que hoje é provisória). Os itens de UI que a
+v0.1 deixou (seletor de fontes, trava de uma transmissão por vez, textos dos presets) estão no
+`BACKLOG.md`.
+
+* **telas de convite e de escolha do nick**, sobre as rotas da v0.2.1: o nome que aparece na sala vem da
+  identidade, no lugar do `Idiota-<uuid>`.
 
 ### v0.2.3 — Publicador nativo
 
@@ -471,7 +478,7 @@ respondendo até todos atualizarem e só então desligar a antiga.
   por várias pessoas pode gerar dezenas de GB;
 * TURN configurado, para quem estiver atrás de redes restritivas;
 * segredos de produção configurados uma única vez no servidor, fora do repositório;
-* banco migrado do computador de casa para a VPS (escolhido na v0.2.2);
+* banco migrado do computador de casa para a VPS (escolhido na v0.2.1);
 * backup automático continua fora da VPS (ex.: Cloudflare R2), para que não se perca junto com ela;
 * **alerta de servidor fora do ar**: um monitor externo gratuito chama o `/health` e avisa no celular.
 
@@ -926,7 +933,7 @@ outra.
 v0.1    API pelo Tailscale Funnel
         mídia pelo LiveKit Cloud (plano gratuito), consumo acompanhado
         ↓
-v0.2.2  banco junto da API, no computador de casa
+v0.2.1  banco junto da API, no computador de casa
         backup fora do computador (ex.: Cloudflare R2)
         ↓
 v0.2.6  LiveKit, API e banco em VPS própria, com domínio
@@ -978,8 +985,8 @@ v0.1
 v0.2
 07. v0.2.0 Auto-update + pipeline com testes + canal beta + versão mínima + "O que há de novo"
     + logs em arquivo + código de acesso provisório
-08. v0.2.1 UI nova
-09. v0.2.2 Convites + identidade do dispositivo + permissões + segurança mínima + banco
+08. v0.2.1 Convites + identidade do dispositivo + permissões + segurança mínima + banco
+09. v0.2.2 UI nova
 10. v0.2.3 Publicador nativo + medição
 11. v0.2.4 Chat real + WebSocket
 12. v0.2.5 Supressão de ruído e cancelamento de eco

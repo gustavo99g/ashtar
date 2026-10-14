@@ -44,12 +44,23 @@ Bugs que saem assim que ficarem prontos, pelo auto-update, sem esperar a entrega
       `commands/screen_share.rs`. O teste `mede_a_exclusao_de_um_chromium` (ignorado) repete a medição com
       qualquer Chromium tocando áudio (`EXCLUDE_PID=<pid da raiz>`).
 
-## v0.2.1 — UI nova
+## v0.2.1 — Identidade, convites e permissões
+
+- [ ] Identidade falsa nova a cada entrada (`idiot-<uuid>`, nome `Idiota-<uuid>`): sem nome escolhido nem id
+      por instalação. **Adiado para a v0.2.1** (identidade do dispositivo, `docs/roadmap.md`). A v0.2.1 não muda
+      nada para o grupo; a UI nova (v0.2.2) é quem passa a usar as rotas. Até lá, o id aleatório por entrada
+      evita colisão no LiveKit.
+
+- [ ] Tela de usuários em que o dono marca quem recebe o beta. A API devolve o canal ao app (v0.2.1; a tela vem com a UI nova da v0.2.2; substitui a
+      variável `ASHTAR_UPDATE_CHANNEL`), e o app guarda o último valor. Papel de dono ("supremo"), acima de
+      administrador; só ele marca o beta. Detalhar no ADR de permissões.
+
+## v0.2.2 — UI nova
 
 - [ ] O seletor (`SourcePicker`) e a trava de uma transmissão por vez (`ScreenShareButton`) existem e foram
       usados nos testes de 05 e 06/10 (ADR 0009). A trava só considera tracks já assinados e não impede duas
       pessoas de iniciarem ao mesmo tempo; o erro de início não tem como ser dispensado. A UI de voz é
-      provisória. **Adiado para a UI nova (v0.2.1).**
+      provisória. **Adiado para a UI nova (v0.2.2).**
 - [ ] Janelas minimizadas não aparecem no seletor. Não é bug nosso: o libwebrtc as descarta da lista
       (`IsIconic`) e também não as captura, e o `CaptureSource` só sai dessa lista (medido: o `start` de uma
       janela minimizada devolve `SourceNotFound`). O seletor recarrega a lista a cada 2 s (ao fim de cada
@@ -57,21 +68,10 @@ Bugs que saem assim que ficarem prontos, pelo auto-update, sem esperar a entrega
       `EnumWindows`, selo "Minimizada" e restauração da janela ao escolher (contraria a decisão 2 do PLAN).
       A lista leva ~95 ms com 4 janelas (release), por causa dos ícones: remedir com muitas janelas.
 - [ ] Os textos dos presets (`presets.ts`) prometem mais fluidez do que o medido em jogo: o Equilibrado ("sem
-      perder fluidez") ficou em 25–34 fps e o Nitidez em 18–25 fps, abaixo dos 30 do próprio nome (ADR 0009). **Adiado para a UI nova (v0.2.1).**
+      perder fluidez") ficou em 25–34 fps e o Nitidez em 18–25 fps, abaixo dos 30 do próprio nome (ADR 0009). **Adiado para a UI nova (v0.2.2).**
 
 - [ ] Botão "Abrir pasta de logs" e interruptor "receber versões beta", adiados da v0.2.0. Até lá, o canal
       vem de `ASHTAR_UPDATE_CHANNEL=beta`.
-
-## v0.2.2 — Identidade, convites e permissões
-
-- [ ] Identidade falsa nova a cada entrada (`idiot-<uuid>`, nome `Idiota-<uuid>`): sem nome escolhido nem id
-      por instalação. **Adiado para a v0.2.2** (identidade do dispositivo, `docs/roadmap.md`). A UI nova (v0.2.1)
-      já traz um nick guardado no computador, que a v0.2.2 aproveita; até lá, o id aleatório por entrada evita
-      colisão no LiveKit.
-
-- [ ] Tela de usuários em que o dono marca quem recebe o beta. A API devolve o canal ao app (substitui a
-      variável `ASHTAR_UPDATE_CHANNEL`), e o app guarda o último valor. Papel de dono ("supremo"), acima de
-      administrador; só ele marca o beta. Detalhar no ADR de permissões.
 
 ## v0.2.3 — Publicador nativo e medição
 

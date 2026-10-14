@@ -256,7 +256,7 @@ A confirmar antes de assinar:
 * upgrade de plano sem migrar a máquina;
 * o consumo medido no teste da v0.1 confirma a estimativa.
 
-O backup semanal da Hostinger não substitui o backup fora da VPS, que começa na v0.2.2 junto com o banco: se a conta ou a
+O backup semanal da Hostinger não substitui o backup fora da VPS, que começa na v0.2.1 junto com o banco: se a conta ou a
 máquina tiver problema, os dois se perdem juntos.
 
 ## Status

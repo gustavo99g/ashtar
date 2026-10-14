@@ -3,7 +3,7 @@
  * baixar uma versão, e a falha de assinatura ou de instalação.
  *
  * Mínimo de propósito: o resto da UI de atualização (canal beta, pasta de logs) vem com a UI nova
- * (v0.2.1). Reiniciar durante uma chamada pede confirmação; sem o clique, a versão é instalada ao
+ * (v0.2.2). Reiniciar durante uma chamada pede confirmação; sem o clique, a versão é instalada ao
  * fechar o app (no Rust).
  */
 import { useEffect, useState } from "react";
