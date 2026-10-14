@@ -44,17 +44,6 @@ Bugs que saem assim que ficarem prontos, pelo auto-update, sem esperar a entrega
       `commands/screen_share.rs`. O teste `mede_a_exclusao_de_um_chromium` (ignorado) repete a medição com
       qualquer Chromium tocando áudio (`EXCLUDE_PID=<pid da raiz>`).
 
-## v0.2.1 — Identidade, convites e permissões
-
-- [ ] Identidade falsa nova a cada entrada (`idiot-<uuid>`, nome `Idiota-<uuid>`): sem nome escolhido nem id
-      por instalação. **Adiado para a v0.2.1** (identidade do dispositivo, `docs/roadmap.md`). A v0.2.1 não muda
-      nada para o grupo; a UI nova (v0.2.2) é quem passa a usar as rotas. Até lá, o id aleatório por entrada
-      evita colisão no LiveKit.
-
-- [ ] Tela de usuários em que o dono marca quem recebe o beta. A API devolve o canal ao app (v0.2.1; a tela vem com a UI nova da v0.2.2; substitui a
-      variável `ASHTAR_UPDATE_CHANNEL`), e o app guarda o último valor. Papel de dono ("supremo"), acima de
-      administrador; só ele marca o beta. Detalhar no ADR de permissões.
-
 ## v0.2.2 — UI nova
 
 - [ ] O seletor (`SourcePicker`) e a trava de uma transmissão por vez (`ScreenShareButton`) existem e foram
@@ -72,6 +61,10 @@ Bugs que saem assim que ficarem prontos, pelo auto-update, sem esperar a entrega
 
 - [ ] Botão "Abrir pasta de logs" e interruptor "receber versões beta", adiados da v0.2.0. Até lá, o canal
       vem de `ASHTAR_UPDATE_CHANNEL=beta`.
+
+- [ ] Tela de usuários em que o dono marca quem recebe o beta. A API (devolver o canal e a permissão no
+      `admin`) sai na v0.2.1 (`NOTES.md`); a tela e o app guardando o último valor vêm aqui, e substituem a
+      variável `ASHTAR_UPDATE_CHANNEL`. Papel de dono ("supremo"), acima de administrador; só ele marca o beta.
 
 ## v0.2.3 — Publicador nativo e medição
 
