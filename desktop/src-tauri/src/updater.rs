@@ -1,4 +1,4 @@
-//! Atualização automática (decisões 3 e 6 do `PLAN.md` da v0.2.0).
+//! Atualização automática (decisões 3 e 6 de `docs/plans/v0.2.0-base-de-entrega.md`).
 //!
 //! Só funciona no build de release: no desenvolvimento, [`spawn_periodic_check`]
 //! e [`check_in_background`] não fazem nada. Verifica ao abrir e a cada 3

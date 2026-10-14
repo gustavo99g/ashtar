@@ -1,4 +1,4 @@
-//! "O que há de novo" (decisão 9 do `PLAN.md` da v0.2.0).
+//! "O que há de novo" (decisão 9 de `docs/plans/v0.2.0-base-de-entrega.md`).
 //!
 //! O `CHANGELOG.md` da raiz do repositório é embutido no binário na
 //! compilação; [`for_version`] devolve a seção de uma versão. O formato é o
