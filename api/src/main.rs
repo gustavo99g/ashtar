@@ -1,28 +1,7 @@
 use std::sync::Arc;
 
-use axum::{
-    Json, Router, middleware,
-    routing::{get, post},
-};
+use api::{AppState, client_policy::ClientPolicy, db};
 use dotenvy::dotenv;
-use serde::Serialize;
-use tower_http::cors::CorsLayer;
-
-mod client_policy;
-mod routes;
-
-use routes::voice::join_voice;
-
-use crate::client_policy::ClientPolicy;
-
-#[derive(Serialize)]
-struct HealthResponse {
-    status: String,
-    version: String,
-    message: String,
-}
-
-const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[tokio::main]
 async fn main() {
@@ -40,19 +19,14 @@ async fn main() {
             "desligado"
         },
     );
+    let database_url = std::env::var("DATABASE_URL").expect("defina DATABASE_URL no .env");
 
-    let api =
-        Router::new()
-            .route("/voice/join", post(join_voice))
-            .layer(middleware::from_fn_with_state(
-                policy,
-                client_policy::enforce,
-            ));
+    let pool = db::connect(&database_url)
+        .await
+        .expect("não foi possivel abrir o banco");
+    println!("Banco: {database_url}");
 
-    let app = Router::new()
-        .route("/health", get(health))
-        .nest("/api", api)
-        .layer(CorsLayer::permissive());
+    let app = api::app(AppState::new(pool), policy);
 
     let listener = tokio::net::TcpListener::bind("127.0.0.1:3000")
         .await
@@ -63,12 +37,4 @@ async fn main() {
     axum::serve(listener, app)
         .await
         .expect("FAILED TO SERVE !!!");
-}
-
-async fn health() -> Json<HealthResponse> {
-    Json(HealthResponse {
-        status: String::from("OK"),
-        version: String::from(VERSION),
-        message: String::from("Server is running"),
-    })
 }
