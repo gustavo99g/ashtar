@@ -55,28 +55,39 @@ pub fn now() -> i64 {
         .map_or(0, |d| d.as_secs() as i64)
 }
 
+/// Apoio para os testes que precisam de um banco em arquivo.
 #[cfg(test)]
-mod tests {
-    use super::*;
+pub(crate) mod test_support {
+    use std::sync::atomic::{AtomicU32, Ordering};
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    static COUNTER: AtomicU32 = AtomicU32::new(0);
 
     /// Caminho de um banco temporário só deste teste (e a URL para abri-lo).
-    fn temp_db() -> (std::path::PathBuf, String) {
+    pub fn temp_db() -> (std::path::PathBuf, String) {
         let nanos = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .map_or(0, |d| d.as_nanos());
+        let n = COUNTER.fetch_add(1, Ordering::Relaxed);
         let path =
-            std::env::temp_dir().join(format!("ashtar-test-{}-{nanos}.db", std::process::id()));
+            std::env::temp_dir().join(format!("ashtar-test-{}-{nanos}-{n}.db", std::process::id()));
         let url = format!("sqlite:{}", path.display().to_string().replace('\\', "/"));
         (path, url)
     }
 
-    fn remove_db(path: &std::path::Path) {
+    pub fn remove_db(path: &std::path::Path) {
         for suffix in ["", "-wal", "-shm"] {
             let mut file = path.as_os_str().to_owned();
             file.push(suffix);
             let _ = std::fs::remove_file(file);
         }
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::test_support::{remove_db, temp_db};
+    use super::*;
 
     async fn insert_user(pool: &SqlitePool, id: &str, nick: &str) -> Result<(), sqlx::Error> {
         sqlx::query("INSERT INTO users (id, nick, created_at) VALUES (?, ?, 0)")

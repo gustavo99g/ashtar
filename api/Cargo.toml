@@ -13,3 +13,8 @@ livekit-api = "0.7.1"
 tower-http = { version = "0.7.1", features = ["cors"] }
 semver = "1"
 sqlx = { version = "0.9.0", default-features = false, features = ["runtime-tokio", "sqlite", "migrate", "macros"] }
+uuid = { version = "1.28.0", features = ["v4"] }
+sha2 = "0.11.1"
+hex = "0.4.3"
+getrandom = "0.4.3"
+thiserror = "2.0.21"

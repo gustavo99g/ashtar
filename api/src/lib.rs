@@ -15,7 +15,10 @@ use crate::client_policy::ClientPolicy;
 
 pub mod client_policy;
 pub mod db;
+pub mod error;
+pub mod identity;
 pub mod routes;
+pub mod secret;
 
 /// Estado compartilhado pelas rotas. Clonar é barato: o pool só conta
 /// referências.
