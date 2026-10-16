@@ -90,16 +90,16 @@ pub async fn redeem(
 }
 
 /// `POST /api/auth/login`: entra com um dispositivo já vinculado.
+///
+/// Fica fora do limite de tentativas, de propósito: a chave do dispositivo tem
+/// 256 bits, então adivinhá-la é inviável; e todo app de quem ainda não tem
+/// convite chama o login ao abrir (e recebe `unknown_device`), o que travaria os
+/// convites de todos. Bloquear o login também deixaria de fora quem já é membro.
 pub async fn login(
     State(state): State<AppState>,
     ApiJson(request): ApiJson<LoginRequest>,
 ) -> Result<Json<SessionResponse>, ApiError> {
-    state.limiter.check()?;
-    let result = devices::login(&state.db, &request.device_key, now()).await;
-    if matches!(result, Err(ApiError::UnknownDevice)) {
-        state.limiter.record_failure();
-    }
-    let (user, token) = result?;
+    let (user, token) = devices::login(&state.db, &request.device_key, now()).await?;
     Ok(Json(SessionResponse {
         token,
         user: UserView::from(&user),

@@ -465,6 +465,49 @@ async fn erros_demais_travam_por_um_tempo() {
 }
 
 #[tokio::test]
+async fn o_login_fica_fora_do_limite_de_tentativas() {
+    let ctx = setup().await;
+    let code = new_invite(&ctx).await;
+    redeem(&ctx, &code, 1, "Fulano").await;
+
+    // Um computador sem convite chama o login ao abrir o app: não conta como erro.
+    for _ in 0..30 {
+        let (status, body) = call(
+            &ctx.router,
+            "POST",
+            "/api/auth/login",
+            None,
+            Some(json!({ "device_key": key(9) })),
+        )
+        .await;
+        assert_eq!(status, StatusCode::UNAUTHORIZED);
+        assert_eq!(body["kind"], "unknown_device");
+    }
+    // Então os convites seguem funcionando.
+    let code = new_invite(&ctx).await;
+    assert_eq!(redeem(&ctx, &code, 2, "Ciclano").await.0, StatusCode::OK);
+
+    // E, com o limite de convites estourado, quem já é membro continua entrando.
+    for _ in 0..20 {
+        redeem(&ctx, "AAAA-AAAA-AAAA", 3, "Beltrano").await;
+    }
+    let code = new_invite(&ctx).await;
+    assert_eq!(
+        redeem(&ctx, &code, 3, "Beltrano").await.0,
+        StatusCode::TOO_MANY_REQUESTS
+    );
+    let (status, _) = call(
+        &ctx.router,
+        "POST",
+        "/api/auth/login",
+        None,
+        Some(json!({ "device_key": key(1) })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+}
+
+#[tokio::test]
 async fn convite_de_grupo_aceita_ate_o_limite_de_usos() {
     let ctx = setup().await;
     let invite = invites::create(&ctx.db, &ctx.owner, InviteKind::New, None, 5 * 60, 2, now())

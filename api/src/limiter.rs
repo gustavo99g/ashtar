@@ -1,4 +1,7 @@
-//! Limite de tentativas erradas em convite e login.
+//! Limite de tentativas erradas de convite.
+//!
+//! Só o uso de convite entra aqui. O login com a chave do dispositivo fica de fora
+//! (ver `routes::auth::login`).
 //!
 //! Conta as falhas de todo mundo junto, numa janela de tempo. Por IP não
 //! daria: atrás do Tailscale Funnel todas as chamadas chegam do mesmo
