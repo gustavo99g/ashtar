@@ -31,6 +31,7 @@ dependencies = [
  "dotenvy",
  "getrandom 0.4.3",
  "hex",
+ "http-body-util",
  "livekit-api",
  "semver",
  "serde",
@@ -39,6 +40,7 @@ dependencies = [
  "sqlx",
  "thiserror",
  "tokio",
+ "tower",
  "tower-http 0.7.1",
  "uuid",
 ]

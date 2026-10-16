@@ -9,9 +9,6 @@ pub mod invites;
 pub mod permissions;
 pub mod users;
 
-#[cfg(test)]
-mod tests;
-
 use sqlx::FromRow;
 
 /// Um membro do grupo.

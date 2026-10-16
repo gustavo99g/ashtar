@@ -1,5 +1,13 @@
-//! A API do Ashtar como biblioteca: o servidor (`main.rs`) e, mais adiante,
-//! o `admin` (`src/bin/admin.rs`) usam as mesmas regras e o mesmo banco.
+//! A API do Ashtar como biblioteca: o servidor (`main.rs`) e o `admin`
+//! (`src/bin/admin.rs`) usam as mesmas regras e o mesmo banco.
+
+pub mod client_policy;
+pub mod db;
+pub mod error;
+pub mod identity;
+pub mod limiter;
+pub mod routes;
+pub mod secret;
 
 use std::sync::Arc;
 
@@ -11,25 +19,23 @@ use serde::Serialize;
 use sqlx::SqlitePool;
 use tower_http::cors::CorsLayer;
 
-use crate::client_policy::ClientPolicy;
+use client_policy::ClientPolicy;
+use limiter::AttemptLimiter;
 
-pub mod client_policy;
-pub mod db;
-pub mod error;
-pub mod identity;
-pub mod routes;
-pub mod secret;
-
-/// Estado compartilhado pelas rotas. Clonar é barato: o pool só conta
-/// referências.
+/// Estado compartilhado pelas rotas. Clonar é barato: o pool e o `Arc` só
+/// contam referências.
 #[derive(Clone)]
 pub struct AppState {
     pub db: SqlitePool,
+    pub limiter: Arc<AttemptLimiter>,
 }
 
 impl AppState {
     pub fn new(db: SqlitePool) -> Self {
-        Self { db }
+        Self {
+            db,
+            limiter: Arc::new(AttemptLimiter::default_for_api()),
+        }
     }
 }
 
@@ -46,6 +52,10 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 pub fn app(state: AppState, policy: Arc<ClientPolicy>) -> Router {
     let api = Router::new()
         .route("/voice/join", post(routes::voice::join_voice))
+        .route("/voice/token", post(routes::voice::voice_token))
+        .route("/auth/redeem", post(routes::auth::redeem))
+        .route("/auth/login", post(routes::auth::login))
+        .route("/me", get(routes::auth::me))
         .layer(middleware::from_fn_with_state(
             policy,
             client_policy::enforce,
