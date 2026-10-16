@@ -24,9 +24,9 @@ Base: branch `dev`, commit `da8039c` (a `0.2.0` publicada no beta). Em cada etap
 | Etapa | Descrição | Status |
 |---|---|---|
 | 0 | Decisões (ADRs 0010 e 0011) | Concluída |
-| 1 | Banco: `lib.rs`, SQLite com migrações, `DATABASE_URL` | Pendente |
-| 2 | Regras: membros, permissões, dispositivo, sessão e convites, sem HTTP | Pendente |
-| 3 | Rotas novas, limite de tentativas e testes de integração | Pendente |
+| 1 | Banco: `lib.rs`, SQLite com migrações, `DATABASE_URL` | Concluída |
+| 2 | Regras: membros, permissões, dispositivo, sessão e convites, sem HTTP | Concluída |
+| 3 | Rotas novas, limite de tentativas e testes de integração | Concluída |
 | 4 | O binário `admin` | Pendente |
 | 5 | Operação: backup agendado, teste de restauração e documentação | Pendente |
 
@@ -86,7 +86,7 @@ plano decidiu além disso.
 As duas ADRs, commitadas em `32316b4`: [`0010`](docs/adr/0010-banco-sqlite.md) e
 [`0011`](docs/adr/0011-identidade-sessao-convites.md).
 
-## Etapa 1: banco — pendente
+## Etapa 1: banco — concluída
 
 - Transformar a API numa biblioteca (`lib.rs`) mais os binários (`main.rs` e, na Etapa 4, `admin`).
 - SQLite pelo `sqlx`, em modo WAL e com `busy_timeout` de 5 s; migrações em `api/migrations/`, embutidas com
@@ -99,7 +99,7 @@ As duas ADRs, commitadas em `32316b4`: [`0010`](docs/adr/0010-banco-sqlite.md) e
 **Pronto quando:** a API sobe e cria o arquivo do banco com as migrações aplicadas; abrir de novo não refaz
 nada; `cargo test` roda as migrações num banco em memória; a rota `/api/voice/join` responde como antes.
 
-## Etapa 2: regras — pendente
+## Etapa 2: regras — concluída
 
 Módulo `identity/`, **sem HTTP**, testado direto sobre o banco em memória.
 
@@ -118,14 +118,28 @@ Módulo `identity/`, **sem HTTP**, testado direto sobre o banco em memória.
 vencido, esgotado e revogado, recuperação de uso único, segundo dispositivo recusado, membro removido sem
 sessão e sem nick preso.
 
-## Etapa 3: rotas — pendente
+## Etapa 3: rotas — concluída
 
 - Rotas novas sobre as regras da Etapa 2: login com a chave (`POST /api/auth/login`), uso de convite (novo e
-  de recuperação), criação, listagem e revogação de convites pelo dono, e `/api/me`. Autenticação por
-  `Authorization: Bearer <token>`.
+  de recuperação, `POST /api/auth/redeem`), `GET /api/me` (permissões e canal de atualização) e
+  `POST /api/voice/token` (identidade e nome vêm do banco). Autenticação por `Authorization: Bearer <token>`.
+  **Criar, listar e revogar convites ficam só no `admin` (Etapa 4):** o dono administra pela linha de comando,
+  não por rota.
 - Limite de tentativas: até 20 convites ou logins errados a cada 10 minutos, somando todo mundo.
-- Testes de integração da API (convites, dispositivo, sessão, permissões e o limite), rodando no CI.
-- A rota `/api/voice/join` e o middleware de `client_policy` continuam como estão.
+- Testes de integração da API (convites, dispositivo, sessão, permissões e o limite), rodando no CI. Ficam
+  num arquivo só, `api/tests/identity.rs`: as rotas pelo HTTP (`oneshot`, sem subir servidor) e o módulo
+  `regras`, direto sobre o banco, inclusive a concorrência em arquivo.
+- A rota `/api/voice/join` e o middleware de `client_policy` continuam como estão. As rotas novas também
+  passam pelo `client_policy`: com `ACCESS_CODE` ligado, exigem o `X-Access-Code`.
+
+Além do previsto, saiu com esta etapa:
+
+- **`ApiJson`:** corpo inválido responde no formato `{ kind, message }` (422, `invalid_request`), não em texto
+  puro. Só nas rotas novas; a rota antiga continua igual.
+- **`Authorization: Bearer`** sem diferenciar maiúscula de minúscula (RFC 9110).
+- **`channel_id` validado** em `/api/voice/token`: de 1 a 64 caracteres, letras ASCII, números, `_` e `-`.
+- **Erros da API** mapeados por tipo para status e `kind` (`error.rs`), e violações de índice único tratadas
+  como erro de regra, não como erro 500.
 
 **Pronto quando:** do convite ao login e a `/api/me` funciona pelo HTTP nos testes; a 21ª tentativa errada
 em 10 minutos é recusada; e o app instalado continua entrando pela rota antiga sem mudar nada.
