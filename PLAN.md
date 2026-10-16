@@ -71,7 +71,8 @@ plano decidiu além disso.
    a pasta `.sqlx` (`cargo sqlx prepare`) no CI. Com `sqlx::query`/`query_as`, o CI não muda nada, e todo SQL
    roda nos testes de integração mesmo assim.
 3. **Limite de tentativas global, não por IP:** atrás do Tailscale Funnel todas as chamadas chegam do mesmo
-   endereço local. 20 erros a cada 10 minutos, somando convite e login.
+   endereço local. 20 convites errados a cada 10 minutos, somando todo mundo. O login fica fora do limite
+   (ADR 0011): a chave do dispositivo não se adivinha, e contar o login travaria os convites de todos.
 4. **Até 50 usos por convite.** Mais que isso é um convite aberto demais para o tamanho do grupo.
 5. **A recuperação também serve para o dono vincular o primeiro computador.** O `admin dono` cria o dono sem
    computador; quando a parte visual chegar, você gera uma recuperação para você mesmo.
@@ -125,7 +126,8 @@ sessão e sem nick preso.
   `POST /api/voice/token` (identidade e nome vêm do banco). Autenticação por `Authorization: Bearer <token>`.
   **Criar, listar e revogar convites ficam só no `admin` (Etapa 4):** o dono administra pela linha de comando,
   não por rota.
-- Limite de tentativas: até 20 convites ou logins errados a cada 10 minutos, somando todo mundo.
+- Limite de tentativas: até 20 convites errados a cada 10 minutos, somando todo mundo. O login não entra na
+  conta e não é bloqueado pelo limite.
 - Testes de integração da API (convites, dispositivo, sessão, permissões e o limite), rodando no CI. Ficam
   num arquivo só, `api/tests/identity.rs`: as rotas pelo HTTP (`oneshot`, sem subir servidor) e o módulo
   `regras`, direto sobre o banco, inclusive a concorrência em arquivo.
@@ -142,7 +144,7 @@ Além do previsto, saiu com esta etapa:
   como erro de regra, não como erro 500.
 
 **Pronto quando:** do convite ao login e a `/api/me` funciona pelo HTTP nos testes; a 21ª tentativa errada
-em 10 minutos é recusada; e o app instalado continua entrando pela rota antiga sem mudar nada.
+em 10 minutos é recusada (e o login de quem já é membro continua funcionando); e o app instalado continua entrando pela rota antiga sem mudar nada.
 
 ## Etapa 4: `admin` — pendente
 
@@ -150,7 +152,14 @@ Segundo binário na mesma crate (`api/src/bin/admin.rs`), com os comandos em por
 migrações) como a API, com a API no ar (WAL).
 
 - Criar o dono (sem computador), marcar e desmarcar o beta de um membro, gerar convite (novo e de
-  recuperação), revogar, listar membros e convites, remover membro e desvincular dispositivo.
+  recuperação), revogar, listar membros e convites, remover membro e desvincular dispositivo, ver as
+  permissões de um membro e `backup` (cópia consistente com `VACUUM INTO`, com data no nome e retenção).
+
+**O `admin` é temporário.** A ideia é mover a administração para a UI já na v0.2.2, com rotas de administração
+na API sobre as mesmas funções de `identity/` (que já recebem o `actor` e passam por `permissions::can`). Por
+isso o binário fica enxuto, sem testes próprios, sem confirmação nos comandos e sem comandos além dos acima: o
+que vale está na biblioteca, que tem os testes. Provavelmente sobrevivem como linha de comando só o `dono`
+(cria o dono antes de existir qualquer sessão) e o `backup` (é o que o Agendador do Windows chama).
 
 **Pronto quando:** do zero, `admin dono` + um convite de grupo + um convite de recuperação para o dono
 fazem o fluxo inteiro sem escrever SQL, com a API ligada.

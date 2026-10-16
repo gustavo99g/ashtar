@@ -23,10 +23,13 @@ conscientemente adiado (marcar como tal) antes de fechar a fase. A lista da fase
 
 ## Riscos e cuidados
 
+- [ ] **O `admin` é temporário** (Etapa 4 do `PLAN.md`): quando a UI da v0.2.2 cobrir a administração, tirar
+      os comandos que ela substituir e deixar só `dono` e `backup`. Até lá, não investir nele além do básico.
+
 - [ ] **Rota antiga aberta:** enquanto o app não usar as rotas novas, `/api/voice/join` continua aceitando
       o código de acesso provisório. Só a parte visual desliga isso e sobe o `MIN_CLIENT_VERSION` (ADR 0011).
 - [ ] **Limite de tentativas global:** quem errar convites de propósito trava os convites de todos por até
-      10 minutos (decisão 3 do `PLAN.md`; ADR 0011).
+      10 minutos; o login fica fora do limite (decisão 3 do `PLAN.md`; ADR 0011).
 - [ ] **Convite de grupo que vaza** deixa entrar quem o viu enquanto vale; o limite de usos, a validade
       curta, o `revogar` e o `remover` seguram isso.
 - [ ] **Trocar a placa-mãe** exige um convite de recuperação (ADR 0011).

@@ -36,7 +36,10 @@ ações de administração (`Action`) passam todas por uma função, `permission
 dono". Permissões dadas a um usuário (`Permission`) ficam na tabela `user_permissions`; hoje só existe
 `atualizacoes.beta`. As chaves das permissões estão no código; o banco guarda só quem tem qual.
 
-**Limite de tentativas.** Até 20 convites ou logins errados a cada 10 minutos, somando todo mundo.
+**Limite de tentativas.** Até 20 convites errados a cada 10 minutos, somando todo mundo. O login com a chave
+do dispositivo fica de fora: a chave tem 256 bits (ou 32 bytes aleatórios), então adivinhá-la é inviável, e
+todo app de quem ainda não tem convite chama o login ao abrir. Contar essas chamadas travaria os convites de
+todos, e bloquear o login deixaria de fora quem já é membro.
 
 ## Alternativas consideradas
 
@@ -53,7 +56,8 @@ dono". Permissões dadas a um usuário (`Permission`) ficam na tabela `user_perm
 ## Consequências
 
 - Formatar o Windows não exige nada; trocar a placa-mãe exige um convite de recuperação.
-- Alguém errando convites de propósito trava os convites de todos por até 10 minutos.
+- Alguém errando convites de propósito trava os convites de todos por até 10 minutos; o login de quem já é
+  membro continua funcionando.
 - Um convite de grupo que vaze, nos minutos em que vale, deixa entrar quem o viu. O limite de usos, a
   validade curta, o `revogar` e o `remover` seguram isso.
 - Quem tiver o executável continua conseguindo token pela rota antiga até a parte visual desligar o código

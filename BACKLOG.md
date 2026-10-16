@@ -62,6 +62,11 @@ Bugs que saem assim que ficarem prontos, pelo auto-update, sem esperar a entrega
 - [ ] Botão "Abrir pasta de logs" e interruptor "receber versões beta", adiados da v0.2.0. Até lá, o canal
       vem de `ASHTAR_UPDATE_CHANNEL=beta`.
 
+- [ ] Rotas de administração na API e tela de administração na UI, no lugar do `admin` temporário da v0.2.1:
+      criar, listar e revogar convite, remover membro, desvincular dispositivo, marcar o beta e ver as
+      permissões. Ficam sobre as funções de `identity/`, que já recebem o `actor`. Depois, tirar do `admin` o
+      que a UI cobrir e deixar só `dono` e `backup`.
+
 - [ ] Tela de usuários em que o dono marca quem recebe o beta. A API (devolver o canal e a permissão no
       `admin`) sai na v0.2.1 (`NOTES.md`); a tela e o app guardando o último valor vêm aqui, e substituem a
       variável `ASHTAR_UPDATE_CHANNEL`. Papel de dono ("supremo"), acima de administrador; só ele marca o beta.
