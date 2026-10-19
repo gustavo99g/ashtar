@@ -93,10 +93,28 @@ flowchart LR
 
 ### API (`api/`)
 
-Backend em Rust com Axum. Hoje expõe o `/health` e a geração de tokens do LiveKit; usuários,
-autenticação, convites, canais, mensagens e permissões entram conforme o roadmap
-([`docs/roadmap.md`](docs/roadmap.md)). O desktop fala com ela por HTTP e nunca recebe as chaves do
-LiveKit, só tokens já assinados.
+Backend em Rust com Axum e SQLite (`sqlx`). O desktop fala com ela por HTTP e nunca recebe as chaves do
+LiveKit, só tokens já assinados. Canais, mensagens e a administração pela UI entram conforme o roadmap
+([`docs/roadmap.md`](docs/roadmap.md)).
+
+A crate é uma biblioteca (`lib.rs`) com dois binários: o servidor (`main.rs`) e o `admin` temporário
+(`src/bin/admin.rs`).
+
+- **`identity/`**: as regras de membros, dispositivo, sessão, convites e permissões. Toda ação de
+  administração recebe quem a faz (`actor`) e passa por `permissions::can`, o único lugar que decide quem
+  pode o quê. As rotas e o `admin` chamam as mesmas funções.
+- **`routes/`**: as rotas HTTP, finas sobre `identity/`: `/api/auth/redeem` (usar convite),
+  `/api/auth/login`, `/api/me`, `/api/voice/token` (token do LiveKit com identidade e nome vindos do banco) e
+  a rota antiga `/api/voice/join`, que continua até o app usar as novas. Autenticação por
+  `Authorization: Bearer <token>`.
+- **`client_policy.rs`**: versão mínima do cliente e código de acesso provisório, antes de toda rota de `/api`.
+- **`limiter.rs`**: até 20 convites errados a cada 10 minutos, somando todo mundo.
+- **`db.rs`** e **`migrations/`**: o banco em modo WAL, com as migrações embutidas no binário.
+- **`secret.rs`**: segredos só como SHA-256 no banco; **`error.rs`**: os erros e o formato `{ kind, message }`.
+
+As decisões estão nas ADRs [0010](docs/adr/0010-banco-sqlite.md) e
+[0011](docs/adr/0011-identidade-sessao-convites.md). Os testes de integração ficam em
+`api/tests/identity.rs`.
 
 ## Fluxos
 

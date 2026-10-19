@@ -1,4 +1,4 @@
-//! Logs do app: terminal e arquivo diário (decisão 10 do `PLAN.md`).
+//! Logs do app: terminal e arquivo diário (decisão 10 de `docs/plans/v0.2.0-base-de-entrega.md`).
 //!
 //! [`init`] roda no início do `main`, antes do Tauri: instala o subscriber
 //! global e o hook de panic. A pasta de logs só é conhecida no `setup`

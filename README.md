@@ -2,7 +2,7 @@
 
 Ashtar é uma aplicação privada de comunicação para uma única comunidade, inspirada no Discord.
 
-> Status atual: **v0.2.0 — Distribuição e atualização** (em andamento)
+> Status atual: **v0.2.1 — Identidade na API** (concluída; a UI nova da v0.2.2 passa a usá-la)
 
 ## Funcionalidades
 
@@ -74,10 +74,45 @@ livekit-server --dev
 
 ### 3. API
 
+A API guarda membros, convites e permissões num banco SQLite. Defina no `.env` o arquivo do banco (veja o
+`.env.example`; o caminho é relativo à pasta `api/`) e suba o servidor:
+
 ```bash
+# .env
+DATABASE_URL=sqlite://ashtar.db
+
 cd api
 cargo run
 ```
+
+O arquivo é criado e as migrações (`api/migrations/`) são aplicadas na primeira vez.
+
+**Administração (`admin`).** Uma ferramenta de linha de comando, no mesmo computador e com o mesmo `.env`,
+que funciona com a API ligada. É temporária: a UI da v0.2.2 passa a fazer isso. `--help` lista os comandos.
+
+```bash
+cargo run --bin admin -- dono <nick>                    # cria o dono, uma vez só
+cargo run --bin admin -- convite                        # novo, 7 dias, 1 uso
+cargo run --bin admin -- convite --validade 5m --usos 8 # para mandar no grupo
+cargo run --bin admin -- recuperacao <nick>             # troca o computador de um membro
+cargo run --bin admin -- convites                       # histórico: quem criou e quem usou
+cargo run --bin admin -- revogar <id>
+cargo run --bin admin -- membros
+cargo run --bin admin -- remover <nick>
+cargo run --bin admin -- desvincular <nick>
+cargo run --bin admin -- beta <nick> ligar|desligar
+cargo run --bin admin -- permissoes <nick>
+```
+
+O código de um convite aparece uma vez só, na criação: copie na hora.
+
+**Backup.** `admin backup <pasta>` grava uma cópia consistente do banco (`VACUUM INTO`, seguro com a API no ar)
+com a data no nome e apaga as mais antigas (`--manter`, 14 por padrão). Um agendamento diário do Windows
+chama esse comando e envia a cópia para fora do computador (Cloudflare R2). Não copie o `.db` à mão: em modo
+WAL, parte dos dados pode estar no arquivo `-wal`.
+
+**Restaurar.** Pare a API, aponte o `DATABASE_URL` para a cópia (ou coloque a cópia no lugar do `.db`),
+confira com `admin membros` e `admin convites`, e suba a API de novo.
 
 ### 4. Desktop
 
@@ -138,8 +173,8 @@ v0.1  → Teste com o grupo
         (Tailscale Funnel + LiveKit Cloud)
 
 v0.2  → Comunidade
-        Entregue em partes: auto-update → servidor na VPS → convites sem senha
-        → supressão de ruído → UI nova → chat real → publicador nativo
+        Entregue em partes: auto-update → convites sem senha → UI nova → chat real e supressão
+        de ruído → servidor na VPS → publicador nativo
 
 v0.3  → Conversas privadas
         Mensagens e ligações privadas + não lidas + bandeja
@@ -189,7 +224,7 @@ Tailscale (`tailscale funnel --bg 3000`). Na primeira vez, o nome público levou
 no DNS; enquanto isso, o túnel rápido da Cloudflare (`cloudflared tunnel --url http://127.0.0.1:3000`)
 serviu de alternativa, com a ressalva de que a URL muda a cada reinício. Os dois só transportam HTTP e
 WebSocket, por isso servem para a API, mas não para a mídia, que trafega por UDP. Com um domínio próprio
-(necessário de qualquer forma na v0.2.6), o túnel nomeado da Cloudflare também dá uma URL fixa.
+(necessário de qualquer forma na v0.2.4), o túnel nomeado da Cloudflare também dá uma URL fixa.
 
 **Mídia pelo LiveKit Cloud.** O plano gratuito (Build) inclui, por mês, 5.000 minutos de participante,
 50 GB de dados transferidos e até 100 participantes simultâneos. Os limites são um teto rígido: se
@@ -207,8 +242,8 @@ teto quando a imagem muda pouco):
 | 1080p30 | 8 Mbps | ~14,4 GB/h | ~3,5 h |
 
 Os minutos duram mais que o tráfego: 5 pessoas por 3 horas gastam 900 minutos, cerca de 5 noites por mês,
-mas o tráfego dos presets de 8 Mbps acaba em cerca de 3,5 horas. Com o publicador nativo (v0.2.3), quem
-transmite abre uma segunda conexão e conta como dois participantes. Ou seja, o plano gratuito comporta uma
+mas o tráfego dos presets de 8 Mbps acaba em cerca de 3,5 horas. Com o publicador nativo (v0.2.5, depois da VPS), quem
+transmite abre uma segunda conexão e conta como dois participantes no Cloud, mas isso já não pesa na cota. Ou seja, o plano gratuito comporta uma
 ou duas noites nos presets pesados e algumas no 720p60, não um mês de uso.
 
 O plano pago seguinte inclui 150.000 minutos e 250 GB, com excedente de US$ 0,12/GB. Com uso intenso
@@ -223,7 +258,7 @@ minutos) deve ser anotado: é o número que confirma o dimensionamento da VPS.
 sobrecarga, conte ~9 Mbps de upload para quem transmite fora da rede local, e um download parecido para
 cada pessoa que assiste. O Movimento usa até 3,5 Mbps.
 
-**VPS.** Na v0.2.6, o servidor do LiveKit (que é gratuito e de código aberto), a API e o banco passam a
+**VPS.** Na v0.2.4, o servidor do LiveKit (que é gratuito e de código aberto), a API e o banco passam a
 rodar numa VPS própria. O LiveKit próprio é pré-requisito das transmissões múltiplas da v0.4, e a API e
 o banco deixam de depender de um computador pessoal ligado. Se os limites do plano gratuito apertarem
 antes, a migração é antecipada. Para o código do LiveKit, a troca é só de configuração: a URL, a chave
@@ -256,14 +291,15 @@ A confirmar antes de assinar:
 * upgrade de plano sem migrar a máquina;
 * o consumo medido no teste da v0.1 confirma a estimativa.
 
-O backup semanal da Hostinger não substitui o backup fora da VPS, que começa na v0.2.2 junto com o banco: se a conta ou a
+O backup semanal da Hostinger não substitui o backup fora da VPS, que começa na v0.2.1 junto com o banco: se a conta ou a
 máquina tiver problema, os dois se perdem juntos.
 
 ## Status
 
-Em desenvolvimento, na **v0.1**. O foco atual é a reorganização do compartilhamento de tela em uma
-estrutura definitiva, detalhada em [`ARCHITECTURE.md`](ARCHITECTURE.md), seguida da liberação do app
-para o grupo como teste.
+Em desenvolvimento, na **v0.2**, entregue em partes (veja o [`docs/roadmap.md`](docs/roadmap.md)). A v0.2.0
+(auto-update, canal beta e pipeline de release) e a v0.2.1 (identidade, convites e permissões na API) estão
+prontas; a próxima é a v0.2.2, a UI nova, que passa a usar as rotas de identidade. A estrutura do código está
+em [`ARCHITECTURE.md`](ARCHITECTURE.md).
 
 ## Licença
 

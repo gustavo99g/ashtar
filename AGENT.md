@@ -28,14 +28,14 @@ Aplicada em `media/`, `commands/` e nos arquivos-raiz.
 
 ## Onde ficam as decisões técnicas
 
-- [`PLAN.md`](PLAN.md) — plano em andamento (fase atual: v0.2.0, base de entrega), com as decisões
-  já tomadas registradas no topo.
-- [`NOTES.md`](NOTES.md) — checklist dos problemas e pendências da fase atual, o que já foi resolvido
+- `PLAN.md` — plano em andamento, com as decisões
+  já tomadas registradas no topo. Só existe durante uma fase: as fases até a v0.2.1 já estão arquivadas em `docs/plans/`.
+- `NOTES.md` — checklist dos problemas e pendências da fase atual, o que já foi resolvido
   e o que foi conscientemente adiado.
 - [`BACKLOG.md`](BACKLOG.md) — o que as fases anteriores adiaram, agrupado pela versão que deve recebê-lo.
   Ao começar uma fase, os itens dela saem do BACKLOG e entram no `NOTES.md`.
 - [`docs/plans/`](docs/plans/) — planos e notas de fases concluídas, arquivados como estavam ao fechar
-  (`v0.1-reorganizacao.md`, `v0.1-notes.md`).
+  (`v0.1-reorganizacao.md`, `v0.1-notes.md`, `v0.2.0-base-de-entrega.md`, `v0.2.0-notes.md`, `v0.2.1-identidade-na-api.md`, `v0.2.1-notes.md`).
 
 ### Raiz vs. `docs/`
 

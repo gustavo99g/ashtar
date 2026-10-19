@@ -1,4 +1,4 @@
-//! Confere quem chama as rotas de `/api` (decisões 8 e 11 do `PLAN.md` da v0.2.0).
+//! Confere quem chama as rotas de `/api` (decisões 8 e 11 de `docs/plans/v0.2.0-base-de-entrega.md`).
 //!
 //! - `MIN_CLIENT_VERSION`: abaixo dela, ou sem o cabeçalho `X-App-Version`,
 //!   a resposta é 426 com `{ kind: "client_outdated", message, min_version }`.

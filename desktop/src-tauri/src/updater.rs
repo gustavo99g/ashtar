@@ -1,4 +1,4 @@
-//! Atualização automática (decisões 3 e 6 do `PLAN.md` da v0.2.0).
+//! Atualização automática (decisões 3 e 6 de `docs/plans/v0.2.0-base-de-entrega.md`).
 //!
 //! Só funciona no build de release: no desenvolvimento, [`spawn_periodic_check`]
 //! e [`check_in_background`] não fazem nada. Verifica ao abrir e a cada 3
@@ -31,8 +31,8 @@ pub enum Channel {
 }
 
 impl Channel {
-    /// Lê `ASHTAR_UPDATE_CHANNEL`. Até a v0.2.2, é o único jeito de entrar no
-    /// beta; na v0.2.2 o canal passa a vir da API.
+    /// Lê `ASHTAR_UPDATE_CHANNEL`. Até a v0.2.1, é o único jeito de entrar no
+    /// beta; na v0.2.1 o canal passa a vir da API.
     pub fn from_env() -> Self {
         Self::parse(std::env::var("ASHTAR_UPDATE_CHANNEL").ok().as_deref())
     }
