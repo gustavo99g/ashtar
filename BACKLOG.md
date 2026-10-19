@@ -18,7 +18,7 @@ Bugs que saem assim que ficarem prontos, pelo auto-update, sem esperar a entrega
 
 - [ ] Eco no compartilhamento da tela inteira com "Todo o sistema". Num teste com amigos (2026-10-06), um
       amigo compartilhou o monitor e quem assistia ouviu a própria voz; só mutar o próprio microfone
-      parava. **Correção fora de ordem** ("Correções fora de ordem" no `docs/roadmap.md`): sai assim que ficar pronta, sem esperar a v0.2.5.
+      parava. **Correção fora de ordem** ("Correções fora de ordem" no `docs/roadmap.md`): sai assim que ficar pronta, sem esperar a v0.2.3.
       **Evidências (medidas nesta máquina; o teste do Brave rodou no perfil de debug, a árvore do app foi vista no
       executável de release):**
       - O código exclui o PID do app (`std::process::id()`) com `EXCLUDE_TARGET_PROCESS_TREE`; conferido na
@@ -79,7 +79,7 @@ Bugs que saem assim que ficarem prontos, pelo auto-update, sem esperar a entrega
       `admin`) sai na v0.2.1 (`NOTES.md`); a tela e o app guardando o último valor vêm aqui, e substituem a
       variável `ASHTAR_UPDATE_CHANNEL`. Papel de dono ("supremo"), acima de administrador; só ele marca o beta.
 
-## v0.2.3 — Publicador nativo e medição
+## v0.2.5 — Publicador nativo e medição
 
 - [ ] Redução da imagem no caminho do IPC. O legado reduzia em BGRA com `fast_image_resize` e
       `ResizeAlg::Nearest`, depois de copiar o frame inteiro (`frame.data().to_vec()`); isso saiu com o
@@ -91,13 +91,13 @@ Bugs que saem assim que ficarem prontos, pelo auto-update, sem esperar a entrega
       foi isolada (uma hipótese, não verificada, é o filtro do `scale`; o legado usava `Nearest`). Próximo
       teste: reduzir em BGRA antes de converter, com o `fast_image_resize`, que por isso continua no
       `Cargo.toml`, sem uso desde a remoção do `legacy/` (ADR 0009).
-      **Adiado para o publicador nativo (v0.2.3):** é um experimento de otimização, não um defeito.
+      **Adiado para o publicador nativo (v0.2.5):** é um experimento de otimização, não um defeito.
 - [ ] A divisão do `capture_frame` em readback, redução e conversão (ADR 0009) vem de uma instrumentação que
       não está no repositório: os logs de tempo por etapa foram removidos (estão no commit `d418b00`). Para
       repetir a medição, recolocar os logs ou deixar um cronômetro permanente no target `perf`.
-      **Adiado para a v0.2.3**, junto das medições do publicador nativo.
+      **Adiado para a v0.2.5**, junto das medições do publicador nativo.
 - [ ] Linha de base de desempenho em build de release, separada para os três presets de qualidade
-      (decisão 16 de `docs/plans/v0.1-reorganizacao.md`). **Adiado para a v0.2.3:** só existe o fps por preset em jogo (ADR 0009); faltam
+      (decisão 16 de `docs/plans/v0.1-reorganizacao.md`). **Adiado para a v0.2.5:** só existe o fps por preset em jogo (ADR 0009); faltam
       CPU, memória e o histograma de intervalos entre frames, que o publicador nativo vai precisar para comparar.
 - [ ] Publicador de vídeo/áudio nativo em Rust (fica para o próximo plano). Ele precisa de duas peças:
   1. **Redução na GPU antes de copiar para a memória**, para janelas em 4K cheio: readback (~7 ms) mais

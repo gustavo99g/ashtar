@@ -173,8 +173,8 @@ v0.1  → Teste com o grupo
         (Tailscale Funnel + LiveKit Cloud)
 
 v0.2  → Comunidade
-        Entregue em partes: auto-update → servidor na VPS → convites sem senha
-        → supressão de ruído → UI nova → chat real → publicador nativo
+        Entregue em partes: auto-update → convites sem senha → UI nova → chat real e supressão
+        de ruído → servidor na VPS → publicador nativo
 
 v0.3  → Conversas privadas
         Mensagens e ligações privadas + não lidas + bandeja
@@ -224,7 +224,7 @@ Tailscale (`tailscale funnel --bg 3000`). Na primeira vez, o nome público levou
 no DNS; enquanto isso, o túnel rápido da Cloudflare (`cloudflared tunnel --url http://127.0.0.1:3000`)
 serviu de alternativa, com a ressalva de que a URL muda a cada reinício. Os dois só transportam HTTP e
 WebSocket, por isso servem para a API, mas não para a mídia, que trafega por UDP. Com um domínio próprio
-(necessário de qualquer forma na v0.2.6), o túnel nomeado da Cloudflare também dá uma URL fixa.
+(necessário de qualquer forma na v0.2.4), o túnel nomeado da Cloudflare também dá uma URL fixa.
 
 **Mídia pelo LiveKit Cloud.** O plano gratuito (Build) inclui, por mês, 5.000 minutos de participante,
 50 GB de dados transferidos e até 100 participantes simultâneos. Os limites são um teto rígido: se
@@ -242,8 +242,8 @@ teto quando a imagem muda pouco):
 | 1080p30 | 8 Mbps | ~14,4 GB/h | ~3,5 h |
 
 Os minutos duram mais que o tráfego: 5 pessoas por 3 horas gastam 900 minutos, cerca de 5 noites por mês,
-mas o tráfego dos presets de 8 Mbps acaba em cerca de 3,5 horas. Com o publicador nativo (v0.2.3), quem
-transmite abre uma segunda conexão e conta como dois participantes. Ou seja, o plano gratuito comporta uma
+mas o tráfego dos presets de 8 Mbps acaba em cerca de 3,5 horas. Com o publicador nativo (v0.2.5, depois da VPS), quem
+transmite abre uma segunda conexão e conta como dois participantes no Cloud, mas isso já não pesa na cota. Ou seja, o plano gratuito comporta uma
 ou duas noites nos presets pesados e algumas no 720p60, não um mês de uso.
 
 O plano pago seguinte inclui 150.000 minutos e 250 GB, com excedente de US$ 0,12/GB. Com uso intenso
@@ -258,7 +258,7 @@ minutos) deve ser anotado: é o número que confirma o dimensionamento da VPS.
 sobrecarga, conte ~9 Mbps de upload para quem transmite fora da rede local, e um download parecido para
 cada pessoa que assiste. O Movimento usa até 3,5 Mbps.
 
-**VPS.** Na v0.2.6, o servidor do LiveKit (que é gratuito e de código aberto), a API e o banco passam a
+**VPS.** Na v0.2.4, o servidor do LiveKit (que é gratuito e de código aberto), a API e o banco passam a
 rodar numa VPS própria. O LiveKit próprio é pré-requisito das transmissões múltiplas da v0.4, e a API e
 o banco deixam de depender de um computador pessoal ligado. Se os limites do plano gratuito apertarem
 antes, a migração é antecipada. Para o código do LiveKit, a troca é só de configuração: a URL, a chave

@@ -15,8 +15,8 @@ v0.1  → Teste com o grupo
         Voz + Screen Share reorganizado, liberado como teste
         ↓
 v0.2  → Comunidade
-        Auto-update + servidor na VPS + convites + supressão de ruído
-        + UI nova + chat real + publicador nativo
+        Auto-update + convites + UI nova + chat real e supressão de ruído
+        + servidor na VPS + publicador nativo
         ↓
 v0.3  → Conversas privadas
         Mensagens e ligações privadas + não lidas + bandeja
@@ -85,7 +85,7 @@ v0.2.N sai como versão `0.2.N0`, e cada correção dela soma 1 no último dígi
 0.2.1, 0.2.2…    correções da v0.2.0
 0.2.10           entrega v0.2.1 (identidade)
 0.2.11…          correções da v0.2.1
-0.2.60           entrega v0.2.6 (servidor)
+0.2.40           entrega v0.2.4 (servidor)
 0.3.0            próxima versão do roadmap
 ```
 
@@ -243,18 +243,18 @@ versões"), e cada uma ganha um plano detalhado próprio antes de começar.
 v0.2.0  Base de entrega       auto-update + pipeline + canal beta + versão mínima + logs
 v0.2.1  Identidade            convites + identidade do dispositivo + permissões + banco (sem mudança visível)
 v0.2.2  UI nova               passa a usar as rotas da identidade
-v0.2.3  Publicador nativo
-v0.2.4  Chat real
-v0.2.5  Áudio                 supressão de ruído e cancelamento de eco
-v0.2.6  Servidor              VPS (LiveKit, API e banco) + domínio + backup + alerta
+v0.2.3  Chat real + áudio     chat com histórico + supressão de ruído e cancelamento de eco
+v0.2.4  Servidor              VPS (LiveKit, API e banco) + domínio + backup + alerta
+v0.2.5  Publicador nativo
 ```
 
-A ordem segue três regras: a base de entrega vem primeiro, porque faz todo o resto chegar sozinho; a
+A ordem segue quatro regras: a base de entrega vem primeiro, porque faz todo o resto chegar sozinho; a
 identidade vem antes da UI nova, e a UI nova antes de qualquer tela nova (convite, nick e chat), para que
 nada seja construído duas vezes (a v0.2.1 e a v0.2.2 são uma entrega conjunta: a primeira não muda nada do
-que o grupo vê, e a segunda mostra tudo); e o publicador nativo vem antes do chat, por ser o maior risco técnico que sobrou da mídia. O servidor próprio
-fica por último: até lá, o LiveKit Cloud e o computador de casa (com o Tailscale Funnel) bastam, ao custo
-de uma migração do banco na v0.2.6. A v0.2.5 (áudio) é pequena e independente e pode sair antes, se o ruído ou o eco começarem a incomodar.
+que o grupo vê, e a segunda mostra tudo); o chat e a supressão de ruído saem juntos, numa versão só (a
+supressão é pequena e não depende do chat); e o servidor próprio vem antes do publicador nativo, que é
+desenvolvido e medido já sobre o LiveKit da VPS, sem a cota de minutos do Cloud. Até o servidor, o LiveKit
+Cloud e o computador de casa (com o Tailscale Funnel) bastam, ao custo de uma migração do banco na v0.2.4.
 
 ---
 
@@ -295,12 +295,12 @@ acesso provisório. As telas de convite e de escolha do nick nascem na UI nova d
 rotas novas e então desliga o código de acesso.
 
 **Banco de dados.** A identidade é o primeiro dado que precisa durar, então o banco entra aqui, rodando
-junto da API no computador que a hospeda (o servidor próprio só vem na v0.2.6):
+junto da API no computador que a hospeda (o servidor próprio só vem na v0.2.4):
 
 * banco escolhido antes da implementação (ADR), com migrações;
 * backup automático, copiado para fora do computador (ex.: Cloudflare R2): a partir daqui há dados reais
   do grupo;
-* a escolha considera a migração para a VPS na v0.2.6: com SQLite, a migração é copiar um arquivo; com
+* a escolha considera a migração para a VPS na v0.2.4: com SQLite, a migração é copiar um arquivo; com
   PostgreSQL, um dump e um restore.
 
 A v0.1 entra com uma identidade aleatória nova a cada entrada (`idiot-<uuid>`, nome `Idiota-<uuid>`); a
@@ -403,21 +403,11 @@ v0.1 deixou (seletor de fontes, trava de uma transmissão por vez, textos dos pr
 * **telas de convite e de escolha do nick**, sobre as rotas da v0.2.1: o nome que aparece na sala vem da
   identidade, no lugar do `Idiota-<uuid>`.
 
-### v0.2.3 — Publicador nativo
+### v0.2.3 — Chat real e supressão de ruído
 
-* publicação do vídeo direto do Rust (conexão `{user_id}:screen`), sem passar pelo WebView;
-* medição lado a lado com o caminho IPC, usando como linha de base a Etapa 6 de `docs/plans/v0.1-reorganizacao.md` e o teste da
-  v0.1.
+Duas partes, entregues juntas. A segunda é pequena e não depende da primeira.
 
-Vem antes do chat porque é a parte de maior risco técnico que sobrou da mídia, e o motivo do aplicativo
-existir. Roda ainda no LiveKit Cloud: a VPS só chega na v0.2.6.
-
-```text
-publicador nativo igual ou melhor que o caminho IPC na medição
-(ou decisão documentada de manter o IPC)
-```
-
-### v0.2.4 — Chat real
+**Chat real**
 
 * enviar, receber e persistir mensagens;
 * histórico ordenado e carregamento incremental;
@@ -426,16 +416,14 @@ publicador nativo igual ou melhor que o caminho IPC na medição
   `message.deleted`, `presence.changed`); a mídia continua no LiveKit;
 * reconexão do canal de eventos.
 
-Até a v0.2.6, o histórico fica no banco do computador que hospeda a API: com ele desligado, não há chat
+Até a v0.2.4, o histórico fica no banco do computador que hospeda a API: com ele desligado, não há chat
 nem histórico.
 
 ```text
 enviar mensagem → o outro receber → fechar e reabrir → ver o histórico
 ```
 
-### v0.2.5 — Supressão de ruído e cancelamento de eco
-
-Entrega pequena e independente; pode sair em qualquer ponto da v0.2, inclusive junto de outra.
+**Supressão de ruído e cancelamento de eco**
 
 * supressão de ruído, cancelamento de eco e controle automático de ganho do microfone, pelos filtros
   do próprio WebView (opções de captura do `livekit-client`);
@@ -451,18 +439,18 @@ Entrega pequena e independente; pode sair em qualquer ponto da v0.2, inclusive j
 microfone sem ruído de teclado nem eco de quem usa caixa de som
 ```
 
-### v0.2.6 — Servidor
+### v0.2.4 — Servidor
 
 Todo o servidor passa para uma VPS própria. A mídia sai do LiveKit Cloud, pré-requisito das transmissões
 múltiplas da v0.4, e a API e o banco saem do seu computador, para que o aplicativo não caia quando ele
-desligar ou reiniciar. Fica por último na v0.2: até aqui, o LiveKit Cloud e o computador de casa bastam
+desligar ou reiniciar. Vem depois do chat e antes do publicador nativo: até aqui, o LiveKit Cloud e o computador de casa bastam
 para o grupo. Pode ser antecipado se a cota do LiveKit Cloud apertar.
 
 **Gatilho para antecipar:** se o consumo de minutos de participante de um mês passar de ~60% dos 5.000 do
 plano gratuito, esta entrega passa à frente (ou o plano pago seguinte cobre o mês). O teste de 2026-10-06
 mostrou que o limite que aperta primeiro são os minutos, não o tráfego (~2 GB numa tarde com até 4
-pessoas). O publicador nativo (v0.2.3) faz quem transmite abrir uma segunda conexão e contar como dois
-participantes, o que acelera esse consumo.
+pessoas). O publicador nativo (v0.2.5) vem depois, já sobre o servidor próprio: a segunda conexão de quem transmite
+não consome essa cota.
 
 O desktop só conhece a URL da API. A URL, a chave e o segredo do LiveKit ficam no servidor, e a URL do
 LiveKit chega ao desktop pela própria API.
@@ -490,6 +478,21 @@ histórico do chat e usuários migrados, sem perda
 restauração do backup testada uma vez
  +
 servidor desligado → alerta no celular
+```
+
+### v0.2.5 — Publicador nativo
+
+* publicação do vídeo direto do Rust (conexão `{user_id}:screen`), sem passar pelo WebView;
+* medição lado a lado com o caminho IPC, usando como linha de base a Etapa 6 de `docs/plans/v0.1-reorganizacao.md` e o teste da
+  v0.1.
+
+Vem depois do servidor próprio: é desenvolvido e medido já sobre o LiveKit da VPS (v0.2.4), sem a cota de
+minutos do Cloud, onde a segunda conexão de quem transmite contaria como mais um participante. É a parte de
+maior risco técnico que sobrou da mídia, e o motivo do aplicativo existir.
+
+```text
+publicador nativo igual ou melhor que o caminho IPC na medição
+(ou decisão documentada de manter o IPC)
 ```
 
 ---
@@ -936,7 +939,7 @@ v0.1    API pelo Tailscale Funnel
 v0.2.1  banco junto da API, no computador de casa
         backup fora do computador (ex.: Cloudflare R2)
         ↓
-v0.2.6  LiveKit, API e banco em VPS própria, com domínio
+v0.2.4  LiveKit, API e banco em VPS própria, com domínio
         alerta de servidor fora do ar
         (antecipado se a cota do LiveKit Cloud apertar)
         ↓
@@ -987,40 +990,39 @@ v0.2
     + logs em arquivo + código de acesso provisório
 08. v0.2.1 Convites + identidade do dispositivo + permissões + segurança mínima + banco
 09. v0.2.2 UI nova
-10. v0.2.3 Publicador nativo + medição
-11. v0.2.4 Chat real + WebSocket
-12. v0.2.5 Supressão de ruído e cancelamento de eco
-13. v0.2.6 VPS (LiveKit, API e banco) + domínio + migração + alerta
+10. v0.2.3 Chat real + WebSocket + supressão de ruído e cancelamento de eco
+11. v0.2.4 VPS (LiveKit, API e banco) + domínio + migração + alerta
+12. v0.2.5 Publicador nativo + medição
 
 v0.3
-14. Mensagens privadas
-15. Não lidas + notificações + bandeja
-16. Ligações privadas + histórico de chamadas
+13. Mensagens privadas
+14. Não lidas + notificações + bandeja
+15. Ligações privadas + histórico de chamadas
 
 v0.4
-17. Transmissões múltiplas + assinatura seletiva
-18. Experiência de quem assiste
+16. Transmissões múltiplas + assinatura seletiva
+17. Experiência de quem assiste
 
 v0.5
-19. Canais e salas
-20. Status + digitando + menções + silenciar canal
-21. Sons, speaking indicator e volume por usuário
+18. Canais e salas
+19. Status + digitando + menções + silenciar canal
+20. Sons, speaking indicator e volume por usuário
 
 v0.6
-22. Tela de configurações + atalhos globais
-23. Confiabilidade + qualidade da conexão + enviar logs
+21. Tela de configurações + atalhos globais
+22. Confiabilidade + qualidade da conexão + enviar logs
 
 v0.7
-24. Perfil + armazenamento de arquivos
-25. Chat avançado + busca
+23. Perfil + armazenamento de arquivos
+24. Chat avançado + busca
 
 v0.8
-26. "Jogando X"
-27. Refinos do screen share
-28. Moderação
+25. "Jogando X"
+26. Refinos do screen share
+27. Moderação
 
 v0.9
-29. Release Candidate
+28. Release Candidate
 
 v1.0
 ```

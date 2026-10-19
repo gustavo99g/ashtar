@@ -6,7 +6,7 @@
 ## Contexto
 
 A identidade (v0.2.1) é o primeiro dado do Ashtar que precisa durar: membros, computadores vinculados,
-convites e permissões. A API roda no computador de casa até a VPS (v0.2.6), para um grupo de 5 a 10
+convites e permissões. A API roda no computador de casa até a VPS (v0.2.4), para um grupo de 5 a 10
 pessoas, com poucas escritas por dia. O banco precisa de migrações, de backup simples e de uma mudança
 fácil para a VPS.
 
@@ -35,5 +35,5 @@ para fora do computador.
 - Migrar para a VPS é copiar um arquivo (o backup mais recente).
 - O `admin` grava com a API no ar (WAL); escritas simultâneas esperam até 5 s (`busy_timeout`).
 - `COLLATE NOCASE` do SQLite só ignora maiúsculas no ASCII: "JOÃO" e "joão" contam como nicks diferentes.
-- Rever se o banco passar a ter muitas escritas concorrentes (chat com histórico grande, na v0.2.4) ou
+- Rever se o banco passar a ter muitas escritas concorrentes (chat com histórico grande, na v0.2.3) ou
   precisar de acesso de mais de uma máquina.
