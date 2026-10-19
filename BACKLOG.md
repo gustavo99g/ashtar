@@ -46,6 +46,14 @@ Bugs que saem assim que ficarem prontos, pelo auto-update, sem esperar a entrega
 
 ## v0.2.2 — UI nova
 
+- [ ] O app passa a usar as rotas de identidade que a v0.2.1 deixou prontas na API (`/api/auth/redeem`,
+      `/api/auth/login`, `/api/me`, `/api/voice/token`): chave do dispositivo calculada no desktop (hash do
+      hardware, ou 32 bytes aleatórios no cofre do Windows quando o hardware é genérico), telas de convite e de
+      escolha do nick, e fim do `idiot-<uuid>`. Em seguida, desligar o código de acesso provisório, a rota
+      `/api/voice/join` e subir o `MIN_CLIENT_VERSION` (ADR 0011).
+- [ ] Criar o dono pelo `admin dono` e gerar um convite de recuperação para vincular o computador do dono
+      (decisão 5 do plano da v0.2.1, `docs/plans/v0.2.1-identidade-na-api.md`).
+
 - [ ] O seletor (`SourcePicker`) e a trava de uma transmissão por vez (`ScreenShareButton`) existem e foram
       usados nos testes de 05 e 06/10 (ADR 0009). A trava só considera tracks já assinados e não impede duas
       pessoas de iniciarem ao mesmo tempo; o erro de início não tem como ser dispensado. A UI de voz é

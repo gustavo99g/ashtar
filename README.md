@@ -2,7 +2,7 @@
 
 Ashtar é uma aplicação privada de comunicação para uma única comunidade, inspirada no Discord.
 
-> Status atual: **v0.2.0 — Distribuição e atualização** (em andamento)
+> Status atual: **v0.2.1 — Identidade na API** (concluída; a UI nova da v0.2.2 passa a usá-la)
 
 ## Funcionalidades
 
@@ -74,10 +74,45 @@ livekit-server --dev
 
 ### 3. API
 
+A API guarda membros, convites e permissões num banco SQLite. Defina no `.env` o arquivo do banco (veja o
+`.env.example`; o caminho é relativo à pasta `api/`) e suba o servidor:
+
 ```bash
+# .env
+DATABASE_URL=sqlite://ashtar.db
+
 cd api
 cargo run
 ```
+
+O arquivo é criado e as migrações (`api/migrations/`) são aplicadas na primeira vez.
+
+**Administração (`admin`).** Uma ferramenta de linha de comando, no mesmo computador e com o mesmo `.env`,
+que funciona com a API ligada. É temporária: a UI da v0.2.2 passa a fazer isso. `--help` lista os comandos.
+
+```bash
+cargo run --bin admin -- dono <nick>                    # cria o dono, uma vez só
+cargo run --bin admin -- convite                        # novo, 7 dias, 1 uso
+cargo run --bin admin -- convite --validade 5m --usos 8 # para mandar no grupo
+cargo run --bin admin -- recuperacao <nick>             # troca o computador de um membro
+cargo run --bin admin -- convites                       # histórico: quem criou e quem usou
+cargo run --bin admin -- revogar <id>
+cargo run --bin admin -- membros
+cargo run --bin admin -- remover <nick>
+cargo run --bin admin -- desvincular <nick>
+cargo run --bin admin -- beta <nick> ligar|desligar
+cargo run --bin admin -- permissoes <nick>
+```
+
+O código de um convite aparece uma vez só, na criação: copie na hora.
+
+**Backup.** `admin backup <pasta>` grava uma cópia consistente do banco (`VACUUM INTO`, seguro com a API no ar)
+com a data no nome e apaga as mais antigas (`--manter`, 14 por padrão). Um agendamento diário do Windows
+chama esse comando e envia a cópia para fora do computador (Cloudflare R2). Não copie o `.db` à mão: em modo
+WAL, parte dos dados pode estar no arquivo `-wal`.
+
+**Restaurar.** Pare a API, aponte o `DATABASE_URL` para a cópia (ou coloque a cópia no lugar do `.db`),
+confira com `admin membros` e `admin convites`, e suba a API de novo.
 
 ### 4. Desktop
 
@@ -261,9 +296,10 @@ máquina tiver problema, os dois se perdem juntos.
 
 ## Status
 
-Em desenvolvimento, na **v0.1**. O foco atual é a reorganização do compartilhamento de tela em uma
-estrutura definitiva, detalhada em [`ARCHITECTURE.md`](ARCHITECTURE.md), seguida da liberação do app
-para o grupo como teste.
+Em desenvolvimento, na **v0.2**, entregue em partes (veja o [`docs/roadmap.md`](docs/roadmap.md)). A v0.2.0
+(auto-update, canal beta e pipeline de release) e a v0.2.1 (identidade, convites e permissões na API) estão
+prontas; a próxima é a v0.2.2, a UI nova, que passa a usar as rotas de identidade. A estrutura do código está
+em [`ARCHITECTURE.md`](ARCHITECTURE.md).
 
 ## Licença
 
