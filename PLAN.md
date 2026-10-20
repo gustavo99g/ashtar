@@ -28,7 +28,7 @@ cada etapa, `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings` e `
 
 | Etapa | Descrição | Status |
 |---|---|---|
-| 0 | Decisões (ADRs 0012 e 0013, seção nova na 0011) | Pendente |
+| 0 | Decisões (ADRs 0012 e 0013, seção nova na 0011) | Concluída (`4a0d09b`) |
 | 1 | API: nome visível, leitura do convite, rotas do painel, quem está na sala, página do convite | Pendente |
 | 2 | Base visual: pastas por domínio, ESLint, Vitest, tokens e temas, design system, janela, AppShell, router | Pendente |
 | 3 | Identidade no app: tipos gerados, TanStack Query, chave do computador, login pelo Rust, sessão | Pendente |
@@ -88,7 +88,7 @@ plano decidiu além disso.
 
 ---
 
-## Etapa 0: decisões — pendente
+## Etapa 0: decisões — concluída (`4a0d09b`)
 
 As ADRs 0012 e 0013 e a seção "Administração pela interface" da 0011.
 
