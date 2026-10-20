@@ -22,6 +22,8 @@ pub enum ApiError {
     InvalidInvite,
     #[error("{0}")]
     InvalidNick(&'static str),
+    #[error("{0}")]
+    InvalidDisplayName(&'static str),
     #[error("Esse nick já está em uso.")]
     NickTaken,
     #[error("Chave do dispositivo inválida.")]
@@ -53,6 +55,9 @@ impl ApiError {
             Self::InvalidInvite => (StatusCode::BAD_REQUEST, "invalid_invite"),
             Self::InvalidNick(_) => (StatusCode::UNPROCESSABLE_ENTITY, "invalid_nick"),
             Self::NickTaken => (StatusCode::CONFLICT, "nick_taken"),
+            Self::InvalidDisplayName(_) => {
+                (StatusCode::UNPROCESSABLE_ENTITY, "invalid_display_name")
+            }
             Self::InvalidDeviceKey => (StatusCode::UNPROCESSABLE_ENTITY, "invalid_device_key"),
             Self::DeviceAlreadyLinked => (StatusCode::CONFLICT, "device_already_linked"),
             Self::InvalidRequest(_) => (StatusCode::UNPROCESSABLE_ENTITY, "invalid_request"),

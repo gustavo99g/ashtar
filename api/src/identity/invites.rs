@@ -9,10 +9,15 @@
 //!   dispositivo dele pelo de quem usar o convite (placa-mãe nova, computador
 //!   novo). Sempre de uso único.
 //!
+//! O convite novo guarda o modelo escolhido na tela ([`Preset`]): "Para uma
+//! pessoa" e "Para o grupo" têm validade e usos fixos, definidos aqui; só "Do
+//! seu jeito" recebe os números de quem cria.
+//!
 //! O código aparece uma vez só, na criação: o banco guarda o hash. O convite
 //! nunca é apagado; ele e os seus usos (`invite_uses`) são o histórico de
 //! quem convidou quem.
 
+use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, SqlitePool};
 use uuid::Uuid;
 
@@ -31,6 +36,82 @@ pub const MAX_TTL_SECS: i64 = 30 * 24 * 60 * 60;
 /// Limite de usos de um convite novo. Mais que isso é um convite aberto demais
 /// para um grupo de 5 a 10 pessoas.
 pub const MAX_USES_LIMIT: i64 = 50;
+
+/// "Para uma pessoa": 7 dias, 1 uso. Para mandar no privado.
+pub const PERSON_TTL_SECS: i64 = 7 * 24 * 60 * 60;
+pub const PERSON_MAX_USES: i64 = 1;
+
+/// "Para o grupo": 5 minutos, até 8 usos. Para mandar no grupo do WhatsApp.
+pub const GROUP_TTL_SECS: i64 = 5 * 60;
+pub const GROUP_MAX_USES: i64 = 8;
+
+/// O modelo de um convite novo, como a tela mostra. A chave em texto vai para o
+/// banco (`invites.preset`) e para o JSON; não mude uma que já existe.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Preset {
+    /// "Para uma pessoa".
+    Person,
+    /// "Para o grupo".
+    Group,
+    /// "Do seu jeito": validade e usos escolhidos por quem cria.
+    Custom,
+}
+
+impl Preset {
+    pub fn as_db(self) -> &'static str {
+        match self {
+            Self::Person => "person",
+            Self::Group => "group",
+            Self::Custom => "custom",
+        }
+    }
+
+    /// `None` para um texto que não é modelo (ou o `NULL` da recuperação).
+    pub fn from_db(value: &str) -> Option<Self> {
+        [Self::Person, Self::Group, Self::Custom]
+            .into_iter()
+            .find(|p| p.as_db() == value)
+    }
+
+    /// O modelo que bate com esses números. É o que fica gravado quando ninguém
+    /// escolheu modelo: os convites do `admin`.
+    pub fn matching(ttl_secs: i64, max_uses: i64) -> Self {
+        match (ttl_secs, max_uses) {
+            (PERSON_TTL_SECS, PERSON_MAX_USES) => Self::Person,
+            (GROUP_TTL_SECS, GROUP_MAX_USES) => Self::Group,
+            _ => Self::Custom,
+        }
+    }
+}
+
+/// O pedido de um convite novo pela tela: um dos modelos fixos, ou "Do seu
+/// jeito" com os números.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NewInvite {
+    Person,
+    Group,
+    Custom { ttl_secs: i64, max_uses: i64 },
+}
+
+impl NewInvite {
+    pub fn preset(self) -> Preset {
+        match self {
+            Self::Person => Preset::Person,
+            Self::Group => Preset::Group,
+            Self::Custom { .. } => Preset::Custom,
+        }
+    }
+
+    /// Validade (em segundos) e usos.
+    pub fn numbers(self) -> (i64, i64) {
+        match self {
+            Self::Person => (PERSON_TTL_SECS, PERSON_MAX_USES),
+            Self::Group => (GROUP_TTL_SECS, GROUP_MAX_USES),
+            Self::Custom { ttl_secs, max_uses } => (ttl_secs, max_uses),
+        }
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum InviteKind {
@@ -101,11 +182,16 @@ pub struct CreatedInvite {
     pub code: String,
     pub expires_at: i64,
     pub max_uses: i64,
+    pub preset: Option<Preset>,
 }
 
 /// Cria um convite. `target` é obrigatório na recuperação e proibido no novo.
 /// `max_uses` vale só para o novo (de 1 a [`MAX_USES_LIMIT`]); a recuperação
 /// é sempre de uso único.
+///
+/// É o caminho do `admin` e dos testes, que dão os números: o convite novo
+/// grava o modelo que bate com eles ([`Preset::matching`]). A tela usa
+/// [`create_new`], que grava o modelo escolhido.
 pub async fn create(
     db: &SqlitePool,
     actor: &User,
@@ -113,6 +199,45 @@ pub async fn create(
     target: Option<&User>,
     ttl_secs: i64,
     max_uses: i64,
+    now: i64,
+) -> Result<CreatedInvite, ApiError> {
+    let preset = match kind {
+        InviteKind::New => Some(Preset::matching(ttl_secs, max_uses)),
+        InviteKind::Recovery => None,
+    };
+    insert(db, actor, kind, target, (ttl_secs, max_uses), preset, now).await
+}
+
+/// Cria um convite novo com o modelo escolhido na tela. Nos modelos fixos, a
+/// validade e os usos s\ão os daqui; "Do seu jeito" guarda `custom` mesmo que os
+/// n\úmeros sejam os de um modelo.
+pub async fn create_new(
+    db: &SqlitePool,
+    actor: &User,
+    invite: NewInvite,
+    now: i64,
+) -> Result<CreatedInvite, ApiError> {
+    let preset = Some(invite.preset());
+    insert(
+        db,
+        actor,
+        InviteKind::New,
+        None,
+        invite.numbers(),
+        preset,
+        now,
+    )
+    .await
+}
+
+/// Confere e grava o convite. O par traz a validade (em segundos) e os usos.
+async fn insert(
+    db: &SqlitePool,
+    actor: &User,
+    kind: InviteKind,
+    target: Option<&User>,
+    (ttl_secs, max_uses): (i64, i64),
+    preset: Option<Preset>,
     now: i64,
 ) -> Result<CreatedInvite, ApiError> {
     match kind {
@@ -164,13 +289,14 @@ pub async fn create(
         code: secret::new_invite_code(),
         expires_at: now + ttl_secs,
         max_uses,
+        preset,
     };
     let normalized = secret::normalize_invite_code(&invite.code).expect("código gerado é válido");
 
     sqlx::query(
         "INSERT INTO invites
-            (id, code_hash, kind, target_user_id, max_uses, created_by, created_at, expires_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        (id, code_hash, kind, target_user_id, max_uses, created_by, created_at, expires_at, preset)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(&invite.id)
     .bind(secret::hash(&normalized))
@@ -180,6 +306,7 @@ pub async fn create(
     .bind(&actor.id)
     .bind(now)
     .bind(invite.expires_at)
+    .bind(preset.map(Preset::as_db))
     .execute(db)
     .await?;
     Ok(invite)
@@ -333,7 +460,7 @@ pub async fn redeem(
     let user: User = match (kind.as_str(), target_id) {
         ("recovery", Some(target_id)) => {
             let user: Option<User> = sqlx::query_as(
-                "SELECT id, nick, is_owner, created_at, removed_at FROM users
+                "SELECT id, nick, is_owner,display_name, created_at, removed_at FROM users
                  WHERE id = ? AND removed_at IS NULL",
             )
             .bind(&target_id)

@@ -1383,3 +1383,244 @@ mod regras {
         assert_eq!(devices_count, 1);
     }
 }
+/// v0.2.2, 1.1: nome visível, busca pelo id e os modelos de convite, direto
+/// sobre o banco.
+mod nome_e_modelos {
+    use api::db;
+    use api::error::ApiError;
+    use api::identity::invites::{self, InviteKind, NewInvite, Preset};
+    use api::identity::{User, users};
+    use sqlx::SqlitePool;
+
+    const NOW: i64 = 1_000_000;
+    const DAY: i64 = 24 * 60 * 60;
+
+    async fn setup() -> (SqlitePool, User) {
+        let pool = db::connect_in_memory().await.unwrap();
+        let owner = users::create_owner(&pool, "Dono", NOW).await.unwrap();
+        (pool, owner)
+    }
+
+    /// Um membro novo com esse nick.
+    async fn join(pool: &SqlitePool, owner: &User, nick: &str, n: u8) -> User {
+        let code = invites::create(pool, owner, InviteKind::New, None, DAY, 1, NOW)
+            .await
+            .unwrap()
+            .code;
+        let key = format!("{n:02x}").repeat(32);
+        invites::redeem(pool, &code, &key, Some(nick), NOW)
+            .await
+            .unwrap()
+            .0
+    }
+
+    async fn stored_preset(pool: &SqlitePool, id: &str) -> Option<String> {
+        sqlx::query_scalar("SELECT preset FROM invites WHERE id = ?")
+            .bind(id)
+            .fetch_one(pool)
+            .await
+            .unwrap()
+    }
+
+    #[tokio::test]
+    async fn nome_visivel_troca_e_volta_para_o_nick() {
+        let (pool, owner) = setup().await;
+        let kid = join(&pool, &owner, "kid", 1).await;
+        assert_eq!(kid.display_name, None);
+        assert_eq!(kid.shown_name(), "kid");
+
+        let kid = users::set_display_name(&pool, &kid, Some("  Kid Bengala "))
+            .await
+            .unwrap();
+        assert_eq!(kid.display_name.as_deref(), Some("Kid Bengala"));
+        assert_eq!(kid.shown_name(), "Kid Bengala");
+        // Gravou mesmo: quem lê do banco vê o nome novo.
+        let again = users::get_by_id(&pool, &kid.id).await.unwrap();
+        assert_eq!(again.display_name.as_deref(), Some("Kid Bengala"));
+
+        // Vazio e `None` voltam para o nick.
+        for blank in [Some(""), Some("   "), None] {
+            let back = users::set_display_name(&pool, &kid, blank).await.unwrap();
+            assert_eq!(back.display_name, None, "{blank:?}");
+            assert_eq!(back.shown_name(), "kid");
+        }
+    }
+
+    #[tokio::test]
+    async fn nome_visivel_pode_repetir_e_nao_vira_nick() {
+        let (pool, owner) = setup().await;
+        let kid = join(&pool, &owner, "kid", 1).await;
+        let ju = join(&pool, &owner, "juliana", 2).await;
+
+        users::set_display_name(&pool, &kid, Some("juju"))
+            .await
+            .unwrap();
+        users::set_display_name(&pool, &ju, Some("juju"))
+            .await
+            .unwrap();
+        // Até o nick de outra pessoa serve de nome visível.
+        users::set_display_name(&pool, &kid, Some("juliana"))
+            .await
+            .unwrap();
+
+        // O nick continua livre e único: o nome visível não ocupa nick.
+        assert!(
+            users::find_active_by_nick(&pool, "juju")
+                .await
+                .unwrap()
+                .is_none()
+        );
+    }
+
+    #[tokio::test]
+    async fn nome_visivel_invalido_nao_muda_nada() {
+        let (pool, owner) = setup().await;
+        let kid = join(&pool, &owner, "kid", 1).await;
+        let kid = users::set_display_name(&pool, &kid, Some("Kid"))
+            .await
+            .unwrap();
+
+        for bad in ["dois  espacos", "emoji 😀", &"a".repeat(33)] {
+            let result = users::set_display_name(&pool, &kid, Some(bad)).await;
+            assert!(
+                matches!(result, Err(ApiError::InvalidDisplayName(_))),
+                "{bad:?}"
+            );
+        }
+        let again = users::get_by_id(&pool, &kid.id).await.unwrap();
+        assert_eq!(again.display_name.as_deref(), Some("Kid"));
+    }
+
+    #[tokio::test]
+    async fn removido_nao_troca_o_nome() {
+        let (pool, owner) = setup().await;
+        let kid = join(&pool, &owner, "kid", 1).await;
+        users::remove(&pool, &owner, &kid, NOW).await.unwrap();
+        let result = users::set_display_name(&pool, &kid, Some("Kid")).await;
+        assert!(matches!(result, Err(ApiError::Unauthenticated)));
+    }
+
+    #[tokio::test]
+    async fn busca_pelo_id_acha_ate_removido() {
+        let (pool, owner) = setup().await;
+        let kid = join(&pool, &owner, "kid", 1).await;
+        users::remove(&pool, &owner, &kid, NOW).await.unwrap();
+
+        let found = users::get_by_id(&pool, &kid.id).await.unwrap();
+        assert_eq!(found.nick, "kid");
+        assert!(!found.is_active());
+        assert!(matches!(
+            users::get_by_id(&pool, "nao-existe").await,
+            Err(ApiError::NotFound(_))
+        ));
+    }
+
+    #[tokio::test]
+    async fn modelos_fixos_usam_os_numeros_da_api() {
+        let (pool, owner) = setup().await;
+
+        let person = invites::create_new(&pool, &owner, NewInvite::Person, NOW)
+            .await
+            .unwrap();
+        assert_eq!(person.expires_at, NOW + 7 * DAY);
+        assert_eq!(person.max_uses, 1);
+        assert_eq!(person.preset, Some(Preset::Person));
+        assert_eq!(
+            stored_preset(&pool, &person.id).await.as_deref(),
+            Some("person")
+        );
+
+        let group = invites::create_new(&pool, &owner, NewInvite::Group, NOW)
+            .await
+            .unwrap();
+        assert_eq!(group.expires_at, NOW + 5 * 60);
+        assert_eq!(group.max_uses, 8);
+        assert_eq!(
+            stored_preset(&pool, &group.id).await.as_deref(),
+            Some("group")
+        );
+    }
+
+    #[tokio::test]
+    async fn do_seu_jeito_guarda_custom_mesmo_com_os_numeros_de_um_modelo() {
+        let (pool, owner) = setup().await;
+        let custom = NewInvite::Custom {
+            ttl_secs: 7 * DAY,
+            max_uses: 1,
+        };
+        let invite = invites::create_new(&pool, &owner, custom, NOW)
+            .await
+            .unwrap();
+        assert_eq!(invite.preset, Some(Preset::Custom));
+        assert_eq!(
+            stored_preset(&pool, &invite.id).await.as_deref(),
+            Some("custom")
+        );
+    }
+
+    #[tokio::test]
+    async fn do_seu_jeito_fora_dos_limites_e_recusado() {
+        let (pool, owner) = setup().await;
+        for (ttl_secs, max_uses) in [(59, 1), (30 * DAY + 1, 1), (DAY, 0), (DAY, 51)] {
+            let custom = NewInvite::Custom { ttl_secs, max_uses };
+            let result = invites::create_new(&pool, &owner, custom, NOW).await;
+            assert!(
+                matches!(result, Err(ApiError::InvalidRequest(_))),
+                "{ttl_secs} {max_uses}"
+            );
+        }
+        for (ttl_secs, max_uses) in [(60, 1), (30 * DAY, 50)] {
+            let custom = NewInvite::Custom { ttl_secs, max_uses };
+            assert!(
+                invites::create_new(&pool, &owner, custom, NOW)
+                    .await
+                    .is_ok()
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn sem_modelo_escolhido_o_modelo_sai_dos_numeros() {
+        // O caminho do `admin convite`: ele só dá validade e usos.
+        let (pool, owner) = setup().await;
+        let cases = [
+            (7 * DAY, 1, "person"),
+            (5 * 60, 8, "group"),
+            (7 * DAY, 2, "custom"),
+            (60 * 60, 1, "custom"),
+        ];
+        for (ttl, uses, expected) in cases {
+            let invite = invites::create(&pool, &owner, InviteKind::New, None, ttl, uses, NOW)
+                .await
+                .unwrap();
+            assert_eq!(
+                stored_preset(&pool, &invite.id).await.as_deref(),
+                Some(expected),
+                "{ttl} {uses}"
+            );
+        }
+
+        // A recuperação não tem modelo.
+        let recovery = invites::create(
+            &pool,
+            &owner,
+            InviteKind::Recovery,
+            Some(&owner),
+            DAY,
+            1,
+            NOW,
+        )
+        .await
+        .unwrap();
+        assert_eq!(recovery.preset, None);
+        assert_eq!(stored_preset(&pool, &recovery.id).await, None);
+    }
+
+    #[tokio::test]
+    async fn membro_nao_cria_convite_com_modelo() {
+        let (pool, owner) = setup().await;
+        let kid = join(&pool, &owner, "kid", 1).await;
+        let result = invites::create_new(&pool, &kid, NewInvite::Group, NOW).await;
+        assert!(matches!(result, Err(ApiError::Forbidden)));
+    }
+}

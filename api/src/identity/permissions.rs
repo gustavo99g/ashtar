@@ -45,6 +45,7 @@ pub enum Action {
     UnlinkDevice,
     RemoveMember,
     ManagePermissions,
+    ViewPanel,
 }
 
 /// O único lugar que decide se `user` pode fazer `action`.
@@ -59,7 +60,8 @@ pub fn can(user: &User, action: Action) -> bool {
         | Action::RevokeInvite
         | Action::UnlinkDevice
         | Action::RemoveMember
-        | Action::ManagePermissions => user.is_owner,
+        | Action::ManagePermissions
+        | Action::ViewPanel => user.is_owner,
     }
 }
 
@@ -154,6 +156,7 @@ mod tests {
         User {
             id: "u".into(),
             nick: "n".into(),
+            display_name: None,
             is_owner,
             created_at: 0,
             removed_at: removed.then_some(1),
@@ -170,6 +173,10 @@ mod tests {
     #[test]
     fn removido_nao_pode_nada() {
         assert!(!can(&user(true, true), Action::CreateInvite));
+        assert!(!can(&user(true, true), Action::ViewPanel));
+        assert!(can(&user(true, false), Action::ViewPanel));
+        assert!(!can(&user(false, false), Action::CreateInvite));
+        assert!(!can(&user(false, false), Action::ViewPanel));
     }
 
     #[test]

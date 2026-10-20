@@ -4,6 +4,9 @@
 CREATE TABLE users (
     id         TEXT    PRIMARY KEY,
     nick       TEXT    NOT NULL CHECK (length(nick) BETWEEN 2 AND 32),
+    -- Nome visível: pode repetir o de outra pessoa. NULL = aparece o nick.
+    -- De 1 a 32 caracteres, como o nick; o CHECK deixa o NULL passar.
+    display_name TEXT  CHECK (length(display_name) BETWEEN 1 AND 32),
     is_owner   INTEGER NOT NULL DEFAULT 0 CHECK (is_owner IN (0, 1)),
     created_at INTEGER NOT NULL,
     removed_at INTEGER
@@ -41,6 +44,8 @@ CREATE TABLE invites (
     kind           TEXT    NOT NULL CHECK (kind IN ('new', 'recovery')),
     target_user_id TEXT    REFERENCES users (id),
     max_uses       INTEGER NOT NULL DEFAULT 1 CHECK (max_uses BETWEEN 1 AND 50),
+    -- O modelo escolhido na tela. NULL só no convite de recuperação.
+    preset         TEXT    CHECK (preset IN ('person', 'group', 'custom')),
     created_by     TEXT    NOT NULL REFERENCES users (id),
     created_at     INTEGER NOT NULL,
     expires_at     INTEGER NOT NULL,

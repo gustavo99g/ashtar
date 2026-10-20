@@ -9,13 +9,14 @@ use crate::error::{ApiError, unique_violation};
 
 const NICK_MIN: usize = 2;
 const NICK_MAX: usize = 32;
+const DISPLAY_NAME_MAX: usize = 32;
 
 /// `SELECT` das colunas de [`User`], seguido do resto da consulta. Uma macro e
 /// não um `format!`: o sqlx só aceita SQL que é texto fixo no código.
 macro_rules! select_user {
     ($rest:literal) => {
         concat!(
-            "SELECT id, nick, is_owner, created_at, removed_at FROM users ",
+            "SELECT id, nick, display_name, is_owner, created_at, removed_at FROM users ",
             $rest
         )
     };
@@ -34,10 +35,7 @@ pub fn validate_nick(input: &str) -> Result<String, ApiError> {
             "O nick precisa ter de 2 a 32 caracteres.",
         ));
     }
-    if !nick
-        .chars()
-        .all(|c| c.is_alphanumeric() || matches!(c, ' ' | '_' | '-' | '.'))
-    {
+    if !nick.chars().all(allowed_char) {
         return Err(ApiError::InvalidNick(
             "Use só letras, números, espaço, _, - e ponto no nick.",
         ));
@@ -48,6 +46,40 @@ pub fn validate_nick(input: &str) -> Result<String, ApiError> {
         ));
     }
     Ok(nick.to_owned())
+}
+
+/// Os caracteres que valem no nick e no nome visível.
+fn allowed_char(c: char) -> bool {
+    c.is_alphanumeric() || matches!(c, ' ' | '_' | '-' | '.')
+}
+
+/// Confere o nome visível e devolve a versão sem espaços nas pontas, ou `None`
+/// quando ele fica em branco (aí aparece o nick).
+///
+/// Regras: as do nick, menos o mínimo de 2 caracteres e ser único. De 1 a 32
+/// caracteres; letras (com acento), números, espaço, `_`, `-` e `.`; sem dois
+/// espaços seguidos.
+pub fn validate_display_name(input: &str) -> Result<Option<String>, ApiError> {
+    let name = input.trim();
+    if name.is_empty() {
+        return Ok(None);
+    }
+    if name.chars().count() > DISPLAY_NAME_MAX {
+        return Err(ApiError::InvalidDisplayName(
+            "O nome visível pode ter até 32 caracteres.",
+        ));
+    }
+    if !name.chars().all(allowed_char) {
+        return Err(ApiError::InvalidDisplayName(
+            "Use só letras, números, espaço, _, - e ponto no nome visível.",
+        ));
+    }
+    if name.contains("  ") {
+        return Err(ApiError::InvalidDisplayName(
+            "O nome visível não pode ter dois espaços seguidos.",
+        ));
+    }
+    Ok(Some(name.to_owned()))
 }
 
 /// Membro ativo com esse nick (sem diferenciar maiúscula de minúscula).
@@ -64,6 +96,20 @@ pub async fn get_active_by_nick(db: &SqlitePool, nick: &str) -> Result<User, Api
     find_active_by_nick(db, nick)
         .await?
         .ok_or_else(|| ApiError::NotFound(format!("Nenhum membro ativo com o nick \"{nick}\".")))
+}
+
+/// O usuário com esse id, removido ou não.
+pub async fn find_by_id(db: &SqlitePool, id: &str) -> Result<Option<User>, ApiError> {
+    let sql = select_user!("WHERE id = ?");
+    Ok(sqlx::query_as(sql).bind(id).fetch_optional(db).await?)
+}
+
+/// Como [`find_by_id`], mas "não encontrado" vira erro. As rotas do Painel
+/// falam dos membros pelo id; o `admin` continua buscando pelo nick.
+pub async fn get_by_id(db: &SqlitePool, id: &str) -> Result<User, ApiError> {
+    find_by_id(db, id)
+        .await?
+        .ok_or_else(|| ApiError::NotFound("Nenhum membro com esse id.".into()))
 }
 
 /// O dono, se já existir.
@@ -105,6 +151,7 @@ pub(super) async fn insert(
     let user = User {
         id: Uuid::new_v4().to_string(),
         nick: nick.to_owned(),
+        display_name: None,
         is_owner,
         created_at: now,
         removed_at: None,
@@ -135,6 +182,29 @@ pub async fn create_owner(db: &SqlitePool, nick: &str, now: i64) -> Result<User,
     }
     let mut conn = db.acquire().await?;
     insert(&mut conn, &nick, true, now).await
+}
+
+/// Troca o nome visível do próprio membro. Texto vazio ou `None` volta para o
+/// nick. Devolve o membro já com o nome novo.
+pub async fn set_display_name(
+    db: &SqlitePool,
+    user: &User,
+    input: Option<&str>,
+) -> Result<User, ApiError> {
+    let display_name = validate_display_name(input.unwrap_or_default())?;
+    let updated =
+        sqlx::query("UPDATE users SET display_name = ? WHERE id = ? AND removed_at IS NULL")
+            .bind(&display_name)
+            .bind(&user.id)
+            .execute(db)
+            .await?;
+    if updated.rows_affected() == 0 {
+        return Err(ApiError::Unauthenticated);
+    }
+    Ok(User {
+        display_name,
+        ..user.clone()
+    })
 }
 
 /// Remove um membro: marca como removido, apaga o dispositivo (e a sessão,
@@ -190,6 +260,41 @@ mod tests {
         assert_eq!(validate_nick("  Kid  ").unwrap(), "Kid");
         assert_eq!(validate_nick("João.Silva_2").unwrap(), "João.Silva_2");
         assert_eq!(validate_nick("Dois Nomes").unwrap(), "Dois Nomes");
+    }
+
+    #[test]
+    fn nome_visivel_em_branco_volta_para_o_nick() {
+        assert_eq!(validate_display_name("").unwrap(), None);
+        assert_eq!(validate_display_name("   ").unwrap(), None);
+        assert_eq!(
+            validate_display_name("  juju ").unwrap().as_deref(),
+            Some("juju")
+        );
+        // Diferente do nick, 1 caractere basta.
+        assert_eq!(validate_display_name("J").unwrap().as_deref(), Some("J"));
+        assert_eq!(
+            validate_display_name(&"é".repeat(32)).unwrap().as_deref(),
+            Some("é".repeat(32).as_str())
+        );
+    }
+
+    #[test]
+    fn nome_visivel_invalido() {
+        for bad in [
+            "emoji 😀",
+            "dois  espacos",
+            "<b>oi</b>",
+            "a\tb",
+            &"a".repeat(33),
+        ] {
+            assert!(
+                matches!(
+                    validate_display_name(bad),
+                    Err(ApiError::InvalidDisplayName(_))
+                ),
+                "{bad:?}"
+            );
+        }
     }
 
     #[test]
