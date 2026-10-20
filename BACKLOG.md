@@ -58,12 +58,6 @@ Bugs que saem assim que ficarem prontos, pelo auto-update, sem esperar a entrega
       usados nos testes de 05 e 06/10 (ADR 0009). A trava só considera tracks já assinados e não impede duas
       pessoas de iniciarem ao mesmo tempo; o erro de início não tem como ser dispensado. A UI de voz é
       provisória. **Adiado para a UI nova (v0.2.2).**
-- [ ] Janelas minimizadas não aparecem no seletor. Não é bug nosso: o libwebrtc as descarta da lista
-      (`IsIconic`) e também não as captura, e o `CaptureSource` só sai dessa lista (medido: o `start` de uma
-      janela minimizada devolve `SourceNotFound`). O seletor recarrega a lista a cada 2 s (ao fim de cada
-      pedido, sem acumular), então uma janela restaurada aparece sem reabrir. Adiado: lista própria com
-      `EnumWindows`, selo "Minimizada" e restauração da janela ao escolher (contraria a decisão 2 do PLAN).
-      A lista leva ~95 ms com 4 janelas (release), por causa dos ícones: remedir com muitas janelas.
 - [ ] Os textos dos presets (`presets.ts`) prometem mais fluidez do que o medido em jogo: o Equilibrado ("sem
       perder fluidez") ficou em 25–34 fps e o Nitidez em 18–25 fps, abaixo dos 30 do próprio nome (ADR 0009). **Adiado para a UI nova (v0.2.2).**
 
@@ -78,6 +72,27 @@ Bugs que saem assim que ficarem prontos, pelo auto-update, sem esperar a entrega
 - [ ] Tela de usuários em que o dono marca quem recebe o beta. A API (devolver o canal e a permissão no
       `admin`) sai na v0.2.1 (`NOTES.md`); a tela e o app guardando o último valor vêm aqui, e substituem a
       variável `ASHTAR_UPDATE_CHANNEL`. Papel de dono ("supremo"), acima de administrador; só ele marca o beta.
+
+## v0.2.3 — Chat real
+
+Itens que a UI nova (v0.2.2) deixou para o chat, porque dependem do WebSocket próprio.
+
+- [ ] Trocar as consultas repetidas da v0.2.2 por eventos: a lista de quem está na sala (hoje a cada 5 s,
+      `GET /api/voice/participants`) pelos webhooks do LiveKit levados pelo WebSocket, e o aviso de quem
+      entrou (hoje o app do dono compara `GET /api/members` a cada 30 s) por um evento. Cada feature ganha um
+      `realtime.ts` que atualiza o cache do TanStack Query (ADR 0012).
+- [ ] O quadro "Canal de texto" do canvas é a referência visual do chat; a rota e o espaço no `AppShell`
+      já existem desde a v0.2.2.
+
+## v0.2.3 e v0.6 — Voz e vídeo
+
+- [ ] A aba "Voz e vídeo" das configurações ficou fora da v0.2.2 e aparece apagada no menu. O quadro dela
+      fica guardado: supressão de ruído, cancelamento de eco e ganho automático na v0.2.3; dispositivos,
+      volumes, teste de microfone, detecção de voz, pressionar para falar e atalhos globais na v0.6. O
+      pressionar para falar com um jogo em foco pede um gancho de teclado em Rust: o atalho global comum do
+      Windows prende a tecla, e o jogo deixaria de recebê-la.
+- [ ] "Reconectando" no painel "Voz conectada" e o aviso "Conexão perdida" do compartilhamento ficaram
+      apagados no canvas na v0.2.2; entram com a reconexão da v0.6.
 
 ## v0.2.5 — Publicador nativo e medição
 
@@ -128,3 +143,13 @@ Miniaturas e o aviso de conteúdo protegido estão na v0.8 do roadmap (`## Scree
 - [ ] Aviso de possível conteúdo protegido (frames totalmente pretos por vários segundos).
 - [ ] Suporte a Linux (risco principal: WebRTC no WebKitGTK) e versão web.
 - [ ] Qualquer funcionalidade nova de voz além do que já existe.
+- [ ] Janelas minimizadas não aparecem no seletor. Não é bug nosso: o libwebrtc as descarta da lista
+      (`IsIconic`) e também não as captura, e o `CaptureSource` só sai dessa lista (medido: o `start` de uma
+      janela minimizada devolve `SourceNotFound`). O seletor recarrega a lista a cada 2 s (ao fim de cada
+      pedido, sem acumular), então uma janela restaurada aparece sem reabrir. Adiado: lista própria com
+      `EnumWindows`, selo "Minimizada" e restauração da janela ao escolher (contraria a decisão 2 do PLAN).
+      A lista leva ~95 ms com 4 janelas (release), por causa dos ícones: remedir com muitas janelas.
+      **Adiado de novo na v0.2.2** (decisão de 17/10): a lista continua sem as minimizadas, e o quadro
+      do seletor no canvas perdeu o selo "Minimizada".
+- [ ] Um segundo tema (claro, por exemplo). A troca por `data-theme` já existe desde a v0.2.2 (ADR 0012);
+      a opção aparece nas configurações quando o tema existir, com o contraste conferido.
