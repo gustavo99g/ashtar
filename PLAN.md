@@ -71,7 +71,7 @@ plano decidiu além disso.
   recuperação ao dono.
 - **Quase ao vivo sem SSE:** quem está na sala a cada 5 s; o aviso do dono comparando a lista de membros a
   cada 30 s. O tempo real chega com o WebSocket do chat.
-- **API:** as mudanças entram como Etapa 1, com a migração `0002`; nome visível na sala vale na próxima
+- **API:** as mudanças entram como Etapa 1, sem migração nova (as colunas entram na `0001`); nome visível na sala vale na próxima
   entrada; nome visível com as regras do nick, menos ser único; o link de download da página do convite lido
   do `latest.json` do estável.
 - **Cor do avatar** sai do nick: FNV-1a de 32 bits sobre o nick em UTF-8 com só o ASCII em minúsculas,
@@ -94,7 +94,7 @@ As ADRs 0012 e 0013 e a seção "Administração pela interface" da 0011.
 
 ## Etapa 1: API — pendente
 
-- Migração `0002`: `users.display_name` e `invites.preset`.
+- Na migração `0001`: `users.display_name` e `invites.preset`.
 - `GET /api/invites/{código}` sem sessão; `PATCH /api/me`; `display_name` e `can_view_panel` no `/api/me`;
   nome visível no nome do participante e o nick nos metadados do `voice/token`.
 - As nove rotas do Painel, com `Action::ViewPanel` e os modelos de convite na API.
