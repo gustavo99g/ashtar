@@ -29,7 +29,7 @@ cada etapa, `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings` e `
 | Etapa | Descrição | Status |
 |---|---|---|
 | 0 | Decisões (ADRs 0012 e 0013, seção nova na 0011) | Concluída (`4a0d09b`) |
-| 1 | API: nome visível, leitura do convite, rotas do painel, quem está na sala, página do convite | Pendente |
+| 1 | API: nome visível, leitura do convite, rotas do painel, quem está na sala, página do convite | Concluída (`373b377`) |
 | 2 | Base visual: pastas por domínio, ESLint, Vitest, tokens e temas, design system, janela, AppShell, router | Pendente |
 | 3 | Identidade no app: tipos gerados, TanStack Query, chave do computador, login pelo Rust, sessão | Pendente |
 | 4 | Entrada: link `ashtar://`, uma instância, convite, nick, recuperação, saiu do grupo | Pendente |
@@ -92,14 +92,14 @@ plano decidiu além disso.
 
 As ADRs 0012 e 0013 e a seção "Administração pela interface" da 0011.
 
-## Etapa 1: API — pendente
+## Etapa 1: API — concluída (`373b377`)
 
 - Na migração `0001`: `users.display_name` e `invites.preset`.
 - `GET /api/invites/{código}` sem sessão; `PATCH /api/me`; `display_name` e `can_view_panel` no `/api/me`;
   nome visível no nome do participante e o nick nos metadados do `voice/token`.
 - As nove rotas do Painel, com `Action::ViewPanel` e os modelos de convite na API.
 - `GET /api/voice/participants`.
-- As páginas `/convite/{código}` e `/recuperar/{código}`, o ícone PNG, `PUBLIC_URL` e a cor do nick em Rust.
+- As páginas `/invite/{código}` e `/recovery/{código}`, o ícone PNG, `PUBLIC_URL` e a cor do nick em Rust.
 
 **Pronto quando:** cada rota nova tem teste de integração passando; a página do convite abre no navegador
 com a prévia certa no chat; o app instalado continua entrando pela rota antiga.

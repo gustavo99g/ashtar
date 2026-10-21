@@ -47,7 +47,7 @@ num arquivo na pasta de dados e usa o último valor gravado em toda verificaçã
 com a API fora do ar. Sem nada gravado, é o estável. A variável `ASHTAR_UPDATE_CHANNEL` fica só para o
 desenvolvimento e, quando existe, vence o arquivo.
 
-**A entrada pelo link.** O esquema `ashtar` (`ashtar://convite/CÓDIGO`, `ashtar://recuperar/CÓDIGO`) pelo
+**A entrada pelo link.** O esquema `ashtar` (`ashtar://invite/CÓDIGO`, `ashtar://recovery/CÓDIGO`) pelo
 `tauri-plugin-deep-link`, registrado pelo instalador e de novo a cada abertura. O
 `tauri-plugin-single-instance`, com o deep link ligado, entrega o link à janela que já está aberta. O app de
 desenvolvimento usa o esquema `ashtar-dev`.

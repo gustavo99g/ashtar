@@ -88,7 +88,7 @@ vale na próxima entrada na sala. Dois membros podem ter o mesmo nome visível; 
 grupo, e o nick continua à mão no Painel.
 
 **Antes de ter conta.** `GET /api/invites/{código}` lê um convite sem gastá-lo e sem sessão, para a tela
-mostrar quem convidou antes do nick. Ela e as páginas `/convite/{código}` e `/recuperar/{código}` (HTML da
+mostrar quem convidou antes do nick. Ela e as páginas `/invite/{código}` e `/recovery/{código}` (HTML da
 própria API, fora da `ClientPolicy`, para o navegador e a prévia no chat) contam no limite de tentativas
 quando o código não vale, como o `redeem`, e respondem igual para inválido, vencido, revogado e esgotado.
 
