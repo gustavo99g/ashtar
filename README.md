@@ -64,7 +64,7 @@ app usa `http://127.0.0.1:3000`; num app gerado com `tauri build`, ela é obriga
 build: mudou, reinicie o `tauri dev` ou gere o app de novo.
 
 `PUBLIC_URL` é o endereço público da API (sem barra final). Ela monta com ele o link dos convites
-(`/convite/CÓDIGO`). Em desenvolvimento, `http://127.0.0.1:3000`; no computador de casa, a URL do Funnel.
+(`/invite/CÓDIGO`). Em desenvolvimento, `http://127.0.0.1:3000`; no computador de casa, a URL do Funnel.
 
 ### 2. LiveKit
 

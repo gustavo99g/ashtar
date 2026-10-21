@@ -60,6 +60,14 @@ pub fn normalize_invite_code(input: &str) -> Option<String> {
     valid.then_some(code)
 }
 
+/// O código no formato `XXXX-XXXX-XXXX`, do jeito que foi gerado, a partir do que
+/// a pessoa digitou. `None` se não for um código. A página do convite usa esse
+/// formato nos links, mesmo que o endereço tenha vindo em minúsculas.
+pub fn display_invite_code(input: &str) -> Option<String> {
+    let code = normalize_invite_code(input)?;
+    Some(format!("{}-{}-{}", &code[..4], &code[4..8], &code[8..]))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -94,5 +102,14 @@ mod tests {
     fn tokens_sao_diferentes() {
         assert_ne!(new_session_token(), new_session_token());
         assert_eq!(new_session_token().len(), 64);
+    }
+
+    #[test]
+    fn mostra_o_codigo_com_hifens() {
+        assert_eq!(
+            display_invite_code("abcd efgh jk0o").as_deref(),
+            Some("ABCD-EFGH-JK00")
+        );
+        assert_eq!(display_invite_code("ABCD-EFGH"), None);
     }
 }

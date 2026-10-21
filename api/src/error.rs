@@ -44,6 +44,9 @@ pub enum ApiError {
     /// Falta configuração no servidor (uma variável do `.env`, por exemplo).
     #[error("Erro interno no servidor.")]
     Config(String),
+    /// O LiveKit não respondeu ou recusou o pedido. O detalhe vai só para o log.
+    #[error("Não foi possível consultar a sala de voz agora.")]
+    LiveKit(String),
 }
 
 impl ApiError {
@@ -64,7 +67,9 @@ impl ApiError {
             Self::NotFound(_) => (StatusCode::NOT_FOUND, "not_found"),
             Self::Conflict(_) => (StatusCode::CONFLICT, "conflict"),
             Self::TooManyAttempts => (StatusCode::TOO_MANY_REQUESTS, "too_many_attempts"),
-            Self::Internal(_) | Self::Config(_) => (StatusCode::INTERNAL_SERVER_ERROR, "internal"),
+            Self::Internal(_) | Self::Config(_) | Self::LiveKit(_) => {
+                (StatusCode::INTERNAL_SERVER_ERROR, "internal")
+            }
         }
     }
 }
@@ -84,6 +89,7 @@ impl IntoResponse for ApiError {
         match &self {
             Self::Internal(error) => eprintln!("erro interno: {error}"),
             Self::Config(message) => eprintln!("configuração: {message}"),
+            Self::LiveKit(message) => eprintln!("livekit: {message}"),
             _ => {}
         }
         let (status, kind) = self.status_and_kind();

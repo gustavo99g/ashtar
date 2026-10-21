@@ -2012,10 +2012,7 @@ mod painel {
         let code = person["code"].as_str().unwrap();
         assert_eq!(person["preset"], "person");
         assert_eq!(person["max_uses"], 1);
-        assert_eq!(
-            person["link"],
-            format!("https://ashtar.test/convite/{code}")
-        );
+        assert_eq!(person["link"], format!("https://ashtar.test/invite/{code}"));
         let expires = person["expires_at"].as_i64().unwrap();
         assert!((before + 7 * DAY..=now() + 7 * DAY).contains(&expires));
         assert_eq!(redeem(&ctx, code, 1, "Fulano").await.0, StatusCode::OK);
@@ -2489,7 +2486,7 @@ mod painel {
         let code = created["code"].as_str().unwrap();
         assert_eq!(
             created["link"],
-            format!("https://ashtar.test/recuperar/{code}")
+            format!("https://ashtar.test/recovery/{code}")
         );
         assert_eq!(created["preset"], Value::Null);
         assert_eq!(created["max_uses"], 1);
@@ -2551,5 +2548,287 @@ mod painel {
         // O nick ficou livre.
         let code = new_invite(&ctx).await;
         assert_eq!(redeem(&ctx, &code, 1, "juliana").await.0, StatusCode::OK);
+    }
+}
+/// v0.2.2, 1.4: quem está na sala. A conversa com o LiveKit fica de fora (os
+/// testes não sobem um servidor de voz); a junção com o banco e as recusas antes
+/// do LiveKit ficam aqui.
+mod sala {
+    use super::*;
+    use api::routes::voice::{RoomParticipant, join_participants};
+
+    fn in_room(identity: &str, screen_sharing: bool) -> RoomParticipant {
+        RoomParticipant {
+            identity: identity.to_owned(),
+            screen_sharing,
+        }
+    }
+
+    #[tokio::test]
+    async fn junta_quem_esta_na_sala_com_o_banco() {
+        let ctx = setup().await;
+        session(&ctx, "juliana", 1).await;
+        session(&ctx, "carla", 2).await;
+        let ju = users::get_active_by_nick(&ctx.db, "juliana").await.unwrap();
+        let carla = users::get_active_by_nick(&ctx.db, "carla").await.unwrap();
+        users::set_display_name(&ctx.db, &ju, Some("juju"))
+            .await
+            .unwrap();
+
+        let room = vec![
+            in_room(&carla.id, true),
+            // O app antigo entra com outra identidade: fica de fora.
+            in_room("idiot-1234", false),
+            in_room(&ju.id, false),
+        ];
+        let joined = join_participants(&ctx.db, room).await.unwrap();
+        let json = serde_json::to_value(&joined).unwrap();
+        assert_eq!(
+            json,
+            json!([
+                { "user_id": carla.id, "nick": "carla", "display_name": null, "screen_sharing": true },
+                { "user_id": ju.id, "nick": "juliana", "display_name": "juju", "screen_sharing": false },
+            ])
+        );
+    }
+
+    #[tokio::test]
+    async fn sala_vazia_e_lista_vazia() {
+        let ctx = setup().await;
+        assert!(
+            join_participants(&ctx.db, Vec::new())
+                .await
+                .unwrap()
+                .is_empty()
+        );
+        let only_strangers = vec![in_room("idiot-1", false), in_room("idiot-2", true)];
+        assert!(
+            join_participants(&ctx.db, only_strangers)
+                .await
+                .unwrap()
+                .is_empty()
+        );
+    }
+
+    #[tokio::test]
+    async fn removido_ainda_conectado_aparece() {
+        let ctx = setup().await;
+        session(&ctx, "bruno", 1).await;
+        let bruno = users::get_active_by_nick(&ctx.db, "bruno").await.unwrap();
+        users::remove(&ctx.db, &ctx.owner, &bruno, now())
+            .await
+            .unwrap();
+
+        let joined = join_participants(&ctx.db, vec![in_room(&bruno.id, false)])
+            .await
+            .unwrap();
+        assert_eq!(joined.len(), 1);
+        assert_eq!(joined[0].nick, "bruno");
+    }
+
+    #[tokio::test]
+    async fn rota_recusa_antes_de_perguntar_ao_livekit() {
+        let ctx = setup().await;
+        let token = session(&ctx, "juliana", 1).await;
+
+        let (status, _) = call(
+            &ctx.router,
+            "GET",
+            "/api/voice/participants?channel_id=jogatina",
+            None,
+            None,
+        )
+        .await;
+        assert_eq!(status, StatusCode::UNAUTHORIZED);
+
+        for uri in [
+            "/api/voice/participants",
+            "/api/voice/participants?channel_id=",
+            "/api/voice/participants?channel_id=com%20espaco",
+            "/api/voice/participants?channel_id=..%2Foutra",
+        ] {
+            let (status, body) = call(&ctx.router, "GET", uri, Some(&token), None).await;
+            assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{uri}");
+            assert_eq!(body["kind"], "invalid_request", "{uri}");
+        }
+    }
+}
+/// v0.2.2, 1.5: as páginas do convite, pelo HTTP. O texto exato de cada página
+/// está nos testes de `routes::pages`; aqui ficam a rota, o limite e o banco.
+mod pagina {
+    use super::*;
+    use axum::http::HeaderMap;
+    use axum::http::header::{CACHE_CONTROL, CONTENT_TYPE};
+
+    async fn get(router: &Router, uri: &str) -> (StatusCode, HeaderMap, Vec<u8>) {
+        let request = Request::builder().uri(uri).body(Body::empty()).unwrap();
+        let response = router.clone().oneshot(request).await.unwrap();
+        let status = response.status();
+        let headers = response.headers().clone();
+        let bytes = response.into_body().collect().await.unwrap().to_bytes();
+        (status, headers, bytes.to_vec())
+    }
+
+    async fn page(ctx: &Ctx, uri: &str) -> (StatusCode, String) {
+        let (status, headers, body) = get(&ctx.router, uri).await;
+        assert_eq!(headers[CONTENT_TYPE], "text/html; charset=utf-8", "{uri}");
+        assert_eq!(headers[CACHE_CONTROL], "no-store", "{uri}");
+        (status, String::from_utf8(body).unwrap())
+    }
+
+    #[tokio::test]
+    async fn convite_valendo_mostra_quem_convidou_e_nao_gasta() {
+        let ctx = setup().await;
+        let code = new_invite(&ctx).await;
+
+        // Digitado em minúsculas: os links saem no formato de sempre.
+        let (status, html) = page(&ctx, &format!("/invite/{}", code.to_lowercase())).await;
+        assert_eq!(status, StatusCode::OK);
+        assert!(html.contains(r#"content="Kid te convidou para o Ashtar""#));
+        assert!(html.contains(&format!(
+            r#"<meta property="og:url" content="https://ashtar.test/invite/{code}">"#
+        )));
+        assert!(html.contains(r#"content="https://ashtar.test/invite.png""#));
+        assert!(html.contains(&format!(r#"href="ashtar://invite/{code}""#)));
+        assert!(html.contains(&format!(r#"data-link="https://ashtar.test/invite/{code}""#)));
+        assert!(html.contains("Vale até "));
+
+        assert_eq!(redeem(&ctx, &code, 1, "Fulano").await.0, StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn recuperacao_segue_o_tipo_do_convite() {
+        let ctx = setup().await;
+        session(&ctx, "juliana", 1).await;
+        let ju = users::get_active_by_nick(&ctx.db, "juliana").await.unwrap();
+        let ju = users::set_display_name(&ctx.db, &ju, Some("juju"))
+            .await
+            .unwrap();
+        let recovery = invites::create(
+            &ctx.db,
+            &ctx.owner,
+            InviteKind::Recovery,
+            Some(&ju),
+            DAY,
+            1,
+            now(),
+        )
+        .await
+        .unwrap();
+
+        // Aberto pelo caminho certo ou pelo outro, a página é a da recuperação.
+        for path in ["recovery", "invite"] {
+            let (status, html) = page(&ctx, &format!("/{path}/{}", recovery.code)).await;
+            assert_eq!(status, StatusCode::OK);
+            assert!(html.contains("<title>Trocar de computador no Ashtar</title>"));
+            assert!(html.contains(r#"Conta de <span class="conta">juju</span>"#));
+            assert!(html.contains(&format!(r#"href="ashtar://recovery/{}""#, recovery.code)));
+        }
+    }
+
+    #[tokio::test]
+    async fn convite_que_nao_vale_responde_200_sem_dizer_por_que() {
+        let ctx = setup().await;
+        let used = new_invite(&ctx).await;
+        redeem(&ctx, &used, 1, "Fulano").await;
+        let expired = invites::create(
+            &ctx.db,
+            &ctx.owner,
+            InviteKind::New,
+            None,
+            60,
+            1,
+            now() - 120,
+        )
+        .await
+        .unwrap();
+
+        for uri in [
+            "/invite/AAAA-AAAA-AAAA".to_owned(),
+            "/invite/isto-nao-e-codigo".to_owned(),
+            format!("/invite/{used}"),
+            format!("/recovery/{}", expired.code),
+        ] {
+            let (status, html) = page(&ctx, &uri).await;
+            assert_eq!(status, StatusCode::OK, "{uri}");
+            assert!(
+                html.contains(r#"content="Esse convite não vale mais""#),
+                "{uri}"
+            );
+            assert!(!html.contains("ashtar://"), "{uri}");
+            assert!(!html.contains("Kid"), "{uri}");
+        }
+    }
+
+    #[tokio::test]
+    async fn codigo_errado_na_pagina_conta_no_limite() {
+        let ctx = setup().await;
+        let code = new_invite(&ctx).await;
+        for _ in 0..20 {
+            page(&ctx, "/invite/AAAA-AAAA-AAAA").await;
+        }
+        let (status, html) = page(&ctx, &format!("/invite/{code}")).await;
+        assert_eq!(status, StatusCode::TOO_MANY_REQUESTS);
+        assert!(html.contains("Muitas tentativas"));
+        // O limite é o mesmo do app.
+        assert_eq!(
+            redeem(&ctx, &code, 1, "Fulano").await.0,
+            StatusCode::TOO_MANY_REQUESTS
+        );
+    }
+
+    #[tokio::test]
+    async fn texto_do_banco_sai_escapado() {
+        let ctx = setup().await;
+        // A validação não deixa um nome assim entrar; o banco aceita, e a página
+        // não pode confiar na validação.
+        sqlx::query("UPDATE users SET display_name = ? WHERE id = ?")
+            .bind(r#"<script>"x"</script>"#)
+            .bind(&ctx.owner.id)
+            .execute(&ctx.db)
+            .await
+            .unwrap();
+        let code = new_invite(&ctx).await;
+
+        let (_, html) = page(&ctx, &format!("/invite/{code}")).await;
+        assert!(!html.contains(r#"<script>"x""#));
+        assert!(html.contains("&lt;script&gt;&quot;x&quot;&lt;/script&gt; te convidou"));
+    }
+
+    #[tokio::test]
+    async fn icone_em_png() {
+        let ctx = setup().await;
+        let (status, headers, body) = get(&ctx.router, "/invite.png").await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(headers[CONTENT_TYPE], "image/png");
+        assert!(body.starts_with(b"\x89PNG\r\n\x1a\n"));
+        // Largura e altura no cabeçalho IHDR do PNG: 512 × 512.
+        assert_eq!(&body[16..24], &[0, 0, 2, 0, 0, 0, 2, 0]);
+    }
+
+    #[tokio::test]
+    async fn paginas_ficam_fora_da_politica_do_app() {
+        let db = db::connect_in_memory().await.unwrap();
+        let owner = users::create_owner(&db, "Kid", now()).await.unwrap();
+        let policy = ClientPolicy {
+            min_version: Some("9.9.9".parse().unwrap()),
+            access_code: Some("segredo".into()),
+        };
+        let router = app(
+            AppState::new(db.clone(), "https://ashtar.test"),
+            Arc::new(policy),
+        );
+        let code = invites::create(&db, &owner, InviteKind::New, None, DAY, 1, now())
+            .await
+            .unwrap()
+            .code;
+
+        let (status, _, _) = get(&router, &format!("/invite/{code}")).await;
+        assert_eq!(status, StatusCode::OK);
+        let (status, _, _) = get(&router, "/invite.png").await;
+        assert_eq!(status, StatusCode::OK);
+        // A API continua exigindo a versão do app.
+        let (status, _, _) = get(&router, &format!("/api/invites/{code}")).await;
+        assert_eq!(status, StatusCode::UPGRADE_REQUIRED);
     }
 }

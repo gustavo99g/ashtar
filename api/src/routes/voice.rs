@@ -1,13 +1,26 @@
+//! Rotas de voz: o token para entrar na sala e a lista de quem já está nela.
+
+use std::collections::HashMap;
 use std::env;
+use std::sync::OnceLock;
+use std::time::Duration;
 
 use axum::Json;
+use axum::extract::rejection::QueryRejection;
+use axum::extract::{Query, State};
 use livekit_api::access_token::{AccessToken, VideoGrants};
+use livekit_api::services::room::RoomClient;
+use livekit_api::services::{ServerError, ServerErrorCode, ServiceError};
+use livekit_protocol::{ParticipantInfo, TrackSource};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use sqlx::SqlitePool;
 
 use super::auth::CurrentUser;
 use super::extract::ApiJson;
+use crate::AppState;
 use crate::error::ApiError;
+use crate::identity::{User, users};
 
 #[derive(Debug, Deserialize)]
 pub struct JoinVoiceRequest {
@@ -68,6 +81,122 @@ pub async fn voice_token(
     Ok(Json(JoinVoiceResponse { token, url }))
 }
 
+#[derive(Debug, Deserialize)]
+pub struct ParticipantsQuery {
+    /// Ausente vira texto vazio, que o `validate_channel_id` recusa com 422.
+    #[serde(default)]
+    pub channel_id: String,
+}
+
+/// Uma pessoa na sala, com o nick e o nome visível do banco.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct ParticipantView {
+    pub user_id: String,
+    pub nick: String,
+    pub display_name: Option<String>,
+    /// Se está transmitindo a tela (o selo TRANSMITINDO).
+    pub screen_sharing: bool,
+}
+
+/// `GET /api/voice/participants?channel_id=jogatina`: quem está na sala agora,
+/// sem precisar entrar. Sala vazia, ou que o LiveKit ainda não criou, responde
+/// `[]`. O app pergunta a cada 5 segundos enquanto a tela do servidor está aberta.
+pub async fn participants(
+    State(state): State<AppState>,
+    CurrentUser(_user): CurrentUser,
+    query: Result<Query<ParticipantsQuery>, QueryRejection>,
+) -> Result<Json<Vec<ParticipantView>>, ApiError> {
+    let Query(query) = query
+        .map_err(|_| ApiError::InvalidRequest("O pedido não está no formato esperado.".into()))?;
+    validate_channel_id(&query.channel_id)?;
+    let room = list_room(&query.channel_id).await?;
+    Ok(Json(join_participants(&state.db, room).await?))
+}
+
+/// Quem o LiveKit diz que está na sala: a identidade do token (o id do membro)
+/// e se tem uma trilha de tela publicada.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RoomParticipant {
+    pub identity: String,
+    pub screen_sharing: bool,
+}
+
+/// Da resposta do LiveKit para o que a lista usa, na ordem em que entraram.
+pub fn room_participants(mut infos: Vec<ParticipantInfo>) -> Vec<RoomParticipant> {
+    infos.sort_by_key(|info| (info.joined_at, info.joined_at_ms));
+    infos
+        .into_iter()
+        .map(|info| RoomParticipant {
+            screen_sharing: info
+                .tracks
+                .iter()
+                .any(|track| track.source() == TrackSource::ScreenShare),
+            identity: info.identity,
+        })
+        .collect()
+}
+
+/// Junta a lista do LiveKit com o banco: o nick e o nome visível saem do membro
+/// cujo id é a identidade. Uma identidade que não é de ninguém (o app antigo
+/// entra como `idiot-<uuid>`) fica de fora. Quem foi removido e continua
+/// conectado aparece: a lista mostra quem está ouvindo de verdade.
+pub async fn join_participants(
+    db: &SqlitePool,
+    room: Vec<RoomParticipant>,
+) -> Result<Vec<ParticipantView>, ApiError> {
+    if room.is_empty() {
+        return Ok(Vec::new());
+    }
+    let members: HashMap<String, User> = users::list(db)
+        .await?
+        .into_iter()
+        .map(|user| (user.id.clone(), user))
+        .collect();
+    Ok(room
+        .into_iter()
+        .filter_map(|participant| {
+            let user = members.get(&participant.identity)?;
+            Some(ParticipantView {
+                user_id: user.id.clone(),
+                nick: user.nick.clone(),
+                display_name: user.display_name.clone(),
+                screen_sharing: participant.screen_sharing,
+            })
+        })
+        .collect())
+}
+
+/// Um cliente do LiveKit para a API inteira, criado na primeira consulta: ele
+/// guarda as conexões abertas entre uma chamada e outra.
+static ROOM_CLIENT: OnceLock<RoomClient> = OnceLock::new();
+
+/// Tempo máximo de uma consulta ao LiveKit. O app pergunta a cada 5 segundos.
+const LIVEKIT_TIMEOUT: Duration = Duration::from_secs(5);
+
+fn room_client() -> Result<&'static RoomClient, ApiError> {
+    if let Some(client) = ROOM_CLIENT.get() {
+        return Ok(client);
+    }
+    let (api_key, api_secret, url) = livekit_env().map_err(ApiError::Config)?;
+    let client =
+        RoomClient::with_api_key(&url, &api_key, &api_secret).with_request_timeout(LIVEKIT_TIMEOUT);
+    Ok(ROOM_CLIENT.get_or_init(|| client))
+}
+
+/// Pergunta ao LiveKit quem está na sala `channel_id`.
+async fn list_room(channel_id: &str) -> Result<Vec<RoomParticipant>, ApiError> {
+    match room_client()?.list_participants(channel_id).await {
+        Ok(infos) => Ok(room_participants(infos)),
+        // Sala que não existe (ainda não criada, ou já fechada): ninguém nela.
+        Err(ServiceError::Twirp(ServerError::Twirp(error)))
+            if error.code == ServerErrorCode::NOT_FOUND =>
+        {
+            Ok(Vec::new())
+        }
+        Err(error) => Err(ApiError::LiveKit(error.to_string())),
+    }
+}
+
 /// Tamanho máximo do id de canal (e, portanto, do nome da sala no LiveKit).
 const CHANNEL_ID_MAX: usize = 64;
 
@@ -114,9 +243,9 @@ fn create_voice_token(
         .with_grants(VideoGrants {
             room_join: true,
             room: channel_id.to_owned(),
-            can_publish: true,
-            can_subscribe: true,
-            can_update_own_metadata: false,
+            can_publish: Some(true),
+            can_subscribe: Some(true),
+            can_update_own_metadata: Some(false),
             ..Default::default()
         })
         .to_jwt()
@@ -146,6 +275,62 @@ mod tests {
         }
     }
 
+    fn participant(identity: &str, joined_at: i64, sources: &[TrackSource]) -> ParticipantInfo {
+        ParticipantInfo {
+            identity: identity.to_owned(),
+            joined_at,
+            tracks: sources
+                .iter()
+                .map(|source| livekit_protocol::TrackInfo {
+                    source: *source as i32,
+                    ..Default::default()
+                })
+                .collect(),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn transmitindo_e_quem_tem_trilha_de_tela() {
+        let room = room_participants(vec![
+            participant("so-voz", 10, &[TrackSource::Microphone]),
+            participant(
+                "tela",
+                11,
+                &[TrackSource::Microphone, TrackSource::ScreenShare],
+            ),
+            // O áudio da tela sem a imagem não conta.
+            participant("audio-da-tela", 12, &[TrackSource::ScreenShareAudio]),
+            participant("camera", 13, &[TrackSource::Camera]),
+            participant("calado", 14, &[]),
+        ]);
+        let sharing: Vec<(&str, bool)> = room
+            .iter()
+            .map(|p| (p.identity.as_str(), p.screen_sharing))
+            .collect();
+        assert_eq!(
+            sharing,
+            [
+                ("so-voz", false),
+                ("tela", true),
+                ("audio-da-tela", false),
+                ("camera", false),
+                ("calado", false),
+            ]
+        );
+    }
+
+    #[test]
+    fn a_lista_vem_na_ordem_de_entrada() {
+        let room = room_participants(vec![
+            participant("terceiro", 30, &[]),
+            participant("primeiro", 10, &[]),
+            participant("segundo", 20, &[]),
+        ]);
+        let order: Vec<&str> = room.iter().map(|p| p.identity.as_str()).collect();
+        assert_eq!(order, ["primeiro", "segundo", "terceiro"]);
+    }
+
     #[test]
     fn token_leva_identidade_nome_e_nick() {
         let token = create_voice_token(
@@ -162,8 +347,8 @@ mod tests {
             .unwrap();
         assert_eq!(claims.sub, "id-1");
         assert_eq!(claims.name, "Kid Bengala");
-        assert_eq!(claims.video.room, "geral");
-        assert!(!claims.video.can_update_own_metadata);
         assert_eq!(claims.metadata, r#"{"nick":"kid"}"#);
+        assert_eq!(claims.video.room, "geral");
+        assert_eq!(claims.video.can_update_own_metadata, Some(false));
     }
 }

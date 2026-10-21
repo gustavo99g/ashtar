@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<meta name="referrer" content="no-referrer">
+<title>{{aba}}</title>
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Ashtar">
+<meta property="og:title" content="{{og_titulo}}">
+<meta property="og:description" content="{{og_descricao}}">
+<meta property="og:url" content="{{og_url}}">
+<meta property="og:image" content="{{og_imagem}}">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="512">
+<meta property="og:image:height" content="512">
+<link rel="icon" href="/invite.png">
+<style>
+*{box-sizing:border-box}
+html,body{margin:0}
+body{min-height:100vh;padding:32px 16px;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse 60% 55% at 50% 45%,rgba(37,99,235,0.13),rgba(37,99,235,0) 70%),#070b16;color:#e2e8f0;font-family:Inter,"Segoe UI",system-ui,sans-serif}
+.ceu{position:fixed;inset:0;width:100%;height:100%;pointer-events:none}
+.cartao{position:relative;width:100%;max-width:480px;padding:40px 36px 32px;border-radius:14px;background:#0c1220;border:1px solid #1b2741;box-shadow:0 24px 64px rgba(2,4,9,0.6);display:flex;flex-direction:column;gap:28px}
+.cartao.vencido{gap:24px}
+.topo{display:flex;flex-direction:column;align-items:center;gap:16px;text-align:center}
+.logo{width:72px;height:72px;border-radius:18px;display:block}
+.textos{display:flex;flex-direction:column;gap:8px}
+h1{margin:0;font-size:24px;font-weight:700;line-height:1.3;color:#e2e8f0;text-wrap:balance}
+.textos p{margin:0;font-size:14px;line-height:1.55;color:#a3b8de;text-wrap:balance}
+.pessoa{display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:10px;background:#111a2f;border:1px solid #22304e}
+.avatar{width:40px;height:40px;flex-shrink:0;border-radius:50%;color:#ffffff;font-size:16px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.pessoa-textos{min-width:0;display:flex;flex-direction:column;gap:3px}
+.frase{font-size:14px;line-height:1.4;color:#d3def2;overflow-wrap:anywhere}
+.quem{font-weight:600;color:#f6c228}
+.conta{font-weight:600;color:#e2e8f0}
+.validade{display:flex;align-items:center;gap:5px;font-size:12px;color:#a3b8de}
+.acoes{display:flex;flex-direction:column;gap:10px}
+.botao{height:44px;border-radius:8px;font-size:14px;font-weight:600;text-decoration:none;display:flex;align-items:center;justify-content:center;gap:8px}
+.primario{background:#2563eb;color:#ffffff}
+.primario:hover{background:#1d4ed8}
+.secundario{background:#111a2f;border:1px solid #22304e;color:#e2e8f0}
+.secundario:hover{background:#18233d}
+a:focus-visible{outline:2px solid #f6c228;outline-offset:2px}
+.ajuda{font-size:12px;line-height:1.5;color:#a3b8de;text-align:center}
+.baixar{display:flex;flex-direction:column;gap:12px;padding-top:24px;border-top:1px solid #1b2741}
+.baixar-titulo{font-size:13px;font-weight:600;color:#e2e8f0;text-align:center}
+ol{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:8px;font-size:12px;line-height:1.5;color:#a3b8de}
+li{display:flex;gap:10px}
+.passo{width:18px;height:18px;flex-shrink:0;border-radius:50%;background:#111a2f;color:#d3def2;font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center}
+strong{font-weight:600;color:#d3def2}
+.alerta{width:64px;height:64px;border-radius:50%;background:#3b1a06;color:#fb923c;display:flex;align-items:center;justify-content:center}
+.rodape{margin:0;padding-top:20px;border-top:1px solid #1b2741;font-size:12px;line-height:1.5;color:#a3b8de;text-align:center}
+@media (max-width:480px){.cartao{padding:32px 20px 24px}}
+</style>
+</head>
+<body>
+<svg class="ceu" viewBox="0 0 1440 816" preserveAspectRatio="xMidYMid slice" fill="none" aria-hidden="true">
+<ellipse cx="720" cy="408" rx="619" ry="204" transform="rotate(-16 720 408)" stroke="#e0f2fe" stroke-opacity="0.05" stroke-width="2"/>
+<ellipse cx="720" cy="408" rx="446" ry="134" transform="rotate(-16 720 408)" stroke="#2563eb" stroke-opacity="0.14" stroke-width="1.5"/>
+<circle cx="115" cy="114" r="1.2" fill="#ffffff" fill-opacity="0.35"/>
+<circle cx="244" cy="587" r="1.0" fill="#ffffff" fill-opacity="0.25"/>
+<circle cx="388" cy="252" r="1.4" fill="#ffffff" fill-opacity="0.3"/>
+<circle cx="489" cy="718" r="1.0" fill="#ffffff" fill-opacity="0.2"/>
+<circle cx="892" cy="73" r="1.2" fill="#ffffff" fill-opacity="0.3"/>
+<circle cx="1022" cy="644" r="1.4" fill="#ffffff" fill-opacity="0.25"/>
+<circle cx="1195" cy="195" r="1.0" fill="#ffffff" fill-opacity="0.35"/>
+<circle cx="1310" cy="497" r="1.2" fill="#ffffff" fill-opacity="0.25"/>
+<circle cx="72" cy="383" r="1.0" fill="#ffffff" fill-opacity="0.2"/>
+<circle cx="1368" cy="734" r="1.0" fill="#ffffff" fill-opacity="0.2"/>
+<circle cx="648" cy="48" r="1.0" fill="#ffffff" fill-opacity="0.2"/>
+<circle cx="806" cy="758" r="1.2" fill="#ffffff" fill-opacity="0.2"/>
+<path d="M273 173Q273 179 279 179Q273 179 273 185Q273 179 267 179Q273 179 273 173Z" fill="#ffffff" fill-opacity="0.35"/>
+<path d="M1238 305Q1238 310 1243 310Q1238 310 1238 315Q1238 310 1233 310Q1238 310 1238 305Z" fill="#ffffff" fill-opacity="0.3"/>
+<path d="M1094 694Q1094 701 1101 701Q1094 701 1094 708Q1094 701 1087 701Q1094 701 1094 694Z" fill="#ffffff" fill-opacity="0.25"/>
+<path d="M158 681Q158 685 162 685Q158 685 158 689Q158 685 154 685Q158 685 158 681Z" fill="#ffffff" fill-opacity="0.3"/>
+</svg>
+<main>
+<!-- corpo -->
+</main>
+<script>
+(() => {
+  var abrir = document.getElementById("abrir");
+  if (!abrir) return;
+
+  // Tenta abrir o app logo que a página termina de carregar. Sem o Ashtar
+  // instalado, o navegador não faz nada, e a pessoa segue pelo botão de baixar.
+  window.addEventListener("load", () => {
+    window.location.href = abrir.href;
+  });
+
+  // Quem baixa agora cola o link no app depois: ele já fica copiado.
+  var link = abrir.getAttribute("data-link");
+  document.getElementById("baixar").addEventListener("click", () => {
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(link).catch(() => {
+        copiarSemApi(link);
+      });
+    } else {
+      copiarSemApi(link);
+    }
+  });
+
+  // Navegador sem a API da área de transferência, ou página sem https.
+  function copiarSemApi(texto) {
+    var campo = document.createElement("textarea");
+    campo.value = texto;
+    campo.setAttribute("readonly", "");
+    campo.style.position = "fixed";
+    campo.style.opacity = "0";
+    document.body.appendChild(campo);
+    campo.select();
+    try {
+      document.execCommand("copy");
+    } catch (erro) {
+      // Sem como copiar: o link continua na barra de endereço.
+    }
+    document.body.removeChild(campo);
+  }
+})();
+</script>
+</body>
+</html>
