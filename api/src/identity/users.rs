@@ -1,10 +1,12 @@
-//! Usuários: nick, dono, busca e remoção.
+//! Usuários: nick, nome visível, dono, busca, a lista do Painel e remoção.
 
-use sqlx::{SqliteConnection, SqlitePool};
+use serde::Serialize;
+use sqlx::{FromRow, SqliteConnection, SqlitePool};
 use uuid::Uuid;
 
 use super::User;
-use super::permissions::{Action, require};
+use super::invites::Preset;
+use super::permissions::{Action, Origin, Permission, require};
 use crate::error::{ApiError, unique_violation};
 
 const NICK_MIN: usize = 2;
@@ -116,6 +118,132 @@ pub async fn get_by_id(db: &SqlitePool, id: &str) -> Result<User, ApiError> {
 pub async fn find_owner(db: &SqlitePool) -> Result<Option<User>, ApiError> {
     let sql = select_user!("WHERE is_owner = 1");
     Ok(sqlx::query_as(sql).fetch_optional(db).await?)
+}
+/// Um membro como a lista do Painel mostra: o computador, o beta, o convite com
+/// que entrou e a recuperação que ainda vale.
+#[derive(Debug, Clone)]
+pub struct MemberDetails {
+    pub user: User,
+    /// Quando o computador atual foi vinculado; `None` sem computador.
+    pub device_linked_at: Option<i64>,
+    /// `None` com o beta desligado (e sempre em quem foi removido).
+    pub beta: Option<BetaGrant>,
+    /// `None` no dono, que criou o grupo.
+    pub joined_with: Option<JoinedWith>,
+    /// O convite de recuperação para ele que ainda vale, se houver.
+    pub pending_recovery: Option<PendingRecovery>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct BetaGrant {
+    pub origin: Origin,
+    /// Quando o dono ligou; `None` no dono, que sempre tem.
+    pub granted_at: Option<i64>,
+}
+
+/// O convite novo com que o membro entrou, e quantos já entraram com ele.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct JoinedWith {
+    pub invite_id: String,
+    pub preset: Option<Preset>,
+    pub uses: i64,
+    pub max_uses: i64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct PendingRecovery {
+    pub invite_id: String,
+    pub expires_at: i64,
+}
+
+/// Todos os membros, os removidos inclusive, do mais antigo para o mais novo,
+/// com o que o Painel mostra de cada um. Uma consulta só: o app do dono a repete
+/// a cada 30 segundos para avisar de quem entrou.
+pub async fn list_details(db: &SqlitePool, now: i64) -> Result<Vec<MemberDetails>, ApiError> {
+    #[derive(FromRow)]
+    struct Row {
+        #[sqlx(flatten)]
+        user: User,
+        device_linked_at: Option<i64>,
+        beta_granted_at: Option<i64>,
+        joined_invite_id: Option<String>,
+        joined_preset: Option<String>,
+        joined_uses: Option<i64>,
+        joined_max_uses: Option<i64>,
+        recovery_invite_id: Option<String>,
+        recovery_expires_at: Option<i64>,
+    }
+
+    // `pending`: a recuperação que ainda vale para cada membro. Com um `MAX()` só
+    // na consulta, o SQLite tira `id` da mesma linha do maior `expires_at`.
+    let rows: Vec<Row> = sqlx::query_as(
+        "WITH pending AS (
+             SELECT r.target_user_id AS user_id, r.id AS invite_id, MAX(r.expires_at) AS expires_at
+             FROM invites r
+             WHERE r.kind = 'recovery' AND r.revoked_at IS NULL AND r.expires_at > ?1
+               AND NOT EXISTS (SELECT 1 FROM invite_uses ru WHERE ru.invite_id = r.id)
+             GROUP BY r.target_user_id
+         ),
+         joined AS (
+             SELECT iu.user_id, i.id AS invite_id, i.preset, i.max_uses,
+                    (SELECT COUNT(*) FROM invite_uses x WHERE x.invite_id = i.id) AS uses
+             FROM invite_uses iu JOIN invites i ON i.id = iu.invite_id
+             WHERE i.kind = 'new'
+         )
+         SELECT u.id, u.nick, u.display_name, u.is_owner, u.created_at, u.removed_at,
+                d.linked_at AS device_linked_at,
+                p.granted_at AS beta_granted_at,
+                j.invite_id AS joined_invite_id, j.preset AS joined_preset,
+                j.uses AS joined_uses, j.max_uses AS joined_max_uses,
+                pr.invite_id AS recovery_invite_id, pr.expires_at AS recovery_expires_at
+         FROM users u
+         LEFT JOIN devices d ON d.user_id = u.id
+         LEFT JOIN user_permissions p
+                ON p.user_id = u.id AND p.permission = ?2 AND u.removed_at IS NULL
+         LEFT JOIN joined j ON j.user_id = u.id
+         LEFT JOIN pending pr ON pr.user_id = u.id
+         ORDER BY u.created_at, u.nick",
+    )
+    .bind(now)
+    .bind(Permission::BetaUpdates.key())
+    .fetch_all(db)
+    .await?;
+
+    Ok(rows
+        .into_iter()
+        .map(|row| {
+            let beta = if row.user.is_owner {
+                Some(BetaGrant {
+                    origin: Origin::Owner,
+                    granted_at: None,
+                })
+            } else {
+                row.beta_granted_at.map(|at| BetaGrant {
+                    origin: Origin::Direct,
+                    granted_at: Some(at),
+                })
+            };
+            let joined_with = row.joined_invite_id.map(|invite_id| JoinedWith {
+                invite_id,
+                preset: row.joined_preset.as_deref().and_then(Preset::from_db),
+                uses: row.joined_uses.unwrap_or_default(),
+                max_uses: row.joined_max_uses.unwrap_or_default(),
+            });
+            let pending_recovery = row.recovery_invite_id.zip(row.recovery_expires_at).map(
+                |(invite_id, expires_at)| PendingRecovery {
+                    invite_id,
+                    expires_at,
+                },
+            );
+            MemberDetails {
+                user: row.user,
+                device_linked_at: row.device_linked_at,
+                beta,
+                joined_with,
+                pending_recovery,
+            }
+        })
+        .collect())
 }
 
 /// Todos os usuários, removidos inclusive, do mais antigo para o mais novo.

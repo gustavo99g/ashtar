@@ -11,7 +11,9 @@ serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.151"
 tokio = { version = "1.53.1", features = ["full"] }
 dotenvy = "0.15.7"
-livekit-api = "0.7.1"
+livekit-api = "0.9.1"
+livekit-protocol = "0.8.2"
+reqwest = { version = "0.13.5", default-features = false, features = ["rustls-tls"] }
 tower-http = { version = "0.7.1", features = ["cors"] }
 semver = "1"
 sqlx = { version = "0.9.0", default-features = false, features = ["runtime-tokio", "sqlite", "migrate", "macros"] }

@@ -13,29 +13,43 @@ use std::sync::Arc;
 
 use axum::{
     Json, Router, middleware,
-    routing::{get, post},
+    routing::{delete, get, post, put},
 };
 use serde::Serialize;
 use sqlx::SqlitePool;
 use tower_http::cors::CorsLayer;
 
 use client_policy::ClientPolicy;
+use identity::invites::InviteKind;
 use limiter::AttemptLimiter;
 
-/// Estado compartilhado pelas rotas. Clonar é barato: o pool e o `Arc` só
+/// Estado compartilhado pelas rotas. Clonar é barato: o pool e os `Arc` só
 /// contam referências.
 #[derive(Clone)]
 pub struct AppState {
     pub db: SqlitePool,
     pub limiter: Arc<AttemptLimiter>,
+    /// O endereço público da API (`PUBLIC_URL`), sem a barra final. Monta o
+    /// link dos convites.
+    pub public_url: Arc<str>,
 }
 
 impl AppState {
-    pub fn new(db: SqlitePool) -> Self {
+    pub fn new(db: SqlitePool, public_url: &str) -> Self {
         Self {
             db,
             limiter: Arc::new(AttemptLimiter::default_for_api()),
+            public_url: public_url.trim_end_matches('/').into(),
         }
+    }
+
+    /// O link que a pessoa abre: `/convite/CÓDIGO` ou `/recuperar/CÓDIGO`.
+    pub fn invite_link(&self, kind: InviteKind, code: &str) -> String {
+        let path = match kind {
+            InviteKind::New => "convite",
+            InviteKind::Recovery => "recuperar",
+        };
+        format!("{}/{path}/{code}", self.public_url)
     }
 }
 
@@ -55,7 +69,25 @@ pub fn app(state: AppState, policy: Arc<ClientPolicy>) -> Router {
         .route("/voice/token", post(routes::voice::voice_token))
         .route("/auth/redeem", post(routes::auth::redeem))
         .route("/auth/login", post(routes::auth::login))
-        .route("/me", get(routes::auth::me))
+        .route("/me", get(routes::auth::me).patch(routes::auth::update_me))
+        .route(
+            "/invites",
+            get(routes::invites::list).post(routes::invites::create),
+        )
+        .route("/invites/{code}", get(routes::invites::preview))
+        .route("/invites/{id}/revoke", post(routes::invites::revoke))
+        .route("/members", get(routes::members::list))
+        .route("/members/{id}", delete(routes::members::remove))
+        .route(
+            "/members/{id}/permissions",
+            get(routes::members::permissions),
+        )
+        .route("/members/{id}/beta", put(routes::members::set_beta))
+        .route("/members/{id}/unlink", post(routes::members::unlink))
+        .route(
+            "/members/{id}/recovery-invite",
+            post(routes::members::recovery_invite),
+        )
         .layer(middleware::from_fn_with_state(
             policy,
             client_policy::enforce,

@@ -3,6 +3,7 @@ use std::env;
 use axum::Json;
 use livekit_api::access_token::{AccessToken, VideoGrants};
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 
 use super::auth::CurrentUser;
 use super::extract::ApiJson;
@@ -32,6 +33,7 @@ pub async fn join_voice(
         &request.channel_id,
         &request.user_id,
         &request.display_name,
+        "",
     )?;
     Ok(Json(JoinVoiceResponse { token, url }))
 }
@@ -42,8 +44,12 @@ pub struct VoiceTokenRequest {
 }
 
 /// `POST /api/voice/token`: a rota nova, só com sessão. Identidade e nome vêm
-/// do banco, nunca do app. Pronta, mas o app só passa a usá-la com a parte
-/// visual.
+/// do banco, nunca do app.
+///
+/// O nome do participante é o nome visível (ou o nick, sem ele), e o nick vai
+/// nos metadados (`{"nick": "..."}`): o cartão da sala mostra os dois, e a cor
+/// do avatar sai do nick. Trocar o nome visível vale na próxima entrada, porque
+/// o nome vai dentro do token.
 pub async fn voice_token(
     CurrentUser(user): CurrentUser,
     ApiJson(request): ApiJson<VoiceTokenRequest>,
@@ -55,7 +61,8 @@ pub async fn voice_token(
         &api_secret,
         &request.channel_id,
         &user.id,
-        &user.nick,
+        user.shown_name(),
+        &json!({ "nick": user.nick }).to_string(),
     )
     .map_err(ApiError::Config)?;
     Ok(Json(JoinVoiceResponse { token, url }))
@@ -98,10 +105,12 @@ fn create_voice_token(
     channel_id: &str,
     user_id: &str,
     display_name: &str,
+    metadata: &str,
 ) -> Result<String, String> {
     AccessToken::with_api_key(api_key, api_secret)
         .with_identity(user_id)
         .with_name(display_name)
+        .with_metadata(metadata)
         .with_grants(VideoGrants {
             room_join: true,
             room: channel_id.to_owned(),
@@ -138,16 +147,23 @@ mod tests {
     }
 
     #[test]
-    fn token_leva_identidade_e_nome_do_banco() {
-        let token =
-            create_voice_token("chave", "segredo-de-teste-comprido", "geral", "id-1", "Kid")
-                .unwrap();
+    fn token_leva_identidade_nome_e_nick() {
+        let token = create_voice_token(
+            "chave",
+            "segredo-de-teste-comprido",
+            "geral",
+            "id-1",
+            "Kid Bengala",
+            r#"{"nick":"kid"}"#,
+        )
+        .unwrap();
         let claims = TokenVerifier::with_api_key("chave", "segredo-de-teste-comprido")
             .verify(&token)
             .unwrap();
         assert_eq!(claims.sub, "id-1");
-        assert_eq!(claims.name, "Kid");
+        assert_eq!(claims.name, "Kid Bengala");
         assert_eq!(claims.video.room, "geral");
         assert!(!claims.video.can_update_own_metadata);
+        assert_eq!(claims.metadata, r#"{"nick":"kid"}"#);
     }
 }

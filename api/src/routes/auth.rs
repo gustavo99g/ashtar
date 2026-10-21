@@ -1,4 +1,5 @@
-//! Rotas de entrada: usar convite, entrar com o dispositivo e `/api/me`.
+//! Rotas de entrada e do perfil: usar convite, entrar com o dispositivo,
+//! `/api/me` e a troca do nome visível.
 //!
 //! Ninguém usa estas rotas ainda: o desktop passa a chamá-las junto com a
 //! parte visual. Até lá, dá para testá-las com `curl`.
@@ -14,7 +15,7 @@ use crate::AppState;
 use crate::db::now;
 use crate::error::ApiError;
 use crate::identity::permissions::{self, Action, Permission};
-use crate::identity::{User, devices, invites};
+use crate::identity::{User, devices, invites, users};
 
 use super::extract::ApiJson;
 
@@ -41,6 +42,8 @@ pub struct SessionResponse {
 pub struct UserView {
     pub id: String,
     pub nick: String,
+    /// `null` quando está em branco: aí o app mostra o nick.
+    pub display_name: Option<String>,
     pub is_owner: bool,
 }
 
@@ -49,6 +52,7 @@ impl From<&User> for UserView {
         Self {
             id: user.id.clone(),
             nick: user.nick.clone(),
+            display_name: user.display_name.clone(),
             is_owner: user.is_owner,
         }
     }
@@ -63,6 +67,14 @@ pub struct MeResponse {
     pub update_channel: &'static str,
     /// O que mostrar ou esconder na interface. Quem decide de verdade é a API.
     pub can_create_invite: bool,
+    /// Se o menu mostra o Painel de controle.
+    pub can_view_panel: bool,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct UpdateMeRequest {
+    /// O nome visível novo. Texto vazio ou `null` volta para o nick.
+    pub display_name: Option<String>,
 }
 
 /// `POST /api/auth/redeem`: usa um convite e já devolve a sessão.
@@ -111,15 +123,31 @@ pub async fn me(
     State(state): State<AppState>,
     CurrentUser(user): CurrentUser,
 ) -> Result<Json<MeResponse>, ApiError> {
-    let effective = permissions::effective(&state.db, &user).await?;
+    Ok(Json(me_response(&state, &user).await?))
+}
+
+/// `PATCH /api/me`: troca o nome visível. Responde como o `GET /api/me`, já
+/// com o nome novo, para o app atualizar o que mostra sem outra chamada.
+pub async fn update_me(
+    State(state): State<AppState>,
+    CurrentUser(user): CurrentUser,
+    ApiJson(request): ApiJson<UpdateMeRequest>,
+) -> Result<Json<MeResponse>, ApiError> {
+    let user = users::set_display_name(&state.db, &user, request.display_name.as_deref()).await?;
+    Ok(Json(me_response(&state, &user).await?))
+}
+
+async fn me_response(state: &AppState, user: &User) -> Result<MeResponse, ApiError> {
+    let effective = permissions::effective(&state.db, user).await?;
     let beta = effective.iter().any(|(p, _)| *p == Permission::BetaUpdates);
 
-    Ok(Json(MeResponse {
-        user: UserView::from(&user),
+    Ok(MeResponse {
+        user: UserView::from(user),
         permissions: effective.iter().map(|(p, _)| p.key()).collect(),
         update_channel: if beta { "beta" } else { "stable" },
-        can_create_invite: permissions::can(&user, Action::CreateInvite),
-    }))
+        can_create_invite: permissions::can(user, Action::CreateInvite),
+        can_view_panel: permissions::can(user, Action::ViewPanel),
+    })
 }
 
 /// Extrator: o membro do `Authorization: Bearer <token>`. Sem token, token

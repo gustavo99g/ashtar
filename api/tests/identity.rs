@@ -31,7 +31,10 @@ struct Ctx {
 async fn setup() -> Ctx {
     let db = db::connect_in_memory().await.unwrap();
     let owner = users::create_owner(&db, "Kid", now()).await.unwrap();
-    let router = app(AppState::new(db.clone()), Arc::new(ClientPolicy::default()));
+    let router = app(
+        AppState::new(db.clone(), "https://ashtar.test/"),
+        Arc::new(ClientPolicy::default()),
+    );
     Ctx { db, router, owner }
 }
 
@@ -1622,5 +1625,931 @@ mod nome_e_modelos {
         let kid = join(&pool, &owner, "kid", 1).await;
         let result = invites::create_new(&pool, &kid, NewInvite::Group, NOW).await;
         assert!(matches!(result, Err(ApiError::Forbidden)));
+    }
+}
+
+/// Vincula o primeiro computador do dono (com uma recuperação para ele mesmo) e
+/// devolve o token.
+async fn owner_session(ctx: &Ctx, device: u8) -> String {
+    let recovery = invites::create(
+        &ctx.db,
+        &ctx.owner,
+        InviteKind::Recovery,
+        Some(&ctx.owner),
+        DAY,
+        1,
+        now(),
+    )
+    .await
+    .unwrap();
+    let (_, body) = redeem(ctx, &recovery.code, device, "").await;
+    body["token"].as_str().unwrap().to_owned()
+}
+
+/// v0.2.2, 1.2: ler o convite antes de usar, o nome visível pelo `/api/me` e o
+/// que o app esconde ou mostra.
+mod entrada_e_perfil {
+    use super::*;
+
+    async fn preview(ctx: &Ctx, code: &str) -> (StatusCode, Value) {
+        call(
+            &ctx.router,
+            "GET",
+            &format!("/api/invites/{code}"),
+            None,
+            None,
+        )
+        .await
+    }
+
+    #[tokio::test]
+    async fn ler_convite_novo_mostra_quem_convidou_sem_gastar() {
+        let ctx = setup().await;
+        let invite = invites::create(
+            &ctx.db,
+            &ctx.owner,
+            InviteKind::New,
+            None,
+            7 * DAY,
+            1,
+            now(),
+        )
+        .await
+        .unwrap();
+
+        // Ler várias vezes, com o código digitado de outro jeito, não gasta o uso.
+        for code in [invite.code.clone(), invite.code.to_lowercase()] {
+            let (status, body) = preview(&ctx, &code).await;
+            assert_eq!(status, StatusCode::OK, "{body}");
+            assert_eq!(
+                body,
+                json!({
+                    "kind": "new",
+                    "invited_by": { "nick": "Kid", "display_name": null },
+                    "expires_at": invite.expires_at,
+                })
+            );
+        }
+        assert_eq!(
+            redeem(&ctx, &invite.code, 1, "Fulano").await.0,
+            StatusCode::OK
+        );
+    }
+
+    #[tokio::test]
+    async fn ler_recuperacao_mostra_a_conta_com_o_nome_visivel() {
+        let ctx = setup().await;
+        session(&ctx, "juliana", 1).await;
+        let ju = users::get_active_by_nick(&ctx.db, "juliana").await.unwrap();
+        let ju = users::set_display_name(&ctx.db, &ju, Some("juju"))
+            .await
+            .unwrap();
+        let recovery = invites::create(
+            &ctx.db,
+            &ctx.owner,
+            InviteKind::Recovery,
+            Some(&ju),
+            DAY,
+            1,
+            now(),
+        )
+        .await
+        .unwrap();
+
+        let (status, body) = preview(&ctx, &recovery.code).await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        assert_eq!(
+            body,
+            json!({
+                "kind": "recovery",
+                "account": { "nick": "juliana", "display_name": "juju" },
+                "expires_at": recovery.expires_at,
+            })
+        );
+        // Nada de id: a rota não tem sessão.
+        assert!(body["account"].get("id").is_none());
+    }
+
+    #[tokio::test]
+    async fn convite_que_nao_vale_da_o_mesmo_erro_ao_ler() {
+        let ctx = setup().await;
+        let expired = invites::create(
+            &ctx.db,
+            &ctx.owner,
+            InviteKind::New,
+            None,
+            60,
+            1,
+            now() - 120,
+        )
+        .await
+        .unwrap();
+        let revoked = invites::create(&ctx.db, &ctx.owner, InviteKind::New, None, DAY, 1, now())
+            .await
+            .unwrap();
+        invites::revoke(&ctx.db, &ctx.owner, &revoked.id, now())
+            .await
+            .unwrap();
+        let used = new_invite(&ctx).await;
+        redeem(&ctx, &used, 1, "Fulano").await;
+
+        // A recuperação de quem foi removido também não vale.
+        let fulano = users::get_active_by_nick(&ctx.db, "Fulano").await.unwrap();
+        let orphan = invites::create(
+            &ctx.db,
+            &ctx.owner,
+            InviteKind::Recovery,
+            Some(&fulano),
+            DAY,
+            1,
+            now(),
+        )
+        .await
+        .unwrap();
+        users::remove(&ctx.db, &ctx.owner, &fulano, now())
+            .await
+            .unwrap();
+
+        for code in [
+            "AAAA-AAAA-AAAA",
+            "nao-e-codigo",
+            &expired.code,
+            &revoked.code,
+            &used,
+            &orphan.code,
+        ] {
+            let (status, body) = preview(&ctx, code).await;
+            assert_eq!(status, StatusCode::BAD_REQUEST, "{code}");
+            assert_eq!(body["kind"], "invalid_invite", "{code}");
+        }
+    }
+
+    #[tokio::test]
+    async fn ler_codigo_errado_conta_no_limite() {
+        let ctx = setup().await;
+        let code = new_invite(&ctx).await;
+        for _ in 0..20 {
+            assert_eq!(
+                preview(&ctx, "AAAA-AAAA-AAAA").await.0,
+                StatusCode::BAD_REQUEST
+            );
+        }
+        // Travou a leitura e o uso, até de um convite que vale.
+        let (status, body) = preview(&ctx, &code).await;
+        assert_eq!(status, StatusCode::TOO_MANY_REQUESTS);
+        assert_eq!(body["kind"], "too_many_attempts");
+        assert_eq!(
+            redeem(&ctx, &code, 1, "Fulano").await.0,
+            StatusCode::TOO_MANY_REQUESTS
+        );
+    }
+
+    #[tokio::test]
+    async fn ler_convite_valido_nao_conta_no_limite() {
+        let ctx = setup().await;
+        let code = new_invite(&ctx).await;
+        for _ in 0..25 {
+            assert_eq!(preview(&ctx, &code).await.0, StatusCode::OK);
+        }
+        assert_eq!(redeem(&ctx, &code, 1, "Fulano").await.0, StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn patch_me_troca_e_limpa_o_nome_visivel() {
+        let ctx = setup().await;
+        let token = session(&ctx, "juliana", 1).await;
+
+        let (status, body) = call(
+            &ctx.router,
+            "PATCH",
+            "/api/me",
+            Some(&token),
+            Some(json!({ "display_name": "  juju " })),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        assert_eq!(body["user"]["nick"], "juliana");
+        assert_eq!(body["user"]["display_name"], "juju");
+        // A resposta é a do `GET /api/me`.
+        assert_eq!(body["update_channel"], "stable");
+
+        let (_, me) = call(&ctx.router, "GET", "/api/me", Some(&token), None).await;
+        assert_eq!(me["user"]["display_name"], "juju");
+
+        // Texto vazio, `null` e campo ausente voltam para o nick.
+        for clear in [
+            json!({ "display_name": "" }),
+            json!({ "display_name": null }),
+            json!({}),
+        ] {
+            let (status, body) =
+                call(&ctx.router, "PATCH", "/api/me", Some(&token), Some(clear)).await;
+            assert_eq!(status, StatusCode::OK);
+            assert_eq!(body["user"]["display_name"], Value::Null);
+        }
+    }
+
+    #[tokio::test]
+    async fn patch_me_recusa_nome_invalido_com_mensagem_pronta() {
+        let ctx = setup().await;
+        let token = session(&ctx, "juliana", 1).await;
+
+        for bad in ["dois  espacos", "emoji 😀", &"a".repeat(33)] {
+            let (status, body) = call(
+                &ctx.router,
+                "PATCH",
+                "/api/me",
+                Some(&token),
+                Some(json!({ "display_name": bad })),
+            )
+            .await;
+            assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{bad}");
+            assert_eq!(body["kind"], "invalid_display_name", "{bad}");
+            assert!(body["message"].as_str().unwrap().contains("nome visível"));
+        }
+
+        // Tipo errado no corpo é `invalid_request`; sem sessão, 401.
+        let (status, body) = call(
+            &ctx.router,
+            "PATCH",
+            "/api/me",
+            Some(&token),
+            Some(json!({ "display_name": 5 })),
+        )
+        .await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+        assert_eq!(body["kind"], "invalid_request");
+        let (status, _) = call(
+            &ctx.router,
+            "PATCH",
+            "/api/me",
+            None,
+            Some(json!({ "display_name": "juju" })),
+        )
+        .await;
+        assert_eq!(status, StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn me_diz_quem_ve_o_painel() {
+        let ctx = setup().await;
+        let member = session(&ctx, "juliana", 1).await;
+        let owner = owner_session(&ctx, 2).await;
+
+        let (_, me) = call(&ctx.router, "GET", "/api/me", Some(&member), None).await;
+        assert_eq!(me["can_view_panel"], false);
+        assert_eq!(me["user"]["display_name"], Value::Null);
+
+        let (_, me) = call(&ctx.router, "GET", "/api/me", Some(&owner), None).await;
+        assert_eq!(me["can_view_panel"], true);
+        assert_eq!(me["can_create_invite"], true);
+    }
+
+    #[tokio::test]
+    async fn o_login_devolve_o_nome_visivel() {
+        let ctx = setup().await;
+        session(&ctx, "juliana", 1).await;
+        let ju = users::get_active_by_nick(&ctx.db, "juliana").await.unwrap();
+        users::set_display_name(&ctx.db, &ju, Some("juju"))
+            .await
+            .unwrap();
+
+        let (status, body) = call(
+            &ctx.router,
+            "POST",
+            "/api/auth/login",
+            None,
+            Some(json!({ "device_key": key(1) })),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(body["user"]["display_name"], "juju");
+    }
+}
+
+/// v0.2.2, 1.3: as nove rotas do Painel, pelo HTTP.
+mod painel {
+    use super::*;
+
+    /// Entra com `nick` e devolve o token e o membro.
+    async fn member(ctx: &Ctx, nick: &str, device: u8) -> (String, User) {
+        let token = session(ctx, nick, device).await;
+        let user = users::get_active_by_nick(&ctx.db, nick).await.unwrap();
+        (token, user)
+    }
+
+    /// Cria um convite pela rota e devolve a resposta.
+    async fn create_invite(ctx: &Ctx, owner: &str, body: Value) -> Value {
+        let (status, created) =
+            call(&ctx.router, "POST", "/api/invites", Some(owner), Some(body)).await;
+        assert_eq!(status, StatusCode::CREATED, "{created}");
+        created
+    }
+
+    fn find<'a>(list: &'a Value, field: &str, value: &str) -> &'a Value {
+        list.as_array()
+            .unwrap()
+            .iter()
+            .find(|item| item[field] == value)
+            .unwrap_or_else(|| panic!("{field} = {value} não está na lista"))
+    }
+
+    #[tokio::test]
+    async fn membro_nao_ve_nem_mexe_no_painel() {
+        let ctx = setup().await;
+        let (token, ju) = member(&ctx, "juliana", 1).await;
+        let invite = invites::create(&ctx.db, &ctx.owner, InviteKind::New, None, DAY, 1, now())
+            .await
+            .unwrap();
+
+        let id = &ju.id;
+        let routes = [
+            (
+                "POST",
+                "/api/invites".to_owned(),
+                Some(json!({ "preset": "person" })),
+            ),
+            ("GET", "/api/invites".to_owned(), None),
+            ("POST", format!("/api/invites/{}/revoke", invite.id), None),
+            ("GET", "/api/members".to_owned(), None),
+            ("GET", format!("/api/members/{id}/permissions"), None),
+            (
+                "PUT",
+                format!("/api/members/{id}/beta"),
+                Some(json!({ "enabled": true })),
+            ),
+            ("POST", format!("/api/members/{id}/unlink"), None),
+            ("POST", format!("/api/members/{id}/recovery-invite"), None),
+            ("DELETE", format!("/api/members/{id}"), None),
+        ];
+        for (method, uri, body) in &routes {
+            let (status, response) =
+                call(&ctx.router, method, uri, Some(&token), body.clone()).await;
+            assert_eq!(status, StatusCode::FORBIDDEN, "{method} {uri}");
+            assert_eq!(response["kind"], "forbidden", "{method} {uri}");
+
+            let (status, _) = call(&ctx.router, method, uri, None, body.clone()).await;
+            assert_eq!(status, StatusCode::UNAUTHORIZED, "{method} {uri}");
+        }
+
+        // Nada mudou: a sessão vale, sem beta, e o convite continua servindo.
+        let (status, me) = call(&ctx.router, "GET", "/api/me", Some(&token), None).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(me["update_channel"], "stable");
+        assert_eq!(
+            redeem(&ctx, &invite.code, 2, "Fulano").await.0,
+            StatusCode::OK
+        );
+    }
+
+    #[tokio::test]
+    async fn criar_convite_pelos_modelos() {
+        let ctx = setup().await;
+        let owner = owner_session(&ctx, 9).await;
+        let before = now();
+
+        let person = create_invite(&ctx, &owner, json!({ "preset": "person" })).await;
+        let code = person["code"].as_str().unwrap();
+        assert_eq!(person["preset"], "person");
+        assert_eq!(person["max_uses"], 1);
+        assert_eq!(
+            person["link"],
+            format!("https://ashtar.test/convite/{code}")
+        );
+        let expires = person["expires_at"].as_i64().unwrap();
+        assert!((before + 7 * DAY..=now() + 7 * DAY).contains(&expires));
+        assert_eq!(redeem(&ctx, code, 1, "Fulano").await.0, StatusCode::OK);
+
+        // Nos modelos fixos, os números do corpo são ignorados.
+        let group = create_invite(
+            &ctx,
+            &owner,
+            json!({ "preset": "group", "ttl_secs": 30 * DAY, "max_uses": 50 }),
+        )
+        .await;
+        assert_eq!(group["preset"], "group");
+        assert_eq!(group["max_uses"], 8);
+        let expires = group["expires_at"].as_i64().unwrap();
+        assert!((before + 5 * 60..=now() + 5 * 60).contains(&expires));
+
+        let custom = create_invite(
+            &ctx,
+            &owner,
+            json!({ "preset": "custom", "ttl_secs": 3600, "max_uses": 3 }),
+        )
+        .await;
+        assert_eq!(custom["preset"], "custom");
+        assert_eq!(custom["max_uses"], 3);
+        let expires = custom["expires_at"].as_i64().unwrap();
+        assert!((before + 3600..=now() + 3600).contains(&expires));
+    }
+
+    #[tokio::test]
+    async fn convite_fora_dos_limites_e_recusado() {
+        let ctx = setup().await;
+        let owner = owner_session(&ctx, 9).await;
+
+        for body in [
+            json!({ "preset": "custom" }),
+            json!({ "preset": "custom", "ttl_secs": 3600 }),
+            json!({ "preset": "custom", "ttl_secs": 59, "max_uses": 1 }),
+            json!({ "preset": "custom", "ttl_secs": 30 * DAY + 1, "max_uses": 1 }),
+            json!({ "preset": "custom", "ttl_secs": 3600, "max_uses": 0 }),
+            json!({ "preset": "custom", "ttl_secs": 3600, "max_uses": 51 }),
+            json!({ "preset": "outro" }),
+            json!({}),
+        ] {
+            let (status, response) = call(
+                &ctx.router,
+                "POST",
+                "/api/invites",
+                Some(&owner),
+                Some(body.clone()),
+            )
+            .await;
+            assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{body}");
+            assert_eq!(response["kind"], "invalid_request", "{body}");
+        }
+        // Só o convite de recuperação do dono, que vinculou o computador dele.
+        assert_eq!(invites::list(&ctx.db).await.unwrap().len(), 1);
+    }
+
+    #[tokio::test]
+    async fn historico_de_convites() {
+        let ctx = setup().await;
+        let owner = owner_session(&ctx, 9).await;
+
+        let group = create_invite(&ctx, &owner, json!({ "preset": "group" })).await;
+        let code = group["code"].as_str().unwrap();
+        redeem(&ctx, code, 1, "juliana").await;
+        redeem(&ctx, code, 2, "carla").await;
+        let ju = users::get_active_by_nick(&ctx.db, "juliana").await.unwrap();
+        users::set_display_name(&ctx.db, &ju, Some("juju"))
+            .await
+            .unwrap();
+
+        let person = create_invite(&ctx, &owner, json!({ "preset": "person" })).await;
+        let uri = format!("/api/invites/{}/revoke", person["id"].as_str().unwrap());
+        assert_eq!(
+            call(&ctx.router, "POST", &uri, Some(&owner), None).await.0,
+            StatusCode::NO_CONTENT
+        );
+
+        let (status, list) = call(&ctx.router, "GET", "/api/invites", Some(&owner), None).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(list.as_array().unwrap().len(), 3);
+
+        let group = find(&list, "id", group["id"].as_str().unwrap());
+        assert_eq!(group["kind"], "new");
+        assert_eq!(group["preset"], "group");
+        assert_eq!(group["status"], "pending");
+        assert_eq!(group["max_uses"], 8);
+        assert_eq!(group["created_by"]["id"], ctx.owner.id.as_str());
+        assert_eq!(group["created_by"]["nick"], "Kid");
+        assert_eq!(group["target"], Value::Null);
+        assert_eq!(group["uses"][0]["user"]["id"], ju.id.as_str());
+        assert_eq!(group["uses"][0]["user"]["nick"], "juliana");
+        assert_eq!(group["uses"][0]["user"]["display_name"], "juju");
+        assert!(group["uses"][0]["used_at"].is_i64());
+        assert_eq!(group["uses"][1]["user"]["nick"], "carla");
+        // O código não volta depois da criação.
+        assert!(group.get("code").is_none() && group.get("link").is_none());
+
+        let person = find(&list, "id", person["id"].as_str().unwrap());
+        assert_eq!(person["status"], "revoked");
+        assert!(person["revoked_at"].is_i64());
+        assert_eq!(person["uses"], json!([]));
+
+        let recovery = find(&list, "kind", "recovery");
+        assert_eq!(recovery["preset"], Value::Null);
+        assert_eq!(recovery["status"], "exhausted");
+        assert_eq!(recovery["target"]["nick"], "Kid");
+    }
+
+    #[tokio::test]
+    async fn revogar_pelo_id_inteiro() {
+        let ctx = setup().await;
+        let owner = owner_session(&ctx, 9).await;
+        let revoke = |id: &str| format!("/api/invites/{id}/revoke");
+
+        let created = create_invite(&ctx, &owner, json!({ "preset": "person" })).await;
+        let id = created["id"].as_str().unwrap();
+
+        // O começo do id fica só no `admin`.
+        let (status, body) = call(&ctx.router, "POST", &revoke(&id[..8]), Some(&owner), None).await;
+        assert_eq!(status, StatusCode::NOT_FOUND);
+        assert_eq!(body["kind"], "not_found");
+
+        let (status, _) = call(&ctx.router, "POST", &revoke(id), Some(&owner), None).await;
+        assert_eq!(status, StatusCode::NO_CONTENT);
+        let (status, body) = call(&ctx.router, "POST", &revoke(id), Some(&owner), None).await;
+        assert_eq!(status, StatusCode::CONFLICT);
+        assert_eq!(body["kind"], "conflict");
+        assert_eq!(
+            redeem(&ctx, created["code"].as_str().unwrap(), 1, "Fulano")
+                .await
+                .0,
+            StatusCode::BAD_REQUEST
+        );
+
+        // Já usado por completo: 409.
+        let used = create_invite(&ctx, &owner, json!({ "preset": "person" })).await;
+        redeem(&ctx, used["code"].as_str().unwrap(), 1, "Fulano").await;
+        let uri = revoke(used["id"].as_str().unwrap());
+        assert_eq!(
+            call(&ctx.router, "POST", &uri, Some(&owner), None).await.0,
+            StatusCode::CONFLICT
+        );
+    }
+
+    #[tokio::test]
+    async fn lista_de_membros_numa_chamada() {
+        let ctx = setup().await;
+        let owner = owner_session(&ctx, 9).await;
+
+        // juliana: convite para uma pessoa, nome visível e beta.
+        let person = create_invite(&ctx, &owner, json!({ "preset": "person" })).await;
+        redeem(&ctx, person["code"].as_str().unwrap(), 1, "juliana").await;
+        let ju = users::get_active_by_nick(&ctx.db, "juliana").await.unwrap();
+        users::set_display_name(&ctx.db, &ju, Some("juju"))
+            .await
+            .unwrap();
+        let uri = format!("/api/members/{}/beta", ju.id);
+        let body = Some(json!({ "enabled": true }));
+        call(&ctx.router, "PUT", &uri, Some(&owner), body).await;
+
+        // carla e pedro: o convite do grupo. carla fica sem computador, com duas
+        // recuperações valendo; pedro, com uma que já venceu.
+        let group = create_invite(&ctx, &owner, json!({ "preset": "group" })).await;
+        let code = group["code"].as_str().unwrap();
+        redeem(&ctx, code, 2, "carla").await;
+        redeem(&ctx, code, 3, "pedro").await;
+        let carla = users::get_active_by_nick(&ctx.db, "carla").await.unwrap();
+        let pedro = users::get_active_by_nick(&ctx.db, "pedro").await.unwrap();
+        let uri = format!("/api/members/{}/unlink", carla.id);
+        call(&ctx.router, "POST", &uri, Some(&owner), None).await;
+        invites::create(
+            &ctx.db,
+            &ctx.owner,
+            InviteKind::Recovery,
+            Some(&carla),
+            DAY,
+            1,
+            now(),
+        )
+        .await
+        .unwrap();
+        let uri = format!("/api/members/{}/recovery-invite", carla.id);
+        let (_, recovery) = call(&ctx.router, "POST", &uri, Some(&owner), None).await;
+        invites::create(
+            &ctx.db,
+            &ctx.owner,
+            InviteKind::Recovery,
+            Some(&pedro),
+            60,
+            1,
+            now() - 120,
+        )
+        .await
+        .unwrap();
+
+        // bruno: do seu jeito, com beta, e removido.
+        let custom = create_invite(
+            &ctx,
+            &owner,
+            json!({ "preset": "custom", "ttl_secs": DAY, "max_uses": 1 }),
+        )
+        .await;
+        redeem(&ctx, custom["code"].as_str().unwrap(), 4, "bruno").await;
+        let bruno = users::get_active_by_nick(&ctx.db, "bruno").await.unwrap();
+        let uri = format!("/api/members/{}/beta", bruno.id);
+        call(
+            &ctx.router,
+            "PUT",
+            &uri,
+            Some(&owner),
+            Some(json!({ "enabled": true })),
+        )
+        .await;
+        let uri = format!("/api/members/{}", bruno.id);
+        call(&ctx.router, "DELETE", &uri, Some(&owner), None).await;
+
+        let (status, list) = call(&ctx.router, "GET", "/api/members", Some(&owner), None).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(list.as_array().unwrap().len(), 5);
+
+        let kid = find(&list, "nick", "Kid");
+        assert_eq!(kid["id"], ctx.owner.id.as_str());
+        assert_eq!(kid["is_owner"], true);
+        assert!(kid["device"]["linked_at"].is_i64());
+        assert_eq!(
+            kid["beta"],
+            json!({ "origin": "owner", "granted_at": null })
+        );
+        assert_eq!(kid["joined_with"], Value::Null);
+
+        let ju = find(&list, "nick", "juliana");
+        assert_eq!(ju["display_name"], "juju");
+        assert_eq!(ju["is_owner"], false);
+        assert!(ju["created_at"].is_i64());
+        assert_eq!(ju["removed_at"], Value::Null);
+        assert!(ju["device"]["linked_at"].is_i64());
+        assert_eq!(ju["beta"]["origin"], "direct");
+        assert!(ju["beta"]["granted_at"].is_i64());
+        assert_eq!(
+            ju["joined_with"],
+            json!({ "invite_id": person["id"], "preset": "person", "uses": 1, "max_uses": 1 })
+        );
+        assert_eq!(ju["pending_recovery"], Value::Null);
+
+        let carla = find(&list, "nick", "carla");
+        assert_eq!(carla["device"], Value::Null);
+        assert_eq!(carla["beta"], Value::Null);
+        assert_eq!(
+            carla["joined_with"],
+            json!({ "invite_id": group["id"], "preset": "group", "uses": 2, "max_uses": 8 })
+        );
+        // Das duas recuperações valendo, a que vence por último.
+        assert_eq!(
+            carla["pending_recovery"],
+            json!({ "invite_id": recovery["id"], "expires_at": recovery["expires_at"] })
+        );
+
+        let pedro = find(&list, "nick", "pedro");
+        assert!(pedro["device"]["linked_at"].is_i64());
+        assert_eq!(pedro["pending_recovery"], Value::Null);
+
+        let bruno = find(&list, "nick", "bruno");
+        assert!(bruno["removed_at"].is_i64());
+        assert_eq!(bruno["device"], Value::Null);
+        assert_eq!(bruno["beta"], Value::Null);
+        assert_eq!(bruno["joined_with"]["preset"], "custom");
+    }
+
+    #[tokio::test]
+    async fn permissoes_de_cada_um_e_de_onde_vem() {
+        let ctx = setup().await;
+        let owner = owner_session(&ctx, 9).await;
+        let (_, ju) = member(&ctx, "juliana", 1).await;
+        let permissions_of = |id: &str| format!("/api/members/{id}/permissions");
+
+        let (status, list) = call(
+            &ctx.router,
+            "GET",
+            &permissions_of(&ctx.owner.id),
+            Some(&owner),
+            None,
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        let keys: Vec<&str> = list
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|g| g["key"].as_str().unwrap())
+            .collect();
+        assert_eq!(
+            keys,
+            [
+                "atualizacoes.beta",
+                "convites.criar",
+                "convites.recuperacao",
+                "convites.revogar",
+                "membros.desvincular",
+                "membros.remover",
+                "permissoes.gerenciar",
+                "painel.ver",
+            ]
+        );
+        assert_eq!(
+            list[0],
+            json!({
+                "key": "atualizacoes.beta",
+                "kind": "permission",
+                "label": "Receber o beta",
+                "granted": true,
+                "origin": "owner",
+                "granted_at": null,
+            })
+        );
+        for grant in list.as_array().unwrap()[1..].iter() {
+            assert_eq!(grant["kind"], "action");
+            assert_eq!(grant["granted"], true);
+            assert_eq!(grant["origin"], "owner");
+        }
+
+        // Membro sem nada.
+        let (_, list) = call(
+            &ctx.router,
+            "GET",
+            &permissions_of(&ju.id),
+            Some(&owner),
+            None,
+        )
+        .await;
+        for grant in list.as_array().unwrap() {
+            assert_eq!(grant["granted"], false, "{grant}");
+            assert_eq!(grant["origin"], Value::Null, "{grant}");
+        }
+
+        // Com o beta ligado pelo dono.
+        let uri = format!("/api/members/{}/beta", ju.id);
+        call(
+            &ctx.router,
+            "PUT",
+            &uri,
+            Some(&owner),
+            Some(json!({ "enabled": true })),
+        )
+        .await;
+        let (_, list) = call(
+            &ctx.router,
+            "GET",
+            &permissions_of(&ju.id),
+            Some(&owner),
+            None,
+        )
+        .await;
+        assert_eq!(list[0]["granted"], true);
+        assert_eq!(list[0]["origin"], "direct");
+        assert!(list[0]["granted_at"].is_i64());
+        assert_eq!(list[1]["granted"], false);
+
+        // Removido não tem nenhuma, nem a que tinha.
+        users::remove(&ctx.db, &ctx.owner, &ju, now())
+            .await
+            .unwrap();
+        let (_, list) = call(
+            &ctx.router,
+            "GET",
+            &permissions_of(&ju.id),
+            Some(&owner),
+            None,
+        )
+        .await;
+        assert!(
+            list.as_array()
+                .unwrap()
+                .iter()
+                .all(|g| g["granted"] == false)
+        );
+
+        let (status, body) = call(
+            &ctx.router,
+            "GET",
+            &permissions_of("nao-existe"),
+            Some(&owner),
+            None,
+        )
+        .await;
+        assert_eq!(status, StatusCode::NOT_FOUND);
+        assert_eq!(body["kind"], "not_found");
+    }
+
+    #[tokio::test]
+    async fn beta_pela_rota() {
+        let ctx = setup().await;
+        let owner = owner_session(&ctx, 9).await;
+        let (token, ju) = member(&ctx, "juliana", 1).await;
+        let beta = |id: &str| format!("/api/members/{id}/beta");
+        let set = |enabled: bool| Some(json!({ "enabled": enabled }));
+
+        for _ in 0..2 {
+            let (status, _) =
+                call(&ctx.router, "PUT", &beta(&ju.id), Some(&owner), set(true)).await;
+            assert_eq!(status, StatusCode::NO_CONTENT);
+        }
+        let (_, me) = call(&ctx.router, "GET", "/api/me", Some(&token), None).await;
+        assert_eq!(me["update_channel"], "beta");
+
+        let (status, _) = call(&ctx.router, "PUT", &beta(&ju.id), Some(&owner), set(false)).await;
+        assert_eq!(status, StatusCode::NO_CONTENT);
+        let (_, me) = call(&ctx.router, "GET", "/api/me", Some(&token), None).await;
+        assert_eq!(me["update_channel"], "stable");
+
+        // O dono está sempre no beta.
+        let (status, body) = call(
+            &ctx.router,
+            "PUT",
+            &beta(&ctx.owner.id),
+            Some(&owner),
+            set(false),
+        )
+        .await;
+        assert_eq!(status, StatusCode::CONFLICT);
+        assert_eq!(body["kind"], "conflict");
+
+        for body in [json!({}), json!({ "enabled": "sim" })] {
+            let (status, response) =
+                call(&ctx.router, "PUT", &beta(&ju.id), Some(&owner), Some(body)).await;
+            assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+            assert_eq!(response["kind"], "invalid_request");
+        }
+        let (status, _) = call(
+            &ctx.router,
+            "PUT",
+            &beta("nao-existe"),
+            Some(&owner),
+            set(true),
+        )
+        .await;
+        assert_eq!(status, StatusCode::NOT_FOUND);
+
+        users::remove(&ctx.db, &ctx.owner, &ju, now())
+            .await
+            .unwrap();
+        let (status, _) = call(&ctx.router, "PUT", &beta(&ju.id), Some(&owner), set(true)).await;
+        assert_eq!(status, StatusCode::CONFLICT);
+    }
+
+    #[tokio::test]
+    async fn desvincular_e_recuperar_pela_rota() {
+        let ctx = setup().await;
+        let owner = owner_session(&ctx, 9).await;
+        let (token, ju) = member(&ctx, "juliana", 1).await;
+        let unlink = format!("/api/members/{}/unlink", ju.id);
+        let recovery = format!("/api/members/{}/recovery-invite", ju.id);
+
+        let (status, _) = call(&ctx.router, "POST", &unlink, Some(&owner), None).await;
+        assert_eq!(status, StatusCode::NO_CONTENT);
+        assert_eq!(
+            call(&ctx.router, "GET", "/api/me", Some(&token), None)
+                .await
+                .0,
+            StatusCode::UNAUTHORIZED
+        );
+        // Sem computador, não há o que desvincular.
+        let (status, body) = call(&ctx.router, "POST", &unlink, Some(&owner), None).await;
+        assert_eq!(status, StatusCode::NOT_FOUND);
+        assert_eq!(body["kind"], "not_found");
+
+        let before = now();
+        let (status, created) = call(&ctx.router, "POST", &recovery, Some(&owner), None).await;
+        assert_eq!(status, StatusCode::CREATED, "{created}");
+        let code = created["code"].as_str().unwrap();
+        assert_eq!(
+            created["link"],
+            format!("https://ashtar.test/recuperar/{code}")
+        );
+        assert_eq!(created["preset"], Value::Null);
+        assert_eq!(created["max_uses"], 1);
+        let expires = created["expires_at"].as_i64().unwrap();
+        assert!((before + 7 * DAY..=now() + 7 * DAY).contains(&expires));
+
+        let (status, body) = redeem(&ctx, code, 2, "").await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(body["user"]["id"], ju.id.as_str());
+
+        // Removido não ganha recuperação.
+        users::remove(&ctx.db, &ctx.owner, &ju, now())
+            .await
+            .unwrap();
+        let (status, _) = call(&ctx.router, "POST", &recovery, Some(&owner), None).await;
+        assert_eq!(status, StatusCode::CONFLICT);
+
+        for uri in [
+            "/api/members/nao-existe/unlink",
+            "/api/members/nao-existe/recovery-invite",
+        ] {
+            let (status, _) = call(&ctx.router, "POST", uri, Some(&owner), None).await;
+            assert_eq!(status, StatusCode::NOT_FOUND, "{uri}");
+        }
+    }
+
+    #[tokio::test]
+    async fn remover_pela_rota() {
+        let ctx = setup().await;
+        let owner = owner_session(&ctx, 9).await;
+        let (token, ju) = member(&ctx, "juliana", 1).await;
+        let uri = format!("/api/members/{}", ju.id);
+
+        let (status, _) = call(&ctx.router, "DELETE", &uri, Some(&owner), None).await;
+        assert_eq!(status, StatusCode::NO_CONTENT);
+        assert_eq!(
+            call(&ctx.router, "GET", "/api/me", Some(&token), None)
+                .await
+                .0,
+            StatusCode::UNAUTHORIZED
+        );
+        let (status, _) = call(&ctx.router, "DELETE", &uri, Some(&owner), None).await;
+        assert_eq!(status, StatusCode::CONFLICT);
+
+        let owner_uri = format!("/api/members/{}", ctx.owner.id);
+        let (status, body) = call(&ctx.router, "DELETE", &owner_uri, Some(&owner), None).await;
+        assert_eq!(status, StatusCode::CONFLICT);
+        assert_eq!(body["kind"], "conflict");
+        let (status, _) = call(
+            &ctx.router,
+            "DELETE",
+            "/api/members/nao-existe",
+            Some(&owner),
+            None,
+        )
+        .await;
+        assert_eq!(status, StatusCode::NOT_FOUND);
+
+        // O nick ficou livre.
+        let code = new_invite(&ctx).await;
+        assert_eq!(redeem(&ctx, &code, 1, "juliana").await.0, StatusCode::OK);
     }
 }
