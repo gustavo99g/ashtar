@@ -30,7 +30,7 @@ export default defineConfig(async () => ({
 	// Testes (`pnpm test`): o DOM é o do jsdom, e o setup liga os matchers do Testing Library.
 	test: {
 		environment: "jsdom",
-		setupFiles: ["./src/test/setup.ts"],
+		setupFiles: ["./src/test/polyfill.ts", "./src/test/setup.ts"],
 	},
 
 	// Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`

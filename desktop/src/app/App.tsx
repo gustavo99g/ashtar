@@ -5,6 +5,8 @@
  */
 import "@/styles/App.css";
 import { RouterProvider } from "react-router-dom";
+import { Toaster } from "@/components/ui/toast";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { useApplyTheme } from "@/features/settings";
 import { UpdateNotice, WhatsNewDialog } from "@/features/updater";
 import { VoiceProvider } from "@/features/voice";
@@ -14,9 +16,13 @@ export function App() {
 	useApplyTheme();
 	return (
 		<VoiceProvider>
-			<RouterProvider router={router} />
-			<UpdateNotice />
-			<WhatsNewDialog />
+			<TooltipProvider>
+				<Toaster>
+					<RouterProvider router={router} />
+					<UpdateNotice />
+					<WhatsNewDialog />
+				</Toaster>
+			</TooltipProvider>
 		</VoiceProvider>
 	);
 }
