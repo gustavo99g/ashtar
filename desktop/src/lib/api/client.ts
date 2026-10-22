@@ -5,8 +5,9 @@
  *
  * Nenhum outro arquivo deve chamar `fetch` para a API diretamente.
  */
-import { apiUrl } from "@/lib/config";
+
 import { checkForUpdate } from "@/lib/tauri/commands";
+import { apiUrl } from "./config";
 
 /** Sem resposta nesse tempo, desiste (a API pode estar fora do ar, com o túnel caído). */
 const TIMEOUT_MS = 10_000;
@@ -46,9 +47,7 @@ export async function apiFetch(
 		response = await fetch(apiUrl(path), {
 			...init,
 			headers,
-			signal: init.signal
-				? AbortSignal.any([init.signal, timeout])
-				: timeout,
+			signal: init.signal ? AbortSignal.any([init.signal, timeout]) : timeout,
 		});
 	} catch (error) {
 		if (error instanceof DOMException && error.name === "TimeoutError") {

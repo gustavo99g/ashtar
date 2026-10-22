@@ -17,8 +17,8 @@ import {
 	useRef,
 	useState,
 } from "react";
-import type { ScreenShareController } from "@/features/screen-share/controller";
-import { IpcScreenShare } from "@/features/screen-share/ipc/IpcScreenShare";
+import type { ScreenShareController } from "@/features/screen-share";
+import { IpcScreenShare } from "@/features/screen-share";
 import { apiFetch } from "@/lib/api";
 import { useNavigationStore } from "@/stores/navigation";
 

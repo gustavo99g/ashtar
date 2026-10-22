@@ -1,9 +1,10 @@
 import { Button } from "@/components/ui/button";
-import { ScreenShareButton } from "@/features/screen-share/ScreenShareButton";
-import { useScreenShareState } from "@/features/screen-share/useScreenShareState";
-
-import { useVoice } from "@/features/voice/useVoice";
-import type { VoiceConnectionState } from "@/features/voice/VoiceProvider";
+import {
+	ScreenShareButton,
+	useScreenShareState,
+} from "@/features/screen-share";
+import type { VoiceConnectionState } from "@/features/voice";
+import { useVoice } from "@/features/voice";
 
 function getConnectionLabel(state: VoiceConnectionState) {
 	switch (state) {

@@ -1,12 +1,12 @@
 import { createBrowserRouter } from "react-router-dom";
-import { AppPage } from "@/pages/app";
-import { LoginPage } from "@/pages/login";
-import { SignupPage } from "@/pages/signup";
+import { AppLayout } from "@/layouts/AppLayout";
+import { LoginPage } from "@/routes/login";
+import { SignupPage } from "@/routes/signup";
 
 export const router = createBrowserRouter([
 	{
 		path: "/",
-		element: <AppPage />,
+		element: <AppLayout />,
 	},
 	{
 		path: "/login",
@@ -18,6 +18,6 @@ export const router = createBrowserRouter([
 	},
 	{
 		path: "/app",
-		element: <AppPage />,
+		element: <AppLayout />,
 	},
 ]);
