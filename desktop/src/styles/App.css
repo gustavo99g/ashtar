@@ -1,191 +1,218 @@
 @import "tailwindcss";
-@import "./primitives.css";
-@import "./themes/dark-discord.css";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 @import "@fontsource-variable/inter";
+@import "@fontsource-variable/jetbrains-mono";
 
+@import "./primitives.css";
+@import "./themes/ashtar-dark.css";
 
-@layer base {
-  *,
-  *::before,
-  *::after {
-    box-sizing: border-box;
-  }
+/*
+ * O `dark:` do Tailwind nunca liga: quem decide as cores é o tema (`data-theme` no <html>).
+ * Sem esta linha, ele seguiria o modo escuro do Windows e brigaria com o tema.
+ */
+@custom-variant dark (&:where(.dark, .dark *));
 
-  html,
-  body,
-  #root {
-    width: 100%;
-    height: 100%;
-  }
+/*
+ * O contrato de tokens: cada `var(--x)` daqui tem que existir em todo tema.
+ * O `--color-*: initial` desliga a paleta padrão do Tailwind (`bg-blue-500`, `text-white`...),
+ * então só existem as cores abaixo.
+ */
+@theme inline {
+	--color-*: initial;
 
-  html,
-  body {
-    margin: 0;
-    padding: 0;
-  }
+	/* Superfícies */
+	--color-background: var(--background);
+	--color-foreground: var(--foreground);
+	--color-card: var(--card);
+	--color-card-foreground: var(--card-foreground);
+	--color-popover: var(--popover);
+	--color-popover-foreground: var(--popover-foreground);
+	--color-rail: var(--rail);
+	--color-field: var(--field);
+	--color-overlay: var(--overlay);
 
-  body {
-    min-width: 320px;
-    background: var(--theme-bg-primary);
-    color: var(--theme-text-primary);
-    font-family: Inter, system-ui, sans-serif;
-    font-synthesis: none;
-    text-rendering: optimizeLegibility;
-  }
+	/* Textos */
+	--color-muted: var(--muted);
+	--color-muted-foreground: var(--muted-foreground);
+	--color-foreground-subtle: var(--foreground-subtle);
+	--color-foreground-faint: var(--foreground-faint);
+	--color-link: var(--link);
+	--color-link-hover: var(--link-hover);
 
-  button,
-  input,
-  textarea,
-  select {
-    font: inherit;
-  }
+	/* Ações */
+	--color-primary: var(--primary);
+	--color-primary-hover: var(--primary-hover);
+	--color-primary-foreground: var(--primary-foreground);
+	--color-secondary: var(--secondary);
+	--color-secondary-hover: var(--secondary-hover);
+	--color-secondary-foreground: var(--secondary-foreground);
+	--color-accent: var(--accent);
+	--color-accent-foreground: var(--accent-foreground);
+	--color-selected: var(--selected);
+	--color-selected-foreground: var(--selected-foreground);
+	--color-destructive: var(--destructive);
+	--color-destructive-hover: var(--destructive-hover);
+	--color-destructive-foreground: var(--destructive-foreground);
+	--color-destructive-subtle: var(--destructive-subtle);
+	--color-destructive-text: var(--destructive-text);
+	--color-destructive-border: var(--destructive-border);
+	--color-warning: var(--warning);
+	--color-warning-hover: var(--warning-hover);
+	--color-warning-foreground: var(--warning-foreground);
+	--color-warning-subtle: var(--warning-subtle);
+	--color-warning-text: var(--warning-text);
 
-  button {
-    border: 0;
-    padding: 0;
-    background: transparent;
-  }
+	/* Bordas e foco */
+	--color-border: var(--border);
+	--color-border-strong: var(--border-strong);
+	--color-input: var(--input);
+	--color-ring: var(--ring);
+	--color-focus: var(--focus);
 
-  input,
-  textarea,
-  select {
-    border: 0;
-    outline: 0;
-  }
+	/* Tons das pílulas e dos ícones */
+	--color-success: var(--success);
+	--color-success-subtle: var(--success-subtle);
+	--color-success-text: var(--success-text);
+	--color-info-subtle: var(--info-subtle);
+	--color-info-text: var(--info-text);
+	--color-neutral-subtle: var(--neutral-subtle);
+	--color-violet-subtle: var(--violet-subtle);
+	--color-violet-text: var(--violet-text);
 
-  img,
-  svg,
-  video,
-  canvas {
-    display: block;
-    max-width: 100%;
-  }
+	/* Dourado */
+	--color-gold: var(--gold);
+	--color-gold-foreground: var(--gold-foreground);
+	--color-gold-text: var(--gold-text);
+	--color-gold-muted: var(--gold-muted);
+	--color-gold-subtle: var(--gold-subtle);
+	--color-gold-wash: var(--gold-wash);
+	--color-gold-border: var(--gold-border);
 
-  button,
-  [role="button"] {
-    cursor: pointer;
-  }
+	/* Presença e chamada */
+	--color-status-online: var(--status-online);
+	--color-status-connecting: var(--status-connecting);
+	--color-status-offline: var(--status-offline);
+	--color-speaking: var(--speaking);
+	--color-live: var(--live);
+	--color-live-foreground: var(--live-foreground);
+	--color-mention: var(--mention);
+	--color-mention-foreground: var(--mention-foreground);
 
-  button:disabled,
-  [aria-disabled="true"] {
-    cursor: default;
-  }
+	/* Sidebar do shadcn */
+	--color-sidebar: var(--sidebar);
+	--color-sidebar-foreground: var(--sidebar-foreground);
+	--color-sidebar-primary: var(--sidebar-primary);
+	--color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+	--color-sidebar-accent: var(--sidebar-accent);
+	--color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+	--color-sidebar-border: var(--sidebar-border);
+	--color-sidebar-ring: var(--sidebar-ring);
 
-  /* Scrollbar global */
-  ::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
-  }
-
-  ::-webkit-scrollbar-track {
-    background: var(--theme-scrollbar-track);
-  }
-
-  ::-webkit-scrollbar-thumb {
-    background: var(--theme-scrollbar-thumb);
-    border-radius: 4px;
-  }
-
-  ::-webkit-scrollbar-thumb:hover {
-    background: var(--theme-scrollbar-thumb-hover);
-  }
+		/* Raio: o tema escolhe o --radius e a escala sai dele (com 8px: 4, 6, 8, 10, 12 e 14). */
+	--radius-sm: calc(var(--radius) - 4px);
+	--radius-md: calc(var(--radius) - 2px);
+	--radius-lg: var(--radius);
+	--radius-xl: calc(var(--radius) + 2px);
+	--radius-2xl: calc(var(--radius) + 4px);
+	--radius-3xl: calc(var(--radius) + 6px);
 }
 
+/* O que não muda com o tema: fontes e sombras. */
 @theme {
-  --font-sans: Inter, system-ui, sans-serif;
-  --font-mono: 'JetBrains Mono', monospace;
+	--font-sans: "Inter Variable", system-ui, sans-serif;
+	--font-mono: "JetBrains Mono Variable", ui-monospace, monospace;
 
-  --color-surface:      var(--theme-bg-primary);
-  --color-surface-alt:  var(--theme-bg-secondary);
-  --color-surface-low:  var(--theme-bg-tertiary);
-  --color-float:        var(--theme-bg-floating);
-  --color-tooltip:      var(--theme-bg-tooltip);
-  --color-raised:       var(--theme-bg-elevated);
-  --color-input:        var(--theme-bg-input);
-  --color-hover:        var(--theme-bg-hover);
-  --color-active:       var(--theme-bg-active);
-  --color-selected:     var(--theme-bg-selected);
-  --color-disabled:     var(--theme-bg-disabled);
+	--shadow-popover: 0 12px 32px rgb(0 0 0 / 0.5);
+	--shadow-toast: 0 12px 32px rgb(0 0 0 / 0.45);
+	--shadow-dialog: 0 24px 64px rgb(0 0 0 / 0.6);
+	--shadow-drawer: -18px 0 48px rgb(0 0 0 / 0.45);
 
-  --color-primary:    var(--theme-text-primary);
-  --color-secondary:  var(--theme-text-secondary);
-  --color-muted:      var(--theme-text-muted);
-  --color-faint:      var(--theme-text-disabled);
-  --color-link:       var(--theme-text-link);
-  --color-link-hover: var(--theme-text-link-hover);
-  --color-inverse:    var(--theme-text-inverse);
+	/* Altura da barra de título: diálogos e gavetas começam abaixo dela (`top-titlebar`). */
+	--spacing-titlebar: 2rem;
 
-  --color-accent:        var(--theme-accent-primary);
-  --color-accent-hover:  var(--theme-accent-hover);
-  --color-accent-active: var(--theme-accent-active);
-  --color-accent-subtle: var(--theme-accent-subtle);
-  --color-accent-wash:   var(--theme-accent-subtle-bg);
+	/* A barra de tempo do aviso. A duração vem do componente. */
+	--animate-toast-timer: toast-timer linear forwards;
 
-  --color-online:  var(--theme-status-online);
-  --color-idle:    var(--theme-status-idle);
-  --color-dnd:     var(--theme-status-dnd);
-  --color-offline: var(--theme-status-offline);
+	@keyframes toast-timer {
+		from {
+			transform: scaleX(1);
+		}
+		to {
+			transform: scaleX(0);
+		}
+	}
+}
 
-  --color-line:         var(--theme-border-subtle);
-  --color-line-mid:     var(--theme-border-default);
-  --color-line-strong:  var(--theme-border-strong);
-  --color-line-focus:   var(--theme-border-focus);
+@layer base {
+	*,
+	*::before,
+	*::after {
+		border-color: var(--color-border);
+	}
 
-  --color-danger:        var(--theme-danger);
-  --color-danger-hover:  var(--theme-danger-hover);
-  --color-success:       var(--theme-success);
-  --color-success-hover: var(--theme-success-hover);
-  --color-warning:       var(--theme-warning);
-  --color-warning-hover: var(--theme-warning-hover);
+	html,
+	body,
+	#root {
+		width: 100%;
+		height: 100%;
+	}
 
-  --color-mention:        var(--theme-mention-bg);
-  --color-mention-text:   var(--theme-mention-text);
-  --color-mention-border: var(--theme-mention-border);
+	body {
+		margin: 0;
+		background: var(--color-background);
+		color: var(--color-foreground);
+		font-family: var(--font-sans);
+		font-synthesis: none;
+		text-rendering: optimizeLegibility;
+		-webkit-font-smoothing: antialiased;
+	}
 
-  /* ── Reaction ── */
-  --color-reaction:              var(--theme-reaction-bg);
-  --color-reaction-border:       var(--theme-reaction-border);
-  --color-reaction-mine:         var(--theme-reaction-bg-mine);
-  --color-reaction-mine-border:  var(--theme-reaction-border-mine);
+	button,
+	[role="button"] {
+		cursor: pointer;
+	}
 
-  --color-embed:        var(--theme-embed-bg);
-  --color-embed-border: var(--theme-embed-border);
+	button:disabled,
+	[aria-disabled="true"] {
+		cursor: default;
+	}
 
-  --color-code:       var(--theme-code-bg);
-  --color-code-text:  var(--theme-code-text);
-  --color-codeblock:  var(--theme-codeblock-bg);
+	/* O foco do teclado é dourado em tudo, como no canvas. */
+	:focus-visible {
+		outline: 2px solid var(--color-focus);
+		outline-offset: 2px;
+	}
 
-  --color-badge:      var(--theme-badge-bg);
-  --color-badge-text: var(--theme-badge-text);
+	::-webkit-scrollbar {
+		width: 8px;
+		height: 8px;
+	}
 
-  --color-scrollbar:       var(--theme-scrollbar-thumb);
-  --color-scrollbar-hover: var(--theme-scrollbar-thumb-hover);
+	::-webkit-scrollbar-track {
+		background: transparent;
+	}
 
-  --color-divider: var(--theme-divider);
+	::-webkit-scrollbar-thumb {
+		background: var(--color-border-strong);
+		border-radius: 4px;
+	}
 
-  --color-scrim-low:  var(--theme-overlay-low);
-  --color-scrim-mid:  var(--theme-overlay-mid);
-  --color-scrim-high: var(--theme-overlay-high);
+	::-webkit-scrollbar-thumb:hover {
+		background: var(--color-foreground-faint);
+	}
 
-  --color-backdrop: var(--theme-backdrop);
-
-  --color-role: var(--theme-role-default);
-
-  --color-chart-1: var(--color-blue-400);
-  --color-chart-2: var(--color-green-400);
-  --color-chart-3: var(--color-yellow-400);
-  --color-chart-4: var(--color-red-400);
-  --color-chart-5: var(--color-orange-400);
-
-  /* Sidebar */
-  --color-sidebar: var(--theme-bg-secondary);
-  --color-sidebar-foreground: var(--theme-text-primary);
-  --color-sidebar-primary: var(--theme-accent-primary);
-  --color-sidebar-primary-foreground: var(--theme-text-inverse);
-  --color-sidebar-accent: var(--theme-bg-hover);
-  --color-sidebar-accent-foreground: var(--theme-text-primary);
-  --color-sidebar-border: var(--theme-border-subtle);
-  --color-sidebar-ring: var(--theme-border-focus);
+	/*
+	 * "Reduzir movimento" do Windows: animações e transições acabam na hora. A barra do aviso
+	 * fica de fora porque ela é o relógio que fecha o aviso (ela só fica invisível).
+	 */
+	@media (prefers-reduced-motion: reduce) {
+		*:not([data-slot="toast-timer"]),
+		*::before,
+		*::after {
+			animation-duration: 0.01ms !important;
+			animation-iteration-count: 1 !important;
+			transition-duration: 0.01ms !important;
+		}
+	}
 }

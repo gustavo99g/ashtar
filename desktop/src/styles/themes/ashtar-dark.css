@@ -1,0 +1,99 @@
+/*
+ * Tema escuro do Ashtar, com as cores do canvas.
+ *
+ * Todo tema preenche o contrato inteiro: cada variável que o App.css lê no `@theme inline`.
+ * O `pnpm check:themes` confere, e o CI roda essa conferência. Um tema muda só cor e raio.
+ */
+[data-theme="ashtar-dark"] {
+	color-scheme: dark;
+
+	/* Superfícies */
+	--background: var(--navy-900);
+	--foreground: var(--navy-50);
+	--card: var(--navy-850);
+	--card-foreground: var(--navy-50);
+	--popover: var(--navy-800);
+	--popover-foreground: var(--navy-50);
+	--rail: var(--navy-950);
+	--field: var(--navy-900);
+	--overlay: color-mix(in srgb, var(--navy-950) 72%, transparent);
+
+	/* Textos */
+	--muted: var(--navy-800);
+	--muted-foreground: var(--navy-200);
+	--foreground-subtle: var(--navy-300);
+	--foreground-faint: var(--navy-500);
+	--link: var(--blue-300);
+	--link-hover: var(--blue-100);
+
+	/* Ações */
+	--primary: var(--blue-600);
+	--primary-hover: var(--blue-700);
+	--primary-foreground: var(--white);
+	--secondary: var(--navy-800);
+	--secondary-hover: var(--navy-700);
+	--secondary-foreground: var(--navy-100);
+	--accent: var(--navy-650);
+	--accent-foreground: var(--navy-50);
+	--selected: var(--blue-900);
+	--selected-foreground: var(--navy-50);
+	--destructive: var(--red-600);
+	--destructive-hover: var(--red-700);
+	--destructive-foreground: var(--white);
+	--destructive-subtle: var(--red-950);
+	--destructive-text: var(--red-300);
+	--destructive-border: var(--red-400);
+	--warning: var(--orange-700);
+	--warning-hover: var(--orange-800);
+	--warning-foreground: var(--white);
+	--warning-subtle: var(--orange-950);
+	--warning-text: var(--orange-300);
+
+	/* Bordas e foco */
+	--border: var(--navy-650);
+	--border-strong: var(--navy-600);
+	--input: var(--navy-600);
+	--ring: var(--blue-500);
+	--focus: var(--gold-500);
+
+	/* Tons das pílulas e dos ícones */
+	--success: var(--green-500);
+	--success-subtle: var(--green-950);
+	--success-text: var(--green-300);
+	--info-subtle: var(--blue-950);
+	--info-text: var(--blue-300);
+	--neutral-subtle: var(--navy-750);
+	--violet-subtle: var(--violet-950);
+	--violet-text: var(--violet-300);
+
+	/* Dourado */
+	--gold: var(--gold-500);
+	--gold-foreground: var(--navy-900);
+	--gold-text: var(--gold-300);
+	--gold-muted: var(--gold-600);
+	--gold-subtle: var(--gold-900);
+	--gold-wash: var(--gold-950);
+	--gold-border: var(--gold-700);
+
+	/* Presença e chamada */
+	--status-online: var(--green-500);
+	--status-connecting: var(--orange-400);
+	--status-offline: var(--navy-300);
+	--speaking: var(--blue-600);
+	--live: var(--gold-500);
+	--live-foreground: var(--navy-900);
+	--mention: var(--gold-900);
+	--mention-foreground: var(--gold-500);
+
+	/* Sidebar do shadcn */
+	--sidebar: var(--navy-850);
+	--sidebar-foreground: var(--navy-50);
+	--sidebar-primary: var(--blue-600);
+	--sidebar-primary-foreground: var(--white);
+	--sidebar-accent: var(--navy-800);
+	--sidebar-accent-foreground: var(--navy-50);
+	--sidebar-border: var(--navy-650);
+	--sidebar-ring: var(--blue-500);
+
+	--radius: 0.5rem;
+}

@@ -1,77 +1,44 @@
 import { Button as ButtonPrimitive } from "@base-ui/react/button";
 import { cva, type VariantProps } from "class-variance-authority";
-
 import { cn } from "@/lib/utils";
 
+/*
+ * Os botões do canvas. O contorno dourado do foco vem do App.css, igual para tudo que recebe
+ * foco, por isso não tem `focus-visible:` aqui.
+ */
 const buttonVariants = cva(
 	[
-		"inline-flex shrink-0 items-center justify-center",
-		"rounded-md",
-		"text-sm font-semibold",
-		"whitespace-nowrap select-none",
-		"transition-colors",
-		"outline-none",
-		"focus-visible:outline-none",
-		"focus-visible:ring-2 focus-visible:ring-line-focus/30",
-		"disabled:pointer-events-none disabled:opacity-50",
-		"[&_svg]:pointer-events-none",
-		"[&_svg]:shrink-0",
-		"[&_svg:not([class*='size-'])]:size-4",
+		"inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-transparent",
+		"font-semibold whitespace-nowrap select-none transition-colors",
+		"disabled:pointer-events-none aria-disabled:cursor-not-allowed",
+		"[&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
 	],
 	{
 		variants: {
 			variant: {
-				primary: [
-					"bg-accent text-primary",
-					"hover:bg-accent-hover",
-					"active:bg-accent-active",
-				],
-
-				secondary: [
-					"bg-raised text-primary",
-					"border border-line",
-					"hover:bg-hover",
-					"active:bg-active",
-				],
-
-				ghost: [
-					"bg-transparent text-secondary",
-					"hover:bg-hover hover:text-primary",
-					"active:bg-active active:text-primary",
-				],
-
-				outline: [
-					"bg-transparent text-primary",
-					"border border-line-mid",
-					"hover:bg-hover",
-					"active:bg-active",
-				],
-
-				link: [
-					"bg-transparent text-link",
-					"hover:text-link-hover",
-					"hover:underline hover:underline-offset-4",
-				],
-
-				danger: [
-					"bg-danger text-primary",
-					"hover:bg-danger-hover",
-					"active:bg-danger-hover",
-				],
+				primary:
+					"bg-primary text-primary-foreground hover:bg-primary-hover disabled:bg-secondary disabled:text-foreground-subtle",
+				secondary:
+					"bg-secondary text-secondary-foreground hover:bg-secondary-hover hover:text-foreground disabled:text-foreground-subtle",
+				outline:
+					"border-border-strong text-secondary-foreground hover:border-ring hover:bg-secondary hover:text-foreground disabled:border-border disabled:text-foreground-subtle",
+				ghost:
+					"text-secondary-foreground hover:bg-secondary hover:text-foreground disabled:text-foreground-subtle",
+				danger:
+					"bg-destructive text-destructive-foreground hover:bg-destructive-hover disabled:bg-secondary disabled:text-foreground-subtle",
+				warning:
+					"bg-warning text-warning-foreground hover:bg-warning-hover disabled:bg-secondary disabled:text-foreground-subtle",
+				link: "text-link hover:text-link-hover disabled:text-foreground-subtle",
 			},
-
 			size: {
-				default: "h-8 gap-2 px-3",
-				xs: "h-6 gap-1 rounded-sm px-2 text-xs",
-				sm: "h-7 gap-1.5 px-2.5 text-sm",
-				lg: "h-10 gap-2 px-4",
-				icon: "size-8",
-				"icon-xs": "size-6 rounded-sm",
-				"icon-sm": "size-7",
-				"icon-lg": "size-10",
+				sm: "h-8 px-3 text-xs",
+				default: "h-9 px-4 text-[13px]",
+				lg: "h-11 px-5 text-sm",
+				"icon-sm": "size-8",
+				icon: "size-9",
 			},
 		},
-
+		compoundVariants: [{ variant: "link", class: "h-auto px-0" }],
 		defaultVariants: {
 			variant: "primary",
 			size: "default",

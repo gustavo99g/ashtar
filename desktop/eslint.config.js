@@ -178,6 +178,13 @@ export default tseslint.config(
 		},
 	},
 	{
+		// Scripts do CI rodam no Node.
+		files: ["scripts/**/*.mjs"],
+		languageOptions: {
+			globals: globals.node,
+		},
+	},
+	{
 		// AudioWorkletProcessor roda num escopo próprio, sem os globais de browser.
 		files: ["**/*.worklet.js"],
 		languageOptions: {

@@ -28,6 +28,11 @@ runs:
       working-directory: desktop
       run: pnpm lint
 
+    - name: Contrato dos temas
+      shell: bash
+      working-directory: desktop
+      run: pnpm check:themes
+
     - name: Typecheck e build do frontend
       shell: bash
       working-directory: desktop

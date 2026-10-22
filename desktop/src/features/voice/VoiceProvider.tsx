@@ -20,7 +20,6 @@ import {
 import type { ScreenShareController } from "@/features/screen-share";
 import { IpcScreenShare } from "@/features/screen-share";
 import { apiFetch } from "@/lib/api";
-import { useNavigationStore } from "@/stores/navigation";
 
 export type VoiceConnectionState =
 	| "disconnected"
@@ -51,6 +50,8 @@ export interface VoiceContextValue {
 	unmute: () => Promise<void>;
 	deafen: () => Promise<void>;
 	undeafen: () => Promise<void>;
+	/** Entra na sala (ou troca de sala). A conexão acontece no efeito do `VoiceProvider`. */
+	join: (channelId: string) => void;
 	leave: () => void;
 }
 
@@ -91,10 +92,8 @@ function toVoiceState(state: ConnectionState): VoiceConnectionState {
 }
 
 export function VoiceProvider({ children }: { children: ReactNode }) {
-	const voiceChannelId = useNavigationStore((state) => state.voiceChannelId);
-	const leaveVoiceChannel = useNavigationStore(
-		(state) => state.leaveVoiceChannel,
-	);
+	/** Sala em que a pessoa quer estar. Mudou, o efeito abaixo sai da anterior e entra na nova. */
+	const [voiceChannelId, setVoiceChannelId] = useState<string | null>(null);
 
 	const [room, setRoom] = useState<Room | null>(null);
 	const [screenShare, setScreenShare] = useState<ScreenShareController | null>(
@@ -241,8 +240,9 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 					await setMicrophone(true);
 				}
 			},
+			join: (channelId) => setVoiceChannelId(channelId),
 			// O cleanup do efeito cuida do resto quando o voiceChannelId vira null.
-			leave: leaveVoiceChannel,
+			leave: () => setVoiceChannelId(null),
 		};
 	}, [
 		voiceChannelId,
@@ -252,7 +252,6 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 		screenShare,
 		isMuted,
 		isDeafened,
-		leaveVoiceChannel,
 	]);
 
 	return (
