@@ -24,14 +24,16 @@ pub fn color(nick: &str) -> &'static str {
     PALETTE[(nick_hash(nick) % 8) as usize]
 }
 
-/// A letra do avatar: a primeira do nome que aparece (o nome visível ou, sem
-/// ele, o nick), em maiúscula.
+/// A letra do avatar: a primeira letra (ou número) do nome que aparece (o nome visível ou, sem
+/// ele, o nick), em maiúscula. Pula o que não é letra nem número (`_`, `.`, espaço); só se o nome
+/// não tiver nenhum, usa o primeiro caractere, e `?` se estiver vazio. É a mesma regra do
+/// `avatarInitial` do app.
 pub fn letter(shown_name: &str) -> String {
     shown_name
         .chars()
-        .next()
-        .map(|c| c.to_uppercase().collect())
-        .unwrap_or_default()
+        .find(|c| c.is_alphanumeric())
+        .or_else(|| shown_name.chars().next())
+        .map_or_else(|| "?".to_owned(), |c| c.to_uppercase().collect())
 }
 
 #[cfg(test)]
@@ -81,6 +83,11 @@ mod tests {
         assert_eq!(letter("juju"), "J");
         assert_eq!(letter("élio"), "É");
         assert_eq!(letter("2pac"), "2");
-        assert_eq!(letter(""), "");
+        // Pula o que não é letra nem número, como o `avatarInitial` do app.
+        assert_eq!(letter("_ana"), "A");
+        assert_eq!(letter(".x"), "X");
+        assert_eq!(letter("✨ juju"), "J");
+        assert_eq!(letter("___"), "_");
+        assert_eq!(letter(""), "?");
     }
 }
