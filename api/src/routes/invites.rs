@@ -12,6 +12,7 @@ use axum::Json;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use serde::{Deserialize, Serialize};
+use ts_rs::TS;
 
 use super::auth::CurrentUser;
 use super::extract::ApiJson;
@@ -25,7 +26,8 @@ use crate::identity::invites::{
 use crate::identity::permissions::{Action, require};
 
 /// Nick e nome visível, sem o id: o que uma rota sem sessão pode mostrar.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, TS)]
+#[ts(export, export_to = "index.ts")]
 pub struct NameView {
     pub nick: String,
     pub display_name: Option<String>,
@@ -40,10 +42,9 @@ impl From<&User> for NameView {
     }
 }
 
-/// `{ "kind": "new", "invited_by": {...}, "expires_at": ... }` ou
-/// `{ "kind": "recovery", "account": {...}, "expires_at": ... }`.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, TS)]
 #[serde(tag = "kind", rename_all = "snake_case")]
+#[ts(export, export_to = "index.ts")]
 pub enum InvitePreviewView {
     New {
         invited_by: NameView,
@@ -79,17 +80,21 @@ pub async fn preview(
     }))
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, TS)]
+#[ts(export, export_to = "index.ts")]
 pub struct CreateInviteRequest {
     pub preset: Preset,
     /// Só no `custom`: validade em segundos (de 60 a 30 dias).
+    #[ts(optional)]
     pub ttl_secs: Option<i64>,
     /// Só no `custom`: de 1 a 50 pessoas.
+    #[ts(optional)]
     pub max_uses: Option<i64>,
 }
 
 /// Um convite recém-criado. O código e o link só aparecem aqui.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, TS)]
+#[ts(export, export_to = "index.ts")]
 pub struct CreatedInviteView {
     pub id: String,
     pub code: String,
@@ -141,24 +146,27 @@ pub async fn create(
 }
 
 /// Quem criou, o alvo da recuperação ou quem entrou: id, nick e nome visível.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, TS)]
+#[ts(export, export_to = "index.ts")]
 pub struct MemberRef {
     pub id: String,
     pub nick: String,
     pub display_name: Option<String>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, TS)]
+#[ts(export, export_to = "index.ts")]
 pub struct InviteUseView {
     pub user: MemberRef,
     pub used_at: i64,
 }
 
-/// Uma linha do histórico de convites.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, TS)]
+#[ts(export, export_to = "index.ts")]
 pub struct InviteView {
     pub id: String,
     /// `"new"` ou `"recovery"`.
+    #[ts(as = "InviteKind")]
     pub kind: String,
     pub preset: Option<Preset>,
     /// `"pending"`, `"exhausted"`, `"revoked"` ou `"expired"`.

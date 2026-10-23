@@ -17,7 +17,8 @@ use axum::http::{HeaderMap, StatusCode};
 use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
 use semver::Version;
-use serde_json::json;
+
+use crate::error::{ErrorBody, ErrorKind};
 
 const APP_VERSION_HEADER: &str = "x-app-version";
 const ACCESS_CODE_HEADER: &str = "x-access-code";
@@ -88,20 +89,24 @@ fn non_empty_env(name: &str) -> Option<String> {
 }
 
 fn outdated(min_version: &Version) -> Response {
-    let body = json!({
-        "kind": "client_outdated",
-        "message": format!(
+    let body = ErrorBody {
+        kind: ErrorKind::ClientOutdated,
+        message: format!(
             "Esta versão do Ashtar é antiga demais. A atualização para a {min_version} está sendo baixada; reinicie quando o aviso aparecer."
         ),
-        "min_version": min_version.to_string(),
-    });
+        min_version: Some(min_version.to_string()),
+    };
     (StatusCode::UPGRADE_REQUIRED, Json(body)).into_response()
 }
+
 fn denied() -> Response {
-    let body = json!({
-        "kind": "access_denied",
-        "message": "Acesso recusado pelo servidor. Atualize o Ashtar ou fale com quem administra o grupo.",
-    });
+    let body = ErrorBody {
+        kind: ErrorKind::AccessDenied,
+        message:
+            "Acesso recusado pelo servidor. Atualize o Ashtar ou fale com quem administra o grupo."
+                .into(),
+        min_version: None,
+    };
     (StatusCode::UNAUTHORIZED, Json(body)).into_response()
 }
 

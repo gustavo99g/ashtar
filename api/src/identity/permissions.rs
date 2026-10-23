@@ -13,6 +13,7 @@
 
 use serde::Serialize;
 use sqlx::SqlitePool;
+use ts_rs::TS;
 
 use super::User;
 use crate::error::ApiError;
@@ -125,8 +126,9 @@ pub fn require(user: &User, action: Action) -> Result<(), ApiError> {
 }
 
 /// De onde vem uma permissão (para o `admin permissoes` e o Painel).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, TS)]
 #[serde(rename_all = "snake_case")]
+#[ts(export, export_to = "index.ts")]
 pub enum Origin {
     /// O dono tem todas.
     Owner,
@@ -213,8 +215,9 @@ pub async fn set(
 
 /// Se a linha é uma [`Permission`] (o dono pode ligar e desligar) ou uma
 /// [`Action`] (hoje, só do dono).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, TS)]
 #[serde(rename_all = "snake_case")]
+#[ts(export, export_to = "index.ts")]
 pub enum GrantKind {
     Permission,
     Action,

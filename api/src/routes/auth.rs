@@ -10,6 +10,7 @@ use axum::http::HeaderMap;
 use axum::http::header::AUTHORIZATION;
 use axum::http::request::Parts;
 use serde::{Deserialize, Serialize};
+use ts_rs::TS;
 
 use crate::AppState;
 use crate::db::now;
@@ -32,13 +33,17 @@ pub struct LoginRequest {
     pub device_key: String,
 }
 
-#[derive(Debug, Serialize)]
+/// A resposta do `redeem` e do `login`. No app, quem recebe é o Rust, que a
+/// devolve igual ao JavaScript.
+#[derive(Debug, Serialize, TS)]
+#[ts(export, export_to = "index.ts")]
 pub struct SessionResponse {
     pub token: String,
     pub user: UserView,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, TS)]
+#[ts(export, export_to = "index.ts")]
 pub struct UserView {
     pub id: String,
     pub nick: String,
@@ -58,20 +63,30 @@ impl From<&User> for UserView {
     }
 }
 
-#[derive(Debug, Serialize)]
+/// De onde o app busca atualizações.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export, export_to = "index.ts")]
+pub enum UpdateChannel {
+    Stable,
+    Beta,
+}
+
+#[derive(Debug, Serialize, TS)]
+#[ts(export, export_to = "index.ts")]
 pub struct MeResponse {
     pub user: UserView,
     /// Chaves das permissões que o membro tem.
     pub permissions: Vec<&'static str>,
-    /// `"beta"` ou `"stable"`: de onde o app busca atualizações.
-    pub update_channel: &'static str,
+    pub update_channel: UpdateChannel,
     /// O que mostrar ou esconder na interface. Quem decide de verdade é a API.
     pub can_create_invite: bool,
     /// Se o menu mostra o Painel de controle.
     pub can_view_panel: bool,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, TS)]
+#[ts(export, export_to = "index.ts")]
 pub struct UpdateMeRequest {
     /// O nome visível novo. Texto vazio ou `null` volta para o nick.
     pub display_name: Option<String>,
@@ -144,7 +159,12 @@ async fn me_response(state: &AppState, user: &User) -> Result<MeResponse, ApiErr
     Ok(MeResponse {
         user: UserView::from(user),
         permissions: effective.iter().map(|(p, _)| p.key()).collect(),
-        update_channel: if beta { "beta" } else { "stable" },
+        update_channel: if beta {
+            UpdateChannel::Beta
+        } else {
+            UpdateChannel::Stable
+        },
+
         can_create_invite: permissions::can(user, Action::CreateInvite),
         can_view_panel: permissions::can(user, Action::ViewPanel),
     })

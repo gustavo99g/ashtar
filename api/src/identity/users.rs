@@ -2,6 +2,7 @@
 
 use serde::Serialize;
 use sqlx::{FromRow, SqliteConnection, SqlitePool};
+use ts_rs::TS;
 use uuid::Uuid;
 
 use super::User;
@@ -134,7 +135,8 @@ pub struct MemberDetails {
     pub pending_recovery: Option<PendingRecovery>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[ts(export, export_to = "index.ts")]
 pub struct BetaGrant {
     pub origin: Origin,
     /// Quando o dono ligou; `None` no dono, que sempre tem.
@@ -142,7 +144,8 @@ pub struct BetaGrant {
 }
 
 /// O convite novo com que o membro entrou, e quantos já entraram com ele.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[ts(export, export_to = "index.ts")]
 pub struct JoinedWith {
     pub invite_id: String,
     pub preset: Option<Preset>,
@@ -150,7 +153,8 @@ pub struct JoinedWith {
     pub max_uses: i64,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[ts(export, export_to = "index.ts")]
 pub struct PendingRecovery {
     pub invite_id: String,
     pub expires_at: i64,

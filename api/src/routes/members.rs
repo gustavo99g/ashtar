@@ -9,6 +9,7 @@ use axum::Json;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use serde::{Deserialize, Serialize};
+use ts_rs::TS;
 
 use super::auth::CurrentUser;
 use super::extract::ApiJson;
@@ -21,13 +22,15 @@ use crate::identity::invites::{self, DEFAULT_TTL_SECS, InviteKind};
 use crate::identity::permissions::{self, Action, GrantKind, Origin, Permission, require};
 use crate::identity::users::{self, BetaGrant, JoinedWith, MemberDetails, PendingRecovery};
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, TS)]
+#[ts(export, export_to = "index.ts")]
 pub struct DeviceView {
     pub linked_at: i64,
 }
 
 /// Um membro na lista do Painel.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, TS)]
+#[ts(export, export_to = "index.ts")]
 pub struct MemberView {
     pub id: String,
     pub nick: String,
@@ -76,7 +79,8 @@ pub async fn list(
 }
 
 /// Uma linha da gaveta de permissões.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, TS)]
+#[ts(export, export_to = "index.ts")]
 pub struct GrantView {
     pub key: &'static str,
     pub kind: GrantKind,

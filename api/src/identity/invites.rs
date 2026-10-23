@@ -19,6 +19,7 @@
 
 use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, SqliteExecutor, SqlitePool};
+use ts_rs::TS;
 use uuid::Uuid;
 
 use super::permissions::{Action, require};
@@ -47,8 +48,9 @@ pub const GROUP_MAX_USES: i64 = 8;
 
 /// O modelo de um convite novo, como a tela mostra. A chave em texto vai para o
 /// banco (`invites.preset`) e para o JSON; não mude uma que já existe.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "snake_case")]
+#[ts(export, export_to = "index.ts")]
 pub enum Preset {
     /// "Para uma pessoa".
     Person,
@@ -113,7 +115,11 @@ impl NewInvite {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// Convite novo ou de recuperação.
+// No histórico, o `kind` sai em texto do banco (`InviteView`); o `rename_all` dá ao
+// TypeScript a mesma união, `"new" | "recovery"`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, TS)]
+#[ts(export, export_to = "index.ts", rename_all = "snake_case")]
 pub enum InviteKind {
     New,
     Recovery,
@@ -129,8 +135,9 @@ impl InviteKind {
 }
 
 /// Situação de um convite num instante.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, TS)]
 #[serde(rename_all = "snake_case")]
+#[ts(export, export_to = "index.ts")]
 pub enum InviteStatus {
     /// Ainda aceita gente.
     Pending,

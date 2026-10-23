@@ -15,6 +15,7 @@ use livekit_protocol::{ParticipantInfo, TrackSource};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use sqlx::SqlitePool;
+use ts_rs::TS;
 
 use super::auth::CurrentUser;
 use super::extract::ApiJson;
@@ -29,7 +30,9 @@ pub struct JoinVoiceRequest {
     pub display_name: String,
 }
 
-#[derive(Debug, Serialize)]
+/// A resposta do `voice/join` e do `voice/token`.
+#[derive(Debug, Serialize, TS)]
+#[ts(export, export_to = "index.ts")]
 pub struct JoinVoiceResponse {
     pub token: String,
     pub url: String,
@@ -51,7 +54,8 @@ pub async fn join_voice(
     Ok(Json(JoinVoiceResponse { token, url }))
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, TS)]
+#[ts(export, export_to = "index.ts")]
 pub struct VoiceTokenRequest {
     pub channel_id: String,
 }
@@ -89,7 +93,8 @@ pub struct ParticipantsQuery {
 }
 
 /// Uma pessoa na sala, com o nick e o nome visível do banco.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[ts(export, export_to = "index.ts")]
 pub struct ParticipantView {
     pub user_id: String,
     pub nick: String,
