@@ -145,6 +145,15 @@ export type NameView = { nick: string, display_name: string | null, };
  */
 export type Origin = "owner" | "direct";
 
+/**
+ * Uma pessoa na sala, com o nick e o nome visível do banco.
+ */
+export type ParticipantView = { user_id: string, nick: string, display_name: string | null, 
+/**
+ * Se está transmitindo a tela (o selo TRANSMITINDO).
+ */
+screen_sharing: boolean, };
+
 export type PendingRecovery = { invite_id: string, expires_at: number, };
 
 /**

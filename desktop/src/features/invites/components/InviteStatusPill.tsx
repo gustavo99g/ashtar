@@ -1,7 +1,5 @@
 import { Badge } from "@/components/ui/badge";
-
-/** A situação do convite como a API devolve (`GET /api/invites`). */
-export type InviteStatus = "pending" | "exhausted" | "revoked" | "expired";
+import type { InviteStatus } from "@/lib/api";
 
 /** O texto e o tom de cada situação, como no histórico do quadro "Convites". */
 const STATUS = {

@@ -36,6 +36,17 @@ jobs:
       - name: Testes
         run: cargo test
 
+      # O `cargo test` acima regrava os tipos do TypeScript do app (ts-rs). Se o arquivo mudou, uma
+      # struct da API mudou sem o `cargo test` local e o commit do resultado.
+      - name: Tipos do app em dia
+        run: |
+          if [ -n "$(git status --porcelain -- ../desktop/src/lib/api/generated)" ]; then
+            echo "::error::Os tipos em desktop/src/lib/api/generated estão desatualizados. Rode cargo test em api/ e faça commit do resultado."
+            git status --short -- ../desktop/src/lib/api/generated
+            git diff -- ../desktop/src/lib/api/generated
+            exit 1
+          fi
+
   desktop:
     name: Desktop
     if: github.event_name == 'pull_request'
