@@ -1,6 +1,6 @@
 //! Ponto de entrada da lib do app desktop (`desktop_lib`, ver `[lib] name` no
-//! `Cargo.toml`). Registra os comandos Tauri (em `commands/`) e o estado
-//! gerenciado (o `ScreenShareManager`, criado no `setup`).
+//! `Cargo.toml`). Registra os plugins, os comandos Tauri (em `commands/`) e o
+//! estado gerenciado (o `ScreenShareManager`, criado no `setup`).
 //!
 //! Learn more about Tauri commands at <https://tauri.app/develop/calling-rust/>
 
@@ -14,8 +14,15 @@ mod error;
 pub mod logging;
 mod media;
 mod updater;
+mod window;
 
 use tauri::{Manager, RunEvent};
+use tauri_plugin_window_state::{AppHandleExt, StateFlags};
+
+/// O que a janela lembra entre aberturas: tamanho, posição e se estava maximizada.
+const WINDOW_STATE: StateFlags = StateFlags::SIZE
+    .union(StateFlags::POSITION)
+    .union(StateFlags::MAXIMIZED);
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run(log_file: logging::LateFile) {
@@ -26,6 +33,11 @@ pub fn run(log_file: logging::LateFile) {
 
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(
+            tauri_plugin_window_state::Builder::new()
+                .with_state_flags(WINDOW_STATE)
+                .build(),
+        )
         .setup(move |app| {
             if let Err(error) = logging::attach_file(app.handle(), &log_file) {
                 tracing::error!(%error, "não foi possível abrir o arquivo de log");
@@ -50,8 +62,20 @@ pub fn run(log_file: logging::LateFile) {
         .build(tauri::generate_context!())
         .expect("error while running tauri application");
 
-    app.run(|app, event| match event {
-        RunEvent::ExitRequested { .. } => app.state::<updater::AutoUpdate>().install_on_exit(),
+    // Antes do `run()`: a janela nasce no começo dele, e o window-state grava o arquivo nessa hora.
+    let first_open = !window::has_saved_state(app.handle());
+
+    app.run(move |app, event| match event {
+        // A janela já existe (e o `setup` já rodou): na primeira abertura, cabe no monitor.
+        RunEvent::Ready if first_open => window::fit_to_monitor(app),
+        RunEvent::ExitRequested { .. } => {
+            // O plugin grava o tamanho da janela no `RunEvent::Exit`, mas o instalador da
+            // atualização encerra o processo antes dele. Por isso a gravação vem aqui, antes.
+            if let Err(error) = app.save_window_state(WINDOW_STATE) {
+                tracing::warn!(%error, "não foi possível gravar o tamanho da janela");
+            }
+            app.state::<updater::AutoUpdate>().install_on_exit();
+        }
         RunEvent::Exit => logging::flush(app),
         _ => {}
     });

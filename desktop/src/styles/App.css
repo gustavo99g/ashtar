@@ -127,12 +127,28 @@
 	--shadow-toast: 0 12px 32px rgb(0 0 0 / 0.45);
 	--shadow-dialog: 0 24px 64px rgb(0 0 0 / 0.6);
 	--shadow-drawer: -18px 0 48px rgb(0 0 0 / 0.45);
+	--shadow-ticket:
+		0 0 0 1px color-mix(in srgb, var(--color-gold) 8%, transparent),
+		0 18px 44px color-mix(in srgb, var(--color-gold) 10%, transparent);
 
 	/* Altura da barra de título: diálogos e gavetas começam abaixo dela (`top-titlebar`). */
 	--spacing-titlebar: 2rem;
 
 	/* A barra de tempo do aviso. A duração vem do componente. */
 	--animate-toast-timer: toast-timer linear forwards;
+	/* O brilho que atravessa o bilhete do convite uma vez, quando ele aparece. */
+	--animate-ticket-shine: ticket-shine 1.4s 0.2s ease-out both;
+
+	@keyframes ticket-shine {
+		from {
+			transform: translateX(0) skewX(-18deg);
+			opacity: 1;
+		}
+		to {
+			transform: translateX(1300px) skewX(-18deg);
+			opacity: 0;
+		}
+	}
 
 	@keyframes toast-timer {
 		from {
