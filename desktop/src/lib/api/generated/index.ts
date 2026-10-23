@@ -168,6 +168,8 @@ export type Preset = "person" | "group" | "custom";
  */
 export type SessionResponse = { token: string, user: UserView, };
 
+export type SetBetaRequest = { enabled: boolean, };
+
 /**
  * De onde o app busca atualizações.
  */

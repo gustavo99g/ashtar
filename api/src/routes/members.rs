@@ -116,7 +116,8 @@ pub async fn permissions(
     ))
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, TS)]
+#[ts(export, export_to = "index.ts")]
 pub struct SetBetaRequest {
     pub enabled: bool,
 }

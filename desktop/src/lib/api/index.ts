@@ -1,5 +1,8 @@
 /**
  * Porta de entrada da API (`api/`). O resto do app importa daqui, nunca dos arquivos da pasta.
+ *
+ * As funções por assunto (`me.ts`, `invites.ts`, `members.ts`, `voice.ts`) não usam React: os
+ * hooks com o cache ficam no `queries.ts` de cada feature.
  */
 export { apiFetch, apiJson, jsonRequest } from "./client";
 export { apiUrl } from "./config";
@@ -12,6 +15,7 @@ export {
 } from "./errors";
 // Os tipos das respostas e dos pedidos, gerados do Rust da API (`cargo test` em `api/`).
 export type * from "./generated";
+export * from "./endpoints";
 export {
 	clearSession,
 	type SessionHandlers,
