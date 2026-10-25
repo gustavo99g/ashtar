@@ -15,6 +15,7 @@ export {
 	parseInviteLink,
 } from "./inviteLink";
 export { LinkWatcher } from "./LinkWatcher";
+export { RequireNoAccount } from "./RequireNoAccount";
 export { checkNick, sameNick } from "./nickRules";
 export {
 	loadOpeningLink,

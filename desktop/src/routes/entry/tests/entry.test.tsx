@@ -169,6 +169,52 @@ describe("o link com o app aberto", () => {
 	});
 });
 
+describe("quem já tem conta não vê as telas de convite", () => {
+	it.each([
+		["Sem convite", paths.entry.noInvite],
+		["Escolha do nick", paths.entry.invite(NEW_CODE)],
+		["Recuperação", paths.entry.recovery(RECOVERY_CODE)],
+		["Saiu do grupo", paths.entry.leftGroup],
+	])("%s leva para o servidor", async (_name, path) => {
+		const router = renderAt(path, { status: "connected", user: kid });
+
+		await screen.findByRole("complementary");
+		expect(router.state.location.pathname).toBe(paths.server);
+	});
+
+	it("Você já está no Ashtar continua aberta a quem tem conta", async () => {
+		const router = renderAt(paths.entry.alreadyIn, {
+			status: "connected",
+			user: kid,
+		});
+
+		await screen.findByRole("heading", { name: "Você já está no Ashtar" });
+		expect(router.state.location.pathname).toBe(paths.entry.alreadyIn);
+	});
+
+	it("com a abertura em andamento, volta para a abertura, que decide", () => {
+		// A abertura faz o login, que fica esperando: o teste só confere para onde foi.
+		vi.mocked(login).mockReturnValue(new Promise(() => {}));
+
+		const router = renderAt(paths.entry.noInvite, { status: "entering" });
+
+		expect(router.state.location.pathname).toBe(paths.start);
+	});
+
+	it("sem conta, a tela fica, e a guarda não manda a pessoa embora ao entrar", async () => {
+		const router = renderAt(paths.entry.noInvite, { status: "noAccount" });
+
+		expect(router.state.location.pathname).toBe(paths.entry.noInvite);
+		// Do campo de colar para a escolha do nick: a guarda não confere de novo.
+		fireEvent.change(screen.getByLabelText("Link ou código do convite"), {
+			target: { value: NEW_CODE },
+		});
+		fireEvent.click(screen.getByRole("button", { name: "Continuar" }));
+		await screen.findByRole("heading", { name: "Você recebeu um convite" });
+		expect(router.state.location.pathname).toBe(paths.entry.invite(NEW_CODE));
+	});
+});
+
 describe("o campo de colar", () => {
 	it("recusa o que não é convite", () => {
 		const router = renderAt(paths.entry.noInvite, { status: "noAccount" });

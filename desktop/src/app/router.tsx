@@ -11,6 +11,7 @@ import {
 	Navigate,
 	type RouteObject,
 } from "react-router-dom";
+import { RequireNoAccount } from "@/features/entry";
 import { AppShell } from "@/layouts/AppShell";
 import { RootLayout } from "@/layouts/RootLayout";
 import { SettingsLayout } from "@/layouts/SettingsLayout";
@@ -39,11 +40,17 @@ export const routes: RouteObject[] = [
 			{
 				path: "/entry",
 				children: [
-					{ path: "no-invite", element: <NoInviteRoute /> },
-					{ path: "invite/:code", element: <InviteRoute /> },
-					{ path: "recovery/:code", element: <RecoveryRoute /> },
+					{
+						// Quem já tem conta não vê as telas de convite (`RequireNoAccount`).
+						element: <RequireNoAccount />,
+						children: [
+							{ path: "no-invite", element: <NoInviteRoute /> },
+							{ path: "invite/:code", element: <InviteRoute /> },
+							{ path: "recovery/:code", element: <RecoveryRoute /> },
+							{ path: "left", element: <LeftGroupRoute /> },
+						],
+					},
 					{ path: "already-in", element: <AlreadyInRoute /> },
-					{ path: "left", element: <LeftGroupRoute /> },
 				],
 			},
 			{
