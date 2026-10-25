@@ -30,9 +30,9 @@ cada etapa, `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings` e `
 |---|---|---|
 | 0 | Decisões (ADRs 0012 e 0013, seção nova na 0011) | Concluída (`4a0d09b`) |
 | 1 | API: nome visível, leitura do convite, rotas do painel, quem está na sala, página do convite | Concluída (`373b377`) |
-| 2 | Base visual: pastas por domínio, ESLint, Vitest, tokens e temas, design system, janela, AppShell, router | Pendente |
-| 3 | Identidade no app: tipos gerados, TanStack Query, chave do computador, login pelo Rust, sessão | Pendente |
-| 4 | Entrada: link `ashtar://`, uma instância, convite, nick, recuperação, saiu do grupo | Pendente |
+| 2 | Base visual: pastas por domínio, ESLint, Vitest, tokens e temas, design system, janela, AppShell, router | Concluída (`520d18d`) |
+| 3 | Identidade no app: tipos gerados, TanStack Query, chave do computador, login pelo Rust, sessão | Concluída (`351a1e1`) |
+| 4 | Entrada: link `ashtar://`, uma instância, convite, nick, recuperação, saiu do grupo | Concluída (`9412f04`) |
 | 5 | Tela do servidor e sala de voz, uma transmissão por vez, convite rápido | Pendente |
 | 6 | Configurações (Perfil, Aplicativo) e atualização com o canal por pessoa | Pendente |
 | 7 | Painel de controle: Convites, Membros, aviso de quem entrou | Pendente |
@@ -104,7 +104,7 @@ As ADRs 0012 e 0013 e a seção "Administração pela interface" da 0011.
 **Pronto quando:** cada rota nova tem teste de integração passando; a página do convite abre no navegador
 com a prévia certa no chat; o app instalado continua entrando pela rota antiga.
 
-## Etapa 2: base visual — pendente
+## Etapa 2: base visual — concluída (`520d18d`)
 
 - Pastas por domínio, sem mudar nada na tela; as regras do ESLint; Vitest e Testing Library no CI.
 - Tokens e temas com as cores do canvas, JetBrains Mono, o script que confere o contrato dos temas.
@@ -118,7 +118,7 @@ com a prévia certa no chat; o app instalado continua entrando pela rota antiga.
 as rotas provisórias navegam e o ESC fecha as configurações; os casos da cor do nick passam no Vitest; o CI
 recusa um import entre features que não passe pelo `index.ts`.
 
-## Etapa 3: identidade no app — pendente
+## Etapa 3: identidade no app — concluída (`351a1e1`)
 
 - `ts-rs` na API gerando os tipos em `lib/api`, e o CI conferindo se estão em dia.
 - TanStack Query com o `queryClient` e as camadas da ADR 0012.
@@ -130,7 +130,7 @@ recusa um import entre features que não passe pelo `index.ts`.
 o caminho da chave sem os valores; os testes da lista de genéricos, do formato da chave e da leitura da
 tabela SMBIOS passam.
 
-## Etapa 4: entrada — pendente
+## Etapa 4: entrada — concluída (`9412f04`)
 
 - `tauri-plugin-deep-link` (`ashtar`, e `ashtar-dev` no desenvolvimento) e `tauri-plugin-single-instance`.
 - As telas Entrando, Sem convite, Escolha do nick, Recuperação, Você já está no Ashtar, Saiu do grupo e os
