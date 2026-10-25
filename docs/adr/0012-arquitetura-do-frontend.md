@@ -14,9 +14,9 @@ cada coisa mora precisam ser cobradas pelas ferramentas, não pela memória.
 
 ## Decisão
 
-**Pastas por domínio.** `app/` (bootstrap, providers, router, `queryClient`), `routes/` (telas de rota,
+**Pastas por domínio.** `app/` (bootstrap, providers, router), `routes/` (telas de rota,
 finas), `layouts/` (`AppShell`), `features/*` (`voice`, `screen-share`, `identity`, `settings`, `updater`,
-e `chat` na v0.2.3), `components/ui` (o design system, sem regra de negócio), `lib/api`, `lib/tauri` (e
+e `chat` na v0.2.3), `components/ui` (o design system, sem regra de negócio), `lib/api`, `lib/query`, `lib/tauri` (e
 `lib/realtime` na v0.2.3) e `styles/`. Cada feature guarda os seus componentes, o `queries.ts`, o store e
 um `index.ts`, que é a única porta de entrada para o resto do app.
 
@@ -27,8 +27,8 @@ importa `@tauri-apps`. Só `lib/api` chama `fetch` e só `lib/realtime` abre `We
 
 **Estado: um lugar para cada tipo.** Dados do servidor ficam no TanStack Query, em camadas: `lib/api/*` são
 funções sem React; `features/*/queries.ts` guarda as chaves e os hooks e é o único que mexe no cache do seu
-domínio; `app/queryClient.ts` só tenta de novo em erro de rede, fim do tempo e erro 5xx, nunca em erro de
-regra. O que precisa ser quase ao vivo na v0.2.2 é consulta repetida (`refetchInterval`): quem está na sala
+domínio; `lib/query` (o `queryClient`) só tenta de novo em erro de rede, fim do tempo e erro 5xx, nunca em erro de
+regra. Ele fica em `lib/` e não em `app/` porque as features também usam a instância fora de componentes (limpar o cache ao sair do grupo, os eventos do chat), e uma feature não importa `app/`. O que precisa ser quase ao vivo na v0.2.2 é consulta repetida (`refetchInterval`): quem está na sala
 a cada 5 s, com a tela visível, e os membros para o aviso do dono a cada 30 s. O estado do app (conexão de
 voz, preferências locais como o tema) fica no zustand. A mídia fica no LiveKit, pelo `VoiceProvider`, que
 vive em `app/`, acima das rotas. Segredos nunca chegam ao frontend (ADR 0013).
