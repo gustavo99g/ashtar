@@ -12,7 +12,13 @@ import {
 } from "@/features/identity";
 import { ApiError, type InvitePreviewView, type UserView } from "@/lib/api";
 import { paths } from "@/lib/paths";
-import { accountMarker, login, redeem } from "@/lib/tauri/commands";
+import {
+	accountMarker,
+	installUpdate,
+	login,
+	pendingUpdate,
+	redeem,
+} from "@/lib/tauri/commands";
 
 // O aviso no canto: o teste confere o pedido, sem desenhar o `Toaster`.
 vi.mock("@/components/ui/toast", async (importOriginal) => ({
@@ -25,6 +31,11 @@ vi.mock("@/lib/tauri/commands", () => ({
 	redeem: vi.fn(),
 	accountMarker: vi.fn(),
 	checkForUpdate: vi.fn(() => Promise.resolve()),
+	pendingUpdate: vi.fn(),
+	installUpdate: vi.fn(),
+	isAppError: () => false,
+	onUpdateReady: vi.fn(() => Promise.resolve(() => {})),
+	onUpdateFailed: vi.fn(() => Promise.resolve(() => {})),
 }));
 
 // O link que chega com o app aberto: o teste entrega com `deliver`.
@@ -192,13 +203,22 @@ describe("quem já tem conta não vê as telas de convite", () => {
 		expect(router.state.location.pathname).toBe(paths.entry.alreadyIn);
 	});
 
-	it("com a abertura em andamento, volta para a abertura, que decide", () => {
-		// A abertura faz o login, que fica esperando: o teste só confere para onde foi.
-		vi.mocked(login).mockReturnValue(new Promise(() => {}));
+	it("com a abertura em andamento, volta para a abertura, que decide", async () => {
+		// A abertura faz o login, que fica esperando enquanto o teste confere para onde foi.
+		let finishLogin: (session: { token: string; user: UserView }) => void = () => {};
+		vi.mocked(login).mockReturnValue(
+			new Promise((resolve) => {
+				finishLogin = resolve;
+			}),
+		);
 
 		const router = renderAt(paths.entry.noInvite, { status: "entering" });
 
 		expect(router.state.location.pathname).toBe(paths.start);
+
+		// O login pendente fica guardado no `startSession` (um por abertura): se ele nunca terminasse,
+		// os testes seguintes pegariam essa promessa em vez de chamar o `login` deles.
+		await act(async () => finishLogin({ token: "tok", user: kid }));
 	});
 
 	it("sem conta, a tela fica, e a guarda não manda a pessoa embora ao entrar", async () => {
@@ -400,5 +420,130 @@ describe("entrar", () => {
 
 		await screen.findByRole("heading", { name: "Você recebeu um convite" });
 		expect(router.state.location.pathname).toBe(paths.entry.invite(NEW_CODE));
+	});
+});
+
+describe("estados e erros", () => {
+	const error = (
+		kind: ApiError["kind"],
+		status: number,
+		message = "Mensagem.",
+	) =>
+		new ApiError({
+			status,
+			kind,
+			message,
+			minVersion: kind === "client_outdated" ? "0.2.20" : null,
+		});
+
+	it.each([
+		[error("network", 0), "Sem conexão com o servidor"],
+		[error("timeout", 0), "Sem conexão com o servidor"],
+		[error("too_many_attempts", 429), "Muitas tentativas"],
+		[error("internal", 500), "Algo deu errado no servidor"],
+		[error("http", 502), "Algo deu errado no servidor"],
+		[error("client_outdated", 426), "Atualize o Ashtar para entrar"],
+		[error("device_key", 0), "Não foi possível entrar"],
+	])("a abertura com %s mostra %j", (failure, title) => {
+		renderAt(paths.start, { status: "error", error: failure });
+
+		expect(screen.getByRole("heading", { name: title })).toBeInTheDocument();
+		expect(screen.getByRole("alert")).toBeInTheDocument();
+	});
+
+	it("sem rede na abertura, Tentar de novo faz o login outra vez", async () => {
+		vi.mocked(login)
+			.mockRejectedValueOnce(error("network", 0))
+			.mockResolvedValueOnce({ token: "tok", user: kid });
+		const router = renderAt(paths.start, { status: "entering" });
+
+		await screen.findByRole("heading", { name: "Sem conexão com o servidor" });
+		fireEvent.click(screen.getByRole("button", { name: "Tentar de novo" }));
+
+		await vi.waitFor(() =>
+			expect(router.state.location.pathname).toBe(paths.server),
+		);
+		expect(login).toHaveBeenCalledTimes(2);
+	});
+
+	it("unknown_device com o marcador vai para Este computador saiu do grupo", async () => {
+		vi.mocked(login).mockRejectedValue(error("unknown_device", 401));
+		vi.mocked(accountMarker).mockResolvedValue({
+			nick: "juju",
+			display_name: null,
+		});
+		const router = renderAt(paths.start, { status: "entering" });
+
+		await screen.findByRole("heading", {
+			name: "Este computador saiu do grupo",
+		});
+		expect(router.state.location.pathname).toBe(paths.entry.leftGroup);
+	});
+
+	it.each([
+		[{ status: "noAccount" } as const, paths.entry.noInvite],
+		[{ status: "leftGroup", account: null } as const, paths.entry.leftGroup],
+	])(
+		"o convite que não vale mais aparece antes do nick (%j)",
+		async (session, pasteScreen) => {
+			// A resposta da API ao `GET /api/invites/{código}` de um convite gasto.
+			const fetchSpy = vi
+				.spyOn(globalThis, "fetch")
+				.mockResolvedValue(
+					Response.json(
+						{
+							kind: "invalid_invite",
+							message: "Convite inválido, expirado ou já usado.",
+						},
+						{ status: 400 },
+					),
+				);
+			const router = renderAt(paths.entry.invite("AAAA-BBBB-CCCC"), session);
+
+			await screen.findByRole("heading", {
+				name: "Esse convite não vale mais",
+			});
+			expect(screen.queryByLabelText("Nick")).toBeNull();
+
+			fireEvent.click(screen.getByRole("button", { name: "Colar outro link" }));
+			expect(router.state.location.pathname).toBe(pasteScreen);
+			fetchSpy.mockRestore();
+		},
+	);
+
+	it("muitas tentativas ao entrar: Tentar de novo manda o mesmo nick", async () => {
+		vi.mocked(redeem)
+			.mockRejectedValueOnce(error("too_many_attempts", 429))
+			.mockResolvedValueOnce({ token: "tok", user: lua });
+		const router = renderAt(paths.entry.invite(NEW_CODE), {
+			status: "noAccount",
+		});
+
+		fireEvent.change(screen.getByLabelText("Nick"), {
+			target: { value: "lua" },
+		});
+		fireEvent.click(screen.getByRole("button", { name: "Entrar no Ashtar" }));
+		await screen.findByRole("heading", { name: "Muitas tentativas" });
+		fireEvent.click(screen.getByRole("button", { name: "Tentar de novo" }));
+
+		await vi.waitFor(() =>
+			expect(router.state.location.pathname).toBe(paths.server),
+		);
+		expect(redeem).toHaveBeenNthCalledWith(2, NEW_CODE, "lua");
+	});
+
+	it("versão velha: Atualizar agora instala a versão baixada", async () => {
+		vi.mocked(pendingUpdate).mockResolvedValue("0.2.20");
+		vi.mocked(installUpdate).mockReturnValue(new Promise(() => {}));
+		renderAt(paths.start, {
+			status: "error",
+			error: error("client_outdated", 426),
+		});
+
+		expect(screen.getByText(/mínima 0\.2\.20/)).toBeInTheDocument();
+		fireEvent.click(screen.getByRole("button", { name: "Atualizar agora" }));
+
+		await vi.waitFor(() => expect(installUpdate).toHaveBeenCalled());
+		expect(screen.getByRole("button", { name: "Atualizando…" })).toBeDisabled();
 	});
 });

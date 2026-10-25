@@ -1,9 +1,9 @@
 import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { ErrorState, OfflineState } from "@/components/ui/states";
 import {
 	ENTERING_TITLE_ID,
 	Entering,
+	EntryProblem,
 	EntryScreen,
 	loadOpeningLink,
 	nextEntryPath,
@@ -46,23 +46,8 @@ export function StartRoute() {
 	}, [linkReady, session, navigate]);
 
 	if (session.status === "error") {
-		const retry = () => void startSession();
-		const offline =
-			session.error.kind === "network" || session.error.kind === "timeout";
 		return (
-			<EntryScreen labelledBy="abertura-erro">
-				<div id="abertura-erro">
-					{offline ? (
-						<OfflineState onRetry={retry} />
-					) : (
-						<ErrorState
-							title="Não foi possível entrar"
-							description={session.error.message}
-							onRetry={retry}
-						/>
-					)}
-				</div>
-			</EntryScreen>
+			<EntryProblem error={session.error} onRetry={() => void startSession()} />
 		);
 	}
 

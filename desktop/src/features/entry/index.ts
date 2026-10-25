@@ -1,5 +1,6 @@
 export { ENTERING_TITLE_ID, Entering } from "./components/Entering";
 export { EntryMessage } from "./components/EntryMessage";
+export { EntryProblem } from "./components/EntryProblem";
 export {
 	EntryFootnote,
 	EntryHeader,
@@ -15,7 +16,6 @@ export {
 	parseInviteLink,
 } from "./inviteLink";
 export { LinkWatcher } from "./LinkWatcher";
-export { RequireNoAccount } from "./RequireNoAccount";
 export { checkNick, sameNick } from "./nickRules";
 export {
 	loadOpeningLink,
@@ -23,4 +23,5 @@ export {
 	useOpeningLinkReady,
 	usePendingLinkStore,
 } from "./pendingLink";
+export { RequireNoAccount } from "./RequireNoAccount";
 export { formatValidUntil } from "./validUntil";

@@ -1,12 +1,12 @@
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { ErrorState } from "@/components/ui/states";
 import {
 	ENTERING_TITLE_ID,
 	Entering,
 	EntryFootnote,
 	EntryHeader,
 	EntryMessage,
+	EntryProblem,
 	EntryScreen,
 	PersonCard,
 } from "@/features/entry";
@@ -52,16 +52,13 @@ export function RecoveryRoute() {
 
 	const invite = preview.data;
 	if (invite === undefined) {
-		if (preview.isError) {
+		// No "Tentar de novo", volta para "Entrando…" enquanto lê de novo.
+		if (preview.isError && !preview.isFetching) {
 			return (
-				<EntryScreen labelledBy="recuperacao-erro">
-					<div id="recuperacao-erro">
-						<ErrorState
-							description={preview.error.message}
-							onRetry={() => void preview.refetch()}
-						/>
-					</div>
-				</EntryScreen>
+				<EntryProblem
+					error={preview.error}
+					onRetry={() => void preview.refetch()}
+				/>
 			);
 		}
 		return (
@@ -89,16 +86,7 @@ export function RecoveryRoute() {
 	}
 
 	if (redeem.isError && !isApiError(redeem.error, "device_already_linked")) {
-		return (
-			<EntryScreen labelledBy="recuperacao-erro">
-				<div id="recuperacao-erro">
-					<ErrorState
-						description={redeem.error.message}
-						onRetry={() => redeem.reset()}
-					/>
-				</div>
-			</EntryScreen>
-		);
+		return <EntryProblem error={redeem.error} onRetry={moveAccount} />;
 	}
 
 	const { nick } = invite.account;

@@ -2,13 +2,13 @@ import { ClockIcon, MonitorIcon } from "lucide-react";
 import { type FormEvent, useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { ErrorState } from "@/components/ui/states";
 import {
 	checkNick,
 	ENTERING_TITLE_ID,
 	Entering,
 	EntryFootnote,
 	EntryHeader,
+	EntryProblem,
 	EntryScreen,
 	formatValidUntil,
 	NickField,
@@ -31,16 +31,13 @@ export function InviteRoute() {
 	// tira a pessoa do meio da escolha do nick.
 	const invite = preview.data;
 	if (invite === undefined) {
-		if (preview.isError) {
+		// No "Tentar de novo", volta para "Entrando…" enquanto lê de novo.
+		if (preview.isError && !preview.isFetching) {
 			return (
-				<EntryScreen labelledBy="convite-erro">
-					<div id="convite-erro">
-						<ErrorState
-							description={preview.error.message}
-							onRetry={() => void preview.refetch()}
-						/>
-					</div>
-				</EntryScreen>
+				<EntryProblem
+					error={preview.error}
+					onRetry={() => void preview.refetch()}
+				/>
 			);
 		}
 		return (
@@ -90,9 +87,7 @@ function ChooseNick({ code, invitedBy, expiresAt }: ChooseNickProps) {
 	if (taken) rejection = NICK_TAKEN;
 	else if (isApiError(error, "invalid_nick")) rejection = error.message;
 
-	function enter(event: FormEvent) {
-		event.preventDefault();
-		const chosen = check.nick;
+	function redeemWith(chosen: string) {
 		redeem.mutate(
 			{ code, nick: chosen },
 			{
@@ -108,21 +103,20 @@ function ChooseNick({ code, invitedBy, expiresAt }: ChooseNickProps) {
 		);
 	}
 
+	function enter(event: FormEvent) {
+		event.preventDefault();
+		redeemWith(check.nick);
+	}
+
 	if (
 		error &&
 		!isApiError(error, "nick_taken") &&
 		!isApiError(error, "invalid_nick") &&
 		!isApiError(error, "device_already_linked")
 	) {
+		// O campo não muda enquanto o erro está na tela: "Tentar de novo" manda o mesmo nick.
 		return (
-			<EntryScreen labelledBy="nick-erro">
-				<div id="nick-erro">
-					<ErrorState
-						description={error.message}
-						onRetry={() => redeem.reset()}
-					/>
-				</div>
-			</EntryScreen>
+			<EntryProblem error={error} onRetry={() => redeemWith(check.nick)} />
 		);
 	}
 
