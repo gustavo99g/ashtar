@@ -1,39 +1,57 @@
-import { useEffect } from "react";
-import { Navigate } from "react-router-dom";
+import { useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { ErrorState, OfflineState } from "@/components/ui/states";
-import { startSession, useSession, useSessionStore } from "@/features/identity";
-import { paths } from "@/lib/paths";
-import { RoutePlaceholder } from "../placeholder";
+import {
+	ENTERING_TITLE_ID,
+	Entering,
+	EntryScreen,
+	loadOpeningLink,
+	nextEntryPath,
+	useOpeningLinkReady,
+} from "@/features/entry";
+import {
+	type Session,
+	startSession,
+	useSession,
+	useSessionStore,
+} from "@/features/identity";
 
 /**
- * A abertura do app ("Entrando…"): faz o login pela chave uma vez e manda para o servidor ou para
- * a entrada. A Etapa 4 desenha a tela, os erros e o caminho de quem chegou por um link.
+ * A abertura do app ("Entrando…"): faz o login pela chave e lê o link que abriu o app, uma vez
+ * cada, e manda para a tela certa (a regra está em `features/entry/destination.ts`). Com o link
+ * e uma conta, o convite não é usado: vai para "Você já está no Ashtar".
  */
 export function StartRoute() {
 	const session = useSession();
+	const linkReady = useOpeningLinkReady();
+	const navigate = useNavigate();
+	// A última sessão que já mandou para outra tela. O `StrictMode` roda o efeito duas vezes, e a
+	// segunda vez não pode decidir de novo: o link já saiu da fila na primeira.
+	const handled = useRef<Session | null>(null);
 
 	useEffect(() => {
 		// Só na abertura: voltar para cá com a sessão já resolvida não faz outro login.
 		if (useSessionStore.getState().session.status === "entering") {
 			void startSession();
 		}
+		void loadOpeningLink();
 	}, []);
 
-	switch (session.status) {
-		case "entering":
-			return <RoutePlaceholder title="Entrando…" stage={4} />;
-		case "connected":
-			return <Navigate to={paths.server} replace />;
-		case "noAccount":
-			return <Navigate to={paths.entry.noInvite} replace />;
-		case "leftGroup":
-			return <Navigate to={paths.entry.leftGroup} replace />;
-		case "error": {
-			const retry = () => void startSession();
-			const offline =
-				session.error.kind === "network" || session.error.kind === "timeout";
-			return (
-				<div className="grid h-full place-items-center p-8">
+	useEffect(() => {
+		if (!linkReady || handled.current === session) return;
+		const path = nextEntryPath(session);
+		if (path === null) return;
+		handled.current = session;
+		void navigate(path, { replace: true });
+	}, [linkReady, session, navigate]);
+
+	if (session.status === "error") {
+		const retry = () => void startSession();
+		const offline =
+			session.error.kind === "network" || session.error.kind === "timeout";
+		return (
+			<EntryScreen labelledBy="abertura-erro">
+				<div id="abertura-erro">
 					{offline ? (
 						<OfflineState onRetry={retry} />
 					) : (
@@ -44,7 +62,13 @@ export function StartRoute() {
 						/>
 					)}
 				</div>
-			);
-		}
+			</EntryScreen>
+		);
 	}
+
+	return (
+		<EntryScreen labelledBy={ENTERING_TITLE_ID}>
+			<Entering />
+		</EntryScreen>
+	);
 }

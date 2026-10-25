@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
 interface InviteTicketProps {
 	/** "Convite para uma pessoa", "Convite para o grupo"... */
 	title: string;
-	/** O endereço sem o código, em letra miúda: `ashtar.exemplo.ts.net/convite/`. */
+	/** O endereço sem o código, em letra miúda: `ashtar.exemplo.ts.net/invite/`. */
 	url: string;
 	code: string;
 	/** "Vale até domingo, 20:10". */
