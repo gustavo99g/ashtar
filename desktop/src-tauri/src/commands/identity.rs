@@ -3,15 +3,18 @@
 //! A chave é calculada aqui dentro (`crate::identity`) e vai direto para a API (`crate::api`); o
 //! JavaScript recebe só a sessão. Espelhados no `commands.ts` (`login`, `redeem`).
 //!
-//! Diferente dos outros comandos, a recusa não é um `AppError`: é o [`ApiError`], no formato do
-//! `apiFetch`, para o frontend tratar um login recusado igual a qualquer chamada à API.
+//! Diferente dos outros comandos, a recusa do `login` e do `redeem` não é um `AppError`: é o
+//! [`ApiError`], no formato do `apiFetch`, para o frontend tratar um login recusado igual a
+//! qualquer chamada à API.
 
 use serde::{Deserialize, Serialize};
-use tauri::AppHandle;
-use tracing::error;
+use tauri::{AppHandle, Manager};
+use tracing::{error, warn};
 
 use crate::api::{self, ApiError};
-use crate::identity;
+use crate::commands::run_blocking;
+use crate::error::AppError;
+use crate::identity::{self, marker, marker::AccountMarker};
 
 /// A resposta do `login` e do `redeem` (`SessionResponse` em `api/src/routes/auth.rs`).
 #[derive(Debug, Serialize, Deserialize)]
@@ -44,7 +47,9 @@ pub async fn login(app: AppHandle) -> Result<SessionResponse, ApiError> {
     let request = LoginRequest {
         device_key: &device_key,
     };
-    api::post(&app, "/api/auth/login", &request).await
+    let session: SessionResponse = api::post(&app, "/api/auth/login", &request).await?;
+    remember_account(&app, &session).await;
+    Ok(session)
 }
 
 /// Entra com um convite (`POST /api/auth/redeem`): cria a conta (convite novo, com `nick`) ou
@@ -61,7 +66,49 @@ pub async fn redeem(
         device_key: &device_key,
         nick: nick.as_deref(),
     };
-    api::post(&app, "/api/auth/redeem", &request).await
+    let session: SessionResponse = api::post(&app, "/api/auth/redeem", &request).await?;
+    remember_account(&app, &session).await;
+    Ok(session)
+}
+
+/// O marcador da conta (`identity/marker.rs`), ou `null` se nenhum login deu certo aqui.
+#[tauri::command]
+pub async fn account_marker(app: AppHandle) -> Result<Option<AccountMarker>, AppError> {
+    let data_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|error| AppError::Internal(error.to_string()))?;
+    run_blocking(move || {
+        marker::read(&data_dir)
+            .map_err(|error| AppError::Internal(format!("marcador da conta: {error}")))
+    })
+    .await
+}
+
+/// Grava o marcador com o nick e o nome da sessão. Uma falha só vai para o log: a sessão vale do
+/// mesmo jeito, e a próxima abertura tenta de novo.
+async fn remember_account(app: &AppHandle, session: &SessionResponse) {
+    let marker = match AccountMarker::deserialize(&session.user) {
+        Ok(marker) => marker,
+        Err(error) => {
+            warn!(%error, "a sessão veio sem o nick para o marcador da conta");
+            return;
+        }
+    };
+    let data_dir = match app.path().app_data_dir() {
+        Ok(dir) => dir,
+        Err(error) => {
+            warn!(%error, "sem a pasta de dados para o marcador da conta");
+            return;
+        }
+    };
+    let written = run_blocking(move || {
+        marker::write(&data_dir, &marker).map_err(|error| AppError::Internal(error.to_string()))
+    })
+    .await;
+    if let Err(error) = written {
+        warn!(%error, "não foi possível gravar o marcador da conta");
+    }
 }
 
 /// A chave, calculada fora da thread do comando (lê o firmware e o Gerenciador de Credenciais).

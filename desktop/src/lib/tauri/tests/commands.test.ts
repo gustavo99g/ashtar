@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError, isRetryable } from "@/lib/api";
-import { login, redeem } from "../commands";
+import { accountMarker, login, redeem } from "../commands";
 
 const { invoke } = vi.hoisted(() => ({ invoke: vi.fn() }));
 vi.mock("@tauri-apps/api/core", () => ({ invoke, Channel: class {} }));
@@ -76,6 +76,15 @@ describe("login e redeem", () => {
 			minVersion: "0.2.2",
 		});
 		expect(invoke).toHaveBeenCalledWith("check_for_update", undefined);
+	});
+
+	it("o marcador não passa pelo ApiError: é um comando local", async () => {
+		invoke.mockResolvedValue({ nick: "kid", display_name: null });
+		await expect(accountMarker()).resolves.toEqual({
+			nick: "kid",
+			display_name: null,
+		});
+		expect(invoke).toHaveBeenCalledWith("account_marker", undefined);
 	});
 
 	it("um erro do próprio Tauri vira kind app", async () => {

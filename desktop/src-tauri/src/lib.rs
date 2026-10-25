@@ -61,7 +61,8 @@ pub fn run(log_file: logging::LateFile) {
             commands::updater::check_for_update,
             commands::app::whats_new,
             commands::identity::login,
-            commands::identity::redeem
+            commands::identity::redeem,
+            commands::identity::account_marker
         ])
         .build(tauri::generate_context!())
         .expect("error while running tauri application");

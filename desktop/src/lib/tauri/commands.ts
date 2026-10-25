@@ -255,3 +255,17 @@ export function login() {
 export function redeem(code: string, nick: string | null) {
 	return callApi<SessionResponse>("redeem", { code, nick });
 }
+
+/** De quem era a conta deste computador. Espelha `identity/marker.rs`. */
+export interface AccountMarker {
+	nick: string;
+	display_name: string | null;
+}
+
+/**
+ * O marcador gravado depois do último `login` ou `redeem` que deu certo, ou `null` se nenhum deu
+ * certo neste computador. Separa "nunca entrou" de "saiu do grupo". Rejeita com um `AppError`.
+ */
+export function accountMarker() {
+	return call<AccountMarker | null>("account_marker");
+}

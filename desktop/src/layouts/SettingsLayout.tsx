@@ -1,6 +1,7 @@
 import { CrownIcon, XIcon } from "lucide-react";
 import { type ReactNode, useEffect } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { useMe } from "@/features/identity";
 import { paths } from "@/lib/paths";
 import { cn } from "@/lib/utils";
 
@@ -55,6 +56,8 @@ function MenuSeparator() {
 
 export function SettingsLayout() {
 	const navigate = useNavigate();
+	// Escondido até o `/api/me` responder: quem decide de verdade é a API, aqui é só o menu.
+	const showPanel = useMe().data?.can_view_panel === true;
 
 	useEffect(() => {
 		const onKeyDown = (event: KeyboardEvent) => {
@@ -90,19 +93,22 @@ export function SettingsLayout() {
 					</span>
 					<MenuItem to={paths.settings.app}>Aplicativo</MenuItem>
 				</MenuGroup>
-				{/* A Etapa 3 esconde este grupo de quem não tem `can_view_panel`. */}
-				<MenuSeparator />
-				<MenuGroup
-					label={
-						<>
-							Painel de controle
-							<CrownIcon aria-hidden="true" className="size-3 text-gold" />
-						</>
-					}
-				>
-					<MenuItem to={paths.settings.invites}>Convites</MenuItem>
-					<MenuItem to={paths.settings.members}>Membros</MenuItem>
-				</MenuGroup>
+				{showPanel && (
+					<>
+						<MenuSeparator />
+						<MenuGroup
+							label={
+								<>
+									Painel de controle
+									<CrownIcon aria-hidden="true" className="size-3 text-gold" />
+								</>
+							}
+						>
+							<MenuItem to={paths.settings.invites}>Convites</MenuItem>
+							<MenuItem to={paths.settings.members}>Membros</MenuItem>
+						</MenuGroup>
+					</>
+				)}
 				<MenuSeparator />
 				{/* A Etapa 6 acrescenta o canal (" · beta"). */}
 				<span className="px-2.5 font-mono text-[11px] text-muted-foreground">

@@ -12,8 +12,12 @@
 //! - o log diz o caminho ("hardware" ou "aleatória") e o motivo, nunca os valores;
 //! - o nome da credencial leva o identificador do app, então o app de desenvolvimento
 //!   (`com.gustavo99g.ashtar.dev`) tem a sua própria chave aleatória.
+//!
+//! O `marker.rs` guarda a outra metade da identidade, que não é segredo: de quem era a conta
+//! deste computador, para a tela "saiu do grupo".
 
 mod key;
+pub mod marker;
 mod smbios;
 #[cfg(target_os = "windows")]
 mod windows;
