@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { routes } from "@/app/router";
+import { toast } from "@/components/ui/toast";
 import { usePendingLinkStore } from "@/features/entry";
 import {
 	identityKeys,
@@ -12,6 +13,12 @@ import {
 import { ApiError, type InvitePreviewView, type UserView } from "@/lib/api";
 import { paths } from "@/lib/paths";
 import { accountMarker, login, redeem } from "@/lib/tauri/commands";
+
+// O aviso no canto: o teste confere o pedido, sem desenhar o `Toaster`.
+vi.mock("@/components/ui/toast", async (importOriginal) => ({
+	...(await importOriginal<typeof import("@/components/ui/toast")>()),
+	toast: { add: vi.fn() },
+}));
 
 vi.mock("@/lib/tauri/commands", () => ({
 	login: vi.fn(),
@@ -79,6 +86,7 @@ beforeEach(() => {
 	vi.mocked(login).mockReset();
 	vi.mocked(redeem).mockReset();
 	vi.mocked(accountMarker).mockReset();
+	vi.mocked(toast.add).mockReset();
 	usePendingLinkStore.setState({ ready: true, pending: null });
 });
 
@@ -117,16 +125,26 @@ describe("a abertura com um link", () => {
 });
 
 describe("o link com o app aberto", () => {
-	it("com conta, mostra Você já está no Ashtar", async () => {
-		const router = renderAt(paths.entry.noInvite, {
+	it("com conta, só avisa no canto e não tira a pessoa da tela", () => {
+		const router = renderAt(paths.voiceRoom, {
 			status: "connected",
 			user: kid,
 		});
 
 		act(() => deliver(`ashtar://invite/${NEW_CODE}`));
 
-		await screen.findByRole("heading", { name: "Você já está no Ashtar" });
-		expect(router.state.location.pathname).toBe(paths.entry.alreadyIn);
+		expect(router.state.location.pathname).toBe(paths.voiceRoom);
+		expect(toast.add).toHaveBeenCalledWith(
+			expect.objectContaining({ title: "Você já está no Ashtar" }),
+		);
+	});
+
+	it("com conta, um link que não é convite não avisa nada", () => {
+		renderAt(paths.server, { status: "connected", user: kid });
+
+		act(() => deliver("ashtar://outra-coisa"));
+
+		expect(toast.add).not.toHaveBeenCalled();
 	});
 
 	it("sem conta, vai para o convite; um link que não é convite é ignorado", async () => {

@@ -1,13 +1,16 @@
 /**
  * Para onde a entrada vai, pela sessão (`features/identity`) e pelo link que chegou. A abertura
- * (`routes/start`) e o `LinkWatcher` decidem pela mesma regra:
+ * (`routes/start`) e o `LinkWatcher` decidem pela mesma regra (menos o caso 1):
  *
  * | Sessão | Sem link | Com link |
  * |---|---|---|
- * | `connected` | tela do servidor | "Você já está no Ashtar" (o convite não é usado) |
+ * | `connected` | tela do servidor | "Você já está no Ashtar" (o convite não é usado) (1) |
  * | `noAccount` | "Você precisa de um convite" | o convite: nick ou recuperação |
  * | `leftGroup` | "Este computador saiu do grupo" | o convite: nick ou recuperação |
  * | `entering`, `error` | fica onde está (`null`) | fica onde está, e o link espera |
+ *
+ * (1) Só na abertura do app. Com o app já aberto, o `LinkWatcher` mostra um aviso no canto e não
+ * troca de tela: a pessoa pode estar numa chamada.
  */
 import type { Session } from "@/features/identity";
 import { paths } from "@/lib/paths";
