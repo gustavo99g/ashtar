@@ -11,6 +11,7 @@
 mod api;
 mod changelog;
 mod commands;
+mod deep_link;
 mod error;
 mod identity;
 pub mod logging;
@@ -34,6 +35,12 @@ pub fn run(log_file: logging::LateFile) {
     );
 
     let app = tauri::Builder::default()
+        // O primeiro plugin: um segundo processo do app (aberto pelo link ou pelo menu Iniciar)
+        // entrega os argumentos ao primeiro e fecha aqui, antes de os outros plugins rodarem.
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            deep_link::bring_to_front(app);
+        }))
+        .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(
             tauri_plugin_window_state::Builder::new()
@@ -48,6 +55,7 @@ pub fn run(log_file: logging::LateFile) {
             app.manage(commands::screen_share::create_manager(app.handle()));
             app.manage(commands::updater::create_auto_update(app.handle()));
             updater::spawn_periodic_check(app.handle().clone());
+            deep_link::register_schemes(app);
             Ok(())
         })
         .plugin(tauri_plugin_opener::init())
