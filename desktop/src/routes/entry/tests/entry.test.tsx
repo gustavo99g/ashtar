@@ -235,6 +235,45 @@ describe("quem já tem conta não vê as telas de convite", () => {
 	});
 });
 
+describe("o nome da pessoa se destaca do texto", () => {
+	function highlighted(name: string) {
+		return screen
+			.getAllByText(name)
+			.some((element) => element.dataset.slot === "person-name");
+	}
+
+	it("na escolha do nick, quem convidou", async () => {
+		renderAt(paths.entry.invite(NEW_CODE), { status: "noAccount" });
+
+		await screen.findByRole("heading", { name: "Você recebeu um convite" });
+		expect(highlighted("kid")).toBe(true);
+	});
+
+	it("na recuperação, de quem é a conta", async () => {
+		renderAt(paths.entry.recovery(RECOVERY_CODE), { status: "noAccount" });
+
+		await screen.findByRole("heading", { name: "Trocar de computador" });
+		expect(highlighted("juju")).toBe(true);
+	});
+
+	it("em Saiu do grupo, de quem era a conta", async () => {
+		renderAt(paths.entry.leftGroup, {
+			status: "leftGroup",
+			account: { nick: "juju", display_name: null },
+		});
+
+		await screen.findByRole("heading", { name: "Este computador saiu do grupo" });
+		expect(highlighted("juju")).toBe(true);
+	});
+
+	it("em Você já está no Ashtar, de quem é a conta deste computador", async () => {
+		renderAt(paths.entry.alreadyIn, { status: "connected", user: kid });
+
+		await screen.findByRole("heading", { name: "Você já está no Ashtar" });
+		expect(highlighted("kid")).toBe(true);
+	});
+});
+
 describe("o campo de colar", () => {
 	it("recusa o que não é convite", () => {
 		const router = renderAt(paths.entry.noInvite, { status: "noAccount" });

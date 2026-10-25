@@ -15,7 +15,11 @@ import {
 	PersonCard,
 	sameNick,
 } from "@/features/entry";
-import { useInvitePreview, useRedeemInvite } from "@/features/identity";
+import {
+	PersonName,
+	useInvitePreview,
+	useRedeemInvite,
+} from "@/features/identity";
 import { isApiError, type NameView } from "@/lib/api";
 import { paths } from "@/lib/paths";
 
@@ -136,7 +140,7 @@ function ChooseNick({ code, invitedBy, expiresAt }: ChooseNickProps) {
 					</>
 				}
 			>
-				<span className="font-semibold text-gold">{invitedBy.nick}</span> te
+				<PersonName>{invitedBy.nick}</PersonName> te
 				convidou para o Ashtar
 			</PersonCard>
 			<form noValidate onSubmit={enter} className="flex flex-col gap-6">

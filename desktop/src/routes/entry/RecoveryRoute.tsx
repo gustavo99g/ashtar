@@ -10,7 +10,12 @@ import {
 	EntryScreen,
 	PersonCard,
 } from "@/features/entry";
-import { Avatar, useInvitePreview, useRedeemInvite } from "@/features/identity";
+import {
+	Avatar,
+	PersonName,
+	useInvitePreview,
+	useRedeemInvite,
+} from "@/features/identity";
 import { isApiError } from "@/lib/api";
 import { paths } from "@/lib/paths";
 
@@ -34,7 +39,12 @@ export function RecoveryRoute() {
 				<EntryMessage
 					titleId="recuperacao-pronta"
 					media={<Avatar nick={nick} size={72} />}
-					title={`Boas-vindas de volta, ${nick}`}
+					title={
+						<>
+							Boas-vindas de volta,{" "}
+							<PersonName className="font-bold">{nick}</PersonName>
+						</>
+					}
 					description="Sua conta agora está neste computador."
 					action={
 						<Button
@@ -98,7 +108,7 @@ export function RecoveryRoute() {
 				description="Este link de recuperação passa a sua conta para este computador. O computador antigo sai dela."
 			/>
 			<PersonCard nick={nick} detail="Nick e permissões continuam os mesmos">
-				Conta de <span className="font-semibold text-foreground">{nick}</span>
+				Conta de <PersonName>{nick}</PersonName>
 			</PersonCard>
 			<Button
 				size="lg"

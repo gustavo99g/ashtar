@@ -1,7 +1,7 @@
 import { Navigate, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { EntryMessage, EntryScreen } from "@/features/entry";
-import { Avatar, useSession } from "@/features/identity";
+import { Avatar, PersonName, useSession } from "@/features/identity";
 import { paths } from "@/lib/paths";
 
 /**
@@ -25,7 +25,12 @@ export function AlreadyInRoute() {
 				titleId="ja-entrou-titulo"
 				media={<Avatar nick={nick} size={44} />}
 				title="Você já está no Ashtar"
-				description={`Este computador já é da conta de ${nick}. O convite continua valendo para outra pessoa.`}
+				description={
+					<>
+						Este computador já é da conta de <PersonName>{nick}</PersonName>. O
+						convite continua valendo para outra pessoa.
+					</>
+				}
 				action={
 					<Button
 						size="lg"

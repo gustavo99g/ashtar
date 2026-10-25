@@ -7,7 +7,7 @@ import {
 	PasteInvite,
 	PersonCard,
 } from "@/features/entry";
-import { useSession } from "@/features/identity";
+import { PersonName, useSession } from "@/features/identity";
 
 /**
  * "Este computador saiu do grupo": o login respondeu `unknown_device` e o marcador diz que este
@@ -41,7 +41,7 @@ export function LeftGroupRoute() {
 					detail="Neste computador, até agora"
 				>
 					Era a conta de{" "}
-					<span className="font-semibold text-foreground">{account.nick}</span>
+					<PersonName>{account.nick}</PersonName>
 				</PersonCard>
 			)}
 			<OrPasteDivider />

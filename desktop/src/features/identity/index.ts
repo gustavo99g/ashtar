@@ -1,4 +1,5 @@
 export { Avatar, AvatarBadge } from "./components/Avatar";
+export { PersonName } from "./components/PersonName";
 export { avatarInitial, NICK_COLORS, nickColor } from "./nickColor";
 export {
 	identityKeys,
