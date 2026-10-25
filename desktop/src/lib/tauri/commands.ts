@@ -9,7 +9,9 @@
  */
 import { Channel, type InvokeArgs, invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-
+import type { SessionResponse } from "@/lib/api";
+// Direto do arquivo, e não do `@/lib/api`: o `client.ts` de lá importa este arquivo (o 426).
+import { errorFromCommand } from "@/lib/api/errors";
 // ---------------------------------------------------------------------------
 // Erro
 // ---------------------------------------------------------------------------
@@ -214,4 +216,42 @@ export interface WhatsNew {
 /** A seção do CHANGELOG.md da versão em execução, ou `null`. */
 export function whatsNew() {
 	return call<WhatsNew | null>("whats_new");
+}
+// ---------------------------------------------------------------------------
+// Identidade (Etapa 3 da v0.2.2)
+// Espelha `commands/identity.rs`. A chave do computador fica no Rust: daqui só sai a sessão.
+// ---------------------------------------------------------------------------
+
+/**
+ * Chama um comando que fala com a API. A recusa não é um `AppError`: é o mesmo `ApiError` do
+ * `apiFetch` (`@/lib/api`), com o `status` e o `kind` da API ou `network`, `timeout`,
+ * `device_key`...
+ */
+async function callApi<T>(command: string, args?: InvokeArgs): Promise<T> {
+	try {
+		return await invoke<T>(command, args);
+	} catch (rejection) {
+		const error = errorFromCommand(rejection);
+		if (error.kind === "client_outdated") {
+			// Como no `apiFetch`: a versão nova provavelmente já está publicada.
+			void checkForUpdate().catch(() => {});
+		}
+		throw error;
+	}
+}
+
+/**
+ * Entra com a chave deste computador (`POST /api/auth/login`). Rejeita com `unknown_device`
+ * quando o computador não tem conta. Quem guarda o token é a `features/identity`.
+ */
+export function login() {
+	return callApi<SessionResponse>("login");
+}
+
+/**
+ * Entra com um convite (`POST /api/auth/redeem`). O `nick` é obrigatório no convite novo e
+ * ignorado no de recuperação.
+ */
+export function redeem(code: string, nick: string | null) {
+	return callApi<SessionResponse>("redeem", { code, nick });
 }
