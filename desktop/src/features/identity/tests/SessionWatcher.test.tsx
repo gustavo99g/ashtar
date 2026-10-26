@@ -13,10 +13,6 @@ vi.mock("@/lib/tauri/commands", () => ({
 	checkForUpdate: vi.fn(() => Promise.resolve()),
 }));
 
-// Só o `leave` da voz importa aqui.
-const leave = vi.fn();
-vi.mock("@/features/voice", () => ({ useVoice: () => ({ leave }) }));
-
 const user: UserView = {
 	id: "u1",
 	nick: "kid",
@@ -49,7 +45,6 @@ beforeEach(async () => {
 afterEach(() => {
 	clearSession();
 	fetchMock.mockReset();
-	leave.mockReset();
 	vi.mocked(login).mockReset();
 	vi.unstubAllGlobals();
 });
@@ -72,7 +67,7 @@ describe("SessionWatcher", () => {
 		).toBe("Bearer novo");
 	});
 
-	it("saiu do grupo: derruba a voz, limpa o cache e navega", async () => {
+	it("saiu do grupo: limpa o cache e navega", async () => {
 		const onLeftGroup = vi.fn();
 		const queryClient = renderWatcher(onLeftGroup);
 		vi.mocked(login).mockRejectedValueOnce(
@@ -86,7 +81,6 @@ describe("SessionWatcher", () => {
 			kind: "unknown_device",
 		});
 
-		expect(leave).toHaveBeenCalledTimes(1);
 		expect(onLeftGroup).toHaveBeenCalledTimes(1);
 		expect(queryClient.getQueryData(identityKeys.me())).toBeUndefined();
 		expect(useSessionStore.getState().session).toEqual({

@@ -2,8 +2,9 @@
  * Raiz do app: os provedores que valem para todas as telas e, dentro deles, o router.
  *
  * O `VoiceProvider` fica acima do router para a chamada sobreviver à troca de rota. O cache da
- * API (`QueryClientProvider`) fica acima de tudo. O `SessionWatcher` precisa dos dois: quando
- * este computador sai do grupo, ele derruba a chamada, limpa o cache e chama `goToLeftGroup`.
+ * API (`QueryClientProvider`) fica acima de tudo. Quando este computador sai do grupo, o
+ * `SessionWatcher` limpa o cache e chama `goToLeftGroup`, e o `VoiceProvider`, que acompanha a
+ * sessão, derruba a chamada.
  */
 import "@/styles/App.css";
 import { QueryClientProvider } from "@tanstack/react-query";

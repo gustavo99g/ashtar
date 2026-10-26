@@ -1,3 +1,4 @@
+export { SALA } from "./channel";
 export { useVoice } from "./useVoice";
 export {
 	type VoiceConnectionState,
