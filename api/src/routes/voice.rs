@@ -103,7 +103,7 @@ pub struct ParticipantView {
     pub screen_sharing: bool,
 }
 
-/// `GET /api/voice/participants?channel_id=jogatina`: quem está na sala agora,
+/// `GET /api/voice/participants?channel_id=sala`: quem está na sala agora,
 /// sem precisar entrar. Sala vazia, ou que o LiveKit ainda não criou, responde
 /// `[]`. O app pergunta a cada 5 segundos enquanto a tela do servidor está aberta.
 pub async fn participants(

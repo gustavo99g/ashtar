@@ -44,3 +44,26 @@ export function watchWindowMaximized(
 		void unlisten.then((stop) => stop());
 	};
 }
+/**
+ * Avisa se a janela está minimizada agora e a cada mudança de tamanho. O WebView2 não diz isso à
+ * página: o wry não esconde o webview ao minimizar, então o `document.visibilityState` pode
+ * continuar "visible". Devolve a função que para de escutar.
+ */
+export function watchWindowMinimized(onChange: (minimized: boolean) => void): () => void {
+	if (!isTauri()) return () => {};
+
+	const window = getCurrentWindow();
+	let stopped = false;
+	const check = () => {
+		void window.isMinimized().then((minimized) => {
+			if (!stopped) onChange(minimized);
+		});
+	};
+
+	check();
+	const unlisten = window.onResized(check);
+	return () => {
+		stopped = true;
+		void unlisten.then((stop) => stop());
+	};
+}

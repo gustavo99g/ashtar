@@ -10,6 +10,7 @@ import {
 	type Session,
 	useSessionStore,
 } from "@/features/identity";
+import { VoiceProvider } from "@/features/voice";
 import { ApiError, type InvitePreviewView, type UserView } from "@/lib/api";
 import { paths } from "@/lib/paths";
 import {
@@ -87,7 +88,9 @@ function renderAt(path: string, session: Session) {
 	const router = createMemoryRouter(routes, { initialEntries: [path] });
 	render(
 		<QueryClientProvider client={queryClient}>
-			<RouterProvider router={router} />
+			<VoiceProvider>
+				<RouterProvider router={router} />
+			</VoiceProvider>
 		</QueryClientProvider>,
 	);
 	return router;

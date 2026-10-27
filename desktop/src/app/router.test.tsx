@@ -3,11 +3,12 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import {
 	createMemoryRouter,
 	matchRoutes,
-	RouterProvider,
 	type RouteObject,
+	RouterProvider,
 } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { identityKeys, useSessionStore } from "@/features/identity";
+import { VoiceProvider } from "@/features/voice";
 import { ApiError, type MeResponse, type UserView } from "@/lib/api";
 import { paths } from "@/lib/paths";
 import { accountMarker, login } from "@/lib/tauri/commands";
@@ -48,7 +49,9 @@ function renderAt(entries: string[], options: { me?: MeResponse } = {}) {
 	});
 	render(
 		<QueryClientProvider client={queryClient}>
-			<RouterProvider router={router} />
+			<VoiceProvider>
+				<RouterProvider router={router} />
+			</VoiceProvider>
 		</QueryClientProvider>,
 	);
 	return router;

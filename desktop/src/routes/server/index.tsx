@@ -1,6 +1,6 @@
-import { RoutePlaceholder } from "../placeholder";
+import { ServerView } from "@/features/voice";
 
-/** A tela do servidor, com quem está na sala. Chega na Etapa 5. */
+/** A tela do servidor, com quem está na sala. */
 export function ServerRoute() {
-	return <RoutePlaceholder title="Tela do servidor" stage={5} />;
+	return <ServerView />;
 }
