@@ -8,7 +8,7 @@ import { paths } from "@/lib/paths";
 import { SALA } from "../channel";
 import { type ChannelMember, memberFromApi, peopleNowLabel } from "../members";
 import { useVoiceParticipants } from "../queries";
-import type { VoiceRoomState } from "../roomState";
+import { watchShare } from "../roomView";
 import { useVoice } from "../useVoice";
 import { LiveBadge } from "./LiveBadge";
 import { Starfield } from "./Starfield";
@@ -31,8 +31,8 @@ export function ServerView() {
 	/** Entra na sala; com `watch`, a sala já abre assistindo a transmissão dessa pessoa. */
 	function enter(watch?: string) {
 		join(SALA.id);
-		const state: VoiceRoomState = { watch };
-		void navigate(paths.voiceRoom, { state });
+		if (watch) watchShare(watch);
+		void navigate(paths.voiceRoom);
 	}
 
 	const members = query.data?.map(memberFromApi);

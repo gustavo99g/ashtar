@@ -9,17 +9,43 @@ import { Avatar, useSession } from "@/features/identity";
 import { paths } from "@/lib/paths";
 import { cn } from "@/lib/utils";
 import { SALA } from "../channel";
-import type { ChannelMember } from "../members";
-import { useChannelMembers } from "../useChannelMembers";
+import { type ChannelMember, memberFromApi } from "../members";
+import { useVoiceParticipants } from "../queries";
+import { useLiveMembers } from "../useLiveMembers";
+import { useVoice } from "../useVoice";
 import { LiveBadge } from "./LiveBadge";
 import { PersonCard } from "./PersonCard";
 
 /*
  * A coluna do servidor: a sala e quem está nela. Sem canais de texto na 0.2.2. A sala leva à
- * tela do servidor, ou à chamada quando a pessoa já está nela.
+ * tela do servidor, ou à chamada quando a pessoa já está nela. Fora da chamada a lista vem da API
+ * (de 5 em 5 segundos); dentro, do LiveKit, com quem fala, sem microfone e sem áudio.
  */
 export function ChannelNav() {
-	const { members, inCall } = useChannelMembers();
+	const { room, voiceChannelId } = useVoice();
+	const inCall = voiceChannelId === SALA.id;
+	return room && inCall ? <LiveChannel /> : <ApiChannel inCall={inCall} />;
+}
+
+function LiveChannel() {
+	return <ChannelEntries members={useLiveMembers()} inCall />;
+}
+
+function ApiChannel({ inCall }: { inCall: boolean }) {
+	// Entrando na chamada, para de perguntar e fica com a última lista até o LiveKit responder.
+	const { data } = useVoiceParticipants(SALA.id, { enabled: !inCall });
+	return (
+		<ChannelEntries members={data?.map(memberFromApi) ?? []} inCall={inCall} />
+	);
+}
+
+function ChannelEntries({
+	members,
+	inCall,
+}: {
+	members: ChannelMember[];
+	inCall: boolean;
+}) {
 	const session = useSession();
 	const myId = session.status === "connected" ? session.user.id : null;
 

@@ -10,6 +10,9 @@
  * Não sabe nada de captura: cria o `ScreenShareController` da sala e o expõe no contexto.
  * Os componentes leem participantes e trilhas pelos hooks do LiveKit (`useParticipants`,
  * `useTracks`...), que funcionam porque a árvore está dentro do `RoomContext`.
+ *
+ * Entra sem assinar nada sozinho (`autoSubscribe: false`): a voz de todo mundo é assinada aqui, e a
+ * tela transmitida só enquanto aparece no Foco (`subscriptions.ts`).
  */
 import { RoomAudioRenderer, RoomContext } from "@livekit/components-react";
 import { ConnectionState, Room, RoomEvent } from "livekit-client";
@@ -27,6 +30,14 @@ import {
 	type ScreenShareController,
 } from "@/features/screen-share";
 import { createVoiceToken } from "@/lib/api";
+import { useRoomView } from "./roomView";
+import { syncSubscription, syncSubscriptions } from "./subscriptions";
+import {
+	encodeVoiceState,
+	parseVoiceState,
+	VOICE_STATE_TOPIC,
+	withDeafened,
+} from "./voiceState";
 
 export type VoiceConnectionState =
 	| "disconnected"
@@ -54,6 +65,8 @@ export interface VoiceContextValue {
 	/** Mute e deafen valem também fora da chamada: a próxima entrada já começa assim. */
 	isMuted: boolean;
 	isDeafened: boolean;
+	/** Quem mais na sala desligou o áudio, pelos avisos dos outros apps (`voiceState.ts`). */
+	deafenedIds: ReadonlySet<string>;
 	mute: () => Promise<void>;
 	unmute: () => Promise<void>;
 	deafen: () => Promise<void>;
@@ -67,6 +80,7 @@ export interface VoiceContextValue {
 }
 
 export const VoiceContext = createContext<VoiceContextValue | null>(null);
+const NOBODY: ReadonlySet<string> = new Set();
 
 /** A sala em que a pessoa quer estar; `attempt` muda a cada "tentar de novo" na mesma sala. */
 interface VoiceTarget {
@@ -106,6 +120,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 	const [error, setError] = useState<VoiceError | null>(null);
 	const [isMuted, setIsMuted] = useState(false);
 	const [isDeafened, setIsDeafened] = useState(false);
+	const [deafenedIds, setDeafenedIds] = useState(NOBODY);
 
 	/** Se o microfone já estava mutado quando o deafen começou. */
 	const mutedBeforeDeafen = useRef(false);
@@ -134,6 +149,45 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 			setConnectionState(toVoiceState(state));
 		});
 
+		nextRoom.on(
+			RoomEvent.DataReceived,
+			(payload, participant, _kind, topic) => {
+				if (topic !== VOICE_STATE_TOPIC || !participant) return;
+				const state = parseVoiceState(payload);
+				if (state) {
+					setDeafenedIds((current) =>
+						withDeafened(current, participant.identity, state.deafened),
+					);
+				}
+			},
+		);
+		nextRoom.on(RoomEvent.ParticipantDisconnected, (participant) => {
+			setDeafenedIds((current) =>
+				withDeafened(current, participant.identity, false),
+			);
+		});
+		// Quem entra depois não recebeu o aviso: repete só para essa pessoa.
+		nextRoom.on(RoomEvent.ParticipantConnected, (participant) => {
+			if (!audioFlags.current.isDeafened) return;
+			void nextRoom.localParticipant
+				.publishData(encodeVoiceState({ deafened: true }), {
+					reliable: true,
+					topic: VOICE_STATE_TOPIC,
+					destinationIdentities: [participant.identity],
+				})
+				.catch((sendError: unknown) =>
+					console.warn("Erro ao avisar o deafen:", sendError),
+				);
+		});
+		// Trilha nova de alguém: a voz é assinada; a tela, só se essa pessoa está no palco do Foco.
+		nextRoom.on(RoomEvent.TrackPublished, (publication, participant) => {
+			syncSubscription(
+				publication,
+				participant,
+				useRoomView.getState().onStage,
+			);
+		});
+
 		// Só dispara quando a sala cai sozinha: no cleanup as escutas saem antes do disconnect.
 		nextRoom.on(RoomEvent.Disconnected, () => {
 			void controller.dispose();
@@ -149,7 +203,8 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 				const { url, token } = await createVoiceToken(channelId);
 				if (cancelled) return;
 
-				await nextRoom.connect(url, token);
+				// Nada é assinado sozinho: quem decide é o efeito do `onStage`, mais abaixo.
+				await nextRoom.connect(url, token, { autoSubscribe: false });
 				if (cancelled) return;
 
 				// O microfone não é obrigatório para entrar: sem permissão ou sem dispositivo, a pessoa
@@ -205,8 +260,28 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 			setScreenShare(null);
 			setConnectionState("disconnected");
 			setError(null);
+			setDeafenedIds(NOBODY);
 		};
 	}, [target]);
+
+	// Avisa os outros apps a cada troca do deafen (e ao entrar, para começar do estado certo).
+	useEffect(() => {
+		if (!room) return;
+		void room.localParticipant
+			.publishData(encodeVoiceState({ deafened: isDeafened }), {
+				reliable: true,
+				topic: VOICE_STATE_TOPIC,
+			})
+			.catch((sendError: unknown) =>
+				console.warn("Erro ao avisar o deafen:", sendError),
+			);
+	}, [room, isDeafened]);
+
+	// Ao entrar, e a cada troca do palco do Foco: assina a voz de todos e a tela de quem está nele.
+	const onStage = useRoomView((state) => state.onStage);
+	useEffect(() => {
+		if (room) syncSubscriptions(room, onStage);
+	}, [room, onStage]);
 
 	const value = useMemo<VoiceContextValue>(() => {
 		async function setMicrophone(enabled: boolean) {
@@ -240,6 +315,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 			screenShare,
 			isMuted,
 			isDeafened,
+			deafenedIds,
 			mute: () => setMicrophone(false),
 			unmute: async () => {
 				// O deafen muta o microfone sozinho, então a pessoa vê "mutado" e clica para desmutar:
@@ -286,6 +362,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 		screenShare,
 		isMuted,
 		isDeafened,
+		deafenedIds,
 	]);
 
 	return (

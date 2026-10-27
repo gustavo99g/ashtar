@@ -140,14 +140,14 @@ describe("a abertura com um link", () => {
 
 describe("o link com o app aberto", () => {
 	it("com conta, só avisa no canto e não tira a pessoa da tela", () => {
-		const router = renderAt(paths.voiceRoom, {
+		const router = renderAt(paths.settings.profile, {
 			status: "connected",
 			user: kid,
 		});
 
 		act(() => deliver(`ashtar://invite/${NEW_CODE}`));
 
-		expect(router.state.location.pathname).toBe(paths.voiceRoom);
+		expect(router.state.location.pathname).toBe(paths.settings.profile);
 		expect(toast.add).toHaveBeenCalledWith(
 			expect.objectContaining({ title: "Você já está no Ashtar" }),
 		);

@@ -1,6 +1,6 @@
-import { RoutePlaceholder } from "../placeholder";
+import { VoiceRoom } from "@/features/voice";
 
-/** Dentro da sala de voz: grade e foco. Chega na Etapa 5. */
+/** Dentro da sala de voz: Grade e Foco. */
 export function VoiceRoomRoute() {
-	return <RoutePlaceholder title="Sala de voz" stage={5} />;
+	return <VoiceRoom />;
 }
