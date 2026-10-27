@@ -6,13 +6,10 @@ import {
 	PhoneOffIcon,
 	ScreenShareIcon,
 } from "lucide-react";
-import type { ComponentProps, ReactNode } from "react";
-import {
-	type ScreenShareController,
-	useShareButton,
-} from "@/features/screen-share";
-import { cn } from "@/lib/utils";
+import type { ScreenShareController } from "@/features/screen-share";
 import { useVoice } from "../useVoice";
+import { BarButton } from "./buttons";
+import { ShareButton } from "./ShareButton";
 
 /*
  * A barra de baixo da sala: Microfone, Áudio (o deafen), Tela e Sair. Sem o controller (ainda
@@ -48,7 +45,7 @@ export function CallControls({
 				{isDeafened ? <HeadphoneOffIcon /> : <HeadphonesIcon />}
 			</BarButton>
 			{controller ? (
-				<ShareBarButton controller={controller} />
+				<ShareButton controller={controller} variant="bar" />
 			) : (
 				<BarButton label="Tela" disabled>
 					<ScreenShareIcon />
@@ -64,70 +61,5 @@ export function CallControls({
 				<PhoneOffIcon className="size-[22px]!" />
 			</BarButton>
 		</div>
-	);
-}
-
-function ShareBarButton({ controller }: { controller: ScreenShareController }) {
-	const { active, disabled, onClick } = useShareButton(controller);
-	return (
-		<BarButton
-			label="Tela"
-			aria-label={active ? "Parar de transmitir a tela" : "Transmitir a tela"}
-			aria-pressed={active}
-			tone={active ? "on" : "default"}
-			disabled={disabled}
-			onClick={onClick}
-		>
-			<ScreenShareIcon />
-		</BarButton>
-	);
-}
-
-interface BarButtonProps extends Omit<ComponentProps<"button">, "children"> {
-	label: string;
-	tone?: "default" | "off" | "on" | "exit";
-	children: ReactNode;
-}
-
-const circleTones = {
-	default: "bg-secondary text-foreground group-hover:bg-secondary-hover",
-	off: "bg-destructive-subtle text-destructive-border",
-	on: "bg-primary text-primary-foreground group-hover:bg-primary-hover",
-	exit: "bg-destructive text-destructive-foreground group-hover:bg-destructive-hover",
-};
-
-export function BarButton({
-	label,
-	tone = "default",
-	className,
-	children,
-	...props
-}: BarButtonProps) {
-	return (
-		<button
-			type="button"
-			className={cn(
-				"group flex w-[76px] flex-col items-center gap-1 aria-disabled:cursor-not-allowed disabled:cursor-not-allowed disabled:opacity-50",
-				className,
-			)}
-			{...props}
-		>
-			<span
-				className={cn(
-					"flex size-10 items-center justify-center rounded-full transition-colors [&_svg]:size-5",
-					circleTones[tone],
-				)}
-			>
-				{children}
-			</span>
-			<span
-				className={cn(
-					"text-xs",
-					tone === "exit" ? "text-destructive-text" : "text-muted-foreground",
-				)}
-			>
-				{label}
-			</span>
-		</button>
 	);
 }

@@ -1,11 +1,14 @@
-import { useTracks } from "@livekit/components-react";
-import { Track } from "livekit-client";
 import { type ReactNode, useEffect, useRef } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/components/ui/states";
 import { useMe, useSession } from "@/features/identity";
-import { useScreenShareState } from "@/features/screen-share";
+import {
+	parseShareTrackName,
+	shareSpec,
+	useScreenShareState,
+	useScreenShares,
+} from "@/features/screen-share";
 import { paths } from "@/lib/paths";
 import { SALA } from "../channel";
 import { stopWatching, useRoomView, watchShare } from "../roomView";
@@ -119,15 +122,15 @@ function ConnectedRoom({ onExit }: { onExit: () => void }) {
 	const members = useLiveMembers();
 	const shareState = useScreenShareState(screenShare);
 	// Todas as publicações de tela, assinadas ou não.
-	const shares = useTracks([Track.Source.ScreenShare], {
-		onlySubscribed: false,
-	});
-	const remoteShares = shares.filter((share) => !share.participant.isLocal);
+	// Uma transmissão por vez: de fora, só a que vale pela regra (as outras param sozinhas).
+	const { winner } = useScreenShares();
+	const remoteShare =
+		winner && !winner.participant.isLocal ? winner : undefined;
+	const remoteInfo = parseShareTrackName(remoteShare?.publication.trackName);
 
 	const watching = useRoomView((state) => state.watching);
-	const watched = remoteShares.find(
-		(share) => share.participant.identity === watching,
-	);
+	const watched =
+		remoteShare?.participant.identity === watching ? remoteShare : undefined;
 
 	// A transmissão assistida acabou: volta para a Grade. Só depois de ela ter aparecido, porque
 	// no primeiro desenho a lista de trilhas ainda vem vazia.
@@ -142,7 +145,10 @@ function ConnectedRoom({ onExit }: { onExit: () => void }) {
 
 	const memberOf = (identity: string) =>
 		members.find((member) => member.id === identity);
-	const sharer = watched ? memberOf(watched.participant.identity) : undefined;
+	const remoteSharer = remoteShare
+		? memberOf(remoteShare.participant.identity)
+		: undefined;
+	const sharer = watched ? remoteSharer : undefined;
 	const focus = Boolean(watched && sharer);
 	// O Foco inteiro (a transmissão e a faixa de quem está na chamada): é ele que vai para a tela cheia.
 	const focusView = useRef<HTMLDivElement>(null);
@@ -160,11 +166,10 @@ function ConnectedRoom({ onExit }: { onExit: () => void }) {
 					actions={
 						<LayoutToggle
 							focus={focus}
-							focusAvailable={remoteShares.length > 0}
+							focusAvailable={remoteShare !== undefined}
 							onGrid={stopWatching}
 							onFocus={() => {
-								const first = remoteShares[0];
-								if (first) watchShare(first.participant.identity);
+								if (remoteShare) watchShare(remoteShare.participant.identity);
 							}}
 						/>
 					}
@@ -180,6 +185,7 @@ function ConnectedRoom({ onExit }: { onExit: () => void }) {
 					<ScreenStage
 						share={watched}
 						sharer={sharer}
+						spec={remoteInfo ? shareSpec(remoteInfo) : undefined}
 						fullscreenTarget={focusView}
 						onStop={stopWatching}
 					/>
@@ -214,25 +220,20 @@ function ConnectedRoom({ onExit }: { onExit: () => void }) {
 							}
 						/>
 					)}
-					{remoteShares.map((share) => {
-						const member = memberOf(share.participant.identity);
-						return (
-							member && (
-								<ShareTile
-									key={share.publication.trackSid}
-									title={`${member.name} está transmitindo`}
-									action={
-										<Button
-											className="h-[34px]"
-											onClick={() => watchShare(member.id)}
-										>
-											Assistir transmissão
-										</Button>
-									}
-								/>
-							)
-						);
-					})}
+					{remoteShare && remoteSharer && (
+						<ShareTile
+							title={`${remoteSharer.name} está transmitindo`}
+							source={remoteInfo?.title}
+							action={
+								<Button
+									className="h-[34px]"
+									onClick={() => watchShare(remoteSharer.id)}
+								>
+									Assistir transmissão
+								</Button>
+							}
+						/>
+					)}
 					{members.map((member) => (
 						<ParticipantTile
 							key={member.id}

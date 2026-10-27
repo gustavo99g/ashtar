@@ -8,13 +8,8 @@ import {
 	VideoIcon,
 	WifiIcon,
 } from "lucide-react";
-import type { ComponentProps } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ConnectingState } from "@/components/ui/states";
-import {
-	type ScreenShareController,
-	useShareButton,
-} from "@/features/screen-share";
 import { paths } from "@/lib/paths";
 import { cn } from "@/lib/utils";
 import { SALA } from "../channel";
@@ -22,6 +17,8 @@ import { pingQuality } from "../ping";
 import { stopWatching } from "../roomView";
 import { usePing } from "../usePing";
 import { useVoice } from "../useVoice";
+import { DockButton } from "./buttons";
+import { ShareButton } from "./ShareButton";
 
 /*
  * O painel "Voz conectada" no pé da coluna, enquanto há chamada: Conectando ou Conectada (com o
@@ -69,13 +66,13 @@ export function VoiceConnection() {
 				<DockButton
 					aria-disabled="true"
 					title="A câmera chega depois"
-					className="text-foreground-subtle"
+					className="cursor-not-allowed hover:bg-secondary-hover"
 				>
 					<VideoIcon />
 					Câmera
 				</DockButton>
 				{room && screenShare ? (
-					<DockShareButton controller={screenShare} />
+					<ShareButton controller={screenShare} variant="dock" />
 				) : (
 					<DockButton disabled>
 						<ScreenShareIcon />
@@ -151,42 +148,5 @@ function Failed() {
 				</span>
 			</div>
 		</div>
-	);
-}
-
-function DockShareButton({
-	controller,
-}: {
-	controller: ScreenShareController;
-}) {
-	const { active, disabled, onClick } = useShareButton(controller);
-	return (
-		<DockButton
-			aria-pressed={active}
-			disabled={disabled}
-			onClick={onClick}
-			className={
-				active
-					? "bg-primary text-primary-foreground hover:bg-primary-hover"
-					: undefined
-			}
-		>
-			<ScreenShareIcon />
-			Tela
-		</DockButton>
-	);
-}
-
-function DockButton({ className, ...props }: ComponentProps<"button">) {
-	return (
-		<button
-			type="button"
-			className={cn(
-				"flex h-8 items-center justify-center gap-1.5 rounded-lg bg-secondary-hover text-xs font-semibold text-secondary-foreground hover:bg-accent [&_svg]:size-4 [&_svg]:stroke-[1.75]",
-				"aria-disabled:cursor-not-allowed aria-disabled:hover:bg-secondary-hover disabled:cursor-not-allowed disabled:opacity-50",
-				className,
-			)}
-			{...props}
-		/>
 	);
 }

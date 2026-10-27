@@ -27,6 +27,7 @@ import type {
 	ShareRequest,
 } from "../controller";
 import { QUALITY_PRESETS } from "../presets";
+import { shareTrackName } from "../shareInfo";
 import { ScreenShareAudio } from "./ScreenShareAudio";
 
 /**
@@ -168,7 +169,13 @@ export class IpcScreenShare implements ScreenShareController {
 
 			await this.room.localParticipant.publishTrack(session.generator, {
 				source: Track.Source.ScreenShare,
-				name: "screen-share",
+				// Quando começou, a qualidade e o título: a regra de uma transmissão por vez e quem
+				// assiste leem daqui (`shareInfo.ts`).
+				name: shareTrackName({
+					startedAt: Date.now(),
+					quality: request.quality,
+					title: request.source.title,
+				}),
 				stream: "screen-share",
 				screenShareEncoding: {
 					maxBitrate: preset.maxBitrate,
