@@ -39,7 +39,7 @@ export const QUALITY_PRESETS = {
 		label: "Equilibrado",
 		spec: "900p · 60",
 		description:
-			"Mais nitidez sem perder fluidez. Exige mais do computador e da conexão.",
+			"Mais nitidez que o Movimento. Exige mais do computador e da conexão.",
 		maxBitrate: 8_000_000,
 		videoCodec: "vp8",
 		maxFramerate: 60,

@@ -11,11 +11,11 @@ export function SourcePickerHost({
 	channelName: string;
 }) {
 	const open = usePickerStore((state) => state.open);
-	if (!open) return null;
 	return (
 		<SourcePicker
 			controller={controller}
 			channelName={channelName}
+			open={open}
 			onClose={closeSourcePicker}
 		/>
 	);
