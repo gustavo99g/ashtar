@@ -44,6 +44,9 @@ windows-sys = { version = "0.61.2", features = [
 ] }
 sha2 = "0.11.1"
 getrandom = "0.4.3"
+# O WebView2 do Tauri: o mesmo `webview2-com` e `windows` que o `wry` já usa (conferir no Cargo.lock).
+webview2-com = "0.39"
+windows = "0.62"
 tauri-plugin-updater = "2.13"
 tokio = { version = "1", features = ["time"] }
 tauri-plugin-window-state = "2.5.0"

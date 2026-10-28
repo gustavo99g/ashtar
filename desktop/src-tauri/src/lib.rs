@@ -16,6 +16,7 @@ mod error;
 mod identity;
 pub mod logging;
 mod media;
+mod permissions;
 mod updater;
 mod window;
 
@@ -56,6 +57,7 @@ pub fn run(log_file: logging::LateFile) {
             app.manage(commands::updater::create_auto_update(app.handle()));
             updater::spawn_periodic_check(app.handle().clone());
             deep_link::register_schemes(app);
+            permissions::allow_microphone(app);
             Ok(())
         })
         .plugin(tauri_plugin_opener::init())
