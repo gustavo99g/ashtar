@@ -1,335 +1,308 @@
-# Discord-like
+# Ashtar
 
-Aplicação privada de comunicação para uma única comunidade, inspirada no Discord.
+Ashtar é uma aplicação privada de comunicação para uma única comunidade, inspirada no Discord.
 
-O objetivo é criar uma solução simples para uso pessoal com amigos, priorizando:
+> Status atual: **v0.2.1 — Identidade na API** (concluída; a UI nova da v0.2.2 passa a usá-la)
 
-- conversa por texto;
-- conversa por voz;
-- compartilhamento de tela;
-- compartilhamento de áudio do sistema quando disponibilizado pelo navegador.
+## Funcionalidades
 
-> O nome do projeto é provisório.
+* ✓ chat de texto (mockado)
+* ✓ voz via LiveKit
+* ✓ compartilhamento de tela (janela ou tela inteira)
+* ⚙️ áudio do compartilhamento: só do aplicativo escolhido ou de todo o sistema, quando o Windows suportar
 
-## Status
+## Plataformas
 
-Projeto em fase de planejamento. A primeira implementação será a `v0.1`, focada em validar voz e compartilhamento de tela em duas máquinas Windows usando Chrome e Edge.
+| Plataforma | Situação |
+|---|---|
+| **Windows 10 e 11** | Suportado. É a única plataforma do app hoje. |
+| **Linux (x86_64)** | A avaliar depois. A estrutura do código já prevê uma segunda plataforma, mas há riscos a verificar antes: o suporte a WebRTC no webview do Linux e a captura de tela pelo portal do sistema. |
+| **macOS** | Fora do escopo. |
 
-## Objetivo inicial
+A captura de áudio de um aplicativo específico usa um recurso recente do Windows. Em versões mais
+antigas, o compartilhamento de tela funciona, mas sem essa opção de áudio.
 
-Colocar uma versão funcional nas mãos de 5 a 10 amigos, sem tentar reproduzir todos os recursos do Discord.
+## Requisitos para desenvolver
 
-O produto final será:
+* **Windows 10 ou 11**
+* **Rust**, na versão fixada em `rust-toolchain.toml` (o `rustup` instala automaticamente)
+* **Visual Studio Build Tools** com o workload de C++ e o **WebView2** (já vem no Windows 11); veja os
+  [pré-requisitos do Tauri](https://v2.tauri.app/start/prerequisites/)
+* **Node.js 20** ou mais recente e **pnpm**
+* **Servidor LiveKit**: local para desenvolver, ou um projeto no LiveKit Cloud (veja
+  [Infraestrutura](#infraestrutura))
 
-- uma única comunidade;
-- acessível apenas por convite;
-- executado inicialmente como aplicação web;
-- compatível inicialmente com Windows;
-- testado inicialmente no Chrome e no Edge;
-- projetado para aproximadamente 5–10 usuários.
+Não é preciso instalar o Tauri CLI globalmente: o `pnpm tauri` usa o pacote do próprio projeto.
 
-A `v0.1` será um protótipo técnico local. Ela utilizará tokens temporários de desenvolvimento e não terá autenticação ou sistema real de convites.
+## Estrutura do repositório
 
-## Arquitetura planejada
-
-```text
-Cliente React/Vite
-        │
-        ├── HTTPS ─────── Rust/Axum
-        │                  ├── autenticação
-        │                  ├── convites
-        │                  ├── mensagens
-        │                  └── tokens LiveKit
-        │
-        └── LiveKit SDK ── LiveKit Server
-                              ├── voz
-                              ├── microfone
-                              └── compartilhamento de tela
-```
-
-O cliente usa o SDK do LiveKit, que abstrai a comunicação de mídia baseada em WebRTC. O projeto não implementará um servidor WebRTC ou SFU próprio.
-
-### Responsabilidades
-
-#### Rust/Axum
-
-O backend será a autoridade da aplicação e ficará responsável por:
-
-- usuários;
-- autenticação e sessões;
-- convites;
-- permissões;
-- canais;
-- mensagens;
-- emissão de tokens do LiveKit;
-- configuração e regras de acesso.
-
-#### React/Vite
-
-O frontend será responsável por:
-
-- interface da aplicação;
-- login e navegação;
-- exibição do chat;
-- controles de microfone;
-- conexão com salas de mídia;
-- compartilhamento de tela;
-- exibição dos participantes.
-
-#### LiveKit Server
-
-O LiveKit Server será responsável pela camada de mídia:
-
-- transporte de áudio e vídeo;
-- salas de voz;
-- distribuição de microfone;
-- distribuição de tela compartilhada;
-- conexão entre participantes;
-- reconexão de mídia.
-
-A chave secreta do LiveKit nunca será exposta ao frontend. O cliente receberá apenas tokens gerados pelo backend Rust.
-
-## Stack e ferramentas
-
-- Backend: Rust com Axum.
-- Frontend: TypeScript com React e Vite.
-- Mídia: LiveKit SDK e LiveKit Server.
-- Banco planejado: SQLite.
-- Documentação: Markdown.
-- Cliente desktop futuro: Tauri.
-
-As versões mínimas do Rust, Node.js, npm e demais ferramentas serão registradas em arquivos de configuração do projeto, como `rust-toolchain.toml`, `.nvmrc` ou `package.json`. Os arquivos de lock também deverão ser mantidos no controle de versão.
-
-## Escopo da `v0.1`
-
-A `v0.1` será um vertical slice técnico para validar a parte mais arriscada do projeto.
-
-### Incluído
-
-- React + Vite;
-- Rust + Axum;
-- endpoint `/health`;
-- endpoint temporário para gerar token LiveKit;
-- uma sala fixa chamada `geral`;
-- conexão de múltiplos participantes;
-- microfone;
-- ativação e desativação do microfone;
-- áudio dos participantes;
-- compartilhamento de tela;
-- áudio do sistema quando Chrome ou Edge disponibilizar essa faixa;
-- indicador de participantes;
-- limite de uma transmissão de tela simultânea;
-- chat apenas mockado.
-
-### Fora do escopo
-
-- login real;
-- convites reais;
-- SQLite;
-- histórico de mensagens;
-- WebSocket próprio;
-- múltiplos canais;
-- permissões completas;
-- câmera;
-- aplicativo Tauri;
-- aplicativo mobile;
-- deploy em produção.
-
-## Configuração da `v0.1`
-
-A primeira versão utilizará uma configuração mínima por variáveis de ambiente:
+Monorepo com dois projetos:
 
 ```text
-SERVER_HOST=127.0.0.1
-SERVER_PORT=3000
-
-LIVEKIT_URL=ws://127.0.0.1:7880
-LIVEKIT_API_KEY=dev_key
-LIVEKIT_API_SECRET=dev_secret
-
-WEB_ORIGIN=http://localhost:5173
-DEV_MODE=true
+ashtar/
+├── desktop/          # app: Tauri + React + TypeScript, com núcleo em Rust
+├── api/              # backend: Rust + Axum
+├── docs/
+│   ├── adr/          # registros de decisões de arquitetura
+│   └── roadmap.md
+├── ARCHITECTURE.md   # mapa do código e regras entre módulos
+├── .env.example
+├── .gitignore
+├── rust-toolchain.toml
+└── README.md
 ```
 
-O endpoint temporário de token somente poderá ser usado em modo de desenvolvimento. O `LIVEKIT_API_SECRET` ficará exclusivamente no backend Rust.
+## Rodando localmente
 
-O frontend receberá somente dados como:
+### 1. Configuração
 
-```json
-{
-  "token": "...",
-  "url": "ws://127.0.0.1:7880"
-}
+Copie o `.env.example` para `.env` e preencha as variáveis do LiveKit (URL do servidor, chave e
+segredo). Para o servidor local em modo de desenvolvimento, a chave é `devkey` e o segredo é `secret`.
+
+`VITE_API_URL` é a URL da API que o app desktop chama (sem barra final). Em desenvolvimento, sem ela, o
+app usa `http://127.0.0.1:3000`; num app gerado com `tauri build`, ela é obrigatória. O valor é gravado no
+build: mudou, reinicie o `tauri dev` ou gere o app de novo.
+
+`PUBLIC_URL` é o endereço público da API (sem barra final). Ela monta com ele o link dos convites
+(`/invite/CÓDIGO`). Em desenvolvimento, `http://127.0.0.1:3000`; no computador de casa, a URL do Funnel.
+
+### 2. LiveKit
+
+Baixe o `livekit-server` na [página de releases](https://github.com/livekit/livekit/releases) e rode
+em modo de desenvolvimento:
+
+```bash
+livekit-server --dev
 ```
 
-Em desenvolvimento local, `ws://` pode ser utilizado quando o cliente e o LiveKit estiverem acessíveis localmente. Em produção, a URL deverá usar `wss://`, por exemplo:
+### 3. API
 
-```json
-{
-  "token": "...",
-  "url": "wss://livekit.seudominio.com"
-}
+A API guarda membros, convites e permissões num banco SQLite. Defina no `.env` o arquivo do banco (veja o
+`.env.example`; o caminho é relativo à pasta `api/`) e suba o servidor:
+
+```bash
+# .env
+DATABASE_URL=sqlite://ashtar.db
+
+cd api
+cargo run
 ```
 
-O desenvolvimento da `v0.1` será local. Testes entre dois computadores poderão exigir HTTPS local e `wss://`, pois o compartilhamento de tela depende de um contexto seguro.
+O arquivo é criado e as migrações (`api/migrations/`) são aplicadas na primeira vez.
 
-## Endpoints iniciais
+**Administração (`admin`).** Uma ferramenta de linha de comando, no mesmo computador e com o mesmo `.env`,
+que funciona com a API ligada. É temporária: a UI da v0.2.2 passa a fazer isso. `--help` lista os comandos.
+
+```bash
+cargo run --bin admin -- dono <nick>                    # cria o dono, uma vez só
+cargo run --bin admin -- convite                        # novo, 7 dias, 1 uso
+cargo run --bin admin -- convite --validade 5m --usos 8 # para mandar no grupo
+cargo run --bin admin -- recuperacao <nick>             # troca o computador de um membro
+cargo run --bin admin -- convites                       # histórico: quem criou e quem usou
+cargo run --bin admin -- revogar <id>
+cargo run --bin admin -- membros
+cargo run --bin admin -- remover <nick>
+cargo run --bin admin -- desvincular <nick>
+cargo run --bin admin -- beta <nick> ligar|desligar
+cargo run --bin admin -- permissoes <nick>
+```
+
+O código de um convite aparece uma vez só, na criação: copie na hora.
+
+**Backup.** `admin backup <pasta>` grava uma cópia consistente do banco (`VACUUM INTO`, seguro com a API no ar)
+com a data no nome e apaga as mais antigas (`--manter`, 14 por padrão). Um agendamento diário do Windows
+chama esse comando e envia a cópia para fora do computador (Cloudflare R2). Não copie o `.db` à mão: em modo
+WAL, parte dos dados pode estar no arquivo `-wal`.
+
+**Restaurar.** Pare a API, aponte o `DATABASE_URL` para a cópia (ou coloque a cópia no lugar do `.db`),
+confira com `admin membros` e `admin convites`, e suba a API de novo.
+
+### 4. Desktop
+
+```bash
+cd desktop
+pnpm install
+pnpm app:dev
+```
+
+Para ver as métricas de desempenho da captura no terminal, rode com `RUST_LOG=info,perf=debug`.
+Números de desempenho só valem em build de release.
+
+## Arquitetura
+
+O app se divide em duas partes que conversam pelo IPC do Tauri:
+
+* **React (webview):** interface, conexão com a sala do LiveKit, microfone, reprodução das vozes e
+  exibição das transmissões dos outros participantes.
+* **Rust:** captura de janelas, telas e do áudio de aplicativos, e tudo que depende do sistema
+  operacional.
 
 ```text
-GET  /health
-POST /api/livekit/token
+Desktop
+   ├── React ── HTTP ──────────→ API
+   │     │                        └── token LiveKit
+   │     └── LiveKit SDK ──────→ LiveKit Server
+   │           ↑
+   └── Rust (captura de tela e áudio) ── IPC ──┘
 ```
 
-Na `v0.2`, o endpoint de token passará a exigir uma sessão autenticada e uma autorização válida.
+A API cuida de usuários, autenticação, sessões, convites, canais, mensagens, permissões e da geração
+dos tokens do LiveKit. Não será implementado um servidor de mídia próprio: o LiveKit cuida dessa
+camada.
 
-## Critérios de aceite da `v0.1`
+Os detalhes estão em [`ARCHITECTURE.md`](ARCHITECTURE.md), e os motivos das principais decisões em
+[`docs/adr/`](docs/adr/).
 
-A versão será considerada validada quando:
+## Prioridade
 
-- o backend iniciar com configuração externa;
-- `/health` retornar sucesso;
-- o frontend solicitar um token ao backend Rust;
-- Chrome e Edge conseguirem entrar na mesma sala;
-- dois participantes conseguirem conversar por voz;
-- o microfone puder ser ativado e desativado;
-- uma tela puder ser compartilhada;
-- o vídeo da tela compartilhada for recebido;
-- o áudio for recebido quando a fonte escolhida disponibilizar áudio;
-- somente uma transmissão de tela simultânea for permitida;
-- um terceiro participante conseguir entrar;
-- sair e entrar novamente funcionar;
-- uma interrupção curta de rede permitir reconexão.
-
-O áudio do sistema é um requisito condicionado à fonte escolhida no diálogo de compartilhamento do Chrome ou Edge. Algumas janelas ou fontes podem não disponibilizar uma faixa de áudio.
-
-## Testes da `v0.1`
-
-A validação será dividida em testes explícitos:
+O uso principal do aplicativo é o compartilhamento de tela, e a mídia é a parte tecnicamente mais
+incerta, por isso vem primeiro:
 
 ```text
-M01 — Dois participantes
-M02 — Microfone
-M03 — Screen share
-M04 — Screen share + áudio
-M05 — Terceiro participante
-M06 — Reentrada
-M07 — Reconexão após interrupção
+Voz + Screen Share
+  ↓
+Comunidade (identidade + chat)
+  ↓
+Recursos secundários
 ```
 
-### Definição dos testes
-
-- **M01 — Dois participantes:** dois computadores Windows diferentes, um usando Chrome e outro Edge, entram na mesma sala e aparecem na lista.
-- **M02 — Microfone:** um participante fala, o outro ouve e o mute interrompe o áudio.
-- **M03 — Screen share:** o vídeo da tela é recebido pelo segundo participante.
-- **M04 — Screen share + áudio:** o áudio é recebido quando a fonte escolhida disponibiliza uma faixa.
-- **M05 — Terceiro participante:** o terceiro participante recebe voz e tela compartilhada.
-- **M06 — Reentrada:** o participante sai e consegue entrar novamente.
-- **M07 — Reconexão:** após uma interrupção curta da conexão de mídia, o cliente recupera a conexão com o LiveKit.
-
-O teste M04 deve registrar a fonte utilizada, como tela inteira, janela ou aba do navegador, para diferenciar limitações do navegador de problemas da aplicação.
+A primeira versão deve ser simples e voltada para aproximadamente 5–10 usuários.
 
 ## Roadmap
 
 ```text
-Fase 0  Especificação e planejamento
-   ↓
-v0.1    Vertical slice de mídia
-        Voz + tela + áudio
-   ↓
-v0.2    Identidade e acesso privado
-        Usuários + login + sessões + convites
-   ↓
-v0.3    Chat persistente
-        SQLite + mensagens + WebSocket
-   ↓
-v0.4    Produto integrado
-        Canais + voz + chat + interface
-   ↓
-v0.5    Deploy privado
-        VPS inicialmente + HTTPS + backups
-        Servidor doméstico como alternativa futura
-   ↓
-v0.6    Estabilidade
-        Reconexão + recuperação + testes
-   ↓
-v1.0    Primeira versão estável
+v0.1  → Teste com o grupo
+        Voz + screen share reorganizado, liberado como teste
+        (Tailscale Funnel + LiveKit Cloud)
+
+v0.2  → Comunidade
+        Entregue em partes: auto-update → convites sem senha → UI nova → chat real e supressão
+        de ruído → servidor na VPS → publicador nativo
+
+v0.3  → Conversas privadas
+        Mensagens e ligações privadas + não lidas + bandeja
+
+v0.4  → Transmissões múltiplas
+        Várias transmissões simultâneas + experiência de quem assiste
+
+v0.5  → Canais e presença
+        Múltiplos canais e salas + status + menções + sons da voz
+
+v0.6  → Confiabilidade e configurações
+        Reconexão + estados + tela de configurações + atalhos globais
+
+v0.7  → Perfil e chat avançado
+        Nick e foto + anexos + editar, responder, reagir + busca
+
+v0.8  → Atividade, moderação e refinamentos
+        "Jogando X" + administração + refinos do screen share
+
+v0.9  → Release Candidate
+        Testes + estabilidade
+
+v1.0  → Primeira versão estável
+        O grupo usa o app como ferramenta principal
 ```
 
-### Depois da `v1.0`
+O detalhamento do roadmap fica em [`docs/roadmap.md`](docs/roadmap.md).
 
-- cliente desktop com Tauri;
-- notificações desktop;
-- câmera;
-- reações;
-- mensagens fixadas;
-- busca;
-- anexos;
-- emojis personalizados;
-- múltiplas transmissões simultâneas.
+## Infraestrutura
 
-## Decisões atuais
-
-- O LiveKit será usado desde a `v0.1`.
-- A aplicação web virá antes do cliente Tauri.
-- Rust será usado no backend com Axum.
-- SQLite será usado quando o chat persistente for implementado.
-- A primeira versão terá uma única comunidade.
-- A primeira versão será focada em Windows, Chrome e Edge.
-- O limite inicial será de 5 a 10 usuários.
-- O desenvolvimento da `v0.1` será local; produção será planejada posteriormente.
-- A VPS será o destino inicial de produção; servidor doméstico será uma alternativa futura.
-- Não será implementado um servidor WebRTC ou SFU próprio.
-- A tela compartilhada terá inicialmente limite de uma transmissão simultânea.
-
-## Estrutura planejada
+O desenvolvimento é local. Para os testes com usuários reais, a infraestrutura será montada em
+etapas, sem custo fixo até que o uso justifique:
 
 ```text
-discord-like/
-├── server/
-│   ├── Cargo.toml
-│   └── src/
-│       ├── main.rs
-│       ├── config.rs
-│       ├── state.rs
-│       ├── error.rs
-│       └── routes.rs
-│
-├── web/
-│   ├── package.json
-│   ├── vite.config.ts
-│   ├── tsconfig.json
-│   └── src/
-│
-├── infra/
-├── docs/
-│   ├── roadmap.md
-│   ├── v0.1.md
-│   ├── architecture.md
-│   ├── testing.md
-│   └── decisions/
-├── .env.example
-├── .gitignore
-├── rust-toolchain.toml
-├── .nvmrc
-└── README.md
+Desenvolvimento local
+        ↓
+Teste com o grupo (v0.1)
+  • API pelo Tailscale Funnel
+  • mídia pelo LiveKit Cloud (plano gratuito)
+        ↓
+VPS com LiveKit, API e banco (v0.2)
 ```
 
-## Documentação planejada
+**API pelo Tailscale Funnel.** O Funnel é gratuito no plano pessoal e dá uma URL fixa
+(`https://<máquina>.<rede>.ts.net`) sem exigir domínio próprio: só o computador que roda a API instala o
+Tailscale (`tailscale funnel --bg 3000`). Na primeira vez, o nome público levou um tempo para ser publicado
+no DNS; enquanto isso, o túnel rápido da Cloudflare (`cloudflared tunnel --url http://127.0.0.1:3000`)
+serviu de alternativa, com a ressalva de que a URL muda a cada reinício. Os dois só transportam HTTP e
+WebSocket, por isso servem para a API, mas não para a mídia, que trafega por UDP. Com um domínio próprio
+(necessário de qualquer forma na v0.2.4), o túnel nomeado da Cloudflare também dá uma URL fixa.
 
-A documentação detalhada será organizada em `docs/` e deverá incluir:
+**Mídia pelo LiveKit Cloud.** O plano gratuito (Build) inclui, por mês, 5.000 minutos de participante,
+50 GB de dados transferidos e até 100 participantes simultâneos. Os limites são um teto rígido: se
+forem atingidos, novas conexões falham até o início do mês seguinte. Acompanhe o consumo no painel do
+LiveKit Cloud.
 
-- especificação da `v0.1`;
-- arquitetura;
-- integração com o LiveKit;
-- plano de testes;
-- decisões arquiteturais;
-- modelo de dados;
-- API HTTP;
-- eventos em tempo real;
-- autenticação e autorização;
-- deploy;
-- backups e restauração;
-- solução de problemas.
+Estimativa para um grupo de 5 pessoas, com o bitrate máximo de cada preset do app (`maxBitrate` em
+`desktop/src/features/screen-share/presets.ts`; ainda não medido em uso real, e o consumo fica abaixo do
+teto quando a imagem muda pouco):
+
+| Preset | Bitrate máximo | Tráfego com 4 pessoas assistindo | Horas no plano gratuito |
+|---|---|---|---|
+| 720p60 | 3,5 Mbps | ~6,3 GB/h | ~8 h |
+| 900p60 | 8 Mbps | ~14,4 GB/h | ~3,5 h |
+| 1080p30 | 8 Mbps | ~14,4 GB/h | ~3,5 h |
+
+Os minutos duram mais que o tráfego: 5 pessoas por 3 horas gastam 900 minutos, cerca de 5 noites por mês,
+mas o tráfego dos presets de 8 Mbps acaba em cerca de 3,5 horas. Com o publicador nativo (v0.2.5, depois da VPS), quem
+transmite abre uma segunda conexão e conta como dois participantes no Cloud, mas isso já não pesa na cota. Ou seja, o plano gratuito comporta uma
+ou duas noites nos presets pesados e algumas no 720p60, não um mês de uso.
+
+O plano pago seguinte inclui 150.000 minutos e 250 GB, com excedente de US$ 0,12/GB. Com uso intenso
+(4 noites por semana, 3 horas, um preset de 8 Mbps no teto, 4 pessoas assistindo), seriam uns 750 GB por
+mês, cerca de US$ 60 de excedente além da mensalidade. O limite que aperta é sempre o tráfego, nunca os
+minutos.
+
+Durante o teste da v0.1, o preset mais leve (720p60) estica a cota, e o consumo de uma noite real (GB e
+minutos) deve ser anotado: é o número que confirma o dimensionamento da VPS.
+
+**Conexão de quem transmite.** Os presets Equilibrado e Nitidez usam até 8 Mbps de vídeo; com o áudio e a
+sobrecarga, conte ~9 Mbps de upload para quem transmite fora da rede local, e um download parecido para
+cada pessoa que assiste. O Movimento usa até 3,5 Mbps.
+
+**VPS.** Na v0.2.4, o servidor do LiveKit (que é gratuito e de código aberto), a API e o banco passam a
+rodar numa VPS própria. O LiveKit próprio é pré-requisito das transmissões múltiplas da v0.4, e a API e
+o banco deixam de depender de um computador pessoal ligado. Se os limites do plano gratuito apertarem
+antes, a migração é antecipada. Para o código do LiveKit, a troca é só de configuração: a URL, a chave
+e o segredo no `.env`.
+
+A VPS é escolhida pelo **tráfego de saída incluso** e pela **latência** até o grupo, não só pela CPU.
+O LiveKit não recodifica vídeo, só repassa os pacotes, então para 5–10 pessoas ele usa pouca CPU e o que
+pesa é a rede. Um servidor nos EUA ou na Europa sai barato, mas soma de 120 a 200 ms para quem está no
+Brasil.
+
+Candidata: **Hostinger VPS no Brasil** (preços de outubro de 2026, promoção com contrato de 24 meses):
+
+| Plano | Recursos | Tráfego | Promoção | Renovação |
+|---|---|---|---|---|
+| KVM 1 | 1 vCPU, 4 GB RAM, 50 GB NVMe | 4 TB | R$ 29,99/mês | R$ 59,99/mês |
+| **KVM 2** | 2 vCPU, 8 GB RAM, 100 GB NVMe | 8 TB | R$ 43,99/mês | R$ 77,99/mês |
+
+A preferida é a **KVM 2**: na mesma máquina rodam LiveKit, API, banco e TURN, e com um único núcleo um
+pico de qualquer um deles afeta a voz de todos. A KVM 2 também deixa folga para as transmissões
+múltiplas da v0.4. A KVM 1 é viável para começar se for possível fazer upgrade sem migrar a máquina.
+Em tráfego, os dois planos sobram: o uso intenso estimado fica em 0,5–1,5 TB por mês.
+
+A confirmar antes de assinar:
+
+* **portas UDP liberadas**: o LiveKit precisa de uma faixa UDP (por padrão 50000–60000), de 7881/TCP e
+  de 443 para o TURN. O Cloudflare Tunnel não transporta mídia, então o LiveKit fica exposto direto,
+  com domínio próprio e certificado;
+* o que acontece ao passar do tráfego do plano: cobrança extra, redução de velocidade ou bloqueio;
+* se o tráfego do plano conta só a saída ou entrada e saída;
+* upgrade de plano sem migrar a máquina;
+* o consumo medido no teste da v0.1 confirma a estimativa.
+
+O backup semanal da Hostinger não substitui o backup fora da VPS, que começa na v0.2.1 junto com o banco: se a conta ou a
+máquina tiver problema, os dois se perdem juntos.
+
+## Status
+
+Em desenvolvimento, na **v0.2**, entregue em partes (veja o [`docs/roadmap.md`](docs/roadmap.md)). A v0.2.0
+(auto-update, canal beta e pipeline de release) e a v0.2.1 (identidade, convites e permissões na API) estão
+prontas; a próxima é a v0.2.2, a UI nova, que passa a usar as rotas de identidade. A estrutura do código está
+em [`ARCHITECTURE.md`](ARCHITECTURE.md).
 
 ## Licença
 

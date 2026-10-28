@@ -1,0 +1,234 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "@fontsource-variable/inter";
+@import "@fontsource-variable/jetbrains-mono";
+
+@import "./primitives.css";
+@import "./themes/ashtar-dark.css";
+
+/*
+ * O `dark:` do Tailwind nunca liga: quem decide as cores é o tema (`data-theme` no <html>).
+ * Sem esta linha, ele seguiria o modo escuro do Windows e brigaria com o tema.
+ */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * O contrato de tokens: cada `var(--x)` daqui tem que existir em todo tema.
+ * O `--color-*: initial` desliga a paleta padrão do Tailwind (`bg-blue-500`, `text-white`...),
+ * então só existem as cores abaixo.
+ */
+@theme inline {
+	--color-*: initial;
+
+	/* Superfícies */
+	--color-background: var(--background);
+	--color-foreground: var(--foreground);
+	--color-card: var(--card);
+	--color-card-foreground: var(--card-foreground);
+	--color-popover: var(--popover);
+	--color-popover-foreground: var(--popover-foreground);
+	--color-rail: var(--rail);
+	--color-field: var(--field);
+	--color-overlay: var(--overlay);
+
+	/* Textos */
+	--color-muted: var(--muted);
+	--color-muted-foreground: var(--muted-foreground);
+	--color-foreground-subtle: var(--foreground-subtle);
+	--color-foreground-faint: var(--foreground-faint);
+	--color-link: var(--link);
+	--color-link-hover: var(--link-hover);
+
+	/* Ações */
+	--color-primary: var(--primary);
+	--color-primary-hover: var(--primary-hover);
+	--color-primary-foreground: var(--primary-foreground);
+	--color-secondary: var(--secondary);
+	--color-secondary-hover: var(--secondary-hover);
+	--color-secondary-foreground: var(--secondary-foreground);
+	--color-accent: var(--accent);
+	--color-accent-foreground: var(--accent-foreground);
+	--color-selected: var(--selected);
+	--color-selected-foreground: var(--selected-foreground);
+	--color-destructive: var(--destructive);
+	--color-destructive-hover: var(--destructive-hover);
+	--color-destructive-foreground: var(--destructive-foreground);
+	--color-destructive-subtle: var(--destructive-subtle);
+	--color-destructive-text: var(--destructive-text);
+	--color-destructive-border: var(--destructive-border);
+	--color-warning: var(--warning);
+	--color-warning-hover: var(--warning-hover);
+	--color-warning-foreground: var(--warning-foreground);
+	--color-warning-subtle: var(--warning-subtle);
+	--color-warning-text: var(--warning-text);
+
+	/* Bordas e foco */
+	--color-border: var(--border);
+	--color-border-strong: var(--border-strong);
+	--color-input: var(--input);
+	--color-ring: var(--ring);
+	--color-focus: var(--focus);
+
+	/* Tons das pílulas e dos ícones */
+	--color-success: var(--success);
+	--color-success-subtle: var(--success-subtle);
+	--color-success-text: var(--success-text);
+	--color-info-subtle: var(--info-subtle);
+	--color-info-text: var(--info-text);
+	--color-neutral-subtle: var(--neutral-subtle);
+	--color-violet-subtle: var(--violet-subtle);
+	--color-violet-text: var(--violet-text);
+
+	/* Dourado */
+	--color-gold: var(--gold);
+	--color-gold-foreground: var(--gold-foreground);
+	--color-gold-text: var(--gold-text);
+	--color-gold-muted: var(--gold-muted);
+	--color-gold-subtle: var(--gold-subtle);
+	--color-gold-wash: var(--gold-wash);
+	--color-gold-border: var(--gold-border);
+
+	/* Presença e chamada */
+	--color-status-online: var(--status-online);
+	--color-status-connecting: var(--status-connecting);
+	--color-status-offline: var(--status-offline);
+	--color-speaking: var(--speaking);
+	--color-live: var(--live);
+	--color-live-foreground: var(--live-foreground);
+	--color-mention: var(--mention);
+	--color-mention-foreground: var(--mention-foreground);
+
+	/* Sidebar do shadcn */
+	--color-sidebar: var(--sidebar);
+	--color-sidebar-foreground: var(--sidebar-foreground);
+	--color-sidebar-primary: var(--sidebar-primary);
+	--color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+	--color-sidebar-accent: var(--sidebar-accent);
+	--color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+	--color-sidebar-border: var(--sidebar-border);
+	--color-sidebar-ring: var(--sidebar-ring);
+
+		/* Raio: o tema escolhe o --radius e a escala sai dele (com 8px: 4, 6, 8, 10, 12 e 14). */
+	--radius-sm: calc(var(--radius) - 4px);
+	--radius-md: calc(var(--radius) - 2px);
+	--radius-lg: var(--radius);
+	--radius-xl: calc(var(--radius) + 2px);
+	--radius-2xl: calc(var(--radius) + 4px);
+	--radius-3xl: calc(var(--radius) + 6px);
+}
+
+/* O que não muda com o tema: fontes e sombras. */
+@theme {
+	--font-sans: "Inter Variable", system-ui, sans-serif;
+	--font-mono: "JetBrains Mono Variable", ui-monospace, monospace;
+
+	--shadow-popover: 0 12px 32px rgb(0 0 0 / 0.5);
+	--shadow-toast: 0 12px 32px rgb(0 0 0 / 0.45);
+	--shadow-dialog: 0 24px 64px rgb(0 0 0 / 0.6);
+	--shadow-drawer: -18px 0 48px rgb(0 0 0 / 0.45);
+	--shadow-ticket:
+		0 0 0 1px color-mix(in srgb, var(--color-gold) 8%, transparent),
+		0 18px 44px color-mix(in srgb, var(--color-gold) 10%, transparent);
+
+	/* Altura da barra de título: diálogos e gavetas começam abaixo dela (`top-titlebar`). */
+	--spacing-titlebar: 2rem;
+
+	/* A barra de tempo do aviso. A duração vem do componente. */
+	--animate-toast-timer: toast-timer linear forwards;
+	/* O brilho que atravessa o bilhete do convite uma vez, quando ele aparece. */
+	--animate-ticket-shine: ticket-shine 1.4s 0.2s ease-out both;
+
+	@keyframes ticket-shine {
+		from {
+			transform: translateX(0) skewX(-18deg);
+			opacity: 1;
+		}
+		to {
+			transform: translateX(1300px) skewX(-18deg);
+			opacity: 0;
+		}
+	}
+
+	@keyframes toast-timer {
+		from {
+			transform: scaleX(1);
+		}
+		to {
+			transform: scaleX(0);
+		}
+	}
+}
+
+@layer base {
+	*,
+	*::before,
+	*::after {
+		border-color: var(--color-border);
+	}
+
+	html,
+	body,
+	#root {
+		width: 100%;
+		height: 100%;
+	}
+
+	body {
+		margin: 0;
+		background: var(--color-background);
+		color: var(--color-foreground);
+		font-family: var(--font-sans);
+		font-synthesis: none;
+		text-rendering: optimizeLegibility;
+		-webkit-font-smoothing: antialiased;
+	}
+
+	button,
+	[role="button"] {
+		cursor: pointer;
+	}
+
+	button:disabled,
+	[aria-disabled="true"] {
+		cursor: default;
+	}
+
+	/* O foco do teclado é dourado em tudo, como no canvas. */
+	:focus-visible {
+		outline: 2px solid var(--color-focus);
+		outline-offset: 2px;
+	}
+
+	::-webkit-scrollbar {
+		width: 8px;
+		height: 8px;
+	}
+
+	::-webkit-scrollbar-track {
+		background: transparent;
+	}
+
+	::-webkit-scrollbar-thumb {
+		background: var(--color-border-strong);
+		border-radius: 4px;
+	}
+
+	::-webkit-scrollbar-thumb:hover {
+		background: var(--color-foreground-faint);
+	}
+
+	/*
+	 * "Reduzir movimento" do Windows: animações e transições acabam na hora. A barra do aviso
+	 * fica de fora porque ela é o relógio que fecha o aviso (ela só fica invisível).
+	 */
+	@media (prefers-reduced-motion: reduce) {
+		*:not([data-slot="toast-timer"]),
+		*::before,
+		*::after {
+			animation-duration: 0.01ms !important;
+			animation-iteration-count: 1 !important;
+			transition-duration: 0.01ms !important;
+		}
+	}
+}

@@ -1,0 +1,66 @@
+/*
+ * Paleta crua do Ashtar. Os valores saem dos geradores do canvas, que são a fonte única.
+ *
+ * Fica fora do @theme de propósito: estas variáveis não viram classes do Tailwind. Só os temas
+ * (themes/*.css) as usam, para preencher o contrato de tokens.
+ */
+:root {
+	/* Azul-marinho: fundos, bordas e textos */
+	--navy-1000: #020409;
+	--navy-950: #04060d;
+	--navy-900: #070b16;
+	--navy-850: #0c1220;
+	--navy-800: #111a2f;
+	--navy-750: #151f36;
+	--navy-700: #18233d;
+	--navy-650: #1b2741;
+	--navy-600: #22304e;
+	--navy-500: #3d4f75;
+	--navy-400: #5a6f99;
+	--navy-300: #6f84ad;
+	--navy-200: #a3b8de;
+	--navy-100: #d3def2;
+	--navy-50: #e2e8f0;
+
+	/* Azul: destaque, foco e links */
+	--blue-950: #172f6b;
+	--blue-900: #183e9a;
+	--blue-700: #1d4ed8;
+	--blue-600: #2563eb;
+	--blue-500: #3b82f6;
+	--blue-300: #93c5fd;
+	--blue-100: #e0f2fe;
+
+	/* Dourado: o dono, o convite, o "você" e a transmissão */
+	--gold-950: #2b2208;
+	--gold-900: #3d300a;
+	--gold-700: #7a5f14;
+	--gold-600: #a08a4e;
+	--gold-500: #f6c228;
+	--gold-300: #fcd34d;
+
+	/* Verde */
+	--green-950: #0b2e1a;
+	--green-500: #22c55e;
+	--green-300: #86efac;
+
+	/* Vermelho */
+	--red-950: #2a0d10;
+	--red-700: #b91c1c;
+	--red-600: #dc2626;
+	--red-400: #f87171;
+	--red-300: #fca5a5;
+
+	/* Laranja */
+	--orange-950: #3b1a06;
+	--orange-800: #9a3412;
+	--orange-700: #c2410c;
+	--orange-400: #fb923c;
+	--orange-300: #fdba74;
+
+	/* Violeta */
+	--violet-950: #2e1a5e;
+	--violet-300: #c4b5fd;
+
+	--white: #ffffff;
+}

@@ -1,0 +1,24 @@
+{
+	"productName": "Ashtar Dev",
+	"identifier": "com.gustavo99g.ashtar.dev",
+	"app": {
+		"windows": [
+			{
+				"title": "Ashtar (dev)",
+				"width": 1440,
+				"height": 900,
+				"minWidth": 1000,
+				"minHeight": 640,
+				"center": true,
+				"decorations": false
+			}
+		]
+	},
+	"plugins": {
+		"deep-link": {
+			"desktop": {
+				"schemes": ["ashtar-dev"]
+			}
+		}
+	}
+}

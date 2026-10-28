@@ -1,0 +1,59 @@
+name: Checagens do desktop
+description: Instala as dependências e roda lint, testes, typecheck, formatação, clippy e testes do Rust do desktop (Windows).
+
+runs:
+  using: composite
+  steps:
+    - uses: pnpm/action-setup@v4
+      with:
+        package_json_file: desktop/package.json
+
+    - uses: actions/setup-node@v4
+      with:
+        node-version: 22
+        cache: pnpm
+        cache-dependency-path: desktop/pnpm-lock.yaml
+
+    - uses: Swatinem/rust-cache@v2
+      with:
+        workspaces: desktop/src-tauri -> target
+
+    - name: Dependências do frontend
+      shell: bash
+      working-directory: desktop
+      run: pnpm install --frozen-lockfile
+
+    - name: Lint
+      shell: bash
+      working-directory: desktop
+      run: pnpm lint
+
+    - name: Contrato dos temas
+      shell: bash
+      working-directory: desktop
+      run: pnpm check:themes
+
+    - name: Typecheck e build do frontend
+      shell: bash
+      working-directory: desktop
+      run: pnpm build
+
+    - name: Formatação
+      shell: bash
+      working-directory: desktop/src-tauri
+      run: cargo fmt --check
+
+    - name: Clippy
+      shell: bash
+      working-directory: desktop/src-tauri
+      run: cargo clippy --all-targets -- -D warnings
+
+    - name: Testes do frontend
+      shell: bash
+      working-directory: desktop
+      run: pnpm test
+
+    - name: Testes do Rust
+      shell: bash
+      working-directory: desktop/src-tauri
+      run: cargo test

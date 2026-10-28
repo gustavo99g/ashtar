@@ -1,0 +1,152 @@
+name: Release
+
+on:
+  push:
+    branches: [dev, main]
+
+permissions:
+  contents: read
+
+# Uma publicação por vez; nunca cancelar uma no meio.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  RELEASES_REPO: gustavo99g/ashtar-releases
+
+jobs:
+  versao:
+    name: Versão
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.versao.outputs.version }}
+      publicada: ${{ steps.release.outputs.publicada }}
+      beta_ok: ${{ steps.release.outputs.beta_ok }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Lê e confere a versão do package.json
+        id: versao
+        run: |
+          VERSION=$(jq -r .version desktop/package.json)
+          if [[ ! "$VERSION" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            echo "::error::versão fora do semver (sem zero à esquerda, sem sufixo): $VERSION"
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Confere se a versão já está publicada
+        id: release
+        env:
+          GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
+          VERSION: ${{ steps.versao.outputs.version }}
+        run: |
+          # Só "release not found" significa "ainda não publicada". Qualquer outro
+          # erro (token ausente, expirado, sem permissão) para o pipeline.
+          if saida=$(gh release view "v$VERSION" --repo "$RELEASES_REPO" 2>&1); then
+            publicada=true
+          elif grep -qi "release not found" <<< "$saida"; then
+            publicada=false
+          else
+            echo "::error::não foi possível consultar o release v$VERSION: $saida"
+            exit 1
+          fi
+          echo "publicada=$publicada" >> "$GITHUB_OUTPUT"
+
+          # O canal beta já aponta para esta versão? Se uma execução anterior caiu
+          # entre publicar e atualizar o manifesto, a versão existe mas o beta não.
+          beta_ok=false
+          if [ "$publicada" = "true" ]; then
+            versao_beta=$(gh release download beta --repo "$RELEASES_REPO" \
+              --pattern latest.json --output - 2>/dev/null | jq -r .version || true)
+            if [ "$versao_beta" = "$VERSION" ]; then
+              beta_ok=true
+            fi
+          fi
+          echo "beta_ok=$beta_ok" >> "$GITHUB_OUTPUT"
+
+  beta:
+    name: Publica no beta
+    needs: versao
+    if: github.ref != 'refs/heads/main' && needs.versao.outputs.publicada == 'false'
+    runs-on: windows-latest
+    env:
+      VERSION: ${{ needs.versao.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Notas da versão (CHANGELOG.md)
+        id: notas
+        shell: bash
+        run: |
+          awk -v v="$VERSION" '/^## /{ if (achou) exit; if ($2 == v) { achou = 1; next } } achou' CHANGELOG.md > notas.md
+          if ! grep -q '[^[:space:]]' notas.md; then
+            echo "::error::CHANGELOG.md não tem a seção '## $VERSION' (ou ela está vazia)"
+            exit 1
+          fi
+          {
+            echo 'texto<<FIM_DAS_NOTAS'
+            cat notas.md
+            echo 'FIM_DAS_NOTAS'
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: ./.github/actions/desktop-checks
+
+      - name: Compila, assina e publica como pre-release
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASES_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          VITE_API_URL: ${{ vars.VITE_API_URL }}
+          VITE_ACCESS_CODE: ${{ secrets.VITE_ACCESS_CODE }}
+        with:
+          projectPath: desktop
+          owner: gustavo99g
+          repo: ashtar-releases
+          releaseCommitish: main
+          tagName: v${{ env.VERSION }}
+          releaseName: Ashtar ${{ env.VERSION }}
+          releaseBody: ${{ steps.notas.outputs.texto }}
+          prerelease: true
+          updaterJsonPreferNsis: true
+
+      - name: Aponta o canal beta para esta versão
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
+        run: bash .github/scripts/apontar-beta.sh
+
+  # Recuperação: a versão foi publicada, mas uma execução anterior caiu antes de
+  # atualizar o manifesto do beta. Só refaz o apontamento, sem compilar de novo.
+  beta-manifesto:
+    name: Corrige o manifesto do beta
+    needs: versao
+    if: github.ref != 'refs/heads/main' && needs.versao.outputs.publicada == 'true' && needs.versao.outputs.beta_ok == 'false'
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ needs.versao.outputs.version }}
+      GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Aponta o canal beta para esta versão
+        run: bash .github/scripts/apontar-beta.sh
+
+  estavel:
+    name: Promove para o estável
+    needs: versao
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ needs.versao.outputs.version }}
+      GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
+    steps:
+      - name: Desmarca o pre-release e marca como latest
+        run: |
+          if [ "${{ needs.versao.outputs.publicada }}" != "true" ]; then
+            echo "::error::v$VERSION não foi publicada no beta. Publique pela dev antes de promover."
+            exit 1
+          fi
+          gh release edit "v$VERSION" --repo "$RELEASES_REPO" --prerelease=false --latest
