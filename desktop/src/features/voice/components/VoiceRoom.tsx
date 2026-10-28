@@ -3,6 +3,7 @@ import { Navigate, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/components/ui/states";
 import { useMe, useSession } from "@/features/identity";
+import { QuickInvite } from "@/features/invites";
 import {
 	parseShareTrackName,
 	shareSpec,
@@ -119,6 +120,8 @@ function MeConnecting() {
 
 function ConnectedRoom({ onExit }: { onExit: () => void }) {
 	const { screenShare } = useVoice();
+	const { data: me } = useMe();
+
 	const members = useLiveMembers();
 	const shareState = useScreenShareState(screenShare);
 	// Todas as publicações de tela, assinadas ou não.
@@ -164,14 +167,19 @@ function ConnectedRoom({ onExit }: { onExit: () => void }) {
 				<RoomHeader
 					subtitle={subtitle}
 					actions={
-						<LayoutToggle
-							focus={focus}
-							focusAvailable={remoteShare !== undefined}
-							onGrid={stopWatching}
-							onFocus={() => {
-								if (remoteShare) watchShare(remoteShare.participant.identity);
-							}}
-						/>
+						<>
+							{me?.can_create_invite && (
+								<QuickInvite canViewPanel={me.can_view_panel} />
+							)}
+							<LayoutToggle
+								focus={focus}
+								focusAvailable={remoteShare !== undefined}
+								onGrid={stopWatching}
+								onFocus={() => {
+									if (remoteShare) watchShare(remoteShare.participant.identity);
+								}}
+							/>
+						</>
 					}
 				/>
 			}
