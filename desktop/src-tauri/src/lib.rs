@@ -19,6 +19,7 @@ mod media;
 mod permissions;
 mod tray;
 mod updater;
+mod webview_process;
 mod window;
 
 use tauri::{Manager, RunEvent};
@@ -61,6 +62,7 @@ pub fn run(log_file: logging::LateFile) {
             updater::spawn_periodic_check(app.handle().clone());
             deep_link::register_schemes(app);
             permissions::allow_microphone(app);
+            webview_process::refresh(app.handle());
             tray::create(app);
             Ok(())
         })

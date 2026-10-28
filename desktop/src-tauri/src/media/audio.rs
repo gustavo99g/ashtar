@@ -42,18 +42,32 @@ pub fn spawn_audio_capture(
     on_end: OnEnd,
 ) -> Result<Option<CaptureHandle>, AppError> {
     let own_pid = std::process::id();
-
-    let target = match mode {
-        AudioMode::Off => return Ok(None),
-        AudioMode::Application { process_id } if process_id == own_pid => {
-            return Err(AppError::AudioCapture(
-                "Não é possível capturar o áudio do próprio app".into(),
-            ));
-        }
-        AudioMode::Application { process_id } => AudioTarget::Process(process_id),
-        AudioMode::System => AudioTarget::SystemExcept(own_pid),
+    let webview_pid = crate::webview_process::browser_pid();
+    let Some(target) = audio_target(mode, own_pid, webview_pid)? else {
+        return Ok(None);
     };
     platform::spawn_audio_capture(target, sink, on_end).map(Some)
+}
+
+/// Traduz o pedido do usuário no que a plataforma captura. `None` é "sem áudio".
+///
+/// Na tela inteira, exclui o processo-navegador do WebView2 (`webview_pid`), que toca a voz do
+/// grupo, e só cai no do app quando ele não é conhecido (`webview_process.rs`).
+fn audio_target(
+    mode: AudioMode,
+    own_pid: u32,
+    webview_pid: Option<u32>,
+) -> Result<Option<AudioTarget>, AppError> {
+    match mode {
+        AudioMode::Off => Ok(None),
+        AudioMode::Application { process_id } if process_id == own_pid => Err(
+            AppError::AudioCapture("Não é possível capturar o áudio do próprio app".into()),
+        ),
+        AudioMode::Application { process_id } => Ok(Some(AudioTarget::Process(process_id))),
+        AudioMode::System => Ok(Some(AudioTarget::SystemExcept(
+            crate::webview_process::exclude_target(own_pid, webview_pid),
+        ))),
+    }
 }
 
 #[cfg(test)]
@@ -66,6 +80,28 @@ mod tests {
         Arc,
     };
     use std::time::Duration;
+
+    #[test]
+    fn tela_inteira_exclui_o_webview_e_so_cai_no_app_sem_ele() {
+        assert_eq!(
+            audio_target(AudioMode::System, 100, Some(200)).unwrap(),
+            Some(AudioTarget::SystemExcept(200))
+        );
+        assert_eq!(
+            audio_target(AudioMode::System, 100, None).unwrap(),
+            Some(AudioTarget::SystemExcept(100))
+        );
+    }
+
+    #[test]
+    fn janela_e_sem_audio_nao_mudam() {
+        assert_eq!(audio_target(AudioMode::Off, 100, Some(200)).unwrap(), None);
+        assert_eq!(
+            audio_target(AudioMode::Application { process_id: 7 }, 100, Some(200)).unwrap(),
+            Some(AudioTarget::Process(7))
+        );
+        assert!(audio_target(AudioMode::Application { process_id: 100 }, 100, Some(200)).is_err());
+    }
 
     /// Liga os logs dentro dos testes. Sem isso, os relatórios do sink não aparecem.
     fn init_test_logs() {
