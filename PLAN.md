@@ -33,7 +33,7 @@ cada etapa, `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings` e `
 | 2 | Base visual: pastas por domínio, ESLint, Vitest, tokens e temas, design system, janela, AppShell, router | Concluída (`520d18d`) |
 | 3 | Identidade no app: tipos gerados, TanStack Query, chave do computador, login pelo Rust, sessão | Concluída (`351a1e1`) |
 | 4 | Entrada: link `ashtar://`, uma instância, convite, nick, recuperação, saiu do grupo | Concluída (`9412f04`) |
-| 5 | Tela do servidor e sala de voz, uma transmissão por vez, convite rápido | Pendente |
+| 5 | Tela do servidor e sala de voz, uma transmissão por vez, convite rápido | Concluída (`4b7bfe5`) |
 | 6 | Configurações (Perfil, Aplicativo) e atualização com o canal por pessoa | Pendente |
 | 7 | Painel de controle: Convites, Membros, aviso de quem entrou | Pendente |
 | 8 | Lançamento: beta, troca do grupo, versão mínima, fim do código de acesso | Pendente |
@@ -139,7 +139,7 @@ tabela SMBIOS passam.
 **Pronto quando:** o link `ashtar://` abre o app fechado e chega ao app aberto sem abrir outra janela; um
 convite novo vai ao nick e a recuperação vai direto à conta; cada linha da tabela de estados aparece.
 
-## Etapa 5: servidor e sala — pendente
+## Etapa 5: servidor e sala — concluída (`4b7bfe5`)
 
 - Tela do servidor com quem está na sala a cada 5 s; sala vazia.
 - Sala pelo `voice/token`, grade e foco, barra de baixo, painel "Voz conectada".
