@@ -74,6 +74,29 @@ fn fit(
     Some((size, (x, y)))
 }
 
+/// Mostra a janela principal na frente das outras: tira do minimizado, mostra e dá o foco.
+///
+/// Chamada pelo `single-instance` quando outro processo do app é aberto e pelo ícone da bandeja
+/// (`tray.rs`), que esconde a janela em vez de fechá-la. O processo novo já
+/// passou ao Windows a permissão de trazer esta janela para a frente; sem ela, o Windows só
+/// piscaria o ícone na barra de tarefas.
+pub fn bring_to_front(app: &AppHandle) {
+    let Some(window) = app.get_webview_window("main") else {
+        tracing::warn!("pediram a janela, mas ela não existe");
+        return;
+    };
+    // Cada passo vale sozinho: se um falhar, os outros ainda ajudam.
+    if let Err(error) = window.unminimize() {
+        tracing::warn!(%error, "não foi possível tirar a janela do minimizado");
+    }
+    if let Err(error) = window.show() {
+        tracing::warn!(%error, "não foi possível mostrar a janela");
+    }
+    if let Err(error) = window.set_focus() {
+        tracing::warn!(%error, "não foi possível dar o foco à janela");
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::fit;

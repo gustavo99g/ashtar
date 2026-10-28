@@ -9,35 +9,13 @@
 //!   segundo processo entregou, e o passa ao frontend (`lib/tauri/deep-link.ts`).
 //!
 //! Aqui ficam só as duas coisas que o app faz por conta própria: trazer a janela para a frente
-//! quando outro processo pede ([`bring_to_front`]) e gravar o esquema no registro do Windows a
+//! quando outro processo pede (`window::bring_to_front`) e gravar o esquema no registro do Windows a
 //! cada abertura ([`register_schemes`]). O link em si não passa por aqui, nem vai para o log: o
 //! código do convite vale como uma senha até ser usado. Quem lê e confere é o frontend
 //! (`features/entry`).
 
-use tauri::{App, AppHandle, Manager};
+use tauri::App;
 use tauri_plugin_deep_link::DeepLinkExt;
-
-/// Mostra a janela principal na frente das outras: tira do minimizado, mostra e dá o foco.
-///
-/// Chamada pelo `single-instance` quando outro processo do app é aberto. O processo novo já
-/// passou ao Windows a permissão de trazer esta janela para a frente; sem ela, o Windows só
-/// piscaria o ícone na barra de tarefas.
-pub fn bring_to_front(app: &AppHandle) {
-    let Some(window) = app.get_webview_window("main") else {
-        tracing::warn!("outro processo pediu a janela, mas ela não existe");
-        return;
-    };
-    // Cada passo vale sozinho: se um falhar, os outros ainda ajudam.
-    if let Err(error) = window.unminimize() {
-        tracing::warn!(%error, "não foi possível tirar a janela do minimizado");
-    }
-    if let Err(error) = window.show() {
-        tracing::warn!(%error, "não foi possível mostrar a janela");
-    }
-    if let Err(error) = window.set_focus() {
-        tracing::warn!(%error, "não foi possível dar o foco à janela");
-    }
-}
 
 /// Grava no registro do Windows (`HKCU\Software\Classes`) os esquemas do `tauri.conf.json`
 /// (`ashtar`, ou `ashtar-dev` no app de desenvolvimento), apontando para este executável.

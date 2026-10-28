@@ -15,7 +15,7 @@ export function toggleMaximizeWindow(): void {
 	if (isTauri()) void getCurrentWindow().toggleMaximize();
 }
 
-/** Fecha a janela: o Rust grava o tamanho dela e, se houver, instala a atualização. */
+/** Fecha a janela. O Rust a esconde na bandeja (`tray.rs`): o app continua aberto, e só o "Sair" da bandeja o encerra. */
 export function closeWindow(): void {
 	if (isTauri()) void getCurrentWindow().close();
 }

@@ -17,6 +17,7 @@ mod identity;
 pub mod logging;
 mod media;
 mod permissions;
+mod tray;
 mod updater;
 mod window;
 
@@ -39,7 +40,7 @@ pub fn run(log_file: logging::LateFile) {
         // O primeiro plugin: um segundo processo do app (aberto pelo link ou pelo menu Iniciar)
         // entrega os argumentos ao primeiro e fecha aqui, antes de os outros plugins rodarem.
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
-            deep_link::bring_to_front(app);
+            window::bring_to_front(app);
         }))
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
@@ -48,6 +49,8 @@ pub fn run(log_file: logging::LateFile) {
                 .with_state_flags(WINDOW_STATE)
                 .build(),
         )
+        // Fechar a janela esconde o app na bandeja; só o "Sair" da bandeja encerra (`tray.rs`).
+        .on_window_event(tray::hide_on_close)
         .setup(move |app| {
             if let Err(error) = logging::attach_file(app.handle(), &log_file) {
                 tracing::error!(%error, "não foi possível abrir o arquivo de log");
@@ -58,6 +61,7 @@ pub fn run(log_file: logging::LateFile) {
             updater::spawn_periodic_check(app.handle().clone());
             deep_link::register_schemes(app);
             permissions::allow_microphone(app);
+            tray::create(app);
             Ok(())
         })
         .plugin(tauri_plugin_opener::init())
