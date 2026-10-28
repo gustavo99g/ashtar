@@ -4,13 +4,25 @@
  * Só monta um `ShareRequest` e o entrega ao controller; não sabe como a captura acontece.
  * Em plataformas onde o próprio sistema mostra o seletor (Wayland), este componente dá lugar
  * a só qualidade e áudio (decisão 14): por isso a escolha da fonte fica numa parte separada.
+ *
+ * Janelas minimizadas não aparecem: o libwebrtc as tira da lista e não as captura (BACKLOG).
  */
+import { CheckIcon, XIcon } from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import {
+	Dialog,
+	DialogClose,
+	DialogContent,
+	DialogDescription,
+	DialogTitle,
+} from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { AudioMode, CaptureSource, Quality } from "@/lib/tauri/commands";
 import { cn } from "@/lib/utils";
 import type { ScreenShareController } from "./controller";
 import { layoutMonitors } from "./monitorLayout";
+import { startShare } from "./pickerStore";
 import { DEFAULT_QUALITY, QUALITY_ORDER, QUALITY_PRESETS } from "./presets";
 
 type Tab = "windows" | "screens";
@@ -24,10 +36,12 @@ type Loaded =
 interface SourcePickerProps {
 	controller: ScreenShareController;
 	channelName: string;
+	open: boolean;
 	onClose: () => void;
 }
 
-const MONITOR_AREA = { width: 750, height: 298 };
+/** A área de dentro da moldura das telas: 800 do diálogo, menos o respiro e a borda. */
+const MONITOR_AREA = { width: 748, height: 298 };
 
 const AUDIO_OPTIONS: Record<AudioChoice, { label: string; hint: string }> = {
 	off: { label: "Sem áudio", hint: "O compartilhamento vai sem som." },
@@ -61,11 +75,36 @@ function toAudioMode(
 /** Intervalo entre o fim de uma atualização da lista de fontes e o pedido seguinte. */
 const SOURCES_REFRESH_MS = 2000;
 
+/** O diálogo. O conteúdo só existe aberto: cada abertura começa do zero e recarrega a lista. */
 export function SourcePicker({
 	controller,
 	channelName,
+	open,
 	onClose,
 }: SourcePickerProps) {
+	return (
+		<Dialog
+			open={open}
+			onOpenChange={(next) => {
+				if (!next) onClose();
+			}}
+		>
+			<DialogContent className="flex max-h-[calc(100%-2rem)] flex-col gap-5 overflow-y-auto rounded-[14px] border-border p-6 sm:max-w-[800px]">
+				<PickerBody
+					controller={controller}
+					channelName={channelName}
+					onClose={onClose}
+				/>
+			</DialogContent>
+		</Dialog>
+	);
+}
+
+function PickerBody({
+	controller,
+	channelName,
+	onClose,
+}: Omit<SourcePickerProps, "open">) {
 	const [loaded, setLoaded] = useState<Loaded>({ status: "loading" });
 	const [tab, setTab] = useState<Tab>("windows");
 	const [selectedKey, setSelectedKey] = useState<string | null>(null);
@@ -115,14 +154,6 @@ export function SourcePicker({
 		};
 	}, [controller]);
 
-	useEffect(() => {
-		const onKeyDown = (event: KeyboardEvent) => {
-			if (event.key === "Escape") onClose();
-		};
-		window.addEventListener("keydown", onKeyDown);
-		return () => window.removeEventListener("keydown", onKeyDown);
-	}, [onClose]);
-
 	const sources = loaded.status === "ready" ? loaded.sources : [];
 	const windows = sources.filter((s) => s.source.kind === "window");
 	const screens = sources.filter((s) => s.source.kind === "monitor");
@@ -146,7 +177,7 @@ export function SourcePicker({
 
 	function share() {
 		if (!selected) return;
-		void controller.start({
+		void startShare(controller, {
 			source: selected,
 			quality,
 			audio: toAudioMode(effectiveAudio, selected),
@@ -154,185 +185,192 @@ export function SourcePicker({
 		onClose();
 	}
 
+	const content = (list: ReactNode) => {
+		if (loaded.status === "loading")
+			return <Centered>Procurando janelas e telas...</Centered>;
+		if (loaded.status === "error") {
+			return (
+				<Centered>Não foi possível listar as fontes: {loaded.message}</Centered>
+			);
+		}
+		return list;
+	};
+
 	return (
-		<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6">
-			<div
-				role="dialog"
-				aria-modal="true"
-				aria-labelledby="source-picker-title"
-				className="flex w-[800px] max-w-full flex-col gap-5 rounded-xl border border-line-strong bg-float p-6"
-			>
-				<header className="flex items-start justify-between gap-4">
-					<div className="flex flex-col gap-1">
-						<h2
-							id="source-picker-title"
-							className="text-xl font-bold text-primary"
-						>
-							Compartilhar tela
-						</h2>
-						<span className="text-sm text-muted">
-							Escolha o que as pessoas em {channelName} vão ver.
-						</span>
-					</div>
-					<Button
-						variant="ghost"
-						size="icon"
-						aria-label="Fechar"
-						onClick={onClose}
-					>
-						×
-					</Button>
-				</header>
-
-				<div
-					role="group"
-					aria-label="Tipo de fonte"
-					className="flex self-start rounded-lg border border-line-strong bg-surface-low p-0.5"
+		<>
+			<header className="flex items-start justify-between gap-4">
+				<div className="flex flex-col gap-1">
+					<DialogTitle className="text-xl font-bold">
+						Compartilhar tela
+					</DialogTitle>
+					<DialogDescription className="text-[13px] leading-normal">
+						Escolha o que as pessoas em {channelName} vão ver.
+					</DialogDescription>
+				</div>
+				<DialogClose
+					render={
+						<Button
+							variant="ghost"
+							size="icon"
+							className="text-muted-foreground"
+						/>
+					}
+					aria-label="Fechar"
 				>
-					<TabButton
-						pressed={tab === "windows"}
-						onClick={() => changeTab("windows")}
-					>
+					<XIcon className="size-[18px]" />
+				</DialogClose>
+			</header>
+
+			<Tabs
+				value={tab}
+				onValueChange={(next: Tab) => changeTab(next)}
+				className="min-h-47 gap-5"
+			>
+				<TabsList
+					aria-label="Tipo de fonte"
+					className="rounded-[10px] bg-background"
+				>
+					<TabsTrigger value="windows" className={TAB_CLASS}>
 						Janelas
-					</TabButton>
-					<TabButton
-						pressed={tab === "screens"}
-						onClick={() => changeTab("screens")}
-					>
+					</TabsTrigger>
+					<TabsTrigger value="screens" className={TAB_CLASS}>
 						Telas
-					</TabButton>
-				</div>
-
-				<div className="h-[360px] overflow-y-auto">
-					{loaded.status === "loading" && (
-						<Centered>Procurando janelas e telas...</Centered>
+					</TabsTrigger>
+				</TabsList>
+				<TabsContent
+					value="windows"
+					className="h-[360px] min-h-32 overflow-y-auto"
+				>
+					{content(
+						<WindowGrid
+							windows={windows}
+							selectedKey={selectedKey}
+							onSelect={setSelectedKey}
+						/>,
 					)}
-					{loaded.status === "error" && (
-						<Centered>
-							Não foi possível listar as fontes: {loaded.message}
-						</Centered>
+				</TabsContent>
+				<TabsContent
+					value="screens"
+					className="h-[360px] min-h-32 overflow-y-auto"
+				>
+					{content(
+						<ScreenLayout
+							screens={screens}
+							selectedKey={selectedKey}
+							onSelect={setSelectedKey}
+						/>,
 					)}
-					{loaded.status === "ready" &&
-						(tab === "windows" ? (
-							<WindowGrid
-								windows={windows}
-								selectedKey={selectedKey}
-								onSelect={setSelectedKey}
-							/>
-						) : (
-							<ScreenLayout
-								screens={screens}
-								selectedKey={selectedKey}
-								onSelect={setSelectedKey}
-							/>
-						))}
-				</div>
+				</TabsContent>
+			</Tabs>
 
-				<div className="grid grid-cols-2 gap-6 border-t border-line-strong pt-4">
-					<div className="flex flex-col gap-2.5">
-						<SectionLabel>Qualidade</SectionLabel>
-						<fieldset
-							role="group"
-							aria-label="Qualidade"
-							className="flex gap-2"
-						>
-							{QUALITY_ORDER.map((value) => {
-								const preset = QUALITY_PRESETS[value];
-								const on = value === quality;
-								return (
-									<button
-										key={value}
-										type="button"
-										aria-pressed={on}
-										onClick={() => setQuality(value)}
-										className={cn(
-											"flex h-15 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg border-2",
-											on
-												? "border-accent bg-selected"
-												: "border-line-strong hover:bg-hover",
-										)}
-									>
-										<span
-											className={cn(
-												"text-sm font-semibold",
-												on ? "text-primary" : "text-muted",
-											)}
-										>
-											{preset.label}
-										</span>
-										<span className="font-mono text-xs text-muted">
-											{preset.spec}
-										</span>
-									</button>
-								);
-							})}
-						</fieldset>
-						<span className="text-xs text-muted">
-							{QUALITY_PRESETS[quality].description}
-						</span>
-					</div>
-
-					<fieldset className="flex flex-col gap-2.5">
-						<legend className="mb-2.5">
-							<SectionLabel>Áudio</SectionLabel>
-						</legend>
-						{audioChoices.map((choice) => {
-							const disabled =
-								choice === "application" &&
-								selected !== null &&
-								selected.processId == null;
+			<div className="grid grid-cols-2 gap-6 border-t border-border pt-4">
+				<div className="flex flex-col gap-2.5">
+					<SectionLabel>Qualidade</SectionLabel>
+					<div role="group" aria-label="Qualidade" className="flex gap-2">
+						{QUALITY_ORDER.map((value) => {
+							const preset = QUALITY_PRESETS[value];
+							const on = value === quality;
 							return (
-								<label
-									key={choice}
+								<button
+									key={value}
+									type="button"
+									aria-pressed={on}
+									onClick={() => setQuality(value)}
 									className={cn(
-										"flex items-start gap-2.5",
-										disabled ? "opacity-50" : "cursor-pointer",
+										"flex h-15 flex-1 flex-col items-center justify-center gap-[3px] rounded-lg border-2 transition-colors",
+										on
+											? "border-ring bg-secondary"
+											: "border-border hover:bg-secondary",
 									)}
 								>
-									<input
-										type="radio"
-										name="screen-share-audio"
-										className="mt-0.5 size-4 accent-accent"
-										checked={effectiveAudio === choice}
-										disabled={disabled}
-										onChange={() => setAudio(choice)}
-									/>
-									<span className="flex flex-col gap-0.5">
-										<span className="text-sm font-medium text-primary">
-											{AUDIO_OPTIONS[choice].label}
-										</span>
-										<span className="text-xs text-muted">
-											{AUDIO_OPTIONS[choice].hint}
-										</span>
+									<span
+										className={cn(
+											"text-[13px] font-semibold",
+											on ? "text-foreground" : "text-muted-foreground",
+										)}
+									>
+										{preset.label}
 									</span>
-								</label>
+									<span className="font-mono text-[11px] text-muted-foreground">
+										{preset.spec}
+									</span>
+								</button>
 							);
 						})}
-					</fieldset>
+					</div>
+					<span className="text-xs leading-normal text-muted-foreground">
+						{QUALITY_PRESETS[quality].description}
+					</span>
 				</div>
 
-				<footer className="flex items-center gap-4 border-t border-line-strong pt-4">
-					<span className="min-w-0 flex-1 truncate text-sm text-muted">
-						{selected ? (
-							<>
-								{selected.source.kind === "window" ? "Janela" : "Tela"}:{" "}
-								<span className="font-semibold text-primary">
-									{selected.title}
+				<fieldset className="flex flex-col gap-2.5">
+					<legend className="mb-2.5">
+						<SectionLabel>Áudio</SectionLabel>
+					</legend>
+					{audioChoices.map((choice) => {
+						const disabled =
+							choice === "application" &&
+							selected !== null &&
+							selected.processId == null;
+						return (
+							<label
+								key={choice}
+								className={cn(
+									"flex items-start gap-2.5",
+									disabled ? "opacity-50" : "cursor-pointer",
+								)}
+							>
+								<input
+									type="radio"
+									name="screen-share-audio"
+									className="mt-0.5 size-4 accent-ring"
+									checked={effectiveAudio === choice}
+									disabled={disabled}
+									onChange={() => setAudio(choice)}
+								/>
+								<span className="flex flex-col gap-0.5">
+									<span className="text-sm font-medium text-foreground">
+										{AUDIO_OPTIONS[choice].label}
+									</span>
+									<span className="text-xs leading-[1.45] text-muted-foreground">
+										{AUDIO_OPTIONS[choice].hint}
+									</span>
 								</span>
-							</>
-						) : (
-							"Nada selecionado."
-						)}
-					</span>
-					<Button variant="ghost" onClick={onClose}>
-						Cancelar
-					</Button>
-					<Button disabled={!selected} onClick={share}>
-						Compartilhar
-					</Button>
-				</footer>
+							</label>
+						);
+					})}
+				</fieldset>
 			</div>
-		</div>
+
+			<footer className="flex items-center gap-4 border-t border-border pt-4">
+				<span className="min-w-0 flex-1 truncate text-[13px] text-muted-foreground">
+					{selected ? (
+						<>
+							{selected.source.kind === "window" ? "Janela" : "Tela"}:{" "}
+							<span className="font-semibold text-foreground">
+								{selected.title}
+							</span>
+						</>
+					) : (
+						"Nada selecionado."
+					)}
+				</span>
+				<Button
+					variant="ghost"
+					className="h-10 text-sm font-medium"
+					onClick={onClose}
+				>
+					Cancelar
+				</Button>
+				<Button
+					className="h-10 px-[18px] text-sm"
+					disabled={!selected}
+					onClick={share}
+				>
+					Compartilhar
+				</Button>
+			</footer>
+		</>
 	);
 }
 
@@ -340,33 +378,13 @@ export function SourcePicker({
 // Partes
 // ---------------------------------------------------------------------------
 
-function TabButton({
-	pressed,
-	onClick,
-	children,
-}: {
-	pressed: boolean;
-	onClick: () => void;
-	children: ReactNode;
-}) {
-	return (
-		<button
-			type="button"
-			aria-pressed={pressed}
-			onClick={onClick}
-			className={cn(
-				"h-8 rounded-md px-3.5 text-sm font-semibold",
-				pressed ? "bg-selected text-primary" : "text-muted hover:text-primary",
-			)}
-		>
-			{children}
-		</button>
-	);
-}
+/** A aba ativa do seletor fica no cinza-azulado do quadro, não no azul das outras abas. */
+const TAB_CLASS =
+	"h-8 rounded-[7px] font-semibold text-muted-foreground data-active:bg-secondary data-active:text-foreground";
 
 function SectionLabel({ children }: { children: ReactNode }) {
 	return (
-		<span className="text-xs font-bold tracking-wider text-muted uppercase">
+		<span className="text-xs font-bold tracking-[0.06em] text-muted-foreground uppercase">
 			{children}
 		</span>
 	);
@@ -374,7 +392,7 @@ function SectionLabel({ children }: { children: ReactNode }) {
 
 function Centered({ children }: { children: ReactNode }) {
 	return (
-		<div className="flex h-full items-center justify-center text-sm text-muted">
+		<div className="flex h-full items-center justify-center text-sm text-muted-foreground">
 			{children}
 		</div>
 	);
@@ -382,8 +400,8 @@ function Centered({ children }: { children: ReactNode }) {
 
 function SelectedMark() {
 	return (
-		<span className="absolute top-2 right-2 flex size-6 items-center justify-center rounded-full bg-accent text-xs text-inverse">
-			✓
+		<span className="absolute top-2 right-2 flex size-6 items-center justify-center rounded-full bg-primary text-primary-foreground">
+			<CheckIcon className="size-3.5" strokeWidth={2.5} />
 		</span>
 	);
 }
@@ -413,26 +431,29 @@ function WindowGrid({
 						type="button"
 						aria-pressed={selected}
 						onClick={() => onSelect(key)}
-						className="flex min-w-0 flex-col gap-2 text-left"
+						className="group flex min-w-0 flex-col gap-2 text-left"
 					>
 						<span
 							className={cn(
-								"relative flex aspect-video items-center justify-center rounded-lg border-2 bg-surface-low",
+								"relative flex aspect-video items-center justify-center rounded-lg border-2 bg-background transition-colors",
 								selected
-									? "border-accent"
-									: "border-line-strong hover:bg-hover",
+									? "border-ring"
+									: "border-border group-hover:border-border-strong",
 							)}
 						>
 							{entry.icon ? (
-								<img src={entry.icon} alt="" className="size-12" />
+								<img src={entry.icon} alt="" className="size-13" />
 							) : (
-								<span className="flex size-12 items-center justify-center rounded-xl bg-raised text-xl font-bold text-primary">
+								<span
+									aria-hidden="true"
+									className="flex size-13 items-center justify-center rounded-xl bg-border-strong text-[22px] font-bold text-foreground"
+								>
 									{entry.title.charAt(0).toUpperCase()}
 								</span>
 							)}
 							{selected && <SelectedMark />}
 						</span>
-						<span className="truncate text-sm text-primary">
+						<span className="truncate text-[13px] text-foreground">
 							{entry.title}
 						</span>
 					</button>
@@ -462,13 +483,14 @@ function ScreenLayout({
 			<div
 				role="group"
 				aria-label="Disposição das telas"
-				className="relative rounded-lg border border-line-strong bg-surface-low"
-				style={{ width: MONITOR_AREA.width, height: MONITOR_AREA.height }}
+				className="relative h-[300px] rounded-[10px] border border-border bg-background"
 			>
 				{placed.map(({ source, monitor, left, top, width, height }) => {
 					const key = sourceKey(source);
 					const selected = key === selectedKey;
 					const resolution = `${monitor.width} × ${monitor.height}`;
+					// O número é a posição na lista do Rust, o mesmo do título ("Tela 2").
+					const number = screens.indexOf(source) + 1;
 					return (
 						<button
 							key={key}
@@ -478,24 +500,34 @@ function ScreenLayout({
 							onClick={() => onSelect(key)}
 							style={{ left, top, width, height }}
 							className={cn(
-								"absolute flex flex-col items-center justify-center gap-1.5 rounded-lg border-2",
+								"absolute flex flex-col items-center justify-center gap-1.5 rounded-lg border-2 transition-colors",
 								selected
-									? "border-accent bg-selected"
-									: "border-line-strong bg-float hover:bg-hover",
+									? "border-ring bg-secondary"
+									: "border-border bg-card hover:border-border-strong",
 							)}
 						>
-							<span className="font-mono text-xs text-secondary">
+							<span
+								className={cn(
+									"text-[32px] leading-none font-bold",
+									selected ? "text-foreground" : "text-muted-foreground",
+								)}
+							>
+								{number}
+							</span>
+							<span className="font-mono text-xs text-secondary-foreground">
 								{resolution}
 							</span>
-							<span className="text-sm font-semibold text-primary">
-								{source.title}
-							</span>
+							{monitor.isPrimary && (
+								<span className="rounded-sm bg-info-subtle px-2 py-0.5 text-[11px] font-semibold text-link-hover">
+									Principal
+								</span>
+							)}
 							{selected && <SelectedMark />}
 						</button>
 					);
 				})}
 			</div>
-			<span className="text-xs text-muted">
+			<span className="text-xs leading-normal text-muted-foreground">
 				A disposição segue a das configurações de vídeo do Windows. Clique na
 				tela que quer compartilhar.
 			</span>

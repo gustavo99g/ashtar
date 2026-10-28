@@ -14,8 +14,12 @@
 		"windows": [
 			{
 				"title": "Ashtar",
-				"width": 800,
-				"height": 600
+				"width": 1440,
+				"height": 900,
+				"minWidth": 1000,
+				"minHeight": 640,
+				"center": true,
+				"decorations": false
 			}
 		],
 		"security": {
@@ -44,6 +48,11 @@
 			"pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEEwQTQ4NjMyNUE5QzgyMEMKUldRTWdweGFNb2Frb0l1T1QyYlNZSHpLQytldmtxdW1CenlsekMzOUR3Z1BmU3NLaFR0MnhCaG4K",
 			"windows": {
 				"installMode": "passive"
+			}
+		},
+		"deep-link": {
+			"desktop": {
+				"schemes": ["ashtar"]
 			}
 		}
 	}

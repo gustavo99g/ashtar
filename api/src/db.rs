@@ -143,7 +143,7 @@ mod tests {
         remove_db(&path);
 
         assert_eq!(users, 1);
-        assert_eq!(applied, 1);
+        assert_eq!(applied, sqlx::migrate!().iter().count() as i64);
     }
 
     #[tokio::test]
@@ -232,6 +232,38 @@ mod tests {
         };
         device("d1", "k1").execute(&pool).await.unwrap();
         assert!(device("d2", "k2").execute(&pool).await.is_err());
+    }
+
+    #[tokio::test]
+    async fn nome_visivel_e_modelo_tem_limites_no_banco() {
+        let pool = connect_in_memory().await.unwrap();
+        insert_user(&pool, "u1", "Gustavo").await.unwrap();
+
+        let name = |value: Option<String>| {
+            sqlx::query("UPDATE users SET display_name = ? WHERE id = 'u1'").bind(value)
+        };
+        assert!(name(None).execute(&pool).await.is_ok());
+        assert!(name(Some("g".into())).execute(&pool).await.is_ok());
+        assert!(name(Some("g".repeat(32))).execute(&pool).await.is_ok());
+        assert!(name(Some(String::new())).execute(&pool).await.is_err());
+        assert!(name(Some("g".repeat(33))).execute(&pool).await.is_err());
+
+        let invite = |id: &'static str, preset: Option<&'static str>| {
+            sqlx::query(
+                "INSERT INTO invites (id, code_hash, kind, max_uses, created_by, created_at, expires_at, preset)
+                 VALUES (?, ?, 'new', 1, 'u1', 0, 1, ?)",
+            )
+            .bind(id)
+            .bind(id)
+            .bind(preset)
+        };
+        for (id, preset) in [("i1", "person"), ("i2", "group"), ("i3", "custom")] {
+            assert!(
+                invite(id, Some(preset)).execute(&pool).await.is_ok(),
+                "{preset}"
+            );
+        }
+        assert!(invite("i4", Some("outro")).execute(&pool).await.is_err());
     }
 
     #[tokio::test]

@@ -1,5 +1,5 @@
 name: Checagens do desktop
-description: Instala as dependências e roda lint, typecheck, formatação, clippy e testes do desktop (Windows).
+description: Instala as dependências e roda lint, testes, typecheck, formatação, clippy e testes do Rust do desktop (Windows).
 
 runs:
   using: composite
@@ -28,6 +28,11 @@ runs:
       working-directory: desktop
       run: pnpm lint
 
+    - name: Contrato dos temas
+      shell: bash
+      working-directory: desktop
+      run: pnpm check:themes
+
     - name: Typecheck e build do frontend
       shell: bash
       working-directory: desktop
@@ -43,7 +48,12 @@ runs:
       working-directory: desktop/src-tauri
       run: cargo clippy --all-targets -- -D warnings
 
-    - name: Testes
+    - name: Testes do frontend
+      shell: bash
+      working-directory: desktop
+      run: pnpm test
+
+    - name: Testes do Rust
       shell: bash
       working-directory: desktop/src-tauri
       run: cargo test

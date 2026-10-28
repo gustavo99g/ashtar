@@ -9,11 +9,17 @@
 //!   dispositivo dele pelo de quem usar o convite (placa-mãe nova, computador
 //!   novo). Sempre de uso único.
 //!
+//! O convite novo guarda o modelo escolhido na tela ([`Preset`]): "Para uma
+//! pessoa" e "Para o grupo" têm validade e usos fixos, definidos aqui; só "Do
+//! seu jeito" recebe os números de quem cria.
+//!
 //! O código aparece uma vez só, na criação: o banco guarda o hash. O convite
 //! nunca é apagado; ele e os seus usos (`invite_uses`) são o histórico de
 //! quem convidou quem.
 
-use sqlx::{FromRow, SqlitePool};
+use serde::{Deserialize, Serialize};
+use sqlx::{FromRow, SqliteExecutor, SqlitePool};
+use ts_rs::TS;
 use uuid::Uuid;
 
 use super::permissions::{Action, require};
@@ -32,7 +38,88 @@ pub const MAX_TTL_SECS: i64 = 30 * 24 * 60 * 60;
 /// para um grupo de 5 a 10 pessoas.
 pub const MAX_USES_LIMIT: i64 = 50;
 
+/// "Para uma pessoa": 7 dias, 1 uso. Para mandar no privado.
+pub const PERSON_TTL_SECS: i64 = 7 * 24 * 60 * 60;
+pub const PERSON_MAX_USES: i64 = 1;
+
+/// "Para o grupo": 5 minutos, até 8 usos. Para mandar no grupo do WhatsApp.
+pub const GROUP_TTL_SECS: i64 = 5 * 60;
+pub const GROUP_MAX_USES: i64 = 8;
+
+/// O modelo de um convite novo, como a tela mostra. A chave em texto vai para o
+/// banco (`invites.preset`) e para o JSON; não mude uma que já existe.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export, export_to = "index.ts")]
+pub enum Preset {
+    /// "Para uma pessoa".
+    Person,
+    /// "Para o grupo".
+    Group,
+    /// "Do seu jeito": validade e usos escolhidos por quem cria.
+    Custom,
+}
+
+impl Preset {
+    pub fn as_db(self) -> &'static str {
+        match self {
+            Self::Person => "person",
+            Self::Group => "group",
+            Self::Custom => "custom",
+        }
+    }
+
+    /// `None` para um texto que não é modelo (ou o `NULL` da recuperação).
+    pub fn from_db(value: &str) -> Option<Self> {
+        [Self::Person, Self::Group, Self::Custom]
+            .into_iter()
+            .find(|p| p.as_db() == value)
+    }
+
+    /// O modelo que bate com esses números. É o que fica gravado quando ninguém
+    /// escolheu modelo: os convites do `admin`.
+    pub fn matching(ttl_secs: i64, max_uses: i64) -> Self {
+        match (ttl_secs, max_uses) {
+            (PERSON_TTL_SECS, PERSON_MAX_USES) => Self::Person,
+            (GROUP_TTL_SECS, GROUP_MAX_USES) => Self::Group,
+            _ => Self::Custom,
+        }
+    }
+}
+
+/// O pedido de um convite novo pela tela: um dos modelos fixos, ou "Do seu
+/// jeito" com os números.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NewInvite {
+    Person,
+    Group,
+    Custom { ttl_secs: i64, max_uses: i64 },
+}
+
+impl NewInvite {
+    pub fn preset(self) -> Preset {
+        match self {
+            Self::Person => Preset::Person,
+            Self::Group => Preset::Group,
+            Self::Custom { .. } => Preset::Custom,
+        }
+    }
+
+    /// Validade (em segundos) e usos.
+    pub fn numbers(self) -> (i64, i64) {
+        match self {
+            Self::Person => (PERSON_TTL_SECS, PERSON_MAX_USES),
+            Self::Group => (GROUP_TTL_SECS, GROUP_MAX_USES),
+            Self::Custom { ttl_secs, max_uses } => (ttl_secs, max_uses),
+        }
+    }
+}
+
+/// Convite novo ou de recuperação.
+// No histórico, o `kind` sai em texto do banco (`InviteView`); o `rename_all` dá ao
+// TypeScript a mesma união, `"new" | "recovery"`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, TS)]
+#[ts(export, export_to = "index.ts", rename_all = "snake_case")]
 pub enum InviteKind {
     New,
     Recovery,
@@ -48,7 +135,9 @@ impl InviteKind {
 }
 
 /// Situação de um convite num instante.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export, export_to = "index.ts")]
 pub enum InviteStatus {
     /// Ainda aceita gente.
     Pending,
@@ -58,14 +147,20 @@ pub enum InviteStatus {
     Expired,
 }
 
-/// Uma linha do histórico, já com os nicks.
+/// Uma linha do histórico, já com os nicks e os nomes visíveis.
 #[derive(Debug, Clone)]
 pub struct InviteRecord {
     pub id: String,
     pub kind: String,
+    /// `None` na recuperação.
+    pub preset: Option<Preset>,
+    pub target_id: Option<String>,
     pub target_nick: Option<String>,
+    pub target_display_name: Option<String>,
     pub max_uses: i64,
+    pub created_by_id: String,
     pub created_by_nick: String,
+    pub created_by_display_name: Option<String>,
     pub created_at: i64,
     pub expires_at: i64,
     pub revoked_at: Option<i64>,
@@ -76,7 +171,9 @@ pub struct InviteRecord {
 #[derive(Debug, Clone, FromRow)]
 pub struct InviteUse {
     pub invite_id: String,
+    pub user_id: String,
     pub nick: String,
+    pub display_name: Option<String>,
     pub used_at: i64,
 }
 
@@ -101,11 +198,16 @@ pub struct CreatedInvite {
     pub code: String,
     pub expires_at: i64,
     pub max_uses: i64,
+    pub preset: Option<Preset>,
 }
 
 /// Cria um convite. `target` é obrigatório na recuperação e proibido no novo.
 /// `max_uses` vale só para o novo (de 1 a [`MAX_USES_LIMIT`]); a recuperação
 /// é sempre de uso único.
+///
+/// É o caminho do `admin` e dos testes, que dão os números: o convite novo
+/// grava o modelo que bate com eles ([`Preset::matching`]). A tela usa
+/// [`create_new`], que grava o modelo escolhido.
 pub async fn create(
     db: &SqlitePool,
     actor: &User,
@@ -113,6 +215,45 @@ pub async fn create(
     target: Option<&User>,
     ttl_secs: i64,
     max_uses: i64,
+    now: i64,
+) -> Result<CreatedInvite, ApiError> {
+    let preset = match kind {
+        InviteKind::New => Some(Preset::matching(ttl_secs, max_uses)),
+        InviteKind::Recovery => None,
+    };
+    insert(db, actor, kind, target, (ttl_secs, max_uses), preset, now).await
+}
+
+/// Cria um convite novo com o modelo escolhido na tela. Nos modelos fixos, a
+/// validade e os usos s\ão os daqui; "Do seu jeito" guarda `custom` mesmo que os
+/// n\úmeros sejam os de um modelo.
+pub async fn create_new(
+    db: &SqlitePool,
+    actor: &User,
+    invite: NewInvite,
+    now: i64,
+) -> Result<CreatedInvite, ApiError> {
+    let preset = Some(invite.preset());
+    insert(
+        db,
+        actor,
+        InviteKind::New,
+        None,
+        invite.numbers(),
+        preset,
+        now,
+    )
+    .await
+}
+
+/// Confere e grava o convite. O par traz a validade (em segundos) e os usos.
+async fn insert(
+    db: &SqlitePool,
+    actor: &User,
+    kind: InviteKind,
+    target: Option<&User>,
+    (ttl_secs, max_uses): (i64, i64),
+    preset: Option<Preset>,
     now: i64,
 ) -> Result<CreatedInvite, ApiError> {
     match kind {
@@ -164,13 +305,14 @@ pub async fn create(
         code: secret::new_invite_code(),
         expires_at: now + ttl_secs,
         max_uses,
+        preset,
     };
     let normalized = secret::normalize_invite_code(&invite.code).expect("código gerado é válido");
 
     sqlx::query(
         "INSERT INTO invites
-            (id, code_hash, kind, target_user_id, max_uses, created_by, created_at, expires_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        (id, code_hash, kind, target_user_id, max_uses, created_by, created_at, expires_at, preset)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(&invite.id)
     .bind(secret::hash(&normalized))
@@ -180,6 +322,7 @@ pub async fn create(
     .bind(&actor.id)
     .bind(now)
     .bind(invite.expires_at)
+    .bind(preset.map(Preset::as_db))
     .execute(db)
     .await?;
     Ok(invite)
@@ -191,16 +334,25 @@ pub async fn list(db: &SqlitePool) -> Result<Vec<InviteRecord>, ApiError> {
     struct Row {
         id: String,
         kind: String,
+        preset: Option<String>,
+        target_id: Option<String>,
         target_nick: Option<String>,
+        target_display_name: Option<String>,
         max_uses: i64,
+        created_by_id: String,
         created_by_nick: String,
+        created_by_display_name: Option<String>,
         created_at: i64,
         expires_at: i64,
         revoked_at: Option<i64>,
     }
 
     let rows: Vec<Row> = sqlx::query_as(
-        "SELECT i.id, i.kind, t.nick AS target_nick, i.max_uses, c.nick AS created_by_nick,
+        "SELECT i.id, i.kind, i.preset,
+              t.id AS target_id, t.nick AS target_nick, t.display_name AS target_display_name,
+              i.max_uses,
+              c.id AS created_by_id, c.nick AS created_by_nick,
+              c.display_name AS created_by_display_name,
                 i.created_at, i.expires_at, i.revoked_at
          FROM invites i
          JOIN users c ON c.id = i.created_by
@@ -211,7 +363,7 @@ pub async fn list(db: &SqlitePool) -> Result<Vec<InviteRecord>, ApiError> {
     .await?;
 
     let uses: Vec<InviteUse> = sqlx::query_as(
-        "SELECT iu.invite_id, u.nick, iu.used_at
+        "SELECT iu.invite_id, u.id AS user_id, u.nick, u.display_name, iu.used_at
          FROM invite_uses iu JOIN users u ON u.id = iu.user_id
          ORDER BY iu.used_at",
     )
@@ -226,17 +378,26 @@ pub async fn list(db: &SqlitePool) -> Result<Vec<InviteRecord>, ApiError> {
                 .filter(|u| u.invite_id == row.id)
                 .cloned()
                 .collect(),
+            preset: row.preset.as_deref().and_then(Preset::from_db),
             id: row.id,
             kind: row.kind,
+            target_id: row.target_id,
             target_nick: row.target_nick,
+            target_display_name: row.target_display_name,
             max_uses: row.max_uses,
+            created_by_id: row.created_by_id,
             created_by_nick: row.created_by_nick,
+            created_by_display_name: row.created_by_display_name,
             created_at: row.created_at,
             expires_at: row.expires_at,
             revoked_at: row.revoked_at,
         })
         .collect())
 }
+
+/// O que o `revoke` precisa saber do convite: id, usos máximos, usos gastos,
+/// quando foi revogado e quando vence.
+type RevokeRow = (String, i64, i64, Option<i64>, i64);
 
 /// Revoga um convite pelo id ou pelo começo dele (no mínimo 4 caracteres,
 /// como o `admin convites` mostra). Quem já entrou com ele continua membro;
@@ -254,7 +415,7 @@ pub async fn revoke(
         ));
     }
 
-    let matches: Vec<(String, i64, i64, Option<i64>, i64)> = sqlx::query_as(
+    let matches: Vec<RevokeRow> = sqlx::query_as(
         "SELECT i.id, i.max_uses,
                 (SELECT COUNT(*) FROM invite_uses iu WHERE iu.invite_id = i.id),
                 i.revoked_at, i.expires_at
@@ -264,7 +425,7 @@ pub async fn revoke(
     .fetch_all(db)
     .await?;
 
-    let (id, max_uses, uses, revoked_at, expires_at) = match matches.as_slice() {
+    let found = match matches.as_slice() {
         [] => return Err(ApiError::NotFound("Nenhum convite com esse id.".into())),
         [one] => one.clone(),
         _ => {
@@ -273,6 +434,34 @@ pub async fn revoke(
             ));
         }
     };
+    revoke_found(db, found, now).await
+}
+
+/// Revoga um convite pelo id inteiro: o caminho do Painel. O começo do id
+/// continua só no `admin`.
+pub async fn revoke_by_id(
+    db: &SqlitePool,
+    actor: &User,
+    id: &str,
+    now: i64,
+) -> Result<(), ApiError> {
+    require(actor, Action::RevokeInvite)?;
+    let found: Option<RevokeRow> = sqlx::query_as(
+        "SELECT i.id, i.max_uses,
+                    (SELECT COUNT(*) FROM invite_uses iu WHERE iu.invite_id = i.id),
+                    i.revoked_at, i.expires_at
+             FROM invites i WHERE i.id = ?",
+    )
+    .bind(id)
+    .fetch_optional(db)
+    .await?;
+    let found = found.ok_or_else(|| ApiError::NotFound("Nenhum convite com esse id.".into()))?;
+    revoke_found(db, found, now).await
+}
+
+/// Confere se o convite ainda pode ser revogado e revoga.
+async fn revoke_found(db: &SqlitePool, found: RevokeRow, now: i64) -> Result<(), ApiError> {
+    let (id, max_uses, uses, revoked_at, expires_at) = found;
     if uses >= max_uses {
         return Err(ApiError::Conflict(
             "Esse convite já foi usado por completo. Para desfazer, remova o membro.".into(),
@@ -313,16 +502,7 @@ pub async fn redeem(
     // outra, e a segunda já vê o convite esgotado.
     let mut tx = db.begin_with("BEGIN IMMEDIATE").await?;
 
-    let invite: Option<(String, String, Option<String>)> = sqlx::query_as(
-        "SELECT i.id, i.kind, i.target_user_id FROM invites i
-         WHERE i.code_hash = ? AND i.revoked_at IS NULL AND i.expires_at > ?
-           AND (SELECT COUNT(*) FROM invite_uses iu WHERE iu.invite_id = i.id) < i.max_uses",
-    )
-    .bind(secret::hash(&code))
-    .bind(now)
-    .fetch_optional(&mut *tx)
-    .await?;
-    let Some((invite_id, kind, target_id)) = invite else {
+    let Some(invite) = find_valid(&mut *tx, &code, now).await? else {
         return Err(ApiError::InvalidInvite);
     };
 
@@ -330,10 +510,10 @@ pub async fn redeem(
         return Err(ApiError::DeviceAlreadyLinked);
     }
 
-    let user: User = match (kind.as_str(), target_id) {
+    let user: User = match (invite.kind.as_str(), invite.target_user_id) {
         ("recovery", Some(target_id)) => {
             let user: Option<User> = sqlx::query_as(
-                "SELECT id, nick, is_owner, created_at, removed_at FROM users
+                "SELECT id, nick, is_owner, display_name, created_at, removed_at FROM users
                  WHERE id = ? AND removed_at IS NULL",
             )
             .bind(&target_id)
@@ -350,7 +530,7 @@ pub async fn redeem(
     let token = devices::link_and_open_session(&mut tx, &user.id, device_key, now).await?;
 
     sqlx::query("INSERT INTO invite_uses (invite_id, user_id, used_at) VALUES (?, ?, ?)")
-        .bind(&invite_id)
+        .bind(&invite.id)
         .bind(&user.id)
         .bind(now)
         .execute(&mut *tx)
@@ -358,4 +538,69 @@ pub async fn redeem(
 
     tx.commit().await?;
     Ok((user, token))
+}
+
+/// Um convite que ainda vale, achado pelo código.
+#[derive(FromRow)]
+struct ValidInvite {
+    id: String,
+    kind: String,
+    target_user_id: Option<String>,
+    created_by: String,
+    expires_at: i64,
+}
+
+/// O convite com esse código (já normalizado), se ainda vale: não revogado, não
+/// vencido e com uso sobrando. Usar e ler o convite passam por aqui, então os dois
+/// nunca discordam do que é um convite válido.
+async fn find_valid<'e>(
+    executor: impl SqliteExecutor<'e>,
+    code: &str,
+    now: i64,
+) -> Result<Option<ValidInvite>, ApiError> {
+    Ok(sqlx::query_as(
+        "SELECT i.id, i.kind, i.target_user_id, i.created_by, i.expires_at FROM invites i
+         WHERE i.code_hash = ? AND i.revoked_at IS NULL AND i.expires_at > ?
+           AND (SELECT COUNT(*) FROM invite_uses iu WHERE iu.invite_id = i.id) < i.max_uses",
+    )
+    .bind(secret::hash(code))
+    .bind(now)
+    .fetch_optional(executor)
+    .await?)
+}
+
+/// O que se mostra de um convite antes de usá-lo.
+#[derive(Debug, Clone)]
+pub struct InvitePreview {
+    pub kind: InviteKind,
+    /// No convite novo, quem convidou; na recuperação, a conta que volta.
+    pub person: User,
+    pub expires_at: i64,
+}
+
+/// Lê um convite sem gastar nada: para a tela mostrar quem convidou (ou de quem
+/// é a conta) antes do nick. Código inválido, vencido, revogado ou esgotado dá o
+/// mesmo [`ApiError::InvalidInvite`] do [`redeem`].
+pub async fn preview(db: &SqlitePool, code: &str, now: i64) -> Result<InvitePreview, ApiError> {
+    let code = secret::normalize_invite_code(code).ok_or(ApiError::InvalidInvite)?;
+    let invite = find_valid(db, &code, now)
+        .await?
+        .ok_or(ApiError::InvalidInvite)?;
+
+    let (kind, person_id) = match invite.target_user_id {
+        Some(target) => (InviteKind::Recovery, target),
+        None => (InviteKind::New, invite.created_by),
+    };
+    let person = users::find_by_id(db, &person_id)
+        .await?
+        .ok_or(ApiError::InvalidInvite)?;
+    // Como no `redeem`: a recuperação de quem foi removido não vale.
+    if kind == InviteKind::Recovery && !person.is_active() {
+        return Err(ApiError::InvalidInvite);
+    }
+    Ok(InvitePreview {
+        kind,
+        person,
+        expires_at: invite.expires_at,
+    })
 }

@@ -2,13 +2,15 @@
 //!
 //! Cada arquivo agrupa os comandos de um assunto. Regras para todos:
 //!
-//! - todo comando é `async` e devolve `Result<_, AppError>`;
+//! - todo comando é `async` e devolve `Result<_, AppError>`, menos o `login` e o `redeem`
+//!   (`identity.rs`), que falam com a API e devolvem o erro dela (`api::ApiError`);
 //! - trabalho que bloqueia (enumeração de fontes, início e fim de captura)
 //!   roda em [`run_blocking`], nunca direto no corpo do comando;
 //! - comandos só traduzem: validam a entrada, chamam `media::` e convertem o
 //!   resultado. Lógica de captura e de sessão não mora aqui.
 
 pub mod app;
+pub mod identity;
 pub mod screen_share;
 pub mod updater;
 

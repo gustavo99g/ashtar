@@ -2,7 +2,7 @@ import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { readFileSync } from "fs";
 import path from "path";
-import { defineConfig } from "vite";
+import { defineConfig } from "vitest/config";
 
 const host = process.env.TAURI_DEV_HOST;
 
@@ -27,6 +27,11 @@ export default defineConfig(async () => ({
 	// desktop/. Só variáveis com prefixo VITE_ chegam ao código do
 	// browser; o resto (segredos da api/) não aparece pro webview.
 	envDir: path.resolve(__dirname, ".."),
+	// Testes (`pnpm test`): o DOM é o do jsdom, e o setup liga os matchers do Testing Library.
+	test: {
+		environment: "jsdom",
+		setupFiles: ["./src/test/polyfill.ts", "./src/test/setup.ts"],
+	},
 
 	// Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
 	//

@@ -20,13 +20,16 @@ async fn main() {
         },
     );
     let database_url = std::env::var("DATABASE_URL").expect("defina DATABASE_URL no .env");
+    let public_url = std::env::var("PUBLIC_URL").expect("defina PUBLIC_URL no .env");
 
     let pool = db::connect(&database_url)
         .await
         .expect("não foi possivel abrir o banco");
     println!("Banco: {database_url}");
 
-    let app = api::app(AppState::new(pool), policy);
+    println!("Endereço público: {public_url}");
+
+    let app = api::app(AppState::new(pool, &public_url), policy);
 
     let listener = tokio::net::TcpListener::bind("127.0.0.1:3000")
         .await

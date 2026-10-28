@@ -1,0 +1,9 @@
+# Configuração do cargo só para a API.
+
+[env]
+# Onde o `cargo test` grava os tipos do TypeScript gerados pelo ts-rs (`#[ts(export)]`): dentro do
+# `lib/api` do app. O `relative` conta a partir de `api/`.
+TS_RS_EXPORT_DIR = { value = "../desktop/src/lib/api/generated", relative = true }
+# Datas e contadores são `i64` no Rust. O JSON os manda como número comum, e o padrão do ts-rs
+# (`bigint`) não bate com o que o `JSON.parse` devolve.
+TS_RS_LARGE_INT = "number"

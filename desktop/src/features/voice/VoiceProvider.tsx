@@ -3,9 +3,16 @@
  *
  * Falhas (conexão ou microfone) ficam em `error`, para a UI poder mostrar o motivo.
  *
+ * Entra com a identidade da sessão: o token vem do `POST /api/voice/token`, com o id do usuário,
+ * o nome visível e o nick nos metadados. Quando a sessão deixa de estar conectada (este computador
+ * saiu do grupo, por exemplo), a chamada cai sozinha.
+ *
  * Não sabe nada de captura: cria o `ScreenShareController` da sala e o expõe no contexto.
  * Os componentes leem participantes e trilhas pelos hooks do LiveKit (`useParticipants`,
  * `useTracks`...), que funcionam porque a árvore está dentro do `RoomContext`.
+ *
+ * Entra sem assinar nada sozinho (`autoSubscribe: false`): a voz de todo mundo é assinada aqui, e a
+ * tela transmitida só enquanto aparece no Foco (`subscriptions.ts`).
  */
 import { RoomAudioRenderer, RoomContext } from "@livekit/components-react";
 import { ConnectionState, Room, RoomEvent } from "livekit-client";
@@ -17,10 +24,20 @@ import {
 	useRef,
 	useState,
 } from "react";
-import type { ScreenShareController } from "@/features/screen-share/controller";
-import { IpcScreenShare } from "@/features/screen-share/ipc/IpcScreenShare";
-import { apiFetch } from "@/lib/api";
-import { useNavigationStore } from "@/stores/navigation";
+import { useSession } from "@/features/identity";
+import {
+	IpcScreenShare,
+	type ScreenShareController,
+} from "@/features/screen-share";
+import { createVoiceToken } from "@/lib/api";
+import { useRoomView } from "./roomView";
+import { syncSubscription, syncSubscriptions } from "./subscriptions";
+import {
+	encodeVoiceState,
+	parseVoiceState,
+	VOICE_STATE_TOPIC,
+	withDeafened,
+} from "./voiceState";
 
 export type VoiceConnectionState =
 	| "disconnected"
@@ -45,31 +62,30 @@ export interface VoiceContextValue {
 	connectionState: VoiceConnectionState;
 	error: VoiceError | null;
 	screenShare: ScreenShareController | null;
+	/** Mute e deafen valem também fora da chamada: a próxima entrada já começa assim. */
 	isMuted: boolean;
 	isDeafened: boolean;
+	/** Quem mais na sala desligou o áudio, pelos avisos dos outros apps (`voiceState.ts`). */
+	deafenedIds: ReadonlySet<string>;
 	mute: () => Promise<void>;
 	unmute: () => Promise<void>;
 	deafen: () => Promise<void>;
 	undeafen: () => Promise<void>;
+	/**
+	 * Entra na sala (ou troca de sala). Na mesma sala, só tenta de novo depois de um erro ou de
+	 * a conexão cair. A conexão acontece no efeito do `VoiceProvider`.
+	 */
+	join: (channelId: string) => void;
 	leave: () => void;
 }
 
 export const VoiceContext = createContext<VoiceContextValue | null>(null);
+const NOBODY: ReadonlySet<string> = new Set();
 
-async function requestVoiceToken(channelId: string) {
-	const random = crypto.randomUUID();
-
-	const res = await apiFetch("/api/voice/join", {
-		method: "POST",
-		headers: { "Content-Type": "application/json" },
-		body: JSON.stringify({
-			channel_id: channelId,
-			user_id: `idiot-${random}`,
-			display_name: `Idiota-${random}`,
-		}),
-	});
-
-	return (await res.json()) as { token: string; url: string };
+/** A sala em que a pessoa quer estar; `attempt` muda a cada "tentar de novo" na mesma sala. */
+interface VoiceTarget {
+	channelId: string;
+	attempt: number;
 }
 
 function errorMessage(error: unknown): string {
@@ -91,10 +107,9 @@ function toVoiceState(state: ConnectionState): VoiceConnectionState {
 }
 
 export function VoiceProvider({ children }: { children: ReactNode }) {
-	const voiceChannelId = useNavigationStore((state) => state.voiceChannelId);
-	const leaveVoiceChannel = useNavigationStore(
-		(state) => state.leaveVoiceChannel,
-	);
+	/** Sala em que a pessoa quer estar. Mudou, o efeito abaixo sai da anterior e entra na nova. */
+	const [target, setTarget] = useState<VoiceTarget | null>(null);
+	const voiceChannelId = target?.channelId ?? null;
 
 	const [room, setRoom] = useState<Room | null>(null);
 	const [screenShare, setScreenShare] = useState<ScreenShareController | null>(
@@ -105,22 +120,72 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 	const [error, setError] = useState<VoiceError | null>(null);
 	const [isMuted, setIsMuted] = useState(false);
 	const [isDeafened, setIsDeafened] = useState(false);
+	const [deafenedIds, setDeafenedIds] = useState(NOBODY);
 
 	/** Se o microfone já estava mutado quando o deafen começou. */
 	const mutedBeforeDeafen = useRef(false);
 
+	/** Mute e deafen de agora, para a conexão ler sem depender deles. */
+	const audioFlags = useRef({ isMuted, isDeafened });
+	audioFlags.current = { isMuted, isDeafened };
+
+	// Sem sessão não há chamada: saiu do grupo, o token da API já não vale.
+	const sessionConnected = useSession().status === "connected";
 	useEffect(() => {
-		if (!voiceChannelId) {
+		if (!sessionConnected) setTarget(null);
+	}, [sessionConnected]);
+
+	useEffect(() => {
+		if (!target) {
 			return;
 		}
 
-		const channelId = voiceChannelId;
+		const { channelId } = target;
 		let cancelled = false;
 		const nextRoom = new Room();
 		const controller = new IpcScreenShare(nextRoom);
 
 		nextRoom.on(RoomEvent.ConnectionStateChanged, (state) => {
 			setConnectionState(toVoiceState(state));
+		});
+
+		nextRoom.on(
+			RoomEvent.DataReceived,
+			(payload, participant, _kind, topic) => {
+				if (topic !== VOICE_STATE_TOPIC || !participant) return;
+				const state = parseVoiceState(payload);
+				if (state) {
+					setDeafenedIds((current) =>
+						withDeafened(current, participant.identity, state.deafened),
+					);
+				}
+			},
+		);
+		nextRoom.on(RoomEvent.ParticipantDisconnected, (participant) => {
+			setDeafenedIds((current) =>
+				withDeafened(current, participant.identity, false),
+			);
+		});
+		// Quem entra depois não recebeu o aviso: repete só para essa pessoa.
+		nextRoom.on(RoomEvent.ParticipantConnected, (participant) => {
+			if (!audioFlags.current.isDeafened) return;
+			void nextRoom.localParticipant
+				.publishData(encodeVoiceState({ deafened: true }), {
+					reliable: true,
+					topic: VOICE_STATE_TOPIC,
+					destinationIdentities: [participant.identity],
+				})
+				.catch((sendError: unknown) =>
+					console.warn("Erro ao avisar o deafen:", sendError),
+				);
+		});
+		// Trilha nova de alguém: a voz é assinada; a tela, só se essa pessoa está no palco do Foco.
+		nextRoom.on(RoomEvent.TrackPublished, (publication, participant) => {
+			syncSubscription(
+				publication,
+				participant,
+				useRoomView.getState().onStage,
+			);
 		});
 
 		// Só dispara quando a sala cai sozinha: no cleanup as escutas saem antes do disconnect.
@@ -135,28 +200,36 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 				setConnectionState("connecting");
 				setError(null);
 
-				const { url, token } = await requestVoiceToken(channelId);
+				const { url, token } = await createVoiceToken(channelId);
 				if (cancelled) return;
 
-				await nextRoom.connect(url, token);
+				// Nada é assinado sozinho: quem decide é o efeito do `onStage`, mais abaixo.
+				await nextRoom.connect(url, token, { autoSubscribe: false });
 				if (cancelled) return;
 
 				// O microfone não é obrigatório para entrar: sem permissão ou sem dispositivo, a pessoa
 				// continua ouvindo e pode compartilhar a tela, só que entra mutada, com o motivo em `error`.
 				// Se isto lançasse para fora, a sala ficaria conectada sem nenhuma UI para sair dela.
+				// Quem mutou (ou fez deafen) antes de entrar entra assim, sem abrir o microfone.
 				let microphoneProblem: string | null = null;
-				try {
-					await nextRoom.localParticipant.setMicrophoneEnabled(true);
-				} catch (microphoneError) {
-					console.warn("Não foi possível ativar o microfone:", microphoneError);
-					microphoneProblem = errorMessage(microphoneError);
+				const { isMuted: wasMuted, isDeafened: wasDeafened } =
+					audioFlags.current;
+				if (!wasMuted && !wasDeafened) {
+					try {
+						await nextRoom.localParticipant.setMicrophoneEnabled(true);
+					} catch (microphoneError) {
+						console.warn(
+							"Não foi possível ativar o microfone:",
+							microphoneError,
+						);
+						microphoneProblem = errorMessage(microphoneError);
+					}
 				}
 				if (cancelled) return;
 
 				setRoom(nextRoom);
 				setScreenShare(controller);
-				setIsMuted(microphoneProblem !== null);
-				setIsDeafened(false);
+				if (microphoneProblem !== null) setIsMuted(true);
 				setError(
 					microphoneProblem === null
 						? null
@@ -187,12 +260,36 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 			setScreenShare(null);
 			setConnectionState("disconnected");
 			setError(null);
+			setDeafenedIds(NOBODY);
 		};
-	}, [voiceChannelId]);
+	}, [target]);
+
+	// Avisa os outros apps a cada troca do deafen (e ao entrar, para começar do estado certo).
+	useEffect(() => {
+		if (!room) return;
+		void room.localParticipant
+			.publishData(encodeVoiceState({ deafened: isDeafened }), {
+				reliable: true,
+				topic: VOICE_STATE_TOPIC,
+			})
+			.catch((sendError: unknown) =>
+				console.warn("Erro ao avisar o deafen:", sendError),
+			);
+	}, [room, isDeafened]);
+
+	// Ao entrar, e a cada troca do palco do Foco: assina a voz de todos e a tela de quem está nele.
+	const onStage = useRoomView((state) => state.onStage);
+	useEffect(() => {
+		if (room) syncSubscriptions(room, onStage);
+	}, [room, onStage]);
 
 	const value = useMemo<VoiceContextValue>(() => {
 		async function setMicrophone(enabled: boolean) {
-			if (!room) return;
+			// Fora da chamada, só guarda a escolha: a conexão lê na próxima entrada.
+			if (!room) {
+				setIsMuted(!enabled);
+				return;
+			}
 
 			try {
 				await room.localParticipant.setMicrophoneEnabled(enabled);
@@ -218,6 +315,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 			screenShare,
 			isMuted,
 			isDeafened,
+			deafenedIds,
 			mute: () => setMicrophone(false),
 			unmute: async () => {
 				// O deafen muta o microfone sozinho, então a pessoa vê "mutado" e clica para desmutar:
@@ -241,8 +339,20 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 					await setMicrophone(true);
 				}
 			},
-			// O cleanup do efeito cuida do resto quando o voiceChannelId vira null.
-			leave: leaveVoiceChannel,
+			join: (channelId) => {
+				const retry =
+					connectionState === "error" || connectionState === "disconnected";
+				if (channelId === voiceChannelId && !retry) return;
+				setTarget((current) => ({
+					channelId,
+					attempt: (current?.attempt ?? 0) + 1,
+				}));
+				// Já como "conectando", para a tela não piscar um estado parado até o efeito rodar.
+				setConnectionState("connecting");
+				setError(null);
+			},
+			// O cleanup do efeito cuida do resto quando a sala vira null.
+			leave: () => setTarget(null),
 		};
 	}, [
 		voiceChannelId,
@@ -252,7 +362,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 		screenShare,
 		isMuted,
 		isDeafened,
-		leaveVoiceChannel,
+		deafenedIds,
 	]);
 
 	return (

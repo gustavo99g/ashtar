@@ -127,11 +127,15 @@ pub async fn list_capture_sources() -> Result<Vec<CaptureSource>, AppError> {
 /// vídeo e, se pedido, o áudio inicializaram (início atômico, decisão 6).
 #[tauri::command]
 pub async fn ipc_screen_share_start(
+    app: tauri::AppHandle,
     manager: State<'_, Arc<ScreenShareManager>>,
     options: StartOptions,
     video: Channel<InvokeResponseBody>,
     audio: Channel<InvokeResponseBody>,
 ) -> Result<u64, AppError> {
+    // O navegador do WebView2 pode ter mudado desde a abertura (ele reiniciou, por exemplo): a
+    // captura da tela inteira exclui o que está valendo agora.
+    crate::webview_process::refresh(&app);
     let manager = Arc::clone(manager.inner());
     let preset = options.quality.preset();
 

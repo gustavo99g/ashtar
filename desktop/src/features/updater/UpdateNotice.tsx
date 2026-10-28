@@ -8,7 +8,7 @@
  */
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { useVoice } from "@/features/voice/useVoice";
+import { useVoice } from "@/features/voice";
 import {
 	installUpdate,
 	isAppError,

@@ -19,7 +19,7 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = [] }
+tauri = { version = "2", features = ["tray-icon"] }
 tauri-plugin-opener = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -28,7 +28,7 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tracing-appender = "0.2"
 wasapi = "0.24.0"
-fast_image_resize = "6.1.0"    # sem uso desde a saida do legacy; fica para testar reduzir em BGRA antes do I420 (ADR 0009)
+fast_image_resize = "6.1.0"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
 base64 = "0.23.1"
 livekit = "0.9.1"
@@ -38,11 +38,23 @@ windows-sys = { version = "0.61.2", features = [
     "Win32_Graphics_Gdi",
     "Win32_Graphics_Dwm",
     "Win32_Storage_Xps",
-    "Win32_System_Threading"
+    "Win32_System_Threading",
+    "Win32_System_SystemInformation",
+    "Win32_System_Diagnostics_ToolHelp",
+    "Win32_Security_Credentials"
 ] }
+sha2 = "0.11.1"
+getrandom = "0.4.3"
+# O WebView2 do Tauri: o mesmo `webview2-com` e `windows` que o `wry` já usa (conferir no Cargo.lock).
+webview2-com = "0.39"
+windows = "0.62"
 tauri-plugin-updater = "2.13"
 tokio = { version = "1", features = ["time"] }
-
+tauri-plugin-window-state = "2.5.0"
+reqwest = { version = "0.13.4", default-features = false, features = ["json", "rustls-no-provider"] }
+rustls = { version = "0.23.45", default-features = false, features = ["ring", "std"] }
+tauri-plugin-deep-link = "2.6.2"
+tauri-plugin-single-instance = { version = "2.5.4", features = ["deep-link"] }
 [profile.dev.package.image]
 
 opt-level = 3

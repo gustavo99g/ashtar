@@ -7,6 +7,14 @@
  */
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/dialog";
 import { type WhatsNew, whatsNew } from "@/lib/tauri/commands";
 
 const LAST_SEEN_KEY = "ashtar.lastSeenVersion";
@@ -32,6 +40,7 @@ export function WhatsNewDialog() {
 		return null;
 	}
 
+	/** Qualquer jeito de fechar (o botão, o ESC, clicar fora) conta como visto. */
 	function close() {
 		if (content) {
 			localStorage.setItem(LAST_SEEN_KEY, content.version);
@@ -39,31 +48,41 @@ export function WhatsNewDialog() {
 		setContent(null);
 	}
 
+	// Uma linha por item, como o CHANGELOG.md escreve: o `- ` do começo não aparece.
 	const items = content.notes
 		.split("\n")
 		.map((line) => line.replace(/^\s*-\s*/, "").trim())
 		.filter((line) => line.length > 0);
 
 	return (
-		<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-			<div
-				role="dialog"
-				aria-modal="true"
-				aria-labelledby="whats-new-title"
-				className="w-full max-w-md rounded-lg border border-line bg-float p-6 text-primary shadow-xl"
-			>
-				<h2 id="whats-new-title" className="text-lg font-semibold">
-					O que há de novo na {content.version}
-				</h2>
-				<ul className="mt-4 list-disc space-y-1 pl-5 text-sm text-secondary">
-					{items.map((item, index) => (
-						<li key={index}>{item}</li>
+		<Dialog
+			open
+			onOpenChange={(open) => {
+				if (!open) close();
+			}}
+		>
+			<DialogContent className="flex max-h-[calc(100%-2rem)] flex-col gap-5 rounded-[14px] border-border p-6 sm:max-w-[480px]">
+				<DialogHeader>
+					<DialogTitle className="text-xl">
+						O que há de novo na {content.version}
+					</DialogTitle>
+					<DialogDescription className="text-[13px] leading-normal">
+						Veja o que mudou desde a última vez que você abriu o Ashtar.
+					</DialogDescription>
+				</DialogHeader>
+				<ul className="-mr-2 flex min-h-0 flex-col gap-2.5 overflow-y-auto pr-2 pl-5 text-sm leading-[1.55] text-secondary-foreground marker:text-foreground-subtle">
+					{items.map((item) => (
+						<li key={item} className="list-disc">
+							{item}
+						</li>
 					))}
 				</ul>
-				<div className="mt-6 flex justify-end">
-					<Button onClick={close}>Entendi</Button>
-				</div>
-			</div>
-		</div>
+				<DialogFooter>
+					<Button size="lg" onClick={close}>
+						Entendi
+					</Button>
+				</DialogFooter>
+			</DialogContent>
+		</Dialog>
 	);
 }
