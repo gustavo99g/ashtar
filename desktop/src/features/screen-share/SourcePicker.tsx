@@ -22,6 +22,7 @@ import type { AudioMode, CaptureSource, Quality } from "@/lib/tauri/commands";
 import { cn } from "@/lib/utils";
 import type { ScreenShareController } from "./controller";
 import { layoutMonitors } from "./monitorLayout";
+import { startShare } from "./pickerStore";
 import { DEFAULT_QUALITY, QUALITY_ORDER, QUALITY_PRESETS } from "./presets";
 
 type Tab = "windows" | "screens";
@@ -176,7 +177,7 @@ function PickerBody({
 
 	function share() {
 		if (!selected) return;
-		void controller.start({
+		void startShare(controller, {
 			source: selected,
 			quality,
 			audio: toAudioMode(effectiveAudio, selected),

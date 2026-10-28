@@ -337,7 +337,9 @@ export class IpcScreenShare implements ScreenShareController {
 							kind: "VideoCapture",
 							message: event.message ?? "A captura de vídeo parou.",
 						}
-					: { status: "idle" },
+					: event.reason === "sourceClosed"
+						? { status: "idle", ended: "sourceClosed" }
+						: { status: "idle" },
 			);
 		});
 	}

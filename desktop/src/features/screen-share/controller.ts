@@ -15,7 +15,11 @@ export interface ShareRequest {
 }
 
 export type ScreenShareState =
-	| { status: "idle" }
+	| {
+			status: "idle";
+			/** A última sessão acabou sem ninguém pedir: a janela ou a tela compartilhada sumiu. */
+			ended?: "sourceClosed";
+	  }
 	| { status: "starting" }
 	| {
 			status: "active";
