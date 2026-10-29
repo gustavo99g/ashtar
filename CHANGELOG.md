@@ -14,6 +14,7 @@
 - O seletor de tela separa janelas e telas e desenha os monitores na posição do Windows.
 - Se a janela compartilhada fechar ou o som dela parar, um aviso conta o que houve e oferece o próximo passo.
 - O microfone liga sozinho ao entrar na sala, sem pedir permissão.
+- Em Configurações › Voz e vídeo, escolha o microfone e a saída de áudio. A troca vale na hora, mesmo no meio da chamada, e um aparelho desconectado cai no padrão do Windows até voltar.
 
 ## 0.2.0
 

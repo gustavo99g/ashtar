@@ -81,16 +81,7 @@ export function SettingsLayout() {
 				</MenuGroup>
 				<MenuSeparator />
 				<MenuGroup label="Ajustes">
-					<span
-						aria-disabled="true"
-						title="Chega depois da 0.2.2"
-						className={cn(
-							itemClass,
-							"cursor-not-allowed text-foreground-subtle",
-						)}
-					>
-						Voz e vídeo
-					</span>
+					<MenuItem to={paths.settings.voice}>Voz e vídeo</MenuItem>
 					<MenuItem to={paths.settings.app}>Aplicativo</MenuItem>
 				</MenuGroup>
 				{showPanel && (

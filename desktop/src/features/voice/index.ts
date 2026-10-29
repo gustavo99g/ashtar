@@ -3,6 +3,7 @@ export { ChannelNav } from "./components/ChannelNav";
 export { ServerView } from "./components/ServerView";
 export { VoiceDock } from "./components/VoiceDock";
 export { VoiceRoom } from "./components/VoiceRoom";
+export { VoiceSettings } from "./components/VoiceSettings";
 export { useVoice } from "./useVoice";
 export {
 	type VoiceConnectionState,

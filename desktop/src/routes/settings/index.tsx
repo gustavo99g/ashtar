@@ -1,3 +1,4 @@
+import { VoiceSettings } from "@/features/voice";
 import { RoutePlaceholder } from "../placeholder";
 
 /*
@@ -6,6 +7,10 @@ import { RoutePlaceholder } from "../placeholder";
 
 export function ProfileSettingsRoute() {
 	return <RoutePlaceholder title="Perfil" stage={6} />;
+}
+
+export function VoiceSettingsRoute() {
+	return <VoiceSettings />;
 }
 
 export function AppSettingsRoute() {
