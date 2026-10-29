@@ -17,7 +17,7 @@
  * Entra com o microfone e a saída de Configurações › Voz e vídeo (`devices.ts`) e troca na hora
  * quando a escolha muda, ou quando o escolhido some e volta (`roomDevices.ts`).
  */
-import { RoomAudioRenderer, RoomContext } from "@livekit/components-react";
+import { RoomContext } from "@livekit/components-react";
 import { ConnectionState, Room, RoomEvent } from "livekit-client";
 import {
 	createContext,
@@ -33,6 +33,7 @@ import {
 	type ScreenShareController,
 } from "@/features/screen-share";
 import { createVoiceToken } from "@/lib/api";
+import { RoomAudio } from "./components/RoomAudio";
 import { effectiveDevice, knownDevices, useDeviceChoice } from "./devices";
 import { type DeviceIds, roomOptions, switchDevice } from "./roomDevices";
 import { useRoomView } from "./roomView";
@@ -396,7 +397,8 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 		<VoiceContext.Provider value={value}>
 			<RoomContext.Provider value={room ?? undefined}>
 				{/* muted também cancela a assinatura: quem entrar depois do deafen não é ouvido. */}
-				{room && <RoomAudioRenderer muted={isDeafened} />}
+				{/* O deafen cala só as vozes: a transmissão segue no volume do Foco. */}
+				{room && <RoomAudio deafened={isDeafened} />}
 				{children}
 			</RoomContext.Provider>
 		</VoiceContext.Provider>
