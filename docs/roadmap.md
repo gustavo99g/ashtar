@@ -402,6 +402,8 @@ v0.1 deixou (seletor de fontes, trava de uma transmissão por vez, textos dos pr
 
 * **telas de convite e de escolha do nick**, sobre as rotas da v0.2.1: o nome que aparece na sala vem da
   identidade, no lugar do `Idiota-<uuid>`.
+* **escolha do microfone e da saída** nas configurações, com o padrão do Windows quando o escolhido está
+  desconectado (pedido de 29/10, adiantado da v0.6).
 
 ### v0.2.3 — Chat real e supressão de ruído
 
@@ -667,7 +669,6 @@ Deixar o aplicativo confiável e ajustável para uso todos os dias.
 
 * tela de configurações única: dispositivos, atalhos, notificações e áudio (supressão de ruído da
   v0.2), para que as opções novas das próximas versões tenham um lugar fixo;
-* seleção de microfone e saída;
 * teste de microfone.
 
 ## Atalhos globais
