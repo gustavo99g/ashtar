@@ -16,12 +16,15 @@ import {
 	onUpdateReady,
 	pendingUpdate,
 } from "@/lib/tauri/commands";
+import { useUpdateChannelSync } from "./useUpdateChannelSync";
 
 type Notice =
 	| { kind: "ready"; version: string }
 	| { kind: "failed"; message: string };
 
 export function UpdateNotice() {
+	// O aviso fica montado o tempo todo, no `App`: é ele que leva ao Rust o canal da API.
+	useUpdateChannelSync();
 	const { connectionState } = useVoice();
 	const [notice, setNotice] = useState<Notice | null>(null);
 	const [installing, setInstalling] = useState(false);
