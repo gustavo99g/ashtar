@@ -45,7 +45,7 @@ export function VoiceSettings() {
 	const devices = useAudioDevices({ revealNames: true });
 
 	return (
-		<div className="@container flex w-full flex-col gap-9 py-14 pr-8 pl-16">
+		<div className="@container flex w-full flex-col gap-9 py-20 pr-28 pl-32">
 			<h1 className="text-[22px] leading-tight font-bold text-foreground">
 				Voz e vídeo
 			</h1>
