@@ -1,5 +1,5 @@
 import { HeadphoneOffIcon, MicOffIcon, Volume2Icon } from "lucide-react";
-import { NavLink } from "react-router-dom";
+import { useMatch, useNavigate } from "react-router-dom";
 import {
 	Popover,
 	PopoverContent,
@@ -17,9 +17,10 @@ import { LiveBadge } from "./LiveBadge";
 import { PersonCard } from "./PersonCard";
 
 /*
- * A coluna do servidor: a sala e quem está nela. Sem canais de texto na 0.2.2. A sala leva à
- * tela do servidor, ou à chamada quando a pessoa já está nela. Fora da chamada a lista vem da API
- * (de 5 em 5 segundos); dentro, do LiveKit, com quem fala, sem microfone e sem áudio.
+ * A coluna do servidor: a sala e quem está nela. Sem canais de texto na 0.2.2. Clicar na sala
+ * entra na chamada, como o Entrar da tela do servidor; quem já está nela só volta para a chamada.
+ * Fora da chamada a lista vem da API (de 5 em 5 segundos); dentro, do LiveKit, com quem fala, sem
+ * microfone e sem áudio.
  */
 export function ChannelNav() {
 	const { room, voiceChannelId } = useVoice();
@@ -48,6 +49,17 @@ function ChannelEntries({
 }) {
 	const session = useSession();
 	const myId = session.status === "connected" ? session.user.id : null;
+	const { join } = useVoice();
+	const navigate = useNavigate();
+	const onRoom = useMatch(paths.voiceRoom) !== null;
+	const onServer = useMatch(paths.server) !== null;
+	// A sala fica marcada na tela dela: a chamada, ou a do servidor para quem está fora.
+	const selected = inCall ? onRoom : onServer;
+
+	function openRoom() {
+		if (!inCall) join(SALA.id);
+		if (!onRoom) void navigate(paths.voiceRoom);
+	}
 
 	return (
 		<nav
@@ -57,16 +69,17 @@ function ChannelEntries({
 			<div className="px-4 pt-3 pb-1 text-[11px] font-bold tracking-[0.06em] text-muted-foreground uppercase">
 				Sala de voz
 			</div>
-			<NavLink
-				to={inCall ? paths.voiceRoom : paths.server}
-				className={({ isActive }) =>
-					cn(
-						"mx-2 flex items-center gap-2 rounded-md px-2 py-1.5 text-sm font-semibold",
-						isActive
-							? "bg-selected text-selected-foreground"
-							: "text-muted-foreground hover:bg-secondary hover:text-foreground",
-					)
-				}
+			<button
+				type="button"
+				aria-label={inCall ? `Abrir a ${SALA.name}` : `Entrar na ${SALA.name}`}
+				aria-current={selected ? "page" : undefined}
+				onClick={openRoom}
+				className={cn(
+					"mx-2 flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm font-semibold",
+					selected
+						? "bg-selected text-selected-foreground"
+						: "text-muted-foreground hover:bg-secondary hover:text-foreground",
+				)}
 			>
 				<Volume2Icon aria-hidden="true" className="size-[18px]" />
 				<span>{SALA.name}</span>
@@ -75,7 +88,7 @@ function ChannelEntries({
 						{members.length}
 					</span>
 				)}
-			</NavLink>
+			</button>
 			{members.length > 0 && (
 				<ul
 					aria-label={`Quem está na ${SALA.name}`}

@@ -7,9 +7,9 @@
 
 A ADR 0011 deixou para o desktop o cálculo da chave do dispositivo e a regra de quando usar a chave
 aleatória. O app precisa entrar sozinho a cada abertura, sem senha; separar quem nunca entrou de quem saiu
-do grupo; receber o convite que a pessoa abre no navegador; e saber o canal de atualização mesmo com a API
-fora do ar. A chave é a credencial de verdade: quem a tem entra como aquele membro. O frontend roda num
-WebView, com bibliotecas de terceiros.
+do grupo; receber o convite que a pessoa abre no navegador; e saber de qual canal buscar as atualizações.
+A chave é a credencial de verdade: quem a tem entra como aquele membro. O frontend roda num WebView, com
+bibliotecas de terceiros.
 
 ## Decisão
 
@@ -42,10 +42,11 @@ nunca em laço.
 nick e a cor da conta. Não é segredo e não autentica nada: só escolhe entre as telas "Este computador saiu
 do grupo" (existe o marcador) e "Você precisa de um convite" (não existe), e mostra de quem era a conta.
 
-**O canal de atualização.** Depois do `/api/me`, o app chama `set_update_channel`. O Rust grava o canal
-num arquivo na pasta de dados e usa o último valor gravado em toda verificação, inclusive antes do login e
-com a API fora do ar. Sem nada gravado, é o estável. A variável `ASHTAR_UPDATE_CHANNEL` fica só para o
-desenvolvimento e, quando existe, vence o arquivo.
+**O canal de atualização.** Depois do `/api/me`, o app chama `set_update_channel`. O Rust guarda o canal
+só na memória e usa o último em toda verificação. A da abertura vem antes do login e usa o estável; se o
+canal for o beta, o `set_update_channel` pede outra verificação na hora. Com a API fora do ar, quem é do
+beta só não recebe a versão beta naquela abertura (o updater nunca volta versão). A variável
+`ASHTAR_UPDATE_CHANNEL` fica só para o desenvolvimento e, quando existe, vence a API.
 
 **A entrada pelo link.** O esquema `ashtar` (`ashtar://invite/CÓDIGO`, `ashtar://recovery/CÓDIGO`) pelo
 `tauri-plugin-deep-link`, registrado pelo instalador e de novo a cada abertura. O
@@ -60,6 +61,8 @@ desenvolvimento usa o esquema `ashtar-dev`.
 - **Sempre a chave aleatória:** some ao formatar o Windows, e o roadmap quer que formatar não exija nada.
 - **Gravar o token** no Gerenciador de Credenciais: pouparia uma chamada por abertura, e só. A chave já é a
   credencial, e um token gravado é mais um segredo em disco.
+- **Gravar o canal num arquivo** da pasta de dados, para a verificação da abertura já usar o último: mais
+  um arquivo que pode ficar errado, para ganhar só a abertura com a API fora do ar.
 - **Calcular a chave no Rust e entregá-la ao JavaScript** para o `apiFetch` fazer o login: mais simples,
   mas expõe a credencial a todo código que roda no WebView.
 - **Reusar "Você precisa de um convite" para quem saiu do grupo:** a pessoa não entenderia por que perdeu o

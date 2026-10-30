@@ -75,7 +75,10 @@ pub fn run(log_file: logging::LateFile) {
             commands::updater::pending_update,
             commands::updater::install_update,
             commands::updater::check_for_update,
+            commands::updater::set_update_channel,
+            commands::updater::check_for_update_now,
             commands::app::whats_new,
+            commands::app::open_log_dir,
             commands::identity::login,
             commands::identity::redeem,
             commands::identity::account_marker
