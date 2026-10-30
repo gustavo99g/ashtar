@@ -12,11 +12,11 @@ conscientemente adiado (marcar como tal) antes de fechar a fase. A lista da fase
       dispensável).
 - [ ] **Textos dos presets** prometem mais fluidez do que o medido em jogo (Equilibrado 25 a 34 fps,
       Nitidez 18 a 25 fps; ADR 0009). Resolve na Etapa 5.
-- [ ] **Botão "Abrir pasta de logs"** (adiado da v0.2.0): vira um comando Rust, porque a permissão
-      `opener:default` não abre caminhos locais. Resolve na Etapa 6.
+- [x] **Botão "Abrir pasta de logs"** (adiado da v0.2.0): vira um comando Rust, porque a permissão
+      `opener:default` não abre caminhos locais. Resolvido na Etapa 6 (`open_log_dir`).
 - [ ] **Interruptor do beta e canal por pessoa** (adiados da v0.2.0 e da v0.2.1): o dono liga e desliga no
-      Painel (Etapa 7); o app guarda o último canal e a variável `ASHTAR_UPDATE_CHANNEL` fica só para o
-      desenvolvimento (Etapa 6).
+      Painel (Etapa 7). O canal por pessoa está feito (Etapa 6): o app passa ao Rust o canal da API depois
+      do `/api/me`, só na memória, e a variável `ASHTAR_UPDATE_CHANNEL` ficou só para o desenvolvimento.
 - [ ] **Administração pela interface** no lugar do `admin` temporário: rotas na Etapa 1, telas na Etapa 7;
       o `admin` fica só com `dono` e `backup` na Etapa 8.
 
@@ -62,4 +62,9 @@ conscientemente adiado (marcar como tal) antes de fechar a fase. A lista da fase
 - [ ] **Minutos do GitHub Actions:** o Vitest e a conferência dos tipos gerados entram no job do Windows,
       que conta em dobro. Acompanhar o consumo do mês da troca.
 - [ ] **Quem sai do beta** fica na versão que já tem até o estável passar dela (o updater não volta
-      versão).
+      versão). Uma versão do beta que já estava baixada, esperando o reiniciar, também é instalada ao
+      fechar o app.
+- [ ] **O "Atualizar agora" da entrada espera sem notícia:** o updater não avisa quando não há versão nova
+      (nem sem rede), então a tela espera até 2 minutos antes de desistir (Etapa 4.5). O
+      `checkForUpdateNow` da Etapa 6.4 devolve o resultado e pode substituir essa espera; a troca fica
+      para depois da 0.2.2.

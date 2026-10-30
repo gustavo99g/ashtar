@@ -174,8 +174,7 @@ sistema" continua sem o som da chamada.
   visual novo.
 
 **Pronto quando:** trocar o nome visível aparece na próxima entrada na sala; ligar o beta de alguém no
-banco faz o app dessa pessoa verificar o beta na hora; com a API fora do ar, o app abre no estável e o
-beta chega na próxima abertura com a API no ar.
+banco faz o app dessa pessoa verificar o beta na hora; com a API fora do ar, o app verifica o estável.
 
 ## Etapa 7: Painel de controle — pendente
 
