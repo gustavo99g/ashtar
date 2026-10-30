@@ -44,7 +44,8 @@ fn endpoint(channel: Channel) -> &'static str {
 pub enum UpdateEvent {
     /// Uma versão foi baixada e conferida; falta reiniciar.
     Ready { version: String },
-    /// A assinatura não confere, o manifesto está errado, ou a instalação falhou.
+    /// A assinatura não confere, ou o manifesto ou o download vieram errados.
+    /// `message` é o texto do aviso para a pessoa; o erro em si vai para o log.
     Failed { message: String },
 }
 
@@ -138,7 +139,7 @@ impl AutoUpdate {
             Err(error) => {
                 tracing::error!(%error, "falha na atualização");
                 (self.on_event)(UpdateEvent::Failed {
-                    message: error.to_string(),
+                    message: failure_text(&error).to_owned(),
                 })
             }
         }
@@ -224,6 +225,21 @@ fn is_network(error: &Error) -> bool {
         Error::Reqwest(_) | Error::Network(_) | Error::ReleaseNotFound
     )
 }
+/// O texto do aviso "Não deu para atualizar", em português e sem os detalhes,
+/// que ficam no log. A próxima verificação (em até 3 horas) tenta de novo.
+fn failure_text(error: &Error) -> &'static str {
+    match error {
+        Error::Minisign(_)
+        | Error::Base64(_)
+        | Error::SignatureUtf8(_)
+        | Error::SignedVersionMismatch { .. }
+        | Error::MissingSignedVersion => {
+            "A assinatura do arquivo não confere. Tentamos de novo mais tarde."
+        }
+        _ => "Tentamos de novo mais tarde.",
+    }
+}
+
 /// Verifica agora e depois a cada 3 horas, enquanto o app estiver aberto.
 /// Não faz nada no desenvolvimento.
 pub fn spawn_periodic_check(app: AppHandle) {
@@ -254,6 +270,20 @@ pub fn check_in_background(app: AppHandle) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn so_o_erro_de_assinatura_fala_da_assinatura() {
+        let signature = failure_text(&Error::SignatureUtf8("x".into()));
+        assert_eq!(
+            signature,
+            "A assinatura do arquivo não confere. Tentamos de novo mais tarde."
+        );
+        assert_eq!(failure_text(&Error::MissingSignedVersion), signature);
+        assert_eq!(
+            failure_text(&Error::TargetNotFound("windows-x86_64".into())),
+            "Tentamos de novo mais tarde."
+        );
+    }
 
     fn auto_update(env: Option<&str>) -> AutoUpdate {
         AutoUpdate::with_env(|_| {}, env.map(str::to_owned))

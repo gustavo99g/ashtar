@@ -282,3 +282,8 @@ export function accountMarker() {
 export function setUpdateChannel(channel: UpdateChannel) {
 	return call<void>("set_update_channel", { channel });
 }
+
+/** Abre a pasta de logs do app no Explorador de Arquivos. Rejeita com um `AppError`. */
+export function openLogDir() {
+	return call<void>("open_log_dir");
+}
