@@ -1,5 +1,15 @@
 # O que há de novo no Ashtar
 
+## 0.2.21
+
+- Em Configurações › Voz e vídeo, escolha o microfone e a saída de áudio. A troca vale na hora, mesmo no meio da chamada, e um aparelho desconectado cai no padrão do Windows até voltar.
+- Ficar sem áudio (ensurdecer) agora cala só as vozes: o som de uma transmissão que você está assistindo segue no volume que você escolheu.
+- Clicar na sala, na coluna da esquerda, entra na chamada.
+- Configurações novas: em Perfil você troca o nome que o grupo vê, e o nick continua o mesmo.
+- Em Aplicativo: a versão, o canal (beta ou estável), Procurar atualização, "O que há de novo" e o botão que abre a pasta de logs.
+- O aviso de atualização ganhou a cara nova. Numa chamada, ele pergunta antes de reiniciar.
+- O beta agora é por pessoa: o dono escolhe quem recebe as versões beta antes do grupo.
+
 ## 0.2.20
 
 - Visual novo do começo ao fim, com barra de título própria e avisos no canto da tela.
@@ -14,7 +24,6 @@
 - O seletor de tela separa janelas e telas e desenha os monitores na posição do Windows.
 - Se a janela compartilhada fechar ou o som dela parar, um aviso conta o que houve e oferece o próximo passo.
 - O microfone liga sozinho ao entrar na sala, sem pedir permissão.
-- Em Configurações › Voz e vídeo, escolha o microfone e a saída de áudio. A troca vale na hora, mesmo no meio da chamada, e um aparelho desconectado cai no padrão do Windows até voltar.
 
 ## 0.2.0
 

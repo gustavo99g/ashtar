@@ -17,8 +17,8 @@ LiveKit e qualquer tempo real por conexão longa (v0.2.3), câmera, um segundo t
 fora de ordem, pelo `BACKLOG.md`).
 
 **Versões.** A entrega sai como `0.2.20` (numeração do roadmap: entrega × 10 + correção). As Etapas 2 a 5
-entram juntas na `dev` como `0.2.20`, a primeira versão no beta; a 5b (pedido de 29/10) sai como `0.2.21`,
-a 6 como `0.2.22` e a 7 como `0.2.23`, cada uma com a sua seção no `CHANGELOG.md`. A Etapa 8 promove para o
+entram juntas na `dev` como `0.2.20`, a primeira versão no beta; a 5b (pedido de 29/10) e a 6 saem juntas
+como `0.2.21` e a 7 como `0.2.22`, cada versão com a sua seção no `CHANGELOG.md`. A Etapa 8 promove para o
 estável e fecha com uma correção que tira o código de acesso do app.
 
 Base: a branch `dev` com a v0.2.1 (código conferido a partir do commit `7daf05e` da `feature/0.2.1`). Em
@@ -36,13 +36,13 @@ cada etapa, `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings` e `
 | 4 | Entrada: link `ashtar://`, uma instância, convite, nick, recuperação, saiu do grupo | Concluída (`9412f04`) |
 | 5 | Tela do servidor e sala de voz, uma transmissão por vez, convite rápido | Concluída (`4b7bfe5`) |
 | 5b | Dispositivos de voz (entrada e saída), o ensurdecer só nas vozes, o nome da sala entra na chamada | Concluída |
-| 6 | Configurações (Perfil, Aplicativo) e atualização com o canal por pessoa | Pendente |
+| 6 | Configurações (Perfil, Aplicativo) e atualização com o canal por pessoa | Concluída |
 | 7 | Painel de controle: Convites, Membros, aviso de quem entrou | Pendente |
 | 8 | Lançamento: beta, troca do grupo, versão mínima, fim do código de acesso | Pendente |
 
 Branches: a Etapa 1 vai direto para a `dev` (só a API muda, nada é publicado). As Etapas 2 a 5 ficam em
 `entrega/ui-nova`, a partir da `dev`, com um pull request por etapa para dentro dela e, no fim, um para a
-`dev`. As Etapas 5b, 6 e 7 saem cada uma da `dev` para a `dev`, com a versão nova.
+`dev`. A Etapa 5b e a 6 saem juntas da `dev` para a `dev` como `0.2.21`, e a 7 sai depois, como `0.2.22`.
 
 ---
 
@@ -166,14 +166,16 @@ servidor de quem ficou fora mostra as duas; só uma transmissão por vez, mesmo 
 fone escolhido passa para o padrão do Windows e volta sem mexer em nada; a tela inteira com "Todo o
 sistema" continua sem o som da chamada.
 
-## Etapa 6: configurações e atualização — pendente
+## Etapa 6: configurações e atualização — concluída
 
 - Perfil com `PATCH /api/me`; Aplicativo com versão, canal, atualização, o que há de novo e Abrir pasta de
   logs.
-- `set_update_channel` e o canal gravado no Rust; os avisos de atualização no visual novo.
+- `set_update_channel` e o canal guardado só na memória do Rust (ADR 0013); os avisos de atualização no
+  visual novo.
 
 **Pronto quando:** trocar o nome visível aparece na próxima entrada na sala; ligar o beta de alguém no
-banco faz o app dessa pessoa verificar o beta na hora; com a API fora do ar, o app usa o último canal.
+banco faz o app dessa pessoa verificar o beta na hora; com a API fora do ar, o app abre no estável e o
+beta chega na próxima abertura com a API no ar.
 
 ## Etapa 7: Painel de controle — pendente
 
