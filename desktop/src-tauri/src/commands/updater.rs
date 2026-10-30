@@ -10,7 +10,7 @@ use tracing::warn;
 use crate::{
     commands::run_blocking,
     error::AppError,
-    updater::{self, AutoUpdate, UpdateEvent},
+    updater::{self, AutoUpdate, Channel, UpdateEvent},
 };
 
 pub const UPDATE_READY: &str = "update-ready";
@@ -69,5 +69,17 @@ pub async fn install_update(app: AppHandle) -> Result<(), AppError> {
 #[tauri::command]
 pub async fn check_for_update(app: AppHandle) -> Result<(), AppError> {
     updater::check_in_background(app);
+    Ok(())
+}
+
+/// Passa ao updater o canal de atualização que a API mandou (`update_channel`
+/// do `/api/me`, ADR 0013). Fica só na memória. Se as verificações passaram
+/// para o beta agora, verifica na hora.
+#[tauri::command]
+pub async fn set_update_channel(app: AppHandle, channel: Channel) -> Result<(), AppError> {
+    let switched_to_beta = app.state::<AutoUpdate>().set_channel(channel);
+    if switched_to_beta {
+        updater::check_in_background(app);
+    }
     Ok(())
 }
