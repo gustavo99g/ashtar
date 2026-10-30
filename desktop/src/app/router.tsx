@@ -28,6 +28,7 @@ import {
 	InvitesSettingsRoute,
 	MembersSettingsRoute,
 	ProfileSettingsRoute,
+	VoiceSettingsRoute,
 } from "@/routes/settings";
 import { StartRoute } from "@/routes/start";
 import { VoiceRoomRoute } from "@/routes/voice-room";
@@ -64,6 +65,7 @@ export const routes: RouteObject[] = [
 						children: [
 							{ index: true, element: <Navigate to="profile" replace /> },
 							{ path: "profile", element: <ProfileSettingsRoute /> },
+							{ path: "voice", element: <VoiceSettingsRoute /> },
 							{ path: "app", element: <AppSettingsRoute /> },
 							{ path: "invites", element: <InvitesSettingsRoute /> },
 							{ path: "members", element: <MembersSettingsRoute /> },

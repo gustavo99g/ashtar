@@ -85,6 +85,16 @@ describe("router", () => {
 		const router = renderAt([paths.server, paths.settings.root]);
 		expect(router.state.location.pathname).toBe(paths.settings.profile);
 	});
+	it("Voz e vídeo abre a aba dos dispositivos", () => {
+		const router = renderAt([paths.server, paths.settings.profile]);
+
+		fireEvent.click(screen.getByRole("link", { name: "Voz e vídeo" }));
+
+		expect(router.state.location.pathname).toBe(paths.settings.voice);
+		expect(
+			screen.getByRole("heading", { name: "Voz e vídeo" }),
+		).toBeInTheDocument();
+	});
 
 	it("o ESC fecha as configurações e volta para onde estava, mesmo depois de trocar de página", () => {
 		const router = renderAt([paths.server, paths.settings.profile]);

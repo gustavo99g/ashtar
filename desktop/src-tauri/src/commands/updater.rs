@@ -10,7 +10,7 @@ use tracing::warn;
 use crate::{
     commands::run_blocking,
     error::AppError,
-    updater::{self, AutoUpdate, UpdateEvent},
+    updater::{self, AutoUpdate, Channel, CheckOutcome, UpdateEvent},
 };
 
 pub const UPDATE_READY: &str = "update-ready";
@@ -24,6 +24,30 @@ pub struct UpdateReadyPayload {
 #[derive(Debug, Clone, Serialize)]
 pub struct UpdateFailedPayload {
     pub message: String,
+}
+
+/// O resultado do "Procurar atualização" (`UpdateCheck` no `commands.ts`): o
+/// [`CheckOutcome`], mais `Disabled` no desenvolvimento, onde a atualização
+/// fica desligada.
+#[derive(Debug, Clone, Serialize)]
+#[serde(tag = "status", rename_all = "camelCase")]
+pub enum UpdateCheck {
+    UpToDate,
+    Ready { version: String },
+    Offline,
+    Failed { message: String },
+    Disabled,
+}
+
+impl From<CheckOutcome> for UpdateCheck {
+    fn from(outcome: CheckOutcome) -> Self {
+        match outcome {
+            CheckOutcome::UpToDate => Self::UpToDate,
+            CheckOutcome::Ready { version } => Self::Ready { version },
+            CheckOutcome::Offline => Self::Offline,
+            CheckOutcome::Failed { message } => Self::Failed { message },
+        }
+    }
 }
 
 /// Cria o estado da atualização, ligado aos eventos do Tauri.
@@ -69,5 +93,28 @@ pub async fn install_update(app: AppHandle) -> Result<(), AppError> {
 #[tauri::command]
 pub async fn check_for_update(app: AppHandle) -> Result<(), AppError> {
     updater::check_in_background(app);
+    Ok(())
+}
+
+/// O "Procurar atualização" da tela Aplicativo: verifica e espera o
+/// resultado, que pode levar o download inteiro. Os eventos saem como numa
+/// verificação qualquer.
+#[tauri::command]
+pub async fn check_for_update_now(app: AppHandle) -> Result<UpdateCheck, AppError> {
+    if cfg!(debug_assertions) {
+        return Ok(UpdateCheck::Disabled);
+    }
+    Ok(app.state::<AutoUpdate>().check(&app).await.into())
+}
+
+/// Passa ao updater o canal de atualização que a API mandou (`update_channel`
+/// do `/api/me`, ADR 0013). Fica só na memória. Se as verificações passaram
+/// para o beta agora, verifica na hora.
+#[tauri::command]
+pub async fn set_update_channel(app: AppHandle, channel: Channel) -> Result<(), AppError> {
+    let switched_to_beta = app.state::<AutoUpdate>().set_channel(channel);
+    if switched_to_beta {
+        updater::check_in_background(app);
+    }
     Ok(())
 }

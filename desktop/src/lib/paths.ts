@@ -9,8 +9,7 @@ export const paths = {
 	entry: {
 		noInvite: "/entry/no-invite",
 		invite: (code: string) => `/entry/invite/${encodeURIComponent(code)}`,
-		recovery: (code: string) =>
-			`/entry/recovery/${encodeURIComponent(code)}`,
+		recovery: (code: string) => `/entry/recovery/${encodeURIComponent(code)}`,
 		alreadyIn: "/entry/already-in",
 		leftGroup: "/entry/left",
 	},
@@ -19,6 +18,7 @@ export const paths = {
 	settings: {
 		root: "/settings",
 		profile: "/settings/profile",
+		voice: "/settings/voice",
 		app: "/settings/app",
 		invites: "/settings/invites",
 		members: "/settings/members",

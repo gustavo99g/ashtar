@@ -9,16 +9,17 @@ protótipo (o canvas "Clone do Discord — telas"). O plano da fase anterior est
 e o dono administra tudo pelo Painel de controle do app. No fim, o código de acesso provisório e a rota
 `/api/voice/join` saem, e a versão mínima sobe.
 
-**Fora do escopo:** o chat real (v0.2.3; o quadro "Canal de texto" fica de referência), a aba Voz e vídeo
-(supressão de ruído na v0.2.3, dispositivos e pressionar para falar na v0.6), Reconectando e Conexão perdida
+**Fora do escopo:** o chat real (v0.2.3; o quadro "Canal de texto" fica de referência), o resto da aba Voz e
+vídeo, que na v0.2.2 só tem os dispositivos (supressão de ruído na v0.2.3, volumes, teste de microfone e
+pressionar para falar na v0.6), Reconectando e Conexão perdida
 (v0.6), o aviso de conteúdo protegido (v0.8), janelas minimizadas no seletor (`BACKLOG.md`), os webhooks do
 LiveKit e qualquer tempo real por conexão longa (v0.2.3), câmera, um segundo tema e a correção do eco (sai
 fora de ordem, pelo `BACKLOG.md`).
 
 **Versões.** A entrega sai como `0.2.20` (numeração do roadmap: entrega × 10 + correção). As Etapas 2 a 5
-entram juntas na `dev` como `0.2.20`, a primeira versão no beta; a 6 sai como `0.2.21` e a 7 como `0.2.22`,
-cada uma com a sua seção no `CHANGELOG.md`. A Etapa 8 promove para o estável e fecha com uma correção que
-tira o código de acesso do app.
+entram juntas na `dev` como `0.2.20`, a primeira versão no beta; a 5b (pedido de 29/10) e a 6 saem juntas
+como `0.2.21` e a 7 como `0.2.22`, cada versão com a sua seção no `CHANGELOG.md`. A Etapa 8 promove para o
+estável e fecha com uma correção que tira o código de acesso do app.
 
 Base: a branch `dev` com a v0.2.1 (código conferido a partir do commit `7daf05e` da `feature/0.2.1`). Em
 cada etapa, `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings` e `cargo test` (em `api/` e em
@@ -34,13 +35,14 @@ cada etapa, `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings` e `
 | 3 | Identidade no app: tipos gerados, TanStack Query, chave do computador, login pelo Rust, sessão | Concluída (`351a1e1`) |
 | 4 | Entrada: link `ashtar://`, uma instância, convite, nick, recuperação, saiu do grupo | Concluída (`9412f04`) |
 | 5 | Tela do servidor e sala de voz, uma transmissão por vez, convite rápido | Concluída (`4b7bfe5`) |
-| 6 | Configurações (Perfil, Aplicativo) e atualização com o canal por pessoa | Pendente |
+| 5b | Dispositivos de voz (entrada e saída), o ensurdecer só nas vozes, o nome da sala entra na chamada | Concluída |
+| 6 | Configurações (Perfil, Aplicativo) e atualização com o canal por pessoa | Concluída |
 | 7 | Painel de controle: Convites, Membros, aviso de quem entrou | Pendente |
 | 8 | Lançamento: beta, troca do grupo, versão mínima, fim do código de acesso | Pendente |
 
 Branches: a Etapa 1 vai direto para a `dev` (só a API muda, nada é publicado). As Etapas 2 a 5 ficam em
 `entrega/ui-nova`, a partir da `dev`, com um pull request por etapa para dentro dela e, no fim, um para a
-`dev`. As Etapas 6 e 7 saem cada uma da `dev` para a `dev`, com a versão nova.
+`dev`. A Etapa 5b e a 6 saem juntas da `dev` para a `dev` como `0.2.21`, e a 7 sai depois, como `0.2.22`.
 
 ---
 
@@ -64,7 +66,8 @@ plano decidiu além disso.
   Credenciais**, direto pelo `windows-sys`. **Token só na memória**, login a cada abertura.
 - **Janela de 1440 × 900** (pedido de 18/10; numa tela menor, 90% da área útil na primeira abertura),
   mínimo de 1000 × 640, barra própria. Toda tela funciona do mínimo até uma tela grande maximizada.
-- **Aba Voz e vídeo fora**; aparece apagada no menu. **Janelas minimizadas** continuam fora do seletor, no
+- **Aba Voz e vídeo só com os dispositivos** (Etapa 5b, pedido de 29/10); o resto da aba está no
+  `BACKLOG.md`. **Janelas minimizadas** continuam fora do seletor, no
   `BACKLOG.md`, e o quadro perdeu o selo. **Reconectando** e **Conexão perdida** ficam para a v0.6 e o
   **conteúdo protegido** para a v0.8.
 - **Tela nova "Este computador saiu do grupo"** para quem foi removido ou desvinculado, com o pedido de
@@ -150,14 +153,28 @@ convite novo vai ao nick e a recuperação vai direto à conta; cada linha da ta
 **Pronto quando:** duas contas entram na sala e se veem pelo nome visível, com a cor do nick; a tela do
 servidor de quem ficou fora mostra as duas; só uma transmissão por vez, mesmo começando juntas.
 
-## Etapa 6: configurações e atualização — pendente
+## Etapa 5b: dispositivos de voz — concluída
+
+- Configurações › Voz e vídeo com a Entrada e a Saída: o "Padrão do Windows" e a lista do Windows,
+  atualizada quando um fone liga ou desliga; a escolha guardada neste computador.
+- A chamada entra com os dispositivos escolhidos e troca na hora; o escolhido desconectado dá lugar ao
+  padrão do Windows até voltar.
+- O ensurdecer cala só as vozes; o som da transmissão segue o volume do Foco.
+- O nome da sala na coluna entra na chamada.
+
+**Pronto quando:** trocar o microfone e a saída no meio de uma chamada vale na hora; desligar e ligar o
+fone escolhido passa para o padrão do Windows e volta sem mexer em nada; a tela inteira com "Todo o
+sistema" continua sem o som da chamada.
+
+## Etapa 6: configurações e atualização — concluída
 
 - Perfil com `PATCH /api/me`; Aplicativo com versão, canal, atualização, o que há de novo e Abrir pasta de
   logs.
-- `set_update_channel` e o canal gravado no Rust; os avisos de atualização no visual novo.
+- `set_update_channel` e o canal guardado só na memória do Rust (ADR 0013); os avisos de atualização no
+  visual novo.
 
 **Pronto quando:** trocar o nome visível aparece na próxima entrada na sala; ligar o beta de alguém no
-banco faz o app dessa pessoa verificar o beta na hora; com a API fora do ar, o app usa o último canal.
+banco faz o app dessa pessoa verificar o beta na hora; com a API fora do ar, o app verifica o estável.
 
 ## Etapa 7: Painel de controle — pendente
 

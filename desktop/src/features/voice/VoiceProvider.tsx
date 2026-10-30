@@ -13,8 +13,11 @@
  *
  * Entra sem assinar nada sozinho (`autoSubscribe: false`): a voz de todo mundo é assinada aqui, e a
  * tela transmitida só enquanto aparece no Foco (`subscriptions.ts`).
+ *
+ * Entra com o microfone e a saída de Configurações › Voz e vídeo (`devices.ts`) e troca na hora
+ * quando a escolha muda, ou quando o escolhido some e volta (`roomDevices.ts`).
  */
-import { RoomAudioRenderer, RoomContext } from "@livekit/components-react";
+import { RoomContext } from "@livekit/components-react";
 import { ConnectionState, Room, RoomEvent } from "livekit-client";
 import {
 	createContext,
@@ -30,8 +33,12 @@ import {
 	type ScreenShareController,
 } from "@/features/screen-share";
 import { createVoiceToken } from "@/lib/api";
+import { RoomAudio } from "./components/RoomAudio";
+import { effectiveDevice, knownDevices, useDeviceChoice } from "./devices";
+import { type DeviceIds, roomOptions, switchDevice } from "./roomDevices";
 import { useRoomView } from "./roomView";
 import { syncSubscription, syncSubscriptions } from "./subscriptions";
+import { useAudioDevices } from "./useAudioDevices";
 import {
 	encodeVoiceState,
 	parseVoiceState,
@@ -128,6 +135,19 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 	/** Mute e deafen de agora, para a conexão ler sem depender deles. */
 	const audioFlags = useRef({ isMuted, isDeafened });
 	audioFlags.current = { isMuted, isDeafened };
+	// O microfone e a saída escolhidos; um que sumiu dá o padrão do Windows (`null`) até voltar.
+	const devices = useAudioDevices();
+	const chosenInput = useDeviceChoice((state) => state.input);
+	const chosenOutput = useDeviceChoice((state) => state.output);
+	const inputId = effectiveDevice(chosenInput, knownDevices(devices, "input"));
+	const outputId = effectiveDevice(
+		chosenOutput,
+		knownDevices(devices, "output"),
+	);
+
+	/** Os dispositivos de agora, para a conexão ler ao criar a sala. */
+	const deviceIds = useRef<DeviceIds>({ input: inputId, output: outputId });
+	deviceIds.current = { input: inputId, output: outputId };
 
 	// Sem sessão não há chamada: saiu do grupo, o token da API já não vale.
 	const sessionConnected = useSession().status === "connected";
@@ -142,7 +162,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 
 		const { channelId } = target;
 		let cancelled = false;
-		const nextRoom = new Room();
+		const nextRoom = new Room(roomOptions(deviceIds.current));
 		const controller = new IpcScreenShare(nextRoom);
 
 		nextRoom.on(RoomEvent.ConnectionStateChanged, (state) => {
@@ -283,6 +303,14 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 		if (room) syncSubscriptions(room, onStage);
 	}, [room, onStage]);
 
+	// No meio da chamada, a escolha nova vale na hora, e o escolhido que some ou volta também.
+	useEffect(() => {
+		if (room) void switchDevice(room, "input", inputId);
+	}, [room, inputId]);
+	useEffect(() => {
+		if (room) void switchDevice(room, "output", outputId);
+	}, [room, outputId]);
+
 	const value = useMemo<VoiceContextValue>(() => {
 		async function setMicrophone(enabled: boolean) {
 			// Fora da chamada, só guarda a escolha: a conexão lê na próxima entrada.
@@ -369,7 +397,8 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 		<VoiceContext.Provider value={value}>
 			<RoomContext.Provider value={room ?? undefined}>
 				{/* muted também cancela a assinatura: quem entrar depois do deafen não é ouvido. */}
-				{room && <RoomAudioRenderer muted={isDeafened} />}
+				{/* O deafen cala só as vozes: a transmissão segue no volume do Foco. */}
+				{room && <RoomAudio deafened={isDeafened} />}
 				{children}
 			</RoomContext.Provider>
 		</VoiceContext.Provider>

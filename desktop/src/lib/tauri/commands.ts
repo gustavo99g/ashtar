@@ -9,7 +9,7 @@
  */
 import { Channel, type InvokeArgs, invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import type { SessionResponse } from "@/lib/api";
+import type { SessionResponse, UpdateChannel } from "@/lib/api";
 // Direto do arquivo, e não do `@/lib/api`: o `client.ts` de lá importa este arquivo (o 426).
 import { errorFromCommand } from "@/lib/api/errors";
 // ---------------------------------------------------------------------------
@@ -268,4 +268,38 @@ export interface AccountMarker {
  */
 export function accountMarker() {
 	return call<AccountMarker | null>("account_marker");
+}
+
+// ---------------------------------------------------------------------------
+// Configurações e atualização (Etapa 6 da v0.2.2)
+// Espelha `commands/updater.rs` e `commands/app.rs`. Mudou lá, muda aqui.
+// ---------------------------------------------------------------------------
+
+/**
+ * Passa ao Rust o canal de atualização que a API mandou (`update_channel` do `/api/me`). Ele fica
+ * só na memória e vale nas próximas verificações; se passou para o beta, o Rust verifica na hora.
+ */
+export function setUpdateChannel(channel: UpdateChannel) {
+	return call<void>("set_update_channel", { channel });
+}
+
+/** Abre a pasta de logs do app no Explorador de Arquivos. Rejeita com um `AppError`. */
+export function openLogDir() {
+	return call<void>("open_log_dir");
+}
+
+/** O resultado do "Procurar atualização". `disabled`: no desenvolvimento, que não se atualiza. */
+export type UpdateCheck =
+	| { status: "upToDate" }
+	| { status: "ready"; version: string }
+	| { status: "offline" }
+	| { status: "failed"; message: string }
+	| { status: "disabled" };
+
+/**
+ * Verifica agora e espera o resultado, que pode levar o download inteiro. Os eventos
+ * (`onUpdateReady`, `onUpdateFailed`) saem do mesmo jeito.
+ */
+export function checkForUpdateNow() {
+	return call<UpdateCheck>("check_for_update_now");
 }

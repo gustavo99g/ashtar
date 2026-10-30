@@ -86,9 +86,11 @@ Itens que a UI nova (v0.2.2) deixou para o chat, porque dependem do WebSocket pr
 
 ## v0.2.3 e v0.6 — Voz e vídeo
 
-- [ ] A aba "Voz e vídeo" das configurações ficou fora da v0.2.2 e aparece apagada no menu. O quadro dela
-      fica guardado: supressão de ruído, cancelamento de eco e ganho automático na v0.2.3; dispositivos,
-      volumes, teste de microfone, detecção de voz, pressionar para falar e atalhos globais na v0.6. O
+- [ ] A aba "Voz e vídeo" das configurações saiu na v0.2.2 só com os dispositivos, Entrada e Saída (Etapa
+      5b). O resto do quadro dela fica guardado: supressão de ruído, cancelamento de eco e ganho automático
+      na v0.2.3; os volumes de entrada e de saída, o teste de microfone, a detecção de voz com a
+      sensibilidade, o pressionar para falar com o atalho, os atalhos globais e os padrões do
+      compartilhamento de tela (qualidade e áudio) na v0.6. O
       pressionar para falar com um jogo em foco pede um gancho de teclado em Rust: o atalho global comum do
       Windows prende a tecla, e o jogo deixaria de recebê-la.
 - [ ] "Reconectando" no painel "Voz conectada" e o aviso "Conexão perdida" do compartilhamento ficaram

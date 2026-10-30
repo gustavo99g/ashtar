@@ -7,15 +7,23 @@
 //! ([`AutoUpdate::install_now`]) ou fechar o app
 //! ([`AutoUpdate::install_on_exit`]). Nunca reinicia sozinho.
 //!
+//! O canal (estável ou beta) vem da API e fica só na memória (`channel.rs`,
+//! ADR 0013): o [`AutoUpdate`] guarda o último e usa em toda verificação. A da
+//! abertura vem antes do login e usa o estável (ou a variável).
+//!
 //! Não conhece nomes de evento do Tauri: avisa por `on_event` (os nomes e o
 //! formato ficam em `commands/updater.rs`). Falha de rede é só log; falha de
 //! assinatura ou de instalação vira [`UpdateEvent::Failed`].
-use std::sync::atomic::{AtomicBool, Ordering};
+
+mod channel;
+
 use std::sync::{Mutex, MutexGuard, PoisonError};
 use std::time::Duration;
 
 use tauri::{AppHandle, Manager, Url};
 use tauri_plugin_updater::{Error, Update, UpdaterExt};
+
+pub use channel::Channel;
 
 const STABLE_ENDPOINT: &str =
     "https://github.com/gustavo99g/ashtar-releases/releases/latest/download/latest.json";
@@ -24,31 +32,10 @@ const BETA_ENDPOINT: &str =
 
 const CHECK_INTERVAL: Duration = Duration::from_secs(3 * 60 * 60);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Channel {
-    Stable,
-    Beta,
-}
-
-impl Channel {
-    /// Lê `ASHTAR_UPDATE_CHANNEL`. Até a v0.2.1, é o único jeito de entrar no
-    /// beta; na v0.2.1 o canal passa a vir da API.
-    pub fn from_env() -> Self {
-        Self::parse(std::env::var("ASHTAR_UPDATE_CHANNEL").ok().as_deref())
-    }
-    /// Só `beta` (sem diferenciar maiúsculas) liga o beta; o resto é estável.
-    fn parse(value: Option<&str>) -> Self {
-        match value {
-            Some(value) if value.trim().eq_ignore_ascii_case("beta") => Self::Beta,
-            _ => Self::Stable,
-        }
-    }
-
-    fn endpoint(self) -> &'static str {
-        match self {
-            Self::Stable => STABLE_ENDPOINT,
-            Self::Beta => BETA_ENDPOINT,
-        }
+fn endpoint(channel: Channel) -> &'static str {
+    match channel {
+        Channel::Stable => STABLE_ENDPOINT,
+        Channel::Beta => BETA_ENDPOINT,
     }
 }
 
@@ -57,7 +44,22 @@ impl Channel {
 pub enum UpdateEvent {
     /// Uma versão foi baixada e conferida; falta reiniciar.
     Ready { version: String },
-    /// A assinatura não confere, o manifesto está errado, ou a instalação falhou.
+    /// A assinatura não confere, ou o manifesto ou o download vieram errados.
+    /// `message` é o texto do aviso para a pessoa; o erro em si vai para o log.
+    Failed { message: String },
+}
+
+/// O resultado de uma verificação, para quem espera por ele (o "Procurar
+/// atualização" da tela Aplicativo). Os eventos saem do mesmo jeito.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CheckOutcome {
+    /// Nada mais novo no canal.
+    UpToDate,
+    /// Há uma versão baixada esperando o "reiniciar" (agora ou de antes).
+    Ready { version: String },
+    /// Não deu para falar com o GitHub. Só log, sem aviso.
+    Offline,
+    /// O mesmo erro do [`UpdateEvent::Failed`], com o mesmo texto.
     Failed { message: String },
 }
 
@@ -70,18 +72,64 @@ struct ReadyUpdate {
 pub struct AutoUpdate {
     on_event: Box<dyn Fn(UpdateEvent) + Send + Sync>,
     ready: Mutex<Option<ReadyUpdate>>,
-    /// Impede duas verificações ao mesmo tempo (a periódica e a pedida pelo
-    /// frontend), que baixariam o mesmo instalador duas vezes.
-    checking: AtomicBool,
+    /// Uma verificação por vez: duas juntas (a periódica e a pedida pelo
+    /// frontend) baixariam o mesmo instalador duas vezes. Um `Mutex` do tokio,
+    /// que a verificação segura atravessando os `.await`.
+    checking: tauri::async_runtime::Mutex<()>,
+    /// O canal das verificações (ver `channel::resolve`).
+    channel: Mutex<Channel>,
+    /// `ASHTAR_UPDATE_CHANNEL`, lida uma vez ao abrir.
+    env_channel: Option<String>,
 }
 
 impl AutoUpdate {
+    /// Cria o estado. Até o primeiro `/api/me`, o canal é o da variável, ou o
+    /// estável.
     pub fn new(on_event: impl Fn(UpdateEvent) + Send + Sync + 'static) -> Self {
+        Self::with_env(on_event, std::env::var("ASHTAR_UPDATE_CHANNEL").ok())
+    }
+
+    fn with_env(
+        on_event: impl Fn(UpdateEvent) + Send + Sync + 'static,
+        env_channel: Option<String>,
+    ) -> Self {
+        let (channel, source) = channel::resolve(env_channel.as_deref(), None);
+        tracing::info!(
+            canal = channel.as_str(),
+            origem = source.describe(),
+            "canal de atualização"
+        );
+
         Self {
             on_event: Box::new(on_event),
             ready: Mutex::new(None),
-            checking: AtomicBool::new(false),
+            checking: tauri::async_runtime::Mutex::new(()),
+            channel: Mutex::new(channel),
+            env_channel,
         }
+    }
+
+    /// Passa a usar nas próximas verificações o canal que a API mandou. Devolve
+    /// `true` se elas acabaram de passar para o beta: aí vale verificar na hora,
+    /// sem esperar as 3 horas.
+    pub fn set_channel(&self, from_api: Channel) -> bool {
+        let (next, source) = channel::resolve(self.env_channel.as_deref(), Some(from_api));
+        let previous = std::mem::replace(
+            &mut *self.channel.lock().unwrap_or_else(PoisonError::into_inner),
+            next,
+        );
+        if previous != next {
+            tracing::info!(
+                canal = next.as_str(),
+                origem = source.describe(),
+                "canal de atualização mudou"
+            );
+        }
+        previous == Channel::Stable && next == Channel::Beta
+    }
+
+    fn current_channel(&self) -> Channel {
+        *self.channel.lock().unwrap_or_else(PoisonError::into_inner)
     }
     /// A versão já baixada, se houver.
     pub fn pending_version(&self) -> Option<String> {
@@ -89,32 +137,42 @@ impl AutoUpdate {
             .as_ref()
             .map(|ready| ready.update.version.clone())
     }
-    /// Verifica, baixa e avisa. Se outra verificação estiver rodando, não faz nada.
-    pub async fn check(&self, app: &AppHandle) {
-        if self.checking.swap(true, Ordering::AcqRel) {
-            return;
-        }
+    /// Verifica, baixa e avisa. Se outra verificação estiver rodando, espera
+    /// ela terminar e verifica de novo (uma versão que ela já baixou não é
+    /// baixada outra vez).
+    pub async fn check(&self, app: &AppHandle) -> CheckOutcome {
+        let _running = self.checking.lock().await;
         let result = self.check_and_download(app).await;
-        self.checking.store(false, Ordering::Release);
 
         match result {
-            Ok(Some(version)) => (self.on_event)(UpdateEvent::Ready { version }),
-            Ok(None) => {}
+            Ok(Some(version)) => {
+                (self.on_event)(UpdateEvent::Ready {
+                    version: version.clone(),
+                });
+                CheckOutcome::Ready { version }
+            }
+            Ok(None) => match self.pending_version() {
+                Some(version) => CheckOutcome::Ready { version },
+                None => CheckOutcome::UpToDate,
+            },
             Err(error) if is_network(&error) => {
                 tracing::warn!(%error, "não foi possivel verificar se há atualização");
+                CheckOutcome::Offline
             }
             Err(error) => {
                 tracing::error!(%error, "falha na atualização");
+                let message = failure_text(&error).to_owned();
                 (self.on_event)(UpdateEvent::Failed {
-                    message: error.to_string(),
-                })
+                    message: message.clone(),
+                });
+                CheckOutcome::Failed { message }
             }
         }
     }
     /// Devolve a versão baixada agora, ou `None` se não havia nada novo.
     async fn check_and_download(&self, app: &AppHandle) -> Result<Option<String>, Error> {
-        let channel = Channel::from_env();
-        let endpoint = Url::parse(channel.endpoint()).expect("endpoint fixo é uma URL válida");
+        let channel = self.current_channel();
+        let endpoint = Url::parse(endpoint(channel)).expect("endpoint fixo é uma URL válida");
 
         // O instalador encerra o processo com `exit`: os logs precisam ser descarregados antes (ver `logging::flush`).
         let flush_app = app.clone();
@@ -192,6 +250,21 @@ fn is_network(error: &Error) -> bool {
         Error::Reqwest(_) | Error::Network(_) | Error::ReleaseNotFound
     )
 }
+/// O texto do aviso "Não deu para atualizar", em português e sem os detalhes,
+/// que ficam no log. A próxima verificação (em até 3 horas) tenta de novo.
+fn failure_text(error: &Error) -> &'static str {
+    match error {
+        Error::Minisign(_)
+        | Error::Base64(_)
+        | Error::SignatureUtf8(_)
+        | Error::SignedVersionMismatch { .. }
+        | Error::MissingSignedVersion => {
+            "A assinatura do arquivo não confere. Tentamos de novo mais tarde."
+        }
+        _ => "Tentamos de novo mais tarde.",
+    }
+}
+
 /// Verifica agora e depois a cada 3 horas, enquanto o app estiver aberto.
 /// Não faz nada no desenvolvimento.
 pub fn spawn_periodic_check(app: AppHandle) {
@@ -224,19 +297,53 @@ mod tests {
     use super::*;
 
     #[test]
-    fn so_beta_liga_o_canal_beta() {
-        assert_eq!(Channel::parse(None), Channel::Stable);
-        assert_eq!(Channel::parse(Some("")), Channel::Stable);
-        assert_eq!(Channel::parse(Some("estavel")), Channel::Stable);
-        assert_eq!(Channel::parse(Some("beta")), Channel::Beta);
-        assert_eq!(Channel::parse(Some(" BETA ")), Channel::Beta);
+    fn so_o_erro_de_assinatura_fala_da_assinatura() {
+        let signature = failure_text(&Error::SignatureUtf8("x".into()));
+        assert_eq!(
+            signature,
+            "A assinatura do arquivo não confere. Tentamos de novo mais tarde."
+        );
+        assert_eq!(failure_text(&Error::MissingSignedVersion), signature);
+        assert_eq!(
+            failure_text(&Error::TargetNotFound("windows-x86_64".into())),
+            "Tentamos de novo mais tarde."
+        );
+    }
+
+    fn auto_update(env: Option<&str>) -> AutoUpdate {
+        AutoUpdate::with_env(|_| {}, env.map(str::to_owned))
+    }
+
+    #[test]
+    fn abre_no_estavel_e_so_a_virada_para_o_beta_pede_verificacao() {
+        let update = auto_update(None);
+        assert_eq!(update.current_channel(), Channel::Stable);
+
+        assert!(!update.set_channel(Channel::Stable));
+        assert!(update.set_channel(Channel::Beta));
+        assert_eq!(update.current_channel(), Channel::Beta);
+        // Já no beta: não verifica de novo a cada /api/me.
+        assert!(!update.set_channel(Channel::Beta));
+        // Saiu do beta: o canal muda, mas não há o que baixar.
+        assert!(!update.set_channel(Channel::Stable));
+        assert_eq!(update.current_channel(), Channel::Stable);
+    }
+
+    #[test]
+    fn a_variavel_de_desenvolvimento_vence_a_api() {
+        let beta = auto_update(Some("beta"));
+        assert_eq!(beta.current_channel(), Channel::Beta);
+        assert!(!beta.set_channel(Channel::Stable));
+        assert_eq!(beta.current_channel(), Channel::Beta);
+
+        let stable = auto_update(Some("estavel"));
+        assert!(!stable.set_channel(Channel::Beta));
+        assert_eq!(stable.current_channel(), Channel::Stable);
     }
 
     #[test]
     fn cada_canal_tem_o_seu_endpoint() {
-        assert!(Channel::Stable.endpoint().contains("/releases/latest/"));
-        assert!(Channel::Beta
-            .endpoint()
-            .contains("/releases/download/beta/"));
+        assert!(endpoint(Channel::Stable).contains("/releases/latest/"));
+        assert!(endpoint(Channel::Beta).contains("/releases/download/beta/"));
     }
 }

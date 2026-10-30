@@ -73,7 +73,7 @@ export function ScreenStage({
 		if (!remoteAudio) return;
 		const apply = () => remoteAudio.setVolume(heard / 100);
 		apply();
-		// O `RoomAudioRenderer` pode ligar o elemento de áudio depois deste efeito, e o LiveKit não
+		// O `RoomAudio` pode ligar o elemento de áudio depois deste efeito, e o LiveKit não
 		// reaplica um volume zero ao ligar: aplica de novo nessa hora.
 		remoteAudio.on(TrackEvent.ElementAttached, apply);
 		return () => {
