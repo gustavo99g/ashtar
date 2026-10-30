@@ -1,5 +1,6 @@
 export { Avatar, AvatarBadge } from "./components/Avatar";
 export { PersonName } from "./components/PersonName";
+export { ProfileSettings } from "./components/ProfileSettings";
 export { avatarInitial, NICK_COLORS, nickColor } from "./nickColor";
 export {
 	nickFromMetadata,

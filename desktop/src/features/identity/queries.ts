@@ -4,7 +4,7 @@
  * array à mão.
  */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { getInvite, getMe } from "@/lib/api";
+import { getInvite, getMe, updateMe } from "@/lib/api";
 import { redeemInvite, useSession } from "./session";
 
 export const identityKeys = {
@@ -54,5 +54,18 @@ export function useRedeemInvite() {
 		// Uma conta nova (ou a recuperada) não aproveita nada que estava no cache.
 		onSettled: () =>
 			queryClient.invalidateQueries({ queryKey: identityKeys.me() }),
+	});
+}
+
+/**
+ * Trocar o nome visível (`PATCH /api/me`): `mutate(nome)`, com `null` ou vazio para voltar ao
+ * nick. A resposta é o mesmo corpo do `GET /api/me` e entra direto no cache do `useMe`.
+ */
+export function useUpdateMe() {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: (displayName: string | null) =>
+			updateMe({ display_name: displayName }),
+		onSuccess: (me) => queryClient.setQueryData(identityKeys.me(), me),
 	});
 }

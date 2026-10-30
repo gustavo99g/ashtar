@@ -1,5 +1,6 @@
+import { ProfileSettings } from "@/features/identity";
 import { AppSettings } from "@/features/updater";
-import { VoiceSettings } from "@/features/voice";
+import { useVoice, VoiceSettings } from "@/features/voice";
 import { RoutePlaceholder } from "../placeholder";
 
 /*
@@ -7,7 +8,11 @@ import { RoutePlaceholder } from "../placeholder";
  */
 
 export function ProfileSettingsRoute() {
-	return <RoutePlaceholder title="Perfil" stage={6} />;
+	// A rota diz se há chamada: a identidade não importa a voz.
+	const { connectionState } = useVoice();
+	const inCall =
+		connectionState !== "disconnected" && connectionState !== "error";
+	return <ProfileSettings inCall={inCall} />;
 }
 
 export function VoiceSettingsRoute() {
