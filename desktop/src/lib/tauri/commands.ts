@@ -287,3 +287,19 @@ export function setUpdateChannel(channel: UpdateChannel) {
 export function openLogDir() {
 	return call<void>("open_log_dir");
 }
+
+/** O resultado do "Procurar atualização". `disabled`: no desenvolvimento, que não se atualiza. */
+export type UpdateCheck =
+	| { status: "upToDate" }
+	| { status: "ready"; version: string }
+	| { status: "offline" }
+	| { status: "failed"; message: string }
+	| { status: "disabled" };
+
+/**
+ * Verifica agora e espera o resultado, que pode levar o download inteiro. Os eventos
+ * (`onUpdateReady`, `onUpdateFailed`) saem do mesmo jeito.
+ */
+export function checkForUpdateNow() {
+	return call<UpdateCheck>("check_for_update_now");
+}

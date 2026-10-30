@@ -58,6 +58,7 @@ export function SettingsLayout() {
 	const navigate = useNavigate();
 	// Escondido até o `/api/me` responder: quem decide de verdade é a API, aqui é só o menu.
 	const showPanel = useMe().data?.can_view_panel === true;
+	const channel = useMe().data?.update_channel;
 
 	useEffect(() => {
 		const onKeyDown = (event: KeyboardEvent) => {
@@ -101,9 +102,11 @@ export function SettingsLayout() {
 					</>
 				)}
 				<MenuSeparator />
-				{/* A Etapa 6 acrescenta o canal (" · beta"). */}
+				{/* O canal só aparece depois do `/api/me`, como na tela Aplicativo. */}
 				<span className="px-2.5 font-mono text-[11px] text-muted-foreground">
 					Ashtar {__APP_VERSION__}
+					{channel === "beta" && " · beta"}
+					{channel === "stable" && " · estável"}
 				</span>
 			</nav>
 			<div className="relative flex min-w-0 flex-1 overflow-y-auto">

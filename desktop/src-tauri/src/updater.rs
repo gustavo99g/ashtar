@@ -49,6 +49,20 @@ pub enum UpdateEvent {
     Failed { message: String },
 }
 
+/// O resultado de uma verificação, para quem espera por ele (o "Procurar
+/// atualização" da tela Aplicativo). Os eventos saem do mesmo jeito.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CheckOutcome {
+    /// Nada mais novo no canal.
+    UpToDate,
+    /// Há uma versão baixada esperando o "reiniciar" (agora ou de antes).
+    Ready { version: String },
+    /// Não deu para falar com o GitHub. Só log, sem aviso.
+    Offline,
+    /// O mesmo erro do [`UpdateEvent::Failed`], com o mesmo texto.
+    Failed { message: String },
+}
+
 /// Uma versão baixada e com a assinatura conferida.
 struct ReadyUpdate {
     update: Update,
@@ -126,21 +140,32 @@ impl AutoUpdate {
     /// Verifica, baixa e avisa. Se outra verificação estiver rodando, espera
     /// ela terminar e verifica de novo (uma versão que ela já baixou não é
     /// baixada outra vez).
-    pub async fn check(&self, app: &AppHandle) {
+    pub async fn check(&self, app: &AppHandle) -> CheckOutcome {
         let _running = self.checking.lock().await;
         let result = self.check_and_download(app).await;
 
         match result {
-            Ok(Some(version)) => (self.on_event)(UpdateEvent::Ready { version }),
-            Ok(None) => {}
+            Ok(Some(version)) => {
+                (self.on_event)(UpdateEvent::Ready {
+                    version: version.clone(),
+                });
+                CheckOutcome::Ready { version }
+            }
+            Ok(None) => match self.pending_version() {
+                Some(version) => CheckOutcome::Ready { version },
+                None => CheckOutcome::UpToDate,
+            },
             Err(error) if is_network(&error) => {
                 tracing::warn!(%error, "não foi possivel verificar se há atualização");
+                CheckOutcome::Offline
             }
             Err(error) => {
                 tracing::error!(%error, "falha na atualização");
+                let message = failure_text(&error).to_owned();
                 (self.on_event)(UpdateEvent::Failed {
-                    message: failure_text(&error).to_owned(),
-                })
+                    message: message.clone(),
+                });
+                CheckOutcome::Failed { message }
             }
         }
     }

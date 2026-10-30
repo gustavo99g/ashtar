@@ -1,3 +1,4 @@
+import { AppSettings } from "@/features/updater";
 import { VoiceSettings } from "@/features/voice";
 import { RoutePlaceholder } from "../placeholder";
 
@@ -14,7 +15,7 @@ export function VoiceSettingsRoute() {
 }
 
 export function AppSettingsRoute() {
-	return <RoutePlaceholder title="Aplicativo" stage={6} />;
+	return <AppSettings />;
 }
 
 export function InvitesSettingsRoute() {
