@@ -4,7 +4,7 @@
  * app, e o aviso de quem entrou repete a mesma consulta.
  */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useSession } from "@/features/identity";
+import { useMe, useSession } from "@/features/identity";
 import { invitesKeys } from "@/features/invites";
 import {
 	createRecoveryInvite,
@@ -15,6 +15,7 @@ import {
 	setMemberBeta,
 	unlinkMember,
 } from "@/lib/api";
+import { useAppVisible } from "@/lib/visibility";
 
 export const membersKeys = {
 	all: ["members"] as const,
@@ -29,6 +30,26 @@ export function useMembers() {
 		queryKey: membersKeys.list(),
 		queryFn: listMembers,
 		enabled: connected,
+	});
+}
+
+/** De quanto em quanto tempo o app do dono pergunta de novo, para o aviso de quem entrou. */
+export const MEMBERS_WATCH_MS = 30_000;
+
+/**
+ * A mesma lista, repetida a cada 30 segundos enquanto o app está à vista, para o aviso de quem
+ * entrou. Só com `can_view_panel`: quem não pode ver o Painel não pergunta. A chave é a da lista,
+ * então a tela Membros e o aviso dividem o cache: o que um busca, o outro vê.
+ */
+export function useMembersWatch() {
+	const visible = useAppVisible();
+	const connected = useSession().status === "connected";
+	const canView = useMe().data?.can_view_panel === true;
+	return useQuery({
+		queryKey: membersKeys.list(),
+		queryFn: listMembers,
+		enabled: connected && canView,
+		refetchInterval: visible ? MEMBERS_WATCH_MS : false,
 	});
 }
 

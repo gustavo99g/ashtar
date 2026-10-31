@@ -1,5 +1,6 @@
 import { Outlet } from "react-router-dom";
 import logo from "@/assets/ashtar.svg";
+import { JoinNotices } from "@/features/members";
 import { ChannelNav, VoiceDock } from "@/features/voice";
 /*
  * A moldura de quem já entrou: a coluna do servidor à esquerda e a rota no meio. As
@@ -21,6 +22,8 @@ export function AppShell() {
 				<VoiceDock />
 			</aside>
 			<main className="flex min-w-0 flex-1 flex-col">
+				{/* O aviso de quem entrou (só para quem vê o Painel): vive enquanto a moldura vive. */}
+				<JoinNotices />
 				<Outlet />
 			</main>
 		</div>
