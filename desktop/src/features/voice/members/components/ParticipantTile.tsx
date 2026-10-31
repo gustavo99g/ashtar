@@ -1,7 +1,7 @@
 import { HeadphoneOffIcon, MicOffIcon, ScreenShareIcon } from "lucide-react";
 import { Avatar } from "@/features/identity";
 import { cn } from "@/lib/utils";
-import type { ChannelMember } from "../members";
+import type { ChannelMember } from "../model/members";
 
 /*
  * Uma pessoa na chamada: o avatar grande e o nome no canto, com os selos de transmitindo, sem

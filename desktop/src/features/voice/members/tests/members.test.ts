@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { memberFromApi, peopleNowLabel } from "../members";
+import { memberFromApi, peopleNowLabel } from "../model/members";
 
 describe("memberFromApi", () => {
 	it("usa o nome visível e, sem ele, o nick", () => {
