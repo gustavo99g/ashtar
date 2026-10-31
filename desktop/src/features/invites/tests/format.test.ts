@@ -7,7 +7,7 @@ import {
 	inviteAddress,
 	peopleText,
 	shortDate,
-} from "../format";
+} from "../model/format";
 
 /** 17 out de 2026, 12:15, no fuso do computador: o "agora" dos quadros. */
 const now = new Date(2026, 9, 17, 12, 15).getTime();

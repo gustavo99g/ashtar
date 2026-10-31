@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { Spinner } from "@/components/ui/spinner";
 import type { CreatedInviteView, MemberView } from "@/lib/api";
-import { memberName } from "../members";
+import { memberName } from "../model/members";
 import { useCreateRecoveryInvite, useUnlinkMember } from "../queries";
 
 /*

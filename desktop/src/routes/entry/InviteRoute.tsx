@@ -3,7 +3,6 @@ import { type FormEvent, useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import {
-	checkNick,
 	ENTERING_TITLE_ID,
 	Entering,
 	EntryFootnote,
@@ -13,10 +12,11 @@ import {
 	formatValidUntil,
 	NickField,
 	PersonCard,
-	sameNick,
 } from "@/features/entry";
 import {
+	checkNick,
 	PersonName,
+	sameNick,
 	useInvitePreview,
 	useRedeemInvite,
 } from "@/features/identity";

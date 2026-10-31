@@ -18,9 +18,9 @@ import {
 import { useMe } from "@/features/identity";
 import { type InviteView, isApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
-import { type InviteRowKind, inviteRow } from "../history";
+import { type InviteRowKind, inviteRow } from "../model/history";
 import { useInvites, useRevokeInvite } from "../queries";
-import { useNow } from "../useNow";
+import { useNow } from "../hooks/useNow";
 import { InviteStatusPill } from "./InviteStatusPill";
 
 /*

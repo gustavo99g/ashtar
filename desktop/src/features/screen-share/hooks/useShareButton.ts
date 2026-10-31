@@ -1,6 +1,6 @@
 import type { Participant } from "livekit-client";
-import type { ScreenShareController } from "./controller";
-import { openSourcePicker } from "./pickerStore";
+import type { ScreenShareController } from "../model/controller";
+import { openSourcePicker } from "../stores/pickerStore";
 import { useScreenShareState } from "./useScreenShareState";
 import { useScreenShares } from "./useScreenShares";
 

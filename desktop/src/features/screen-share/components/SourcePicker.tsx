@@ -20,10 +20,10 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { AudioMode, CaptureSource, Quality } from "@/lib/tauri/commands";
 import { cn } from "@/lib/utils";
-import type { ScreenShareController } from "./controller";
-import { layoutMonitors } from "./monitorLayout";
-import { startShare } from "./pickerStore";
-import { DEFAULT_QUALITY, QUALITY_ORDER, QUALITY_PRESETS } from "./presets";
+import type { ScreenShareController } from "../model/controller";
+import { layoutMonitors } from "../model/monitorLayout";
+import { startShare } from "../stores/pickerStore";
+import { DEFAULT_QUALITY, QUALITY_ORDER, QUALITY_PRESETS } from "../model/presets";
 
 type Tab = "windows" | "screens";
 type AudioChoice = AudioMode["mode"];

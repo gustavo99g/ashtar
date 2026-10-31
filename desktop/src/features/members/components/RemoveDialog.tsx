@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/dialog";
 import { Spinner } from "@/components/ui/spinner";
 import type { MemberView } from "@/lib/api";
-import { memberName } from "../members";
+import { memberName } from "../model/members";
 import { useRemoveMember } from "../queries";
 
 /*

@@ -1,8 +1,7 @@
-import { useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
-
 import { setSessionHandlers } from "@/lib/api";
-import { reauthenticate, setLeftGroup } from "./session";
+import { useClearCache } from "../queries";
+import { reauthenticate, setLeftGroup } from "../stores/sessionStore";
 
 /**
  * Liga a sessão ao `lib/api`: registra como entrar de novo depois de um 401 e o que fazer quando
@@ -13,7 +12,7 @@ import { reauthenticate, setLeftGroup } from "./session";
  * então quem navega é o `onLeftGroup` que o `App` passa.
  */
 export function SessionWatcher({ onLeftGroup }: { onLeftGroup: () => void }) {
-	const queryClient = useQueryClient();
+	const clearCache = useClearCache();
 
 	useEffect(
 		() =>
@@ -24,10 +23,10 @@ export function SessionWatcher({ onLeftGroup }: { onLeftGroup: () => void }) {
 					// estiver na tela não busca de novo.
 					setLeftGroup();
 					onLeftGroup();
-					queryClient.clear();
+					clearCache();
 				},
 			}),
-		[queryClient, onLeftGroup],
+		[clearCache, onLeftGroup],
 	);
 
 	return null;

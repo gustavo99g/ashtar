@@ -2,14 +2,14 @@ import { useTracks } from "@livekit/components-react";
 import { renderHook } from "@testing-library/react";
 import { Track } from "livekit-client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { ScreenShareController } from "../controller";
-import { usePickerStore } from "../pickerStore";
-import { shareTrackName } from "../shareInfo";
-import { useScreenShareState } from "../useScreenShareState";
-import { useShareButton } from "../useShareButton";
+import type { ScreenShareController } from "../model/controller";
+import { usePickerStore } from "../stores/pickerStore";
+import { shareTrackName } from "../model/shareInfo";
+import { useScreenShareState } from "../hooks/useScreenShareState";
+import { useShareButton } from "../hooks/useShareButton";
 
 vi.mock("@livekit/components-react", () => ({ useTracks: vi.fn() }));
-vi.mock("../useScreenShareState", () => ({ useScreenShareState: vi.fn() }));
+vi.mock("../hooks/useScreenShareState", () => ({ useScreenShareState: vi.fn() }));
 
 const controller = { stop: vi.fn() } as unknown as ScreenShareController;
 

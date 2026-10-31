@@ -8,7 +8,7 @@ import {
 	joinedFact,
 	joinedVia,
 	memberName,
-} from "../members";
+} from "../model/members";
 import { member, NOW, owner } from "./testMembers";
 
 const DAY = 86_400;

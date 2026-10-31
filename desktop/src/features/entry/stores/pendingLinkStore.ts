@@ -9,8 +9,8 @@
 import { create } from "zustand";
 import type { Session } from "@/features/identity";
 import { openingLink } from "@/lib/tauri/deep-link";
-import { entryDestination } from "./destination";
-import { type InviteLink, parseInviteLink } from "./inviteLink";
+import { entryDestination } from "../model/destination";
+import { type InviteLink, parseInviteLink } from "../model/inviteLink";
 
 interface PendingLinkState {
 	/** Já se sabe se o app abriu por um link (o `getCurrent` do plugin respondeu). */

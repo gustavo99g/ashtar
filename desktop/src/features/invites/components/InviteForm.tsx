@@ -14,7 +14,7 @@ import { ChoiceCard, ChoiceCardGroup } from "@/components/ui/choice-card";
 import { Segmented, SegmentedItem } from "@/components/ui/segmented";
 import { Spinner } from "@/components/ui/spinner";
 import type { CreatedInviteView, CreateInviteRequest, Preset } from "@/lib/api";
-import { dayAndTime, peopleText } from "../format";
+import { dayAndTime, peopleText } from "../model/format";
 import {
 	CUSTOM_TTLS,
 	type CustomTtl,
@@ -22,9 +22,9 @@ import {
 	MIN_USES,
 	PRESET_LIMITS,
 	PRESETS,
-} from "../presets";
+} from "../model/presets";
 import { useCreateInvite } from "../queries";
-import { useNow } from "../useNow";
+import { useNow } from "../hooks/useNow";
 
 /*
  * O "Novo convite" dos quadros "Convites" e "Convites (do seu jeito)": os três modelos, os campos

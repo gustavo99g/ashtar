@@ -1,18 +1,18 @@
-export type { ScreenShareController, ScreenShareState } from "./controller";
+export type { ScreenShareController, ScreenShareState } from "./model/controller";
 export { IpcScreenShare } from "./ipc/IpcScreenShare";
-export { type ShareNotice, shareNotice } from "./notices";
+export { type ShareNotice, shareNotice } from "./model/notices";
 export {
 	closeSourcePicker,
 	openSourcePicker,
 	restartShare,
-} from "./pickerStore";
-export { SourcePickerHost } from "./SourcePickerHost";
+} from "./stores/pickerStore";
+export { SourcePickerHost } from "./components/SourcePickerHost";
 export {
 	parseShareTrackName,
 	type ShareInfo,
 	shareSpec,
 	shareWinner,
-} from "./shareInfo";
-export { useScreenShareState } from "./useScreenShareState";
-export { useScreenShares } from "./useScreenShares";
-export { useShareButton } from "./useShareButton";
+} from "./model/shareInfo";
+export { useScreenShareState } from "./hooks/useScreenShareState";
+export { useScreenShares } from "./hooks/useScreenShares";
+export { useShareButton } from "./hooks/useShareButton";

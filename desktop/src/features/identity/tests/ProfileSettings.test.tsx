@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError, type MeResponse, updateMe } from "@/lib/api";
 import { ProfileSettings } from "../components/ProfileSettings";
 import { identityKeys } from "../queries";
-import { useSessionStore } from "../session";
+import { useSessionStore } from "../stores/sessionStore";
 
 vi.mock("@/lib/api", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/lib/api")>()),

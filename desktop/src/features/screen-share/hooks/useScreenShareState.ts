@@ -1,5 +1,5 @@
 import { useCallback, useSyncExternalStore } from "react";
-import type { ScreenShareController, ScreenShareState } from "./controller";
+import type { ScreenShareController, ScreenShareState } from "../model/controller";
 
 /** Constante: o `getSnapshot` precisa devolver o mesmo objeto enquanto nada muda. */
 const IDLE: ScreenShareState = { status: "idle" };

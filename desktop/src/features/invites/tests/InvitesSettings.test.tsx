@@ -12,7 +12,7 @@ import {
 	revokeInvite,
 } from "@/lib/api";
 import { InvitesSettings } from "../components/InvitesSettings";
-import { rememberQuickInvite, useQuickInviteStore } from "../quickInvite";
+import { rememberQuickInvite, useQuickInviteStore } from "../stores/quickInviteStore";
 
 vi.mock("@/lib/api", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/lib/api")>()),

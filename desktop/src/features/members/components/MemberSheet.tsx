@@ -29,7 +29,7 @@ import {
 	joinedFact,
 	type MemberFact,
 	memberName,
-} from "../members";
+} from "../model/members";
 import { useMemberPermissions } from "../queries";
 import type { MemberActions } from "./MemberMenu";
 import { OwnerBadge } from "./MemberRow";

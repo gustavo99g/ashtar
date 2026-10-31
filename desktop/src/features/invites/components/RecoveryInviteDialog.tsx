@@ -9,8 +9,8 @@ import {
 	DialogTitle,
 } from "@/components/ui/dialog";
 import type { CreatedInviteView } from "@/lib/api";
-import { dayAndTime, inviteAddress } from "../format";
-import { useCopy } from "../useCopy";
+import { dayAndTime, inviteAddress } from "../model/format";
+import { useCopy } from "../hooks/useCopy";
 import { InviteTicket } from "./InviteTicket";
 
 /*

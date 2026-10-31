@@ -11,7 +11,7 @@ import {
 	listInvites,
 	revokeInvite,
 } from "@/lib/api";
-import { forgetQuickInvite } from "./quickInvite";
+import { forgetQuickInvite } from "./stores/quickInviteStore";
 
 export const invitesKeys = {
 	all: ["invites"] as const,

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { MemberView } from "@/lib/api";
-import { joinNotices, noticeText } from "../joinNotices";
+import { joinNotices, noticeText } from "../model/joinNotices";
 import { member, NOW, owner } from "./testMembers";
 
 const group = (uses: number) => ({

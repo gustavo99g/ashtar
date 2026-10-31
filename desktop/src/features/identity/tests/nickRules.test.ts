@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { checkNick, sameNick } from "../nickRules";
+import { checkNick, sameNick } from "../model/nickRules";
 
 describe("checkNick", () => {
 	// Os mesmos casos do teste da API (`users.rs`).

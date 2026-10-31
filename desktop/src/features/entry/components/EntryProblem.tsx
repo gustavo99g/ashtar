@@ -15,7 +15,7 @@ import { useSession } from "@/features/identity";
 import { ApiError, isApiError } from "@/lib/api";
 import { paths } from "@/lib/paths";
 import { cn } from "@/lib/utils";
-import { useUpdateNow } from "../useUpdateNow";
+import { useUpdateNow } from "../hooks/useUpdateNow";
 import { EntryMessage } from "./EntryMessage";
 import { EntryScreen } from "./EntryScreen";
 

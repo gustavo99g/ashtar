@@ -5,7 +5,7 @@ import { toast } from "@/components/ui/toast";
 import { Avatar, AvatarBadge } from "@/features/identity";
 import type { MemberView } from "@/lib/api";
 import { paths } from "@/lib/paths";
-import { type JoinNotice, joinNotices, noticeText } from "../joinNotices";
+import { type JoinNotice, joinNotices, noticeText } from "../model/joinNotices";
 import { useMembersWatch } from "../queries";
 
 /*

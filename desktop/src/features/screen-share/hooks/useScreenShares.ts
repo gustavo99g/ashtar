@@ -1,6 +1,6 @@
 import { type TrackReference, useTracks } from "@livekit/components-react";
 import { Track } from "livekit-client";
-import { shareWinner } from "./shareInfo";
+import { shareWinner } from "../model/shareInfo";
 
 /**
  * As transmissões da sala, pelas publicações (assinadas ou não), e a que vale quando há mais de

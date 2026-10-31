@@ -1,6 +1,6 @@
 import type { ComponentProps, ReactNode } from "react";
 import { cn } from "@/lib/utils";
-import { avatarInitial, nickColor } from "../nickColor";
+import { avatarInitial, nickColor } from "../model/nickColor";
 
 /*
  * O avatar do canvas: um círculo na cor do nick com a letra do nome. Não há foto na 0.2.2.

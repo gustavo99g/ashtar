@@ -14,7 +14,7 @@ import {
 	filterMembers,
 	type MemberFilter,
 	memberName,
-} from "../members";
+} from "../model/members";
 import {
 	useCreateRecoveryInvite,
 	useMembers,

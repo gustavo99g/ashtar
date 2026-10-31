@@ -14,14 +14,13 @@ export {
 	type InviteLink,
 	type InviteLinkKind,
 	parseInviteLink,
-} from "./inviteLink";
-export { LinkWatcher } from "./LinkWatcher";
-export { checkNick, sameNick } from "./nickRules";
+} from "./model/inviteLink";
+export { LinkWatcher } from "./components/LinkWatcher";
 export {
 	loadOpeningLink,
 	nextEntryPath,
 	useOpeningLinkReady,
 	usePendingLinkStore,
-} from "./pendingLink";
-export { RequireNoAccount } from "./RequireNoAccount";
-export { formatValidUntil } from "./validUntil";
+} from "./stores/pendingLinkStore";
+export { RequireNoAccount } from "./components/RequireNoAccount";
+export { formatValidUntil } from "./model/validUntil";

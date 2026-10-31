@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { InviteView } from "@/lib/api";
-import { inviteRow, joinNames } from "../history";
+import { inviteRow, joinNames } from "../model/history";
 
 /** 17 out de 2026, 12:15: o "agora" dos quadros. */
 const now = new Date(2026, 9, 17, 12, 15).getTime();

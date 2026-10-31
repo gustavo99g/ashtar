@@ -9,7 +9,7 @@ import {
 	deviceText,
 	joinedVia,
 	memberName,
-} from "../members";
+} from "../model/members";
 import { type MemberActions, MemberMenu } from "./MemberMenu";
 
 /*

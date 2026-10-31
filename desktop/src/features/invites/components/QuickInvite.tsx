@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/popover";
 import { Spinner } from "@/components/ui/spinner";
 import { paths } from "@/lib/paths";
-import { expiryTime, inviteAddress } from "../format";
+import { expiryTime, inviteAddress } from "../model/format";
 import { useCreateInvite } from "../queries";
 import {
 	forgetQuickInvite,
@@ -26,8 +26,8 @@ import {
 	rememberQuickInvite,
 	timeLeft,
 	useQuickInviteStore,
-} from "../quickInvite";
-import { useNow } from "../useNow";
+} from "../stores/quickInviteStore";
+import { useNow } from "../hooks/useNow";
 import { InviteStatusPill } from "./InviteStatusPill";
 import { InviteTicket } from "./InviteTicket";
 

@@ -1,5 +1,5 @@
-import type { ScreenShareController } from "./controller";
-import { closeSourcePicker, usePickerStore } from "./pickerStore";
+import type { ScreenShareController } from "../model/controller";
+import { closeSourcePicker, usePickerStore } from "../stores/pickerStore";
 import { SourcePicker } from "./SourcePicker";
 
 /** O seletor de fonte, montado uma vez enquanto há chamada; abre com `openSourcePicker`. */

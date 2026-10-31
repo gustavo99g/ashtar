@@ -6,7 +6,7 @@ vi.mock("@/lib/tauri/deep-link", () => ({ openingLink: vi.fn() }));
 /** O módulo guarda a leitura da abertura: cada teste começa com um novo. */
 async function load() {
 	vi.resetModules();
-	return import("../pendingLink");
+	return import("../stores/pendingLinkStore");
 }
 
 beforeEach(() => {

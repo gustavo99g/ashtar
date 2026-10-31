@@ -6,8 +6,8 @@ import {
 	onUpdateFailed,
 	onUpdateReady,
 } from "@/lib/tauri/commands";
-import { useUpdaterStore } from "../store";
-import { UpdateNotice } from "../UpdateNotice";
+import { useUpdaterStore } from "../stores/updaterStore";
+import { UpdateNotice } from "../components/UpdateNotice";
 
 vi.mock("@/lib/tauri/commands", () => ({
 	installUpdate: vi.fn(() => new Promise(() => {})),

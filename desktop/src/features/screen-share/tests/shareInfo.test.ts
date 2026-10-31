@@ -4,7 +4,7 @@ import {
 	shareSpec,
 	shareTrackName,
 	shareWinner,
-} from "../shareInfo";
+} from "../model/shareInfo";
 
 const name = (startedAt: number) =>
 	shareTrackName({ startedAt, quality: "720p60", title: "Jogo" });

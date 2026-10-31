@@ -30,9 +30,9 @@ import {
 	updateFailed,
 	updateReady,
 	useUpdaterStore,
-} from "./store";
-import { useInCall } from "./useInCall";
-import { useUpdateChannelSync } from "./useUpdateChannelSync";
+} from "../stores/updaterStore";
+import { useInCall } from "../useInCall";
+import { useUpdateChannelSync } from "../hooks/useUpdateChannelSync";
 
 /** Liga os eventos do Rust ao estado. */
 function useUpdateEvents() {

@@ -30,8 +30,8 @@ import {
 	restartToUpdate,
 	updateReady,
 	useUpdaterStore,
-} from "./store";
-import { useInCall } from "./useInCall";
+} from "../stores/updaterStore";
+import { useInCall } from "../useInCall";
 
 /**
  * Onde o Rust grava os logs (`app_log_dir`: a pasta local do Windows com o identificador do

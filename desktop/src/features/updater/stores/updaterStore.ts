@@ -7,6 +7,7 @@
  * mesma confirmação durante uma chamada, no próprio aviso.
  */
 import { create } from "zustand";
+import { persist } from "zustand/middleware";
 import { installUpdate, type WhatsNew, whatsNew } from "@/lib/tauri/commands";
 
 /** O aviso no canto, nos estados do quadro "Atualização: avisos". */
@@ -27,20 +28,42 @@ interface UpdaterState {
 	 */
 	whatsNew: WhatsNew | null;
 	whatsNewOpen: boolean;
+	/**
+	 * A última versão cujo "O que há de novo" a pessoa já viu. Fica no `localStorage`, que é da pasta
+	 * de dados do app (o identificador): o app instalado e o de desenvolvimento não se misturam.
+	 */
+	lastSeenVersion: string | null;
 }
 
-export const useUpdaterStore = create<UpdaterState>()(() => ({
-	readyVersion: null,
-	notice: null,
-	whatsNew: null,
-	whatsNewOpen: false,
-}));
+/** A chave de antes do `persist` (v0.2.20): lida uma vez, para quem já viu não ver de novo. */
+const LEGACY_LAST_SEEN_KEY = "ashtar.lastSeenVersion";
 
-/**
- * A última versão cujo "O que há de novo" a pessoa já viu. O `localStorage` é da pasta de dados do
- * app (o identificador): o app instalado e o de desenvolvimento não se misturam.
- */
-const LAST_SEEN_KEY = "ashtar.lastSeenVersion";
+export const useUpdaterStore = create<UpdaterState>()(
+	persist(
+		(): UpdaterState => ({
+			readyVersion: null,
+			notice: null,
+			whatsNew: null,
+			whatsNewOpen: false,
+			lastSeenVersion: null,
+		}),
+		{
+			name: "ashtar-updater",
+			version: 1,
+			// Só a versão vista vai para o disco; o aviso e a versão baixada são desta execução.
+			partialize: (state) => ({ lastSeenVersion: state.lastSeenVersion }),
+			merge: (persisted, current) => {
+				const saved = (persisted as { lastSeenVersion?: unknown } | undefined)
+					?.lastSeenVersion;
+				const lastSeenVersion =
+					typeof saved === "string"
+						? saved
+						: localStorage.getItem(LEGACY_LAST_SEEN_KEY);
+				return { ...current, lastSeenVersion };
+			},
+		},
+	),
+);
 
 /** Quando o Reiniciar falha, a versão continua baixada: o Rust tenta de novo ao fechar o app. */
 const INSTALL_FAILED = "Tentamos de novo mais tarde.";
@@ -104,7 +127,10 @@ async function install() {
  */
 export async function showWhatsNewOnce() {
 	const content = await whatsNew().catch(() => null);
-	if (!content || localStorage.getItem(LAST_SEEN_KEY) === content.version)
+	if (
+		!content ||
+		useUpdaterStore.getState().lastSeenVersion === content.version
+	)
 		return;
 	useUpdaterStore.setState({ whatsNew: content, whatsNewOpen: true });
 }
@@ -119,6 +145,8 @@ export async function openWhatsNew() {
 /** Entendi, Esc ou clicar fora: fecha e guarda a versão como vista. */
 export function closeWhatsNew() {
 	const content = useUpdaterStore.getState().whatsNew;
-	if (content) localStorage.setItem(LAST_SEEN_KEY, content.version);
-	useUpdaterStore.setState({ whatsNewOpen: false });
+	useUpdaterStore.setState({
+		whatsNewOpen: false,
+		...(content && { lastSeenVersion: content.version }),
+	});
 }

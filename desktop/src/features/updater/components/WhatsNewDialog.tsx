@@ -10,7 +10,7 @@ import logo from "@/assets/ashtar.svg";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
-import { closeWhatsNew, showWhatsNewOnce, useUpdaterStore } from "./store";
+import { closeWhatsNew, showWhatsNewOnce, useUpdaterStore } from "../stores/updaterStore";
 
 export function WhatsNewDialog() {
 	const content = useUpdaterStore((state) => state.whatsNew);

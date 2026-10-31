@@ -15,7 +15,7 @@ import {
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import type { MemberView } from "@/lib/api";
-import { memberName } from "../members";
+import { memberName } from "../model/members";
 
 /*
  * O menu dos "..." de cada membro (quadro "Membros"). Desvincular só aparece com computador, e

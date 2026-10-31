@@ -7,9 +7,9 @@ import {
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import type { CreatedInviteView } from "@/lib/api";
-import { dayAndTime, inviteAddress } from "../format";
-import { ticketTitle } from "../presets";
-import { useCopy } from "../useCopy";
+import { dayAndTime, inviteAddress } from "../model/format";
+import { ticketTitle } from "../model/presets";
+import { useCopy } from "../hooks/useCopy";
 import { InviteTicket } from "./InviteTicket";
 
 /*

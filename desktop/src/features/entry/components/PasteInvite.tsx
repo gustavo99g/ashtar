@@ -2,8 +2,8 @@ import { type FormEvent, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { TextField } from "@/components/ui/text-field";
-import { invitePath } from "../destination";
-import { parseInviteLink } from "../inviteLink";
+import { invitePath } from "../model/destination";
+import { parseInviteLink } from "../model/inviteLink";
 
 interface PasteInviteProps {
 	label: string;

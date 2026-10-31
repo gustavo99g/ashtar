@@ -6,7 +6,7 @@ import {
 	rememberQuickInvite,
 	timeLeft,
 	useQuickInviteStore,
-} from "../quickInvite";
+} from "../stores/quickInviteStore";
 
 const invite = (expiresAt: number, id = "i1"): CreatedInviteView => ({
 	id,

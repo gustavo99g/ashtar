@@ -5,7 +5,7 @@
  * React. O último pedido serve ao "Tentar de novo" do aviso de áudio.
  */
 import { create } from "zustand";
-import type { ScreenShareController, ShareRequest } from "./controller";
+import type { ScreenShareController, ShareRequest } from "../model/controller";
 
 export const usePickerStore = create<{
 	open: boolean;

@@ -3,9 +3,9 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "@/components/ui/toast";
 import { useSessionStore } from "@/features/identity";
 import { watchLinks } from "@/lib/tauri/deep-link";
-import { entryDestination } from "./destination";
-import { parseInviteLink } from "./inviteLink";
-import { keepPendingLink } from "./pendingLink";
+import { entryDestination } from "../model/destination";
+import { parseInviteLink } from "../model/inviteLink";
+import { keepPendingLink } from "../stores/pendingLinkStore";
 
 /**
  * Escuta os links `ashtar://` que chegam com o app aberto (o `single-instance` já trouxe a janela
