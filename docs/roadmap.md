@@ -390,6 +390,9 @@ sem identidade válida → nenhum token do LiveKit
 
 ### v0.2.2 — UI nova
 
+> Publicada como `0.2.20` e `0.2.21` (31/10), **menos o Painel de controle**, que sai junto com o chat,
+> na v0.2.3 (`0.2.30`). O plano e o andamento estão no `PLAN.md`.
+
 Refazer a interface a partir do novo protótipo, depois da identidade (v0.2.1) e antes do chat, para que as
 telas de convite, de nick e de conversa sejam construídas uma única vez em cima da interface definitiva. É
 aqui que o grupo passa a ver a identidade: a UI nova usa as rotas de convite e de sessão da v0.2.1 e desliga
@@ -407,7 +410,8 @@ v0.1 deixou (seletor de fontes, trava de uma transmissão por vez, textos dos pr
 
 ### v0.2.3 — Chat real e supressão de ruído
 
-Duas partes, entregues juntas. A segunda é pequena e não depende da primeira.
+Duas partes, entregues juntas. A segunda é pequena e não depende da primeira. Esta versão também leva o
+Painel de controle da v0.2.2 (Convites, Membros e o aviso de quem entrou), que não é publicado antes.
 
 **Chat real**
 

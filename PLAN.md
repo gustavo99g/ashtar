@@ -16,10 +16,11 @@ pressionar para falar na v0.6), Reconectando e Conexão perdida
 LiveKit e qualquer tempo real por conexão longa (v0.2.3), câmera, um segundo tema e a correção do eco (sai
 fora de ordem, pelo `BACKLOG.md`).
 
-**Versões.** A entrega sai como `0.2.20` (numeração do roadmap: entrega × 10 + correção). As Etapas 2 a 5
-entram juntas na `dev` como `0.2.20`, a primeira versão no beta; a 5b (pedido de 29/10) e a 6 saem juntas
-como `0.2.21` e a 7 como `0.2.22`, cada versão com a sua seção no `CHANGELOG.md`. A Etapa 8 promove para o
-estável e fecha com uma correção que tira o código de acesso do app.
+**Versões.** A UI nova saiu como `0.2.20` e `0.2.21` (numeração do roadmap: entrega × 10 + correção; a
+`0.2.21` já está na `main`, pelos pull requests #6 e #7, de 31/10). O **Painel de controle (Etapa 7) não
+sai sozinho**: é publicado junto com o chat, como a **v0.2.3** (`0.2.30`), e as suas notas ficam na seção
+`## 0.2.30` do `CHANGELOG.md`. A Etapa 8 (lançamento) fica para depois do chat: ela promove para o estável e
+fecha com uma correção que tira o código de acesso do app.
 
 Base: a branch `dev` com a v0.2.1 (código conferido a partir do commit `7daf05e` da `feature/0.2.1`). Em
 cada etapa, `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings` e `cargo test` (em `api/` e em
@@ -35,14 +36,16 @@ cada etapa, `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings` e `
 | 3 | Identidade no app: tipos gerados, TanStack Query, chave do computador, login pelo Rust, sessão | Concluída (`351a1e1`) |
 | 4 | Entrada: link `ashtar://`, uma instância, convite, nick, recuperação, saiu do grupo | Concluída (`9412f04`) |
 | 5 | Tela do servidor e sala de voz, uma transmissão por vez, convite rápido | Concluída (`4b7bfe5`) |
-| 5b | Dispositivos de voz (entrada e saída), o ensurdecer só nas vozes, o nome da sala entra na chamada | Concluída |
-| 6 | Configurações (Perfil, Aplicativo) e atualização com o canal por pessoa | Concluída |
-| 7 | Painel de controle: Convites, Membros, aviso de quem entrou | Pendente |
-| 8 | Lançamento: beta, troca do grupo, versão mínima, fim do código de acesso | Pendente |
+| 5b | Dispositivos de voz (entrada e saída), o ensurdecer só nas vozes, o nome da sala entra na chamada | Concluída (`b514541`) |
+| 6 | Configurações (Perfil, Aplicativo) e atualização com o canal por pessoa | Concluída (`b514541`) |
+| 7 | Painel de controle: Convites, Membros, aviso de quem entrou | Concluída |
+| 8 | Lançamento (depois do chat): beta, troca do grupo, versão mínima, fim do código de acesso | Pendente |
 
 Branches: a Etapa 1 vai direto para a `dev` (só a API muda, nada é publicado). As Etapas 2 a 5 ficam em
 `entrega/ui-nova`, a partir da `dev`, com um pull request por etapa para dentro dela e, no fim, um para a
-`dev`. A Etapa 5b e a 6 saem juntas da `dev` para a `dev` como `0.2.21`, e a 7 sai depois, como `0.2.22`.
+`dev`. A 5b e a 6 saíram da `feature/0.2.2` para a `dev` (pull request #6) e da `dev` para a `main` (#7),
+como `0.2.21`. A Etapa 7 fica na `feature/0.2.3`, sem pull request para a `dev`: nada é publicado até o
+chat (v0.2.3) ficar pronto, e a `dev` recebe tudo junto.
 
 ---
 
@@ -153,7 +156,7 @@ convite novo vai ao nick e a recuperação vai direto à conta; cada linha da ta
 **Pronto quando:** duas contas entram na sala e se veem pelo nome visível, com a cor do nick; a tela do
 servidor de quem ficou fora mostra as duas; só uma transmissão por vez, mesmo começando juntas.
 
-## Etapa 5b: dispositivos de voz — concluída
+## Etapa 5b: dispositivos de voz — concluída (`b514541`)
 
 - Configurações › Voz e vídeo com a Entrada e a Saída: o "Padrão do Windows" e a lista do Windows,
   atualizada quando um fone liga ou desliga; a escolha guardada neste computador.
@@ -166,7 +169,7 @@ servidor de quem ficou fora mostra as duas; só uma transmissão por vez, mesmo 
 fone escolhido passa para o padrão do Windows e volta sem mexer em nada; a tela inteira com "Todo o
 sistema" continua sem o som da chamada.
 
-## Etapa 6: configurações e atualização — concluída
+## Etapa 6: configurações e atualização — concluída (`b514541`)
 
 - Perfil com `PATCH /api/me`; Aplicativo com versão, canal, atualização, o que há de novo e Abrir pasta de
   logs.
@@ -176,11 +179,13 @@ sistema" continua sem o som da chamada.
 **Pronto quando:** trocar o nome visível aparece na próxima entrada na sala; ligar o beta de alguém no
 banco faz o app dessa pessoa verificar o beta na hora; com a API fora do ar, o app verifica o estável.
 
-## Etapa 7: Painel de controle — pendente
+## Etapa 7: Painel de controle — concluída
 
 - Convites: os três modelos, o bilhete, o histórico com filtros e o Revogar.
 - Membros: os filtros, o beta, o menu do membro e a gaveta de permissões.
 - O aviso de quem entrou, a cada 30 s no app do dono.
+- Remover ou desvincular tira a pessoa da sala de voz na hora (`kick_in_background`), e o app dela confere
+  a sessão.
 
 **Pronto quando:** cada ação do Painel funciona contra a API da Etapa 1, e quem entra com um convite aparece
 no aviso do dono em até 30 s.

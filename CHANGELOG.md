@@ -1,5 +1,11 @@
 # O que há de novo no Ashtar
 
+## 0.2.30
+
+- Painel de controle (só para o dono): em Convites, crie convites para uma pessoa, para o grupo ou do seu jeito, copie o link e veja o histórico, com Revogar. Em Membros, veja quem está no grupo, ligue o beta de cada um, crie um convite de recuperação, desvincule o computador ou remova alguém.
+- O dono recebe um aviso quando alguém entra no grupo.
+- Quem é removido do grupo ou tem o computador desvinculado sai da sala na hora.
+
 ## 0.2.21
 
 - Em Configurações › Voz e vídeo, escolha o microfone e a saída de áudio. A troca vale na hora, mesmo no meio da chamada, e um aparelho desconectado cai no padrão do Windows até voltar.
