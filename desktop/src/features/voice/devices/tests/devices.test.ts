@@ -1,15 +1,14 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import {
 	type AudioDevice,
-	chooseDevice,
 	type DeviceInfo,
 	effectiveDevice,
 	isMissing,
 	knownDevices,
 	readDevices,
 	UNKNOWN_DEVICES,
-	useDeviceChoice,
-} from "../devices";
+} from "../model/devices";
+import { chooseDevice, useDeviceChoice } from "../stores/deviceChoiceStore";
 
 /** O que o WebView2 devolve no Windows: o "default", o "communications" e os de verdade. */
 const WINDOWS: DeviceInfo[] = [

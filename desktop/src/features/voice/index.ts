@@ -3,7 +3,7 @@ export { LiveBadge } from "./components/LiveBadge";
 export { PersonCard } from "./components/PersonCard";
 export { VoiceDock } from "./components/VoiceDock";
 export { VoiceRoom } from "./components/VoiceRoom";
-export { VoiceSettings } from "./components/VoiceSettings";
+export { VoiceSettings } from "./devices/components/VoiceSettings";
 export { useInCall } from "./hooks/useInCall";
 export { type ChannelMember, memberFromApi, peopleNowLabel } from "./members";
 export { useVoiceParticipants } from "./queries";

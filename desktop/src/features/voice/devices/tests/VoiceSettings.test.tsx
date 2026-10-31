@@ -2,7 +2,8 @@ import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { VoiceSettings } from "../components/VoiceSettings";
-import { chooseDevice, type DeviceInfo, useDeviceChoice } from "../devices";
+import type { DeviceInfo } from "../model/devices";
+import { chooseDevice, useDeviceChoice } from "../stores/deviceChoiceStore";
 
 const WINDOWS: DeviceInfo[] = [
 	{

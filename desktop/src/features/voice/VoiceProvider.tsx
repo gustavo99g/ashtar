@@ -40,11 +40,12 @@ import {
 } from "@/features/screen-share";
 import { createVoiceToken, getMe } from "@/lib/api";
 import { RoomAudio } from "./components/RoomAudio";
-import { effectiveDevice, knownDevices, useDeviceChoice } from "./devices";
-import { type DeviceIds, roomOptions, switchDevice } from "./roomDevices";
+import { effectiveDevice, knownDevices } from "./devices/model/devices";
+import { useDeviceChoice } from "./devices/stores/deviceChoiceStore";
+import { type DeviceIds, roomOptions, switchDevice } from "./devices/model/roomDevices";
 import { useRoomView } from "./roomView";
 import { syncSubscription, syncSubscriptions } from "./subscriptions";
-import { useAudioDevices } from "./useAudioDevices";
+import { useAudioDevices } from "./devices/hooks/useAudioDevices";
 import {
 	encodeVoiceState,
 	parseVoiceState,

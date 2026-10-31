@@ -1,6 +1,6 @@
 import type { Room } from "livekit-client";
 import { describe, expect, it, vi } from "vitest";
-import { roomOptions, switchDevice } from "../roomDevices";
+import { roomOptions, switchDevice } from "../model/roomDevices";
 
 /** Só o que o `switchDevice` usa da sala. */
 function fakeRoom(

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { type AudioDevices, readDevices, UNKNOWN_DEVICES } from "./devices";
+import { type AudioDevices, readDevices, UNKNOWN_DEVICES } from "../model/devices";
 
 /**
  * Os microfones e as saídas deste computador, lidos de novo a cada `devicechange` (um fone USB ou

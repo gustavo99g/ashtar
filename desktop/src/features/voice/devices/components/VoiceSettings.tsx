@@ -11,13 +11,12 @@ import {
 import {
 	type AudioDevice,
 	type AudioDevices,
-	chooseDevice,
 	type DeviceKind,
 	isMissing,
 	knownDevices,
-	useDeviceChoice,
-} from "../devices";
-import { useAudioDevices } from "../useAudioDevices";
+} from "../model/devices";
+import { useAudioDevices } from "../hooks/useAudioDevices";
+import { chooseDevice, useDeviceChoice } from "../stores/deviceChoiceStore";
 
 /*
  * Configurações › Voz e vídeo (quadro "Configurações — voz e vídeo"). Na 0.2.2, só o bloco

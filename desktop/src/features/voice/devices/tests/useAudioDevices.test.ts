@@ -1,7 +1,7 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { DeviceInfo } from "../devices";
-import { useAudioDevices } from "../useAudioDevices";
+import type { DeviceInfo } from "../model/devices";
+import { useAudioDevices } from "../hooks/useAudioDevices";
 
 const MIC: DeviceInfo = {
 	kind: "audioinput",
