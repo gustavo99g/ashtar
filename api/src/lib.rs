@@ -80,7 +80,6 @@ pub fn app(state: AppState, policy: Arc<ClientPolicy>) -> Router {
         .with_state(state.clone());
 
     let api = Router::new()
-        .route("/voice/join", post(routes::voice::join_voice))
         .route("/voice/token", post(routes::voice::voice_token))
         .route("/voice/participants", get(routes::voice::participants))
         .route("/auth/redeem", post(routes::auth::redeem))

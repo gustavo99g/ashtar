@@ -2,12 +2,10 @@
 //!
 //! - `MIN_CLIENT_VERSION`: abaixo dela, ou sem o cabeçalho `X-App-Version`,
 //!   a resposta é 426 com `{ kind: "client_outdated", message, min_version }`.
-//! - `ACCESS_CODE`: código errado ou ausente em `X-Access-Code` recebe 401 com
-//!   `{ kind: "access_denied", message }`.
 //!
-//! Variável ausente ou vazia desliga a conferência correspondente. A versão é
-//! conferida antes do código: um app antigo com um código velho recebe
-//! "atualize", que é o que resolve.
+//! Variável ausente ou vazia desliga a conferência. Quem manda de verdade é a sessão
+//! (`/api/me`, o token do app): a versão só diz ao app antigo que ele precisa atualizar.
+//! O código de acesso provisório (`ACCESS_CODE`, `X-Access-Code`) saiu na v0.2.2.
 
 use std::sync::Arc;
 
@@ -21,12 +19,10 @@ use semver::Version;
 use crate::error::{ErrorBody, ErrorKind};
 
 const APP_VERSION_HEADER: &str = "x-app-version";
-const ACCESS_CODE_HEADER: &str = "x-access-code";
 
 #[derive(Debug, Clone, Default)]
 pub struct ClientPolicy {
     pub min_version: Option<Version>,
-    pub access_code: Option<String>,
 }
 
 impl ClientPolicy {
@@ -38,10 +34,7 @@ impl ClientPolicy {
                 .unwrap_or_else(|error| panic!("MIN_CLIENT_VERSION inválida ({value}): {error}"))
         });
 
-        Self {
-            min_version,
-            access_code: non_empty_env("ACCESS_CODE"),
-        }
+        Self { min_version }
     }
     /// `Err` com a resposta pronta se a chamada deve ser recusada.
     ///
@@ -54,11 +47,6 @@ impl ClientPolicy {
                 Some(version) if version >= *min_version => {}
                 _ => return Err(Box::new(outdated(min_version))),
             }
-        }
-        if let Some(access_code) = &self.access_code
-            && header(headers, ACCESS_CODE_HEADER) != Some(access_code.as_str())
-        {
-            return Err(Box::new(denied()));
         }
 
         Ok(())
@@ -99,17 +87,6 @@ fn outdated(min_version: &Version) -> Response {
     (StatusCode::UPGRADE_REQUIRED, Json(body)).into_response()
 }
 
-fn denied() -> Response {
-    let body = ErrorBody {
-        kind: ErrorKind::AccessDenied,
-        message:
-            "Acesso recusado pelo servidor. Atualize o Ashtar ou fale com quem administra o grupo."
-                .into(),
-        min_version: None,
-    };
-    (StatusCode::UNAUTHORIZED, Json(body)).into_response()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -122,10 +99,9 @@ mod tests {
         map
     }
 
-    fn policy(min_version: Option<&str>, access_code: Option<&str>) -> ClientPolicy {
+    fn policy(min_version: Option<&str>) -> ClientPolicy {
         ClientPolicy {
             min_version: min_version.map(|v| Version::parse(v).unwrap()),
-            access_code: access_code.map(str::to_owned),
         }
     }
 
@@ -135,12 +111,12 @@ mod tests {
 
     #[test]
     fn sem_variaveis_tudo_passa() {
-        assert_eq!(status(policy(None, None).check(&headers(&[]))), None);
+        assert_eq!(status(policy(None).check(&headers(&[]))), None);
     }
 
     #[test]
     fn versao_abaixo_da_minima_recebe_426() {
-        let policy = policy(Some("0.2.1"), None);
+        let policy = policy(Some("0.2.1"));
         let old = headers(&[("x-app-version", "0.2.0")]);
         assert_eq!(
             status(policy.check(&old)),
@@ -150,7 +126,7 @@ mod tests {
 
     #[test]
     fn versao_igual_ou_acima_passa() {
-        let policy = policy(Some("0.2.1"), None);
+        let policy = policy(Some("0.2.1"));
         assert_eq!(
             status(policy.check(&headers(&[("x-app-version", "0.2.1")]))),
             None
@@ -163,7 +139,7 @@ mod tests {
 
     #[test]
     fn sem_cabecalho_ou_versao_invalida_recebe_426() {
-        let policy = policy(Some("0.2.0"), None);
+        let policy = policy(Some("0.2.0"));
         assert_eq!(
             status(policy.check(&headers(&[]))),
             Some(StatusCode::UPGRADE_REQUIRED)
@@ -176,25 +152,9 @@ mod tests {
     }
 
     #[test]
-    fn codigo_errado_ou_ausente_recebe_401() {
-        let policy = policy(None, Some("segredo"));
-        assert_eq!(
-            status(policy.check(&headers(&[]))),
-            Some(StatusCode::UNAUTHORIZED)
-        );
-        let wrong = headers(&[("x-access-code", "outro")]);
-        assert_eq!(status(policy.check(&wrong)), Some(StatusCode::UNAUTHORIZED));
-        let right = headers(&[("x-access-code", "segredo")]);
-        assert_eq!(status(policy.check(&right)), None);
-    }
-
-    #[test]
-    fn versao_e_conferida_antes_do_codigo() {
-        let policy = policy(Some("0.2.1"), Some("segredo"));
-        let old_without_code = headers(&[("x-app-version", "0.2.0")]);
-        assert_eq!(
-            status(policy.check(&old_without_code)),
-            Some(StatusCode::UPGRADE_REQUIRED)
-        );
+    fn o_codigo_de_acesso_antigo_nao_vale_mais() {
+        // Um app antigo ainda manda o `X-Access-Code`: a API ignora, não recusa.
+        let with_code = headers(&[("x-access-code", "qualquer")]);
+        assert_eq!(status(policy(None).check(&with_code)), None);
     }
 }

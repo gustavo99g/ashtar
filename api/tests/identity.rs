@@ -258,6 +258,21 @@ async fn sem_sessao_nao_entra() {
 }
 
 #[tokio::test]
+async fn a_rota_antiga_de_voz_nao_existe_mais() {
+    // O `/api/voice/join` dava token a quem mandasse a identidade no corpo, sem sessão.
+    let ctx = setup().await;
+    let (status, _) = call(
+        &ctx.router,
+        "POST",
+        "/api/voice/join",
+        None,
+        Some(json!({ "channel_id": "sala", "user_id": "x", "display_name": "Fulano" })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
 async fn recuperacao_troca_o_computador() {
     let ctx = setup().await;
     let code = new_invite(&ctx).await;
@@ -2812,7 +2827,6 @@ mod pagina {
         let owner = users::create_owner(&db, "Kid", now()).await.unwrap();
         let policy = ClientPolicy {
             min_version: Some("9.9.9".parse().unwrap()),
-            access_code: Some("segredo".into()),
         };
         let router = app(
             AppState::new(db.clone(), "https://ashtar.test"),

@@ -40,7 +40,7 @@ min_version?: string, };
  * O `kind` de toda recusa da API. O app decide o que mostrar por ele, nunca
  * pela mensagem.
  */
-export type ErrorKind = "unauthenticated" | "unknown_device" | "forbidden" | "invalid_invite" | "invalid_nick" | "invalid_display_name" | "nick_taken" | "invalid_device_key" | "device_already_linked" | "invalid_request" | "not_found" | "conflict" | "too_many_attempts" | "internal" | "client_outdated" | "access_denied";
+export type ErrorKind = "unauthenticated" | "unknown_device" | "forbidden" | "invalid_invite" | "invalid_nick" | "invalid_display_name" | "nick_taken" | "invalid_device_key" | "device_already_linked" | "invalid_request" | "not_found" | "conflict" | "too_many_attempts" | "internal" | "client_outdated";
 
 /**
  * Se a linha é uma [`Permission`] (o dono pode ligar e desligar) ou uma
@@ -90,7 +90,7 @@ target: MemberRef | null, created_at: number, expires_at: number, revoked_at: nu
 uses: Array<InviteUseView>, };
 
 /**
- * A resposta do `voice/join` e do `voice/token`.
+ * A resposta do `voice/token`.
  */
 export type JoinVoiceResponse = { token: string, url: string, };
 

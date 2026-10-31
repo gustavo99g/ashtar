@@ -104,10 +104,9 @@ A crate é uma biblioteca (`lib.rs`) com dois binários: o servidor (`main.rs`) 
   administração recebe quem a faz (`actor`) e passa por `permissions::can`, o único lugar que decide quem
   pode o quê. As rotas e o `admin` chamam as mesmas funções.
 - **`routes/`**: as rotas HTTP, finas sobre `identity/`: `/api/auth/redeem` (usar convite),
-  `/api/auth/login`, `/api/me`, `/api/voice/token` (token do LiveKit com identidade e nome vindos do banco) e
-  a rota antiga `/api/voice/join`, que continua até o app usar as novas. Autenticação por
-  `Authorization: Bearer <token>`.
-- **`client_policy.rs`**: versão mínima do cliente e código de acesso provisório, antes de toda rota de `/api`.
+  `/api/auth/login`, `/api/me`, `/api/voice/token` (token do LiveKit com identidade e nome vindos do banco). A rota
+  antiga `/api/voice/join` saiu na v0.2.2. Autenticação por `Authorization: Bearer <token>`.
+- **`client_policy.rs`**: a versão mínima do cliente, antes de toda rota de `/api`.
 - **`limiter.rs`**: até 20 convites errados a cada 10 minutos, somando todo mundo.
 - **`db.rs`** e **`migrations/`**: o banco em modo WAL, com as migrações embutidas no binário.
 - **`secret.rs`**: segredos só como SHA-256 no banco; **`error.rs`**: os erros e o formato `{ kind, message }`.

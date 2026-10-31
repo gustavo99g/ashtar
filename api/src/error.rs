@@ -34,8 +34,6 @@ pub enum ErrorKind {
     Internal,
     /// Da `ClientPolicy`: o app está abaixo da versão mínima (426).
     ClientOutdated,
-    /// Da `ClientPolicy`: o código de acesso não confere (401).
-    AccessDenied,
 }
 
 /// O corpo de toda resposta de erro.

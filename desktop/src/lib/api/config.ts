@@ -11,7 +11,7 @@ const DEV_API_URL = "http://127.0.0.1:3000";
 
 /**
  * Monta a URL de um endpoint da API a partir de `VITE_API_URL` (por exemplo
- * `apiUrl("/api/voice/join")`). Sem a variável, só o desenvolvimento cai na API local; um app
+ * `apiUrl("/api/me")`). Sem a variável, só o desenvolvimento cai na API local; um app
  * gerado sem ela falha com uma mensagem clara, em vez de tentar `127.0.0.1` em silêncio.
  */
 export function apiUrl(path: string): string {

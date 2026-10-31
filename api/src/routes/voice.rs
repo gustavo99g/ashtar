@@ -25,35 +25,12 @@ use crate::AppState;
 use crate::error::ApiError;
 use crate::identity::{User, users};
 
-#[derive(Debug, Deserialize)]
-pub struct JoinVoiceRequest {
-    pub channel_id: String,
-    pub user_id: String,
-    pub display_name: String,
-}
-
-/// A resposta do `voice/join` e do `voice/token`.
+/// A resposta do `voice/token`.
 #[derive(Debug, Serialize, TS)]
 #[ts(export, export_to = "index.ts")]
 pub struct JoinVoiceResponse {
     pub token: String,
     pub url: String,
-}
-
-/// Rota de hoje: identidade e nome vêm do app. Continua até a parte visual.
-pub async fn join_voice(
-    Json(request): Json<JoinVoiceRequest>,
-) -> Result<Json<JoinVoiceResponse>, String> {
-    let (api_key, api_secret, url) = livekit_env()?;
-    let token = create_voice_token(
-        &api_key,
-        &api_secret,
-        &request.channel_id,
-        &request.user_id,
-        &request.display_name,
-        "",
-    )?;
-    Ok(Json(JoinVoiceResponse { token, url }))
 }
 
 #[derive(Debug, Deserialize, TS)]

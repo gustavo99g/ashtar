@@ -68,10 +68,6 @@ async function send(
 	const headers = new Headers(init.headers);
 	headers.set("X-App-Version", __APP_VERSION__);
 
-	const accessCode = import.meta.env.VITE_ACCESS_CODE?.trim();
-	if (accessCode) {
-		headers.set("X-Access-Code", accessCode);
-	}
 	if (token) {
 		headers.set("Authorization", `Bearer ${token}`);
 	}
