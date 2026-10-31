@@ -1,7 +1,7 @@
 export { SALA } from "./channel";
 export { LiveBadge } from "./components/LiveBadge";
 export { PersonCard } from "./members/components/PersonCard";
-export { VoiceDock } from "./components/VoiceDock";
+export { VoiceDock } from "./dock/components/VoiceDock";
 export { VoiceRoom } from "./components/VoiceRoom";
 export { VoiceSettings } from "./devices/components/VoiceSettings";
 export { useInCall } from "./hooks/useInCall";

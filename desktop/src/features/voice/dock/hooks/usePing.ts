@@ -1,7 +1,7 @@
 import { type Room, Track } from "livekit-client";
 import { useEffect, useState } from "react";
 import { useAppVisible } from "@/lib/visibility";
-import { pingFromStats } from "./ping";
+import { pingFromStats } from "../model/ping";
 
 /** De quanto em quanto tempo o painel "Voz conectada" mede o ping. */
 const PING_REFRESH_MS = 5_000;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { pingFromStats, pingQuality } from "../ping";
+import { pingFromStats, pingQuality } from "../model/ping";
 
 function report(...entries: Record<string, unknown>[]): RTCStatsReport {
 	return new Map(

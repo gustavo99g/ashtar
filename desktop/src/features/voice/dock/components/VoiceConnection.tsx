@@ -12,13 +12,13 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { ConnectingState } from "@/components/ui/states";
 import { paths } from "@/lib/paths";
 import { cn } from "@/lib/utils";
-import { SALA } from "../channel";
-import { pingQuality } from "../ping";
-import { stopWatching } from "../roomView";
-import { usePing } from "../usePing";
-import { useVoice } from "../useVoice";
-import { DockButton } from "./buttons";
-import { ShareButton } from "./ShareButton";
+import { SALA } from "../../channel";
+import { pingQuality } from "../model/ping";
+import { stopWatching } from "../../roomView";
+import { usePing } from "../hooks/usePing";
+import { useVoice } from "../../useVoice";
+import { DockButton } from "../../components/buttons";
+import { ShareButton } from "../../components/ShareButton";
 
 /*
  * O painel "Voz conectada" no pé da coluna, enquanto há chamada: Conectando ou Conectada (com o

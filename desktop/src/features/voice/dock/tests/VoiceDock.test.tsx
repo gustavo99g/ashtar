@@ -6,16 +6,16 @@ import {
 	type ScreenShareController,
 } from "@/features/screen-share";
 import { VoiceDock } from "../components/VoiceDock";
-import { useVoice } from "../useVoice";
+import { useVoice } from "../../useVoice";
 
-vi.mock("../useVoice", () => ({ useVoice: vi.fn() }));
+vi.mock("../../useVoice", () => ({ useVoice: vi.fn() }));
 // Só o que o `VoiceDock` monta por conta própria importa aqui: o seletor e os avisos.
 vi.mock("../components/UserPanel", () => ({ UserPanel: () => null }));
 vi.mock("../components/VoiceConnection", () => ({
 	VoiceConnection: () => null,
 }));
-vi.mock("../components/ShareRaceGuard", () => ({ ShareRaceGuard: () => null }));
-vi.mock("../components/ShareNotices", () => ({ ShareNotices: () => null }));
+vi.mock("../../components/ShareRaceGuard", () => ({ ShareRaceGuard: () => null }));
+vi.mock("../../components/ShareNotices", () => ({ ShareNotices: () => null }));
 
 const controller = {
 	getState: () => ({ status: "idle" }),

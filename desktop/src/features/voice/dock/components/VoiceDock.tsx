@@ -1,8 +1,8 @@
 import { SourcePickerHost } from "@/features/screen-share";
-import { SALA } from "../channel";
-import { useVoice } from "../useVoice";
-import { ShareNotices } from "./ShareNotices";
-import { ShareRaceGuard } from "./ShareRaceGuard";
+import { SALA } from "../../channel";
+import { useVoice } from "../../useVoice";
+import { ShareNotices } from "../../components/ShareNotices";
+import { ShareRaceGuard } from "../../components/ShareRaceGuard";
 import { UserPanel } from "./UserPanel";
 import { VoiceConnection } from "./VoiceConnection";
 

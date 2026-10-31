@@ -10,7 +10,7 @@ import { Link } from "react-router-dom";
 import { Avatar, useMe, useSession } from "@/features/identity";
 import { paths } from "@/lib/paths";
 import { cn } from "@/lib/utils";
-import { useVoice } from "../useVoice";
+import { useVoice } from "../../useVoice";
 
 /*
  * O cartão de quem está usando, no pé da coluna: avatar, nome, microfone, áudio e o botão das
