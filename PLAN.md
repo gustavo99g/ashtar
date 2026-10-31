@@ -19,8 +19,8 @@ fora de ordem, pelo `BACKLOG.md`).
 **Versões.** A UI nova saiu como `0.2.20` e `0.2.21` (numeração do roadmap: entrega × 10 + correção; a
 `0.2.21` já está na `main`, pelos pull requests #6 e #7, de 31/10). O **Painel de controle (Etapa 7) não
 sai sozinho**: é publicado junto com o chat, como a **v0.2.3** (`0.2.30`), e as suas notas ficam na seção
-`## 0.2.30` do `CHANGELOG.md`. A Etapa 8 (lançamento) fica para depois do chat: ela promove para o estável e
-fecha com uma correção que tira o código de acesso do app.
+`## 0.2.30` do `CHANGELOG.md`. A Etapa 8 (lançamento) não esperou o chat: o grupo já usa as contas e o Painel funcionou (31/10). A
+limpeza do código de acesso ficou de fora e está no `BACKLOG.md`.
 
 Base: a branch `dev` com a v0.2.1 (código conferido a partir do commit `7daf05e` da `feature/0.2.1`). Em
 cada etapa, `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings` e `cargo test` (em `api/` e em
@@ -39,7 +39,7 @@ cada etapa, `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings` e `
 | 5b | Dispositivos de voz (entrada e saída), o ensurdecer só nas vozes, o nome da sala entra na chamada | Concluída (`b514541`) |
 | 6 | Configurações (Perfil, Aplicativo) e atualização com o canal por pessoa | Concluída (`b514541`) |
 | 7 | Painel de controle: Convites, Membros, aviso de quem entrou | Concluída |
-| 8 | Lançamento (depois do chat): beta, troca do grupo, versão mínima, fim do código de acesso | Pendente |
+| 8 | Lançamento: beta, troca do grupo, versão mínima, fim do código de acesso | Concluída (o grupo já usa; a limpeza do código de acesso ficou no `BACKLOG.md`) |
 
 Branches: a Etapa 1 vai direto para a `dev` (só a API muda, nada é publicado). As Etapas 2 a 5 ficam em
 `entrega/ui-nova`, a partir da `dev`, com um pull request por etapa para dentro dela e, no fim, um para a
@@ -190,7 +190,7 @@ banco faz o app dessa pessoa verificar o beta na hora; com a API fora do ar, o a
 **Pronto quando:** cada ação do Painel funciona contra a API da Etapa 1, e quem entra com um convite aparece
 no aviso do dono em até 30 s.
 
-## Etapa 8: lançamento — pendente
+## Etapa 8: lançamento — concluída
 
 - Beta com o dono vinculado por uma recuperação; a troca do grupo; versão mínima, sem `/api/voice/join` e
   sem `ACCESS_CODE`, tudo junto.
@@ -200,6 +200,11 @@ no aviso do dono em até 30 s.
 
 **Pronto quando:** todo o grupo está no estável com conta, e a API recusa a rota velha e o app velho com o
 pedido de atualização.
+
+**Como fechou (31/10).** O grupo já usa o app com conta e o Painel de controle funcionou, e a etapa foi
+dada como concluída por isso. **Não entrou**, e foi para o `BACKLOG.md` ("Correções fora de ordem"): a rota
+`/api/voice/join`, o `ACCESS_CODE` e o `X-Access-Code`, a subida do `MIN_CLIENT_VERSION` e o `admin` só com
+`dono` e `backup`. Por isso a API ainda aceita a rota velha e o app antigo.
 
 ---
 

@@ -16,6 +16,13 @@ Ao resolver um item, apague-o daqui e registre o resultado no ADR ou no commit.
 
 Bugs que saem assim que ficarem prontos, pelo auto-update, sem esperar a entrega da ordem.
 
+- [ ] **Limpeza do código de acesso** (adiada da Etapa 8; o grupo já usa as contas): tirar a rota
+      `/api/voice/join`, o `ACCESS_CODE` e o `X-Access-Code` (`client_policy.rs`, que também tem a
+      comparação sem tempo constante), o `VITE_ACCESS_CODE` do app e do CI, e subir o `MIN_CLIENT_VERSION`
+      para a versão com a troca. Tem de ser tudo junto: sem o código e com a rota antiga no ar, a rota velha
+      daria token a qualquer um com a versão certa no cabeçalho. Só depois de todo o grupo estar no app novo.
+      O `admin` fica só com `dono` e `backup`. O `.env.example` já saiu do `ACCESS_CODE`.
+
 - [ ] Eco no compartilhamento da tela inteira com "Todo o sistema". Num teste com amigos (2026-10-06), um
       amigo compartilhou o monitor e quem assistia ouviu a própria voz; só mutar o próprio microfone
       parava. **Correção fora de ordem** ("Correções fora de ordem" no `docs/roadmap.md`): sai assim que ficar pronta, sem esperar a v0.2.3.
