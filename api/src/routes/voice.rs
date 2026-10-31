@@ -1,4 +1,6 @@
 //! Rotas de voz: o token para entrar na sala e a lista de quem já está nela.
+//! Também tira da sala quem foi removido ou teve o computador desvinculado
+//! ([`kick_in_background`], chamado pelas rotas de membros).
 
 use std::collections::HashMap;
 use std::env;
@@ -193,13 +195,75 @@ async fn list_room(channel_id: &str) -> Result<Vec<RoomParticipant>, ApiError> {
     match room_client()?.list_participants(channel_id).await {
         Ok(infos) => Ok(room_participants(infos)),
         // Sala que não existe (ainda não criada, ou já fechada): ninguém nela.
-        Err(ServiceError::Twirp(ServerError::Twirp(error)))
-            if error.code == ServerErrorCode::NOT_FOUND =>
-        {
-            Ok(Vec::new())
-        }
+        Err(error) if is_not_found(&error) => Ok(Vec::new()),
         Err(error) => Err(ApiError::LiveKit(error.to_string())),
     }
+}
+
+/// O "não existe" do LiveKit: a sala, ou a pessoa dentro dela.
+fn is_not_found(error: &ServiceError) -> bool {
+    matches!(
+        error,
+        ServiceError::Twirp(ServerError::Twirp(error)) if error.code == ServerErrorCode::NOT_FOUND
+    )
+}
+
+/// O que tirar alguém da sala precisa do LiveKit: o `RoomClient` de verdade, ou
+/// um de mentira nos testes.
+pub(crate) trait VoiceRooms {
+    /// O nome de toda sala aberta agora.
+    async fn names(&self) -> Result<Vec<String>, ServiceError>;
+    /// O `RemoveParticipant`: derruba a conexão de `identity` na sala `room`.
+    async fn remove(&self, room: &str, identity: &str) -> Result<(), ServiceError>;
+}
+
+impl VoiceRooms for RoomClient {
+    async fn names(&self) -> Result<Vec<String>, ServiceError> {
+        let rooms = self.list_rooms(Vec::new()).await?;
+        Ok(rooms.into_iter().map(|room| room.name).collect())
+    }
+
+    async fn remove(&self, room: &str, identity: &str) -> Result<(), ServiceError> {
+        self.remove_participant(room, identity).await
+    }
+}
+
+/// Tira `identity` de toda sala em que estiver e devolve de quantas saiu. Quem
+/// não está numa sala (o "não existe" do LiveKit) não é erro. O LiveKit também
+/// recusa o token antigo dessa pessoa numa nova entrada; o novo, a API já não dá.
+pub(crate) async fn kick_from(
+    rooms: &impl VoiceRooms,
+    identity: &str,
+) -> Result<usize, ServiceError> {
+    let mut removed = 0;
+    for room in rooms.names().await? {
+        match rooms.remove(&room, identity).await {
+            Ok(()) => removed += 1,
+            Err(error) if is_not_found(&error) => {}
+            Err(error) => return Err(error),
+        }
+    }
+    Ok(removed)
+}
+
+/// Tira da sala, na hora, quem acabou de ser removido ou de ter o computador
+/// desvinculado: sem isso, a pessoa continuaria ouvindo e falando até a próxima
+/// chamada à API. Roda à parte, para a resposta não esperar o LiveKit (até 5
+/// segundos por consulta). Se falhar, a remoção continua valendo e o erro vai
+/// para o log.
+pub fn kick_in_background(identity: String) {
+    tokio::spawn(async move {
+        let result = match room_client() {
+            Ok(client) => kick_from(client, &identity)
+                .await
+                .map_err(|error| error.to_string()),
+            Err(ApiError::Config(message)) => Err(message),
+            Err(error) => Err(error.to_string()),
+        };
+        if let Err(error) = result {
+            eprintln!("livekit: não deu para tirar {identity} da sala: {error}");
+        }
+    });
 }
 
 /// Tamanho máximo do id de canal (e, portanto, do nome da sala no LiveKit).
@@ -334,6 +398,78 @@ mod tests {
         ]);
         let order: Vec<&str> = room.iter().map(|p| p.identity.as_str()).collect();
         assert_eq!(order, ["primeiro", "segundo", "terceiro"]);
+    }
+
+    /// Um LiveKit de mentira: as salas, quem está em cada uma e um erro opcional.
+    struct FakeRooms {
+        rooms: Vec<(&'static str, Vec<&'static str>)>,
+        fail_on: Option<&'static str>,
+        removed: std::sync::Mutex<Vec<String>>,
+    }
+
+    fn twirp(code: &str) -> ServiceError {
+        ServiceError::Twirp(ServerError::Twirp(ServerErrorCode {
+            code: code.to_owned(),
+            msg: String::new(),
+            meta: HashMap::new(),
+        }))
+    }
+
+    impl VoiceRooms for FakeRooms {
+        async fn names(&self) -> Result<Vec<String>, ServiceError> {
+            Ok(self
+                .rooms
+                .iter()
+                .map(|(name, _)| name.to_string())
+                .collect())
+        }
+
+        async fn remove(&self, room: &str, identity: &str) -> Result<(), ServiceError> {
+            if self.fail_on == Some(room) {
+                return Err(twirp(ServerErrorCode::UNAVAILABLE));
+            }
+            let (_, people) = self.rooms.iter().find(|(name, _)| *name == room).unwrap();
+            if !people.contains(&identity) {
+                return Err(twirp(ServerErrorCode::NOT_FOUND));
+            }
+            self.removed
+                .lock()
+                .unwrap()
+                .push(format!("{room}/{identity}"));
+            Ok(())
+        }
+    }
+
+    fn fake(rooms: Vec<(&'static str, Vec<&'static str>)>) -> FakeRooms {
+        FakeRooms {
+            rooms,
+            fail_on: None,
+            removed: Default::default(),
+        }
+    }
+
+    #[tokio::test]
+    async fn tirar_da_sala_passa_por_todas_e_ignora_onde_nao_esta() {
+        let rooms = fake(vec![
+            ("sala", vec!["kid", "juju"]),
+            ("papo", vec!["kid"]),
+            ("afk", vec!["marcao"]),
+        ]);
+        assert_eq!(kick_from(&rooms, "kid").await.unwrap(), 2);
+        assert_eq!(*rooms.removed.lock().unwrap(), ["sala/kid", "papo/kid"]);
+
+        // Fora de todas as salas, ou sem sala nenhuma: nada a fazer, sem erro.
+        assert_eq!(kick_from(&rooms, "ninguem").await.unwrap(), 0);
+        assert_eq!(kick_from(&fake(vec![]), "kid").await.unwrap(), 0);
+    }
+
+    #[tokio::test]
+    async fn outro_erro_do_livekit_volta_para_quem_chamou() {
+        let mut rooms = fake(vec![("sala", vec!["kid"])]);
+        rooms.fail_on = Some("sala");
+        let error = kick_from(&rooms, "kid").await.unwrap_err();
+        assert!(!is_not_found(&error));
+        assert!(is_not_found(&twirp(ServerErrorCode::NOT_FOUND)));
     }
 
     #[test]
