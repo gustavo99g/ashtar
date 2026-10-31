@@ -39,7 +39,7 @@ painel (o da Hostinger tem), abra as mesmas portas lá também.
 
 ## Passo a passo
 
-1. **VPS.** Ubuntu 24.04, no Brasil (Hostinger KVM 2, ver o [README](../../README.md#infraestrutura)).
+1. **VPS.** Ubuntu 26.04 LTS (ou 24.04), sem painel nem app, no Brasil (Hostinger KVM 2, ver o [README](../../README.md#infraestrutura)).
    Anote o IP público.
 2. **Endereço.** Crie um registro DNS `A` de `livekit.<seu domínio>` para o IP da VPS. Sem domínio, dá para
    usar `livekit.<ip-com-hífens>.sslip.io` (ex.: `livekit.203-0-113-10.sslip.io`), que já aponta para o IP.
