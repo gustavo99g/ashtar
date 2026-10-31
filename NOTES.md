@@ -25,14 +25,14 @@ conscientemente adiado (marcar como tal) antes de fechar a fase. A lista da fase
 - [ ] **Identidade falsa nova a cada entrada** (`idiot-<uuid>`, nome `Idiota-<uuid>`): o app passa a entrar
       pelo `POST /api/voice/token`, com o nome visível e o nick vindos do banco (Etapa 5). A rota antiga
       sai na limpeza do código de acesso (`BACKLOG.md`).
-- [ ] **Rota antiga aberta:** `/api/voice/join` continua aceitando o código de acesso. Sai na limpeza do
-      código de acesso (`BACKLOG.md`), junto com o `ACCESS_CODE` e a subida do `MIN_CLIENT_VERSION`.
+- [x] **Rota antiga aberta:** `/api/voice/join` aceitava o código de acesso. Saiu, junto com o `ACCESS_CODE`
+      (`8ba3399`). Falta só subir o `MIN_CLIENT_VERSION` (`BACKLOG.md`).
 - [ ] **Vincular o computador do dono:** `admin dono` e uma recuperação para você mesmo, aberta no app
       beta (Etapa 8).
 - [ ] **Backup fora do computador** e uma restauração testada **antes** de o grupo entrar (Etapa 5 da
       v0.2.1). Se a v0.2.1 fechar sem isso, fica aqui como condição da troca.
-- [ ] **Comparação do código de acesso** sem tempo constante em `client_policy.rs`: some com o código de
-      acesso (`BACKLOG.md`).
+- [x] **Comparação do código de acesso** sem tempo constante em `client_policy.rs`: sumiu com o código de
+      acesso (`8ba3399`).
 
 ## Antes da troca do grupo
 
@@ -49,9 +49,9 @@ conscientemente adiado (marcar como tal) antes de fechar a fase. A lista da fase
 
 - [ ] **Hardware genérico:** quem cai na chave aleatória perde a conta ao formatar e precisa de uma
       recuperação. O log da Etapa 3 mostra quantos são no beta (ADR 0013).
-- [ ] **A troca tem de ser junta** (limpeza do código de acesso, `BACKLOG.md`): sem o código de acesso e com a rota antiga no ar, a rota velha
-      daria token a qualquer um que mandasse a versão certa no cabeçalho. A API sobe sem a rota, com o
-      `MIN_CLIENT_VERSION` novo e sem o `ACCESS_CODE`, numa vez só.
+- [x] **A troca tem de ser junta:** sem o código de acesso e com a rota antiga no ar, a rota velha daria
+      token a qualquer um que mandasse a versão certa no cabeçalho. A rota e o código saíram juntos
+      (`8ba3399`), então não há mais essa janela.
 - [ ] **Contrato da API durante o beta:** o app instalado e o novo usam a mesma API. A Etapa 1 só acrescenta;
       o nome do participante no `voice/token` muda, mas só o app novo usa essa rota.
 - [ ] **A barra própria** perde o menu de encaixe do Windows 11 (ADR 0012).

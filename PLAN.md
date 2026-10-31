@@ -204,7 +204,8 @@ pedido de atualização.
 **Como fechou (31/10).** O grupo já usa o app com conta e o Painel de controle funcionou, e a etapa foi
 dada como concluída por isso. **Não entrou**, e foi para o `BACKLOG.md` ("Correções fora de ordem"): a rota
 `/api/voice/join`, o `ACCESS_CODE` e o `X-Access-Code`, a subida do `MIN_CLIENT_VERSION` e o `admin` só com
-`dono` e `backup`. Por isso a API ainda aceita a rota velha e o app antigo.
+`dono` e `backup`. A rota e o código de acesso saíram no mesmo dia (`8ba3399`); o que sobrou, enxugar o
+`admin` e subir o `MIN_CLIENT_VERSION`, está no `BACKLOG.md`.
 
 ---
 

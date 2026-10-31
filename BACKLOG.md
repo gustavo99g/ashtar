@@ -16,12 +16,14 @@ Ao resolver um item, apague-o daqui e registre o resultado no ADR ou no commit.
 
 Bugs que saem assim que ficarem prontos, pelo auto-update, sem esperar a entrega da ordem.
 
-- [ ] **Limpeza do código de acesso** (adiada da Etapa 8; o grupo já usa as contas): tirar a rota
-      `/api/voice/join`, o `ACCESS_CODE` e o `X-Access-Code` (`client_policy.rs`, que também tem a
-      comparação sem tempo constante), o `VITE_ACCESS_CODE` do app e do CI, e subir o `MIN_CLIENT_VERSION`
-      para a versão com a troca. Tem de ser tudo junto: sem o código e com a rota antiga no ar, a rota velha
-      daria token a qualquer um com a versão certa no cabeçalho. Só depois de todo o grupo estar no app novo.
-      O `admin` fica só com `dono` e `backup`. O `.env.example` já saiu do `ACCESS_CODE`.
+- [ ] **Enxugar o `admin`** (o que sobrou da Etapa 8; o código de acesso e a rota `/api/voice/join`
+      já saíram): o Painel de controle cobre `convite`, `convites`, `revogar`, `membros`, `remover`,
+      `desvincular`, `beta` e `permissoes`. **Não tirar o `recuperacao`**: se o dono perde o computador, ele
+      não consegue abrir o Painel, e esse comando é o único jeito de criar a recuperação dele. Ficariam
+      `dono`, `backup`, `recuperacao` e, de preferência, `membros`, só para conferir o banco. Se for feito,
+      atualizar o `README.md`, o `scripts/local/admin-shell.ps1` (a lista de comandos) e os testes.
+- [ ] **Subir o `MIN_CLIENT_VERSION`** no `.env` de produção (`0.2.20`, a primeira versão com conta): um
+      app mais velho passa a receber o pedido de atualização, em vez de erro de rota. É só configuração.
 
 - [ ] Eco no compartilhamento da tela inteira com "Todo o sistema". Num teste com amigos (2026-10-06), um
       amigo compartilhou o monitor e quem assistia ouviu a própria voz; só mutar o próprio microfone
