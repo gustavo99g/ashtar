@@ -157,6 +157,29 @@ muda o que re-renderiza, e é uma entrega com testes próprios, quando a segunda
 4. A `voice` em subdomínios, um pull request cada: `devices`, `members`, `dock`, `call` e, por último,
    `room`.
 
+## Como ficou (31/10)
+
+Feito em passos, cada um com `tsc`, `eslint`, os testes e o build passando. O que difere do plano acima:
+
+- **As rotas de convite e de recuperação** levam para a `entry` o fluxo inteiro (ler o convite,
+  redirecionar e o formulário), em `InviteFlow` e `RecoveryFlow`, e não só um `InviteForm`: a leitura do
+  convite e o formulário dividem o estado. A rota só lê o parâmetro da URL.
+- **`devices.ts` foi dividido:** as regras puras em `devices/model/devices.ts` e o store em
+  `devices/stores/deviceChoiceStore.ts`, para o `model/` ficar sem zustand.
+- **`useInCall`** mora em `voice/room/hooks/`. O token do LiveKit e a conferência da sessão passaram para
+  `voice/room/queries.ts`, sem cache.
+- **O Painel de controle** não virou `features/admin/`: as telas de Convites ficaram na `invites` (que já
+  tinha o bilhete e o convite rápido) e as de Membros numa feature `members`, que usa `invites` e
+  `identity` pelos `index.ts`. O `admin/` só vale se o Painel ganhar uma tela que não é de nenhum dos dois.
+- **Os testes** de cada subdomínio da `voice` ficam em `tests/` dentro dele; nas outras features, em
+  `tests/` da feature.
+- **O `commands.ts`** virou `lib/tauri/commands/`, e a exceção do ESLint para chamar `invoke` passou a valer
+  para a pasta toda.
+- **O `updater/store.ts`** passou para o `persist` (`ashtar-updater`); a chave antiga é lida uma vez, para
+  quem já viu o "O que há de novo" não ver de novo.
+- **`scripts/move-files.mjs`** move arquivos e reescreve os imports (relativos, `@/` e `vi.mock`). Ficou
+  no repositório para as próximas reorganizações.
+
 ## Alternativas consideradas
 
 - **Cobrar as gavetas no ESLint:** o `model/` sem React, o `components/` sem a API e o cache com dono único

@@ -50,7 +50,7 @@ que cada tema define o contrato inteiro. O tema muda só cor, raio e no máximo 
 o tema escuro do canvas.
 
 **Tipos da API.** Gerados do Rust com o `ts-rs` para dentro de `lib/api`; o CI confere se os arquivos
-gerados estão em dia. Os comandos do Tauri continuam escritos à mão em `lib/tauri/commands.ts`.
+gerados estão em dia. Os comandos do Tauri continuam escritos à mão em `lib/tauri/commands/` (era um arquivo só até a ADR 0014).
 
 **Janela.** 1440 × 900, o tamanho dos quadros, com mínimo de 1000 × 640. Numa tela que não comporta (a
 primeira abertura, sem nada gravado), ela fica com 90% da área útil do monitor, centralizada. Sem a barra do

@@ -37,7 +37,7 @@ flowchart LR
     CMD[commands] --> S
   end
   subgraph React["React (webview)"]
-    TS[lib/tauri/commands.ts] --> CMD
+    TS[lib/tauri/commands/] --> CMD
     IPC -- "Channel, bytes crus" --> SS[features/screen-share]
     SS --> TS
     V[features/voice] --> SS
@@ -85,9 +85,13 @@ flowchart LR
 
 ### Frontend do app (`desktop/src/`)
 
-- **`lib/tauri/commands.ts`**: o único arquivo que importa `@tauri-apps/api`. Tem os tipos do
-  contrato (`AppError`, `CaptureSource`, `SourceRef`) e um wrapper tipado por comando e evento.
-- **`features/voice/`**: a conexão com a sala do LiveKit, mute e deafen.
+- **`lib/tauri/commands/`**: a única pasta que importa `@tauri-apps/api`, com um arquivo por assunto
+  (`core`, `screen-share`, `updater`, `app`, `identity`). Tem os tipos do contrato (`AppError`,
+  `CaptureSource`, `SourceRef`) e um wrapper tipado por comando e evento.
+- **`features/voice/`**: a conexão com a sala do LiveKit, em subdomínios: `room` (a conexão, mute e
+  deafen), `devices` (microfone e saída), `members` (quem está na sala), `call` (a sala por dentro) e
+  `dock` (o pé da coluna). O padrão das pastas de cada feature está na ADR 0014.
+- **`features/server/`**: a coluna e a tela do servidor, sobre a `voice`.
 - **`features/screen-share/`**: a interface `ScreenShareController` e suas implementações; hoje, a
   `IpcScreenShare`, que recebe os dados do Rust e os publica no LiveKit.
 
@@ -164,7 +168,7 @@ Regras que atravessam módulos. Quebrar uma delas costuma produzir bugs longe da
   encerra é o manager, de fora da thread.
 - **Só os pontos de entrada comuns chamam `platform::`.** `media/sources.rs` e `media/audio.rs`
   escolhem a implementação; o resto do código nunca usa `platform::win32` diretamente.
-- **Só o `commands.ts` importa `@tauri-apps/api`.** A regra de lint impede o contrário. Isso mantém
+- **Só a pasta `commands/` importa `@tauri-apps/api`.** A regra de lint impede o contrário. Isso mantém
   aberta a possibilidade de uma versão web.
 - **Dados binários atravessam o IPC como bytes crus** (`InvokeResponseBody::Raw`), nunca como
   `Vec<u8>` serializado em JSON.
