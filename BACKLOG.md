@@ -72,6 +72,9 @@ Bugs que saem assim que ficarem prontos, pelo auto-update, sem esperar a entrega
 - [ ] Tela de usuários em que o dono marca quem recebe o beta. A API (devolver o canal e a permissão no
       `admin`) sai na v0.2.1 (`NOTES.md`); a tela e o app guardando o último valor vêm aqui, e substituem a
       variável `ASHTAR_UPDATE_CHANNEL`. Papel de dono ("supremo"), acima de administrador; só ele marca o beta.
+- [ ] Organizar as features do front pelo padrão da ADR 0014 (gavetas `components/`, `hooks/`, `stores/`,
+      `model/`; a `voice` em subdomínios e a `server` separada). Depois da Etapa 7, um pull request por
+      passo. Sem regra de ESLint: é convenção.
 
 ## v0.2.3 — Chat real
 
