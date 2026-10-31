@@ -31,6 +31,11 @@ interface InviteTicketProps {
 	status?: ReactNode;
 	/** O que resta do prazo, de 0 a 1, para a barra debaixo da validade. Sem ele, sem barra. */
 	timeLeft?: number;
+	/**
+	 * A cor de onde o bilhete está, para os recortes do picote: a página (`background`) ou um
+	 * cartão, diálogo ou popover (`card`). Sem ela, a página no tamanho normal e o cartão no compacto.
+	 */
+	surface?: "background" | "card";
 	size?: "default" | "compact";
 	className?: string;
 }
