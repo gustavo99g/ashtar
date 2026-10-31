@@ -1,4 +1,4 @@
-import { ServerView } from "@/features/voice";
+import { ServerView } from "@/features/server";
 
 /** A tela do servidor, com quem está na sala. */
 export function ServerRoute() {

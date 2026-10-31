@@ -1,14 +1,16 @@
 import { Outlet } from "react-router-dom";
 import logo from "@/assets/ashtar.svg";
 import { JoinNotices } from "@/features/members";
-import { ChannelNav, VoiceDock } from "@/features/voice";
+import { ChannelNav } from "@/features/server";
+import { VoiceDock } from "@/features/voice";
 /*
  * A moldura de quem já entrou: a coluna do servidor à esquerda e a rota no meio. As
  * configurações também são filhas daqui e se desenham por cima de tudo (o `SettingsLayout` ocupa
  * a moldura inteira), então a coluna continua montada embaixo delas.
  *
- * A coluna vem da `features/voice`: a sala com quem está nela (`ChannelNav`) e, no pé, o
- * cartão de quem está usando, com o botão de configurações (`VoiceDock`).
+ * A coluna vem da `features/server` (a sala com quem está nela, `ChannelNav`) e da
+ * `features/voice` (no pé, o cartão de quem está usando, com o botão de configurações,
+ * `VoiceDock`).
  */
 export function AppShell() {
 	return (

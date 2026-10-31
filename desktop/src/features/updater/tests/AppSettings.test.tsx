@@ -18,7 +18,7 @@ vi.mock("@/lib/tauri/commands", () => ({
 let me: MeResponse | undefined;
 vi.mock("@/features/identity", () => ({ useMe: () => ({ data: me }) }));
 vi.mock("@/features/voice", () => ({
-	useVoice: () => ({ connectionState: "disconnected" }),
+	useInCall: () => false,
 }));
 
 function meWith(

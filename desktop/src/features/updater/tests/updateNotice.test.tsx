@@ -21,7 +21,8 @@ vi.mock("@/features/identity", () => ({ useMe: () => ({ data: undefined }) }));
 let connectionState: VoiceConnectionState = "disconnected";
 vi.mock("@/features/voice", () => ({
 	SALA: { id: "sala", name: "Sala" },
-	useVoice: () => ({ connectionState }),
+	useInCall: () =>
+		connectionState !== "disconnected" && connectionState !== "error",
 }));
 
 /** O que o Rust manda pelo evento, pela função que o componente registrou. */

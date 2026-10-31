@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { type ReactNode, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { SALA } from "@/features/voice";
+import { SALA, useInCall } from "@/features/voice";
 import {
 	onUpdateFailed,
 	onUpdateReady,
@@ -31,7 +31,6 @@ import {
 	updateReady,
 	useUpdaterStore,
 } from "../stores/updaterStore";
-import { useInCall } from "../useInCall";
 import { useUpdateChannelSync } from "../hooks/useUpdateChannelSync";
 
 /** Liga os eventos do Rust ao estado. */

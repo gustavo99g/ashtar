@@ -31,7 +31,7 @@ import {
 	updateReady,
 	useUpdaterStore,
 } from "../stores/updaterStore";
-import { useInCall } from "../useInCall";
+import { useInCall } from "@/features/voice";
 
 /**
  * Onde o Rust grava os logs (`app_log_dir`: a pasta local do Windows com o identificador do

@@ -5,12 +5,16 @@ import { ErrorState, LoadingState, OfflineState } from "@/components/ui/states";
 import { Avatar } from "@/features/identity";
 import { isApiError } from "@/lib/api";
 import { paths } from "@/lib/paths";
-import { SALA } from "../channel";
-import { type ChannelMember, memberFromApi, peopleNowLabel } from "../members";
-import { useVoiceParticipants } from "../queries";
-import { watchShare } from "../roomView";
-import { useVoice } from "../useVoice";
-import { LiveBadge } from "./LiveBadge";
+import {
+	type ChannelMember,
+	LiveBadge,
+	memberFromApi,
+	peopleNowLabel,
+	SALA,
+	useVoice,
+	useVoiceParticipants,
+	watchShare,
+} from "@/features/voice";
 import { Starfield } from "./Starfield";
 
 /*

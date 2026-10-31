@@ -8,13 +8,16 @@ import {
 import { Avatar, useSession } from "@/features/identity";
 import { paths } from "@/lib/paths";
 import { cn } from "@/lib/utils";
-import { SALA } from "../channel";
-import { type ChannelMember, memberFromApi } from "../members";
-import { useVoiceParticipants } from "../queries";
-import { useLiveMembers } from "../useLiveMembers";
-import { useVoice } from "../useVoice";
-import { LiveBadge } from "./LiveBadge";
-import { PersonCard } from "./PersonCard";
+import {
+	type ChannelMember,
+	LiveBadge,
+	memberFromApi,
+	PersonCard,
+	SALA,
+	useLiveMembers,
+	useVoice,
+	useVoiceParticipants,
+} from "@/features/voice";
 
 /*
  * A coluna do servidor: a sala e quem está nela. Sem canais de texto na 0.2.2. Clicar na sala
