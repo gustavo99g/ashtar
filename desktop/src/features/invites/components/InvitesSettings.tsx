@@ -2,6 +2,7 @@ import { type ReactNode, useId, useState } from "react";
 import type { CreatedInviteView } from "@/lib/api";
 import { CreatedInvite } from "./CreatedInvite";
 import { InviteForm } from "./InviteForm";
+import { InviteHistory } from "./InviteHistory";
 
 /*
  * Configurações › Painel de controle › Convites (quadros "Convites", "Convites (do seu jeito)" e
@@ -30,6 +31,13 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 export function InvitesSettings() {
 	// O convite recém-criado. Só existe aqui: sair da tela esquece o código, que não volta.
 	const [created, setCreated] = useState<CreatedInviteView | null>(null);
+	// O último criado ganha o selo "Novo" no histórico, mesmo depois do "Criar outro convite".
+	const [newId, setNewId] = useState<string | null>(null);
+
+	function onCreated(invite: CreatedInviteView) {
+		setCreated(invite);
+		setNewId(invite.id);
+	}
 
 	return (
 		<div className="@container flex w-full flex-col gap-8 py-20 pr-28 pl-32">
@@ -43,9 +51,10 @@ export function InvitesSettings() {
 						onCreateAnother={() => setCreated(null)}
 					/>
 				) : (
-					<InviteForm onCreated={setCreated} />
+					<InviteForm onCreated={onCreated} />
 				)}
 			</Section>
+			<InviteHistory newId={newId} />
 		</div>
 	);
 }

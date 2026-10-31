@@ -86,3 +86,12 @@ export function duration(secs: number): string {
 export function peopleText(maxUses: number): string {
 	return maxUses === 1 ? "1 pessoa" : `até ${maxUses} pessoas`;
 }
+
+/** Quando foi criado, como no histórico: "agora", "hoje, 09:30", "ontem, 18:40" ou "em 15 out, 20:10". */
+export function createdWhen(at: number, now: number): string {
+	if (now - at * 1000 < 60_000) return "agora";
+	const when = dayAndTime(at, now);
+	return when.startsWith("hoje") || when.startsWith("ontem")
+		? when
+		: `em ${when}`;
+}

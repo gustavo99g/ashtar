@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+	createdWhen,
 	dayAndTime,
 	duration,
 	expiryTime,
@@ -51,5 +52,11 @@ describe("datas e prazos", () => {
 	it("conta as pessoas", () => {
 		expect(peopleText(1)).toBe("1 pessoa");
 		expect(peopleText(8)).toBe("até 8 pessoas");
+	});
+	it('diz quando foi criado, com o "em" só nas datas', () => {
+		expect(createdWhen(now / 1000 - 20, now)).toBe("agora");
+		expect(createdWhen(at(17, 9, 30), now)).toBe("hoje, 09:30");
+		expect(createdWhen(at(16, 18, 40), now)).toBe("ontem, 18:40");
+		expect(createdWhen(at(15, 20, 10), now)).toBe("em 15 out, 20:10");
 	});
 });
