@@ -1,0 +1,3 @@
+# Gerados pelo setup.sh na VPS; têm o segredo do LiveKit.
+.env
+livekit.yaml

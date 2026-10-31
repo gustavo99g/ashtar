@@ -1,0 +1,28 @@
+# LiveKit próprio na VPS, com o Caddy na frente para o HTTPS (wss://).
+# Os dois usam a rede do host: o LiveKit anuncia o IP público da máquina para a mídia,
+# e o Docker não precisa mapear a porta UDP nem a TCP de fallback.
+#
+# Antes de subir: ./setup.sh (gera o .env e o livekit.yaml, que ficam só na VPS).
+
+services:
+  livekit:
+    image: livekit/livekit-server:v1.13.10
+    command: --config /etc/livekit.yaml
+    network_mode: host
+    restart: unless-stopped
+    volumes:
+      - ./livekit.yaml:/etc/livekit.yaml:ro
+
+  caddy:
+    image: caddy:2.11.7-alpine
+    network_mode: host
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:

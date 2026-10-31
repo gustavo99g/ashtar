@@ -454,6 +454,12 @@ mostrou que o limite que aperta primeiro são os minutos, não o tráfego (~2 GB
 pessoas). O publicador nativo (v0.2.5) vem depois, já sobre o servidor próprio: a segunda conexão de quem transmite
 não consome essa cota.
 
+**Antecipado em 2026-10-31: só o LiveKit.** A cota de tráfego (GB) do plano gratuito chegou perto do fim, ao
+contrário do teste de 2026-10-06, em que os minutos pareciam o limite. O LiveKit passa para a VPS antes do
+resto, com a API e o banco ainda em casa; a troca é só no `.env` da API. Configuração e passo a passo em
+[`deploy/livekit/`](../deploy/livekit/README.md). Desta entrega ficam pendentes o TURN por TLS na 443, a API e
+o banco na VPS, o backup e o alerta.
+
 O desktop só conhece a URL da API. A URL, a chave e o segredo do LiveKit ficam no servidor, e a URL do
 LiveKit chega ao desktop pela própria API.
 

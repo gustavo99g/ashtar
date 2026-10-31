@@ -1,0 +1,5 @@
+# Certificado automático (Let's Encrypt) para o domínio do LiveKit e proxy do
+# sinal (HTTP + WebSocket) para a porta 7880. A mídia não passa por aqui.
+{$LIVEKIT_DOMAIN} {
+	reverse_proxy 127.0.0.1:7880
+}

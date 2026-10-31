@@ -218,7 +218,9 @@ Teste com o grupo (v0.1)
   • API pelo Tailscale Funnel
   • mídia pelo LiveKit Cloud (plano gratuito)
         ↓
-VPS com LiveKit, API e banco (v0.2)
+LiveKit na VPS, API e banco ainda em casa (antecipado, 2026-10-31)
+        ↓
+VPS com LiveKit, API e banco (v0.2.4)
 ```
 
 **API pelo Tailscale Funnel.** O Funnel é gratuito no plano pessoal e dá uma URL fixa
@@ -264,7 +266,8 @@ cada pessoa que assiste. O Movimento usa até 3,5 Mbps.
 **VPS.** Na v0.2.4, o servidor do LiveKit (que é gratuito e de código aberto), a API e o banco passam a
 rodar numa VPS própria. O LiveKit próprio é pré-requisito das transmissões múltiplas da v0.4, e a API e
 o banco deixam de depender de um computador pessoal ligado. Se os limites do plano gratuito apertarem
-antes, a migração é antecipada. Para o código do LiveKit, a troca é só de configuração: a URL, a chave
+antes, a migração é antecipada. Foi o que aconteceu com o LiveKit: a cota de tráfego apertou e ele passa
+para a VPS antes do resto (configuração em [`deploy/livekit/`](deploy/livekit/README.md)). Para o código do LiveKit, a troca é só de configuração: a URL, a chave
 e o segredo no `.env`.
 
 A VPS é escolhida pelo **tráfego de saída incluso** e pela **latência** até o grupo, não só pela CPU.
