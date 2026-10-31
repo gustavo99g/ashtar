@@ -5,7 +5,8 @@
  *
  * Entra com a identidade da sessão: o token vem do `POST /api/voice/token`, com o id do usuário,
  * o nome visível e o nick nos metadados. Quando a sessão deixa de estar conectada (este computador
- * saiu do grupo, por exemplo), a chamada cai sozinha.
+ * saiu do grupo, por exemplo), a chamada cai sozinha. Quando a API tira a pessoa da sala (removida
+ * ou com o computador desvinculado no Painel), confere a sessão na hora.
  *
  * Não sabe nada de captura: cria o `ScreenShareController` da sala e o expõe no contexto.
  * Os componentes leem participantes e trilhas pelos hooks do LiveKit (`useParticipants`,
@@ -18,7 +19,12 @@
  * quando a escolha muda, ou quando o escolhido some e volta (`roomDevices.ts`).
  */
 import { RoomContext } from "@livekit/components-react";
-import { ConnectionState, Room, RoomEvent } from "livekit-client";
+import {
+	ConnectionState,
+	DisconnectReason,
+	Room,
+	RoomEvent,
+} from "livekit-client";
 import {
 	createContext,
 	type ReactNode,
@@ -32,7 +38,7 @@ import {
 	IpcScreenShare,
 	type ScreenShareController,
 } from "@/features/screen-share";
-import { createVoiceToken } from "@/lib/api";
+import { createVoiceToken, getMe } from "@/lib/api";
 import { RoomAudio } from "./components/RoomAudio";
 import { effectiveDevice, knownDevices, useDeviceChoice } from "./devices";
 import { type DeviceIds, roomOptions, switchDevice } from "./roomDevices";
@@ -209,10 +215,15 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 		});
 
 		// Só dispara quando a sala cai sozinha: no cleanup as escutas saem antes do disconnect.
-		nextRoom.on(RoomEvent.Disconnected, () => {
+		nextRoom.on(RoomEvent.Disconnected, (reason) => {
 			void controller.dispose();
 			setRoom(null);
 			setScreenShare(null);
+			// A API tirou esta pessoa da sala: confere a sessão já. Se ela saiu do grupo, o 401 leva à
+			// tela "saiu do grupo" (pelo `lib/api`), sem esperar a próxima consulta.
+			if (reason === DisconnectReason.PARTICIPANT_REMOVED) {
+				void getMe().catch(() => {});
+			}
 		});
 
 		async function connect() {
