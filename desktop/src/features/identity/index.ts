@@ -1,6 +1,7 @@
 export { Avatar, AvatarBadge } from "./components/Avatar";
 export { PersonName } from "./components/PersonName";
 export { ProfileSettings } from "./components/ProfileSettings";
+export { SessionWatcher } from "./components/SessionWatcher";
 export { avatarInitial, NICK_COLORS, nickColor } from "./model/nickColor";
 export { checkNick, NICK_MAX, NICK_MIN, sameNick } from "./model/nickRules";
 export {
@@ -15,7 +16,6 @@ export {
 	useMe,
 	useRedeemInvite,
 } from "./queries";
-export { SessionWatcher } from "./components/SessionWatcher";
 export {
 	redeemInvite,
 	type Session,
