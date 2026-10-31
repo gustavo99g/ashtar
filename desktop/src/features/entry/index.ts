@@ -1,5 +1,7 @@
 export { ENTERING_TITLE_ID, Entering } from "./components/Entering";
 export { EntryMessage } from "./components/EntryMessage";
+export { InviteFlow } from "./components/InviteFlow";
+export { RecoveryFlow } from "./components/RecoveryFlow";
 export { EntryProblem } from "./components/EntryProblem";
 export {
 	EntryFootnote,
