@@ -43,7 +43,7 @@ import { RoomAudio } from "./components/RoomAudio";
 import { effectiveDevice, knownDevices } from "./devices/model/devices";
 import { useDeviceChoice } from "./devices/stores/deviceChoiceStore";
 import { type DeviceIds, roomOptions, switchDevice } from "./devices/model/roomDevices";
-import { useRoomView } from "./roomView";
+import { useRoomView } from "./call/stores/roomViewStore";
 import { syncSubscription, syncSubscriptions } from "./subscriptions";
 import { useAudioDevices } from "./devices/hooks/useAudioDevices";
 import {

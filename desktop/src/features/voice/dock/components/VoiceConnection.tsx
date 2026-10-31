@@ -14,11 +14,11 @@ import { paths } from "@/lib/paths";
 import { cn } from "@/lib/utils";
 import { SALA } from "../../channel";
 import { pingQuality } from "../model/ping";
-import { stopWatching } from "../../roomView";
+import { stopWatching } from "../../call/stores/roomViewStore";
 import { usePing } from "../hooks/usePing";
 import { useVoice } from "../../useVoice";
-import { DockButton } from "../../components/buttons";
-import { ShareButton } from "../../components/ShareButton";
+import { DockButton } from "../../call/components/buttons";
+import { ShareButton } from "../../call/components/ShareButton";
 
 /*
  * O painel "Voz conectada" no pé da coluna, enquanto há chamada: Conectando ou Conectada (com o

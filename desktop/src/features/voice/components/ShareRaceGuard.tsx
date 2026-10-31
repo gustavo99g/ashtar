@@ -9,8 +9,8 @@ import {
 	useScreenShares,
 } from "@/features/screen-share";
 import { paths } from "@/lib/paths";
-import { watchShare } from "../roomView";
-import { NoticeIcon } from "./NoticeIcon";
+import { watchShare } from "../call/stores/roomViewStore";
+import { NoticeIcon } from "../call/components/NoticeIcon";
 
 /**
  * Quando duas pessoas começam a transmitir juntas, cada app aplica a mesma regra

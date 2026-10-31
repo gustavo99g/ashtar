@@ -7,7 +7,7 @@ import {
 	ScreenShareIcon,
 } from "lucide-react";
 import type { ScreenShareController } from "@/features/screen-share";
-import { useVoice } from "../useVoice";
+import { useVoice } from "../../useVoice";
 import { BarButton } from "./buttons";
 import { ShareButton } from "./ShareButton";
 

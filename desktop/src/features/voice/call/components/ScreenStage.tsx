@@ -18,14 +18,14 @@ import { Slider } from "@/components/ui/slider";
 import { Spinner } from "@/components/ui/spinner";
 import { Avatar } from "@/features/identity";
 import { cn } from "@/lib/utils";
-import type { ChannelMember } from "../members/model/members";
-import { setOnStage } from "../roomView";
+import type { ChannelMember } from "../../members/model/members";
+import { setOnStage } from "../stores/roomViewStore";
 import {
 	audibleVolume,
 	setShareVolume,
 	toggleShareMuted,
 	useShareVolume,
-} from "../shareVolume";
+} from "../stores/shareVolumeStore";
 import { LiveBadge } from "./LiveBadge";
 
 /*

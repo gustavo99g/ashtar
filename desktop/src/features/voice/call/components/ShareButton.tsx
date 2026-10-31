@@ -15,7 +15,7 @@ import {
 	useShareButton,
 } from "@/features/screen-share";
 import { paths } from "@/lib/paths";
-import { watchShare } from "../roomView";
+import { watchShare } from "../stores/roomViewStore";
 import { BarButton, DockButton } from "./buttons";
 
 /*

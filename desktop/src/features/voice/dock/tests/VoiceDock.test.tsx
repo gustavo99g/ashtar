@@ -15,7 +15,7 @@ vi.mock("../components/VoiceConnection", () => ({
 	VoiceConnection: () => null,
 }));
 vi.mock("../../components/ShareRaceGuard", () => ({ ShareRaceGuard: () => null }));
-vi.mock("../../components/ShareNotices", () => ({ ShareNotices: () => null }));
+vi.mock("../../call/components/ShareNotices", () => ({ ShareNotices: () => null }));
 
 const controller = {
 	getState: () => ({ status: "idle" }),

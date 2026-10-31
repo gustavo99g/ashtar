@@ -4,7 +4,7 @@ import {
 	setShareVolume,
 	toggleShareMuted,
 	useShareVolume,
-} from "../shareVolume";
+} from "../stores/shareVolumeStore";
 
 const volume = () => audibleVolume(useShareVolume.getState());
 

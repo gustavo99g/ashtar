@@ -5,7 +5,7 @@ import {
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
-import { SALA } from "../channel";
+import { SALA } from "../../channel";
 
 /*
  * O topo da sala: o nome, um resumo (quantas pessoas, ou quem está sendo assistido) e, à direita,

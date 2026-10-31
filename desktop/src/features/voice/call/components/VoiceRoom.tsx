@@ -11,12 +11,12 @@ import {
 	useScreenShares,
 } from "@/features/screen-share";
 import { paths } from "@/lib/paths";
-import { SALA } from "../channel";
-import { stopWatching, useRoomView, watchShare } from "../roomView";
-import { useLiveMembers } from "../members/hooks/useLiveMembers";
-import { useVoice } from "../useVoice";
+import { SALA } from "../../channel";
+import { stopWatching, useRoomView, watchShare } from "../stores/roomViewStore";
+import { useLiveMembers } from "../../members/hooks/useLiveMembers";
+import { useVoice } from "../../useVoice";
 import { CallControls } from "./CallControls";
-import { ConnectingTile, ParticipantTile } from "../members/components/ParticipantTile";
+import { ConnectingTile, ParticipantTile } from "../../members/components/ParticipantTile";
 import { RoomGrid } from "./RoomGrid";
 import { LayoutToggle, RoomHeader } from "./RoomHeader";
 import { ScreenStage } from "./ScreenStage";
