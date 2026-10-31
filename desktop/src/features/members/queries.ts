@@ -5,7 +5,16 @@
  */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSession } from "@/features/identity";
-import { listMembers, type MemberView, setMemberBeta } from "@/lib/api";
+import { invitesKeys } from "@/features/invites";
+import {
+	createRecoveryInvite,
+	getMemberPermissions,
+	listMembers,
+	type MemberView,
+	removeMember,
+	setMemberBeta,
+	unlinkMember,
+} from "@/lib/api";
 
 export const membersKeys = {
 	all: ["members"] as const,
@@ -20,6 +29,15 @@ export function useMembers() {
 		queryKey: membersKeys.list(),
 		queryFn: listMembers,
 		enabled: connected,
+	});
+}
+
+/** As permissões de um membro, como a API devolve (`GET /api/members/{id}/permissions`). */
+export function useMemberPermissions(id: string | null) {
+	return useQuery({
+		queryKey: membersKeys.permissions(id ?? ""),
+		queryFn: () => getMemberPermissions(id ?? ""),
+		enabled: id !== null,
 	});
 }
 
@@ -62,6 +80,52 @@ export function useSetMemberBeta() {
 				queryClient.invalidateQueries({
 					queryKey: membersKeys.permissions(id),
 				}),
+			]),
+	});
+}
+
+/** Tira o computador do membro (`POST /api/members/{id}/unlink`): ele fica "Sem computador". */
+export function useUnlinkMember() {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: (id: string) => unlinkMember(id),
+		onSettled: () =>
+			queryClient.invalidateQueries({ queryKey: membersKeys.list() }),
+	});
+}
+
+/**
+ * Cria o convite de recuperação de alguém (`POST /api/members/{id}/recovery-invite`). O código só
+ * vem nesta resposta. O membro passa a ter "Recuperação valendo até..." e o histórico de convites
+ * ganha uma linha.
+ */
+export function useCreateRecoveryInvite() {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: (id: string) => createRecoveryInvite(id),
+		onSettled: () =>
+			Promise.all([
+				queryClient.invalidateQueries({ queryKey: membersKeys.list() }),
+				queryClient.invalidateQueries({ queryKey: invitesKeys.list() }),
+			]),
+	});
+}
+
+/**
+ * Remove alguém do grupo (`DELETE /api/members/{id}`). A API também revoga as recuperações dele
+ * que ainda valiam, então o histórico de convites muda junto.
+ */
+export function useRemoveMember() {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: (id: string) => removeMember(id),
+		onSettled: (_data, _error, id) =>
+			Promise.all([
+				queryClient.invalidateQueries({ queryKey: membersKeys.list() }),
+				queryClient.invalidateQueries({
+					queryKey: membersKeys.permissions(id),
+				}),
+				queryClient.invalidateQueries({ queryKey: invitesKeys.list() }),
 			]),
 	});
 }

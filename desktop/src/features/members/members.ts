@@ -87,3 +87,58 @@ export function joinedVia(member: MemberView): string {
 			return "Convite";
 	}
 }
+
+/** Uma linha de "No grupo", na gaveta do membro. */
+export interface MemberFact {
+	title: string;
+	detail: string;
+}
+
+const JOINED_WITH = {
+	person: "Com um convite seu",
+	group: "Com o convite do grupo",
+	custom: "Com um convite do seu jeito",
+} as const;
+
+/** "Entrou em 2 out / Com um convite seu", ou "Criou o grupo em 1 out / É o dono". */
+export function joinedFact(member: MemberView): MemberFact {
+	const date = shortDate(member.created_at);
+	if (member.is_owner)
+		return { title: `Criou o grupo em ${date}`, detail: "É o dono" };
+	const preset = member.joined_with?.preset;
+	return {
+		title: `Entrou em ${date}`,
+		detail: preset ? JOINED_WITH[preset] : "Com um convite",
+	};
+}
+
+/** "Computador vinculado / Desde 2 out", "Sem computador / ...", "Removido em 14 out / ...". */
+export function deviceFact(member: MemberView): MemberFact {
+	if (member.removed_at !== null) {
+		return {
+			title: `Removido em ${shortDate(member.removed_at)}`,
+			detail: "As mensagens continuam no histórico",
+		};
+	}
+	const { detail } = deviceText(member);
+	return {
+		title: member.device ? "Computador vinculado" : "Sem computador",
+		detail: detail.charAt(0).toUpperCase() + detail.slice(1),
+	};
+}
+
+/** "Canal beta / Ligado por você em 12 out", "Canal estável / ...". */
+export function channelFact(member: MemberView): MemberFact {
+	if (!member.beta)
+		return {
+			title: "Canal estável",
+			detail: "Recebe as versões depois do beta",
+		};
+	if (member.is_owner)
+		return { title: "Canal beta", detail: "O dono sempre recebe o beta" };
+	const at = member.beta.granted_at;
+	return {
+		title: "Canal beta",
+		detail: at ? `Ligado por você em ${shortDate(at)}` : "Ligado por você",
+	};
+}

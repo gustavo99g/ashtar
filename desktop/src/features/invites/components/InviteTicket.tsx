@@ -90,6 +90,7 @@ function InviteTicket({
 	notice = "O código aparece só agora.",
 	status,
 	timeLeft,
+	surface,
 	size = "default",
 	className,
 }: InviteTicketProps) {
@@ -98,7 +99,9 @@ function InviteTicket({
 	/** O semicírculo recortado em cima e embaixo do picote. Tem a cor do fundo de onde está. */
 	const notch = cn(
 		"absolute rounded-full border border-gold-border",
-		compact ? "bg-card" : "bg-background",
+		(surface ?? (compact ? "card" : "background")) === "card"
+			? "bg-card"
+			: "bg-background",
 		s.notch,
 	);
 

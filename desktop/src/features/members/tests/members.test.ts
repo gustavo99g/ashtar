@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+	channelFact,
+	deviceFact,
 	deviceText,
 	filterCounts,
 	filterMembers,
+	joinedFact,
 	joinedVia,
 	memberName,
 } from "../members";
@@ -96,5 +99,39 @@ describe("lista de membros", () => {
 				}),
 			),
 		).toBe("Convite do seu jeito");
+	});
+	it('monta o "No grupo" da gaveta', () => {
+		expect(joinedFact(owner)).toEqual({
+			title: "Criou o grupo em 1 out",
+			detail: "É o dono",
+		});
+		expect(joinedFact(list[1])).toEqual({
+			title: "Entrou em 7 out",
+			detail: "Com um convite seu",
+		});
+		expect(deviceFact(list[1])).toEqual({
+			title: "Computador vinculado",
+			detail: "Desde 7 out",
+		});
+		expect(deviceFact(list[2])).toEqual({
+			title: "Sem computador",
+			detail: "Recuperação valendo até 23 out",
+		});
+		expect(deviceFact(list[3])).toEqual({
+			title: "Removido em 14 out",
+			detail: "As mensagens continuam no histórico",
+		});
+		expect(channelFact(owner)).toEqual({
+			title: "Canal beta",
+			detail: "O dono sempre recebe o beta",
+		});
+		expect(channelFact(list[1])).toEqual({
+			title: "Canal beta",
+			detail: "Ligado por você em 16 out",
+		});
+		expect(channelFact(list[2])).toEqual({
+			title: "Canal estável",
+			detail: "Recebe as versões depois do beta",
+		});
 	});
 });

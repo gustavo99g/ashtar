@@ -10,6 +10,7 @@ import {
 	joinedVia,
 	memberName,
 } from "../members";
+import { type MemberActions, MemberMenu } from "./MemberMenu";
 
 /*
  * Uma linha da lista de membros. Larga (`@3xl`, a largura da página), tem as colunas do quadro:
@@ -39,12 +40,18 @@ export function OwnerBadge() {
 	);
 }
 
-interface MemberRowProps {
+interface MemberRowProps extends MemberActions {
 	member: MemberView;
+	canUnlink: boolean;
 	onBetaChange: (enabled: boolean) => void;
 }
 
-export function MemberRow({ member, onBetaChange }: MemberRowProps) {
+export function MemberRow({
+	member,
+	canUnlink,
+	onBetaChange,
+	...actions
+}: MemberRowProps) {
 	const name = memberName(member);
 	const removed = member.removed_at !== null;
 	const device = deviceText(member);
@@ -54,12 +61,15 @@ export function MemberRow({ member, onBetaChange }: MemberRowProps) {
 		<li
 			className={cn(
 				MEMBER_GRID,
-				"gap-y-1.5 border-t border-border py-2.5 pr-2.5 pl-3.5",
+				"gap-y-1.5 border-t border-border py-2.5 pr-2.5 pl-3.5 hover:bg-card",
 			)}
 		>
-			<div
+			<button
+				type="button"
+				aria-label={`Detalhes de ${name}`}
+				onClick={actions.onOpen}
 				className={cn(
-					"flex min-w-0 items-center gap-3",
+					"flex min-w-0 items-center gap-3 text-left",
 					removed && "opacity-60",
 				)}
 			>
@@ -79,7 +89,7 @@ export function MemberRow({ member, onBetaChange }: MemberRowProps) {
 						{member.nick}
 					</span>
 				</span>
-			</div>
+			</button>
 
 			{/* Estreita, esta caixa vira a segunda linha; larga, some (`contents`) e as duas colunas entram na grade. */}
 			<div
@@ -132,7 +142,11 @@ export function MemberRow({ member, onBetaChange }: MemberRowProps) {
 					/>
 				)}
 			</span>
-			<span className="flex justify-end" />
+			<span className="flex justify-end">
+				{!removed && (
+					<MemberMenu member={member} canUnlink={canUnlink} {...actions} />
+				)}
+			</span>
 		</li>
 	);
 }
