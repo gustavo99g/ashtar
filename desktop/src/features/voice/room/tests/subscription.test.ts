@@ -1,6 +1,6 @@
 import { type RemoteParticipant, type Room, Track } from "livekit-client";
 import { describe, expect, it, vi } from "vitest";
-import { syncSubscriptions, wantsTrack } from "../subscriptions";
+import { syncSubscriptions, wantsTrack } from "../model/subscriptions";
 
 /** Uma publicação de mentira: a fonte, o desejo de agora e o `setSubscribed` observado. */
 function publication(source: Track.Source, desired: boolean) {

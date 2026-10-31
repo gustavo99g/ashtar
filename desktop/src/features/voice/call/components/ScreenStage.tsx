@@ -30,7 +30,7 @@ import { LiveBadge } from "./LiveBadge";
 
 /*
  * O Foco: a transmissão grande, com quem transmite no canto, o volume do áudio da transmissão, a
- * tela cheia e o Parar de assistir. O volume fica gravado (`shareVolume.ts`) e vale para a próxima
+ * tela cheia e o Parar de assistir. O volume fica gravado (`shareVolumeStore.ts`) e vale para a próxima
  * transmissão; a tela cheia é a do próprio webview e vale para o Foco inteiro (`fullscreenTarget`),
  * com a faixa de quem está na chamada. A tela de quem transmite só é baixada enquanto este palco
  * existe.

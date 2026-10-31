@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { encodeVoiceState, parseVoiceState, withDeafened } from "../voiceState";
+import { encodeVoiceState, parseVoiceState, withDeafened } from "../model/voiceState";
 
 describe("voiceState", () => {
 	it("o aviso volta igual do outro lado", () => {

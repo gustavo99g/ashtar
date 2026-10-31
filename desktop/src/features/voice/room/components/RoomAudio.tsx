@@ -5,7 +5,7 @@ import { Track } from "livekit-client";
  * O som da sala: a voz de cada um e o áudio das transmissões. Faz o mesmo que o
  * `RoomAudioRenderer` do LiveKit, com uma diferença: o deafen cala só as vozes. Com o áudio
  * desativado, a pessoa não ouve ninguém falar, e a transmissão que ela assiste continua com o som,
- * no volume do Foco (`shareVolume.ts`).
+ * no volume do Foco (`shareVolumeStore.ts`).
  *
  * Calar uma voz também pede ao servidor que pare de mandá-la: quem entrar na sala depois do deafen
  * também não é ouvido.

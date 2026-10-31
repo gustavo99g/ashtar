@@ -1,5 +1,5 @@
 /**
- * Leva a escolha dos dispositivos (`devices.ts`) para a sala do LiveKit: ao entrar, pelas opções
+ * Leva a escolha dos dispositivos (`deviceChoiceStore.ts`) para a sala do LiveKit: ao entrar, pelas opções
  * da `Room`, e no meio da chamada, pelo `switchActiveDevice`. Quem usa é o `VoiceProvider`.
  */
 import type { Room, RoomOptions } from "livekit-client";

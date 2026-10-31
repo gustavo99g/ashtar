@@ -12,11 +12,11 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { ConnectingState } from "@/components/ui/states";
 import { paths } from "@/lib/paths";
 import { cn } from "@/lib/utils";
-import { SALA } from "../../channel";
+import { SALA } from "../../room/model/channel";
 import { pingQuality } from "../model/ping";
 import { stopWatching } from "../../call/stores/roomViewStore";
 import { usePing } from "../hooks/usePing";
-import { useVoice } from "../../useVoice";
+import { useVoice } from "../../room/hooks/useVoice";
 import { DockButton } from "../../call/components/buttons";
 import { ShareButton } from "../../call/components/ShareButton";
 

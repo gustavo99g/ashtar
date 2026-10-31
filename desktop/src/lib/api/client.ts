@@ -3,7 +3,7 @@
  * (decisões 8 e 11 da v0.2.0) e da sessão, põe um limite de tempo e transforma toda recusa num
  * `ApiError` com o `kind` da API.
  *
- * Um 401 `unauthenticated` com sessão faz o login de novo uma vez (`session.ts`) e repete a
+ * Um 401 `unauthenticated` com sessão faz o login de novo uma vez (`sessionStore.ts`) e repete a
  * chamada uma vez. Nenhum outro arquivo deve chamar `fetch` para a API.
  */
 import { checkForUpdate } from "@/lib/tauri/commands";

@@ -3,9 +3,9 @@ import { DisconnectReason, RoomEvent } from "livekit-client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { useSessionStore } from "@/features/identity";
 import { createVoiceToken, getMe, type UserView } from "@/lib/api";
-import { SALA } from "../channel";
-import { useVoice } from "../useVoice";
-import { VoiceProvider } from "../VoiceProvider";
+import { SALA } from "../model/channel";
+import { useVoice } from "../hooks/useVoice";
+import { VoiceProvider } from "../components/VoiceProvider";
 
 vi.mock("@/lib/api", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/lib/api")>()),

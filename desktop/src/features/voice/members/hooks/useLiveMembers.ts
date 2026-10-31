@@ -2,7 +2,7 @@ import { useParticipants } from "@livekit/components-react";
 import type { Participant } from "livekit-client";
 import { participantPerson } from "@/features/identity";
 import type { ChannelMember } from "../model/members";
-import { useVoice } from "../../useVoice";
+import { useVoice } from "../../room/hooks/useVoice";
 
 export interface LiveMember extends ChannelMember {
 	participant: Participant;

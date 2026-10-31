@@ -15,7 +15,7 @@
  * Entra sem assinar nada sozinho (`autoSubscribe: false`): a voz de todo mundo é assinada aqui, e a
  * tela transmitida só enquanto aparece no Foco (`subscriptions.ts`).
  *
- * Entra com o microfone e a saída de Configurações › Voz e vídeo (`devices.ts`) e troca na hora
+ * Entra com o microfone e a saída de Configurações › Voz e vídeo (`deviceChoiceStore.ts`) e troca na hora
  * quando a escolha muda, ou quando o escolhido some e volta (`roomDevices.ts`).
  */
 import { RoomContext } from "@livekit/components-react";
@@ -38,20 +38,20 @@ import {
 	IpcScreenShare,
 	type ScreenShareController,
 } from "@/features/screen-share";
-import { createVoiceToken, getMe } from "@/lib/api";
-import { RoomAudio } from "./components/RoomAudio";
-import { effectiveDevice, knownDevices } from "./devices/model/devices";
-import { useDeviceChoice } from "./devices/stores/deviceChoiceStore";
-import { type DeviceIds, roomOptions, switchDevice } from "./devices/model/roomDevices";
-import { useRoomView } from "./call/stores/roomViewStore";
-import { syncSubscription, syncSubscriptions } from "./subscriptions";
-import { useAudioDevices } from "./devices/hooks/useAudioDevices";
+import { RoomAudio } from "./RoomAudio";
+import { effectiveDevice, knownDevices } from "../../devices/model/devices";
+import { useDeviceChoice } from "../../devices/stores/deviceChoiceStore";
+import { type DeviceIds, roomOptions, switchDevice } from "../../devices/model/roomDevices";
+import { useRoomView } from "../../call/stores/roomViewStore";
+import { syncSubscription, syncSubscriptions } from "../model/subscriptions";
+import { checkSession, requestVoiceToken } from "../queries";
+import { useAudioDevices } from "../../devices/hooks/useAudioDevices";
 import {
 	encodeVoiceState,
 	parseVoiceState,
 	VOICE_STATE_TOPIC,
 	withDeafened,
-} from "./voiceState";
+} from "../model/voiceState";
 
 export type VoiceConnectionState =
 	| "disconnected"
@@ -223,7 +223,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 			// A API tirou esta pessoa da sala: confere a sessão já. Se ela saiu do grupo, o 401 leva à
 			// tela "saiu do grupo" (pelo `lib/api`), sem esperar a próxima consulta.
 			if (reason === DisconnectReason.PARTICIPANT_REMOVED) {
-				void getMe().catch(() => {});
+				void checkSession();
 			}
 		});
 
@@ -232,7 +232,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 				setConnectionState("connecting");
 				setError(null);
 
-				const { url, token } = await createVoiceToken(channelId);
+				const { url, token } = await requestVoiceToken(channelId);
 				if (cancelled) return;
 
 				// Nada é assinado sozinho: quem decide é o efeito do `onStage`, mais abaixo.

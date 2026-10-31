@@ -1,8 +1,8 @@
 import { SourcePickerHost } from "@/features/screen-share";
-import { SALA } from "../../channel";
-import { useVoice } from "../../useVoice";
+import { SALA } from "../../room/model/channel";
+import { useVoice } from "../../room/hooks/useVoice";
 import { ShareNotices } from "../../call/components/ShareNotices";
-import { ShareRaceGuard } from "../../components/ShareRaceGuard";
+import { ShareRaceGuard } from "../../room/components/ShareRaceGuard";
 import { UserPanel } from "./UserPanel";
 import { VoiceConnection } from "./VoiceConnection";
 
