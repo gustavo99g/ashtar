@@ -1,4 +1,5 @@
 import { ProfileSettings } from "@/features/identity";
+import { InvitesSettings } from "@/features/invites";
 import { AppSettings } from "@/features/updater";
 import { useVoice, VoiceSettings } from "@/features/voice";
 import { RoutePlaceholder } from "../placeholder";
@@ -24,7 +25,7 @@ export function AppSettingsRoute() {
 }
 
 export function InvitesSettingsRoute() {
-	return <RoutePlaceholder title="Convites" stage={7} />;
+	return <InvitesSettings />;
 }
 
 export function MembersSettingsRoute() {

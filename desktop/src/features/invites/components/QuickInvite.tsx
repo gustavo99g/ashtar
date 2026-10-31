@@ -27,6 +27,7 @@ import {
 	timeLeft,
 	useQuickInviteStore,
 } from "../quickInvite";
+import { useNow } from "../useNow";
 import { InviteStatusPill } from "./InviteStatusPill";
 import { InviteTicket } from "./InviteTicket";
 
@@ -196,14 +197,4 @@ function MoreOptions({ onNavigate }: { onNavigate: () => void }) {
 			</Button>
 		</div>
 	);
-}
-
-/** `Date.now()`, atualizado a cada `intervalMs`. */
-function useNow(intervalMs: number): number {
-	const [now, setNow] = useState(() => Date.now());
-	useEffect(() => {
-		const timer = setInterval(() => setNow(Date.now()), intervalMs);
-		return () => clearInterval(timer);
-	}, [intervalMs]);
-	return now;
 }
