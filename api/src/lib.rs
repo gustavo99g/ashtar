@@ -2,6 +2,7 @@
 //! (`src/bin/admin.rs`) usam as mesmas regras e o mesmo banco.
 
 pub mod avatar;
+pub mod chat;
 pub mod client_policy;
 pub mod db;
 pub mod download;
@@ -24,7 +25,7 @@ use tower_http::cors::CorsLayer;
 use client_policy::ClientPolicy;
 use download::DownloadLink;
 use identity::invites::InviteKind;
-use limiter::AttemptLimiter;
+use limiter::{AttemptLimiter, SendLimiter};
 
 /// Estado compartilhado pelas rotas. Clonar é barato: o pool e os `Arc` só
 /// contam referências.
@@ -32,6 +33,8 @@ use limiter::AttemptLimiter;
 pub struct AppState {
     pub db: SqlitePool,
     pub limiter: Arc<AttemptLimiter>,
+    /// O limite de envio do chat, por pessoa.
+    pub send_limiter: Arc<SendLimiter>,
     /// O endereço público da API (`PUBLIC_URL`), sem a barra final. Monta o
     /// link dos convites.
     pub public_url: Arc<str>,
@@ -44,6 +47,7 @@ impl AppState {
         Self {
             db,
             limiter: Arc::new(AttemptLimiter::default_for_api()),
+            send_limiter: Arc::new(SendLimiter::default_for_chat()),
             public_url: public_url.trim_end_matches('/').into(),
             download: Arc::new(DownloadLink::default()),
         }
@@ -68,7 +72,6 @@ struct HealthResponse {
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-/// Monta todas as rotas. O `/health` fica fora da `ClientPolicy`.
 /// Monta todas as rotas. O `/health` e as páginas do convite ficam fora da
 /// `ClientPolicy`: quem as abre é o navegador, não o app.
 pub fn app(state: AppState, policy: Arc<ClientPolicy>) -> Router {
@@ -103,6 +106,11 @@ pub fn app(state: AppState, policy: Arc<ClientPolicy>) -> Router {
             "/members/{id}/recovery-invite",
             post(routes::members::recovery_invite),
         )
+        .route(
+            "/channels/{id}/messages",
+            get(routes::messages::list).post(routes::messages::send),
+        )
+        .route("/people", get(routes::people::list))
         .layer(middleware::from_fn_with_state(
             policy,
             client_policy::enforce,
