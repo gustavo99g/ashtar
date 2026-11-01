@@ -12,13 +12,14 @@ use axum::http::request::Parts;
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
+use super::extract::ApiJson;
 use crate::AppState;
 use crate::db::now;
 use crate::error::ApiError;
 use crate::identity::permissions::{self, Action, Permission};
+use crate::identity::users::Person;
 use crate::identity::{User, devices, invites, users};
-
-use super::extract::ApiJson;
+use crate::realtime::ServerEvent;
 
 #[derive(Debug, Deserialize)]
 pub struct RedeemRequest {
@@ -109,7 +110,17 @@ pub async fn redeem(
     if matches!(result, Err(ApiError::InvalidInvite)) {
         state.limiter.record_failure();
     }
-    let (user, token) = result?;
+    let invites::Redeemed {
+        user,
+        token,
+        new_member,
+    } = result?;
+    // A recuperação devolve quem já existia: só o convite novo avisa o grupo.
+    if new_member {
+        state.hub.publish(&ServerEvent::MemberJoined {
+            person: Person::new(&user, false),
+        });
+    }
     Ok(Json(SessionResponse {
         token,
         user: UserView::from(&user),

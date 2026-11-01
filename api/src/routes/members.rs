@@ -14,7 +14,6 @@ use ts_rs::TS;
 use super::auth::CurrentUser;
 use super::extract::ApiJson;
 use super::invites::CreatedInviteView;
-use super::voice;
 use crate::AppState;
 use crate::db::now;
 use crate::error::ApiError;
@@ -22,6 +21,9 @@ use crate::identity::devices;
 use crate::identity::invites::{self, DEFAULT_TTL_SECS, InviteKind};
 use crate::identity::permissions::{self, Action, GrantKind, Origin, Permission, require};
 use crate::identity::users::{self, BetaGrant, JoinedWith, MemberDetails, PendingRecovery};
+use crate::realtime::ServerEvent;
+use crate::voice;
+
 #[derive(Debug, Serialize, TS)]
 #[ts(export, export_to = "index.ts")]
 pub struct DeviceView {
@@ -143,7 +145,7 @@ pub async fn set_beta(
     Ok(StatusCode::NO_CONTENT)
 }
 /// `POST /api/members/{id}/unlink`: tira o computador do membro, derruba a
-/// sessão e o tira da sala de voz. Para voltar, ele precisa de uma recuperação,
+/// sessão, fecha o WebSocket (4001) e o tira da sala de voz. Para voltar, ele precisa de uma recuperação,
 /// que o app cria logo em seguida quando a caixa "Já criar o convite de
 /// recuperação" está marcada.
 pub async fn unlink(
@@ -154,6 +156,7 @@ pub async fn unlink(
     require(&user, Action::UnlinkDevice)?;
     let target = users::get_by_id(&state.db, &id).await?;
     devices::unlink(&state.db, &user, &target).await?;
+    state.hub.close_user(&target.id);
     voice::kick_in_background(target.id);
     Ok(StatusCode::NO_CONTENT)
 }
@@ -187,8 +190,9 @@ pub async fn recovery_invite(
     ))
 }
 
-/// `DELETE /api/members/{id}`: remove o membro. Ele sai na hora (da sessão e da
-/// sala de voz) e o nick fica livre.
+/// `DELETE /api/members/{id}`: remove o membro. Ele sai na hora (da sessão, do
+/// WebSocket e da sala de voz), some da coluna de membros (`member.left`) e o
+/// nick fica livre.
 pub async fn remove(
     State(state): State<AppState>,
     CurrentUser(user): CurrentUser,
@@ -197,6 +201,10 @@ pub async fn remove(
     require(&user, Action::RemoveMember)?;
     let target = users::get_by_id(&state.db, &id).await?;
     users::remove(&state.db, &user, &target, now()).await?;
+    state.hub.close_user(&target.id);
+    state.hub.publish(&ServerEvent::MemberLeft {
+        user_id: target.id.clone(),
+    });
     voice::kick_in_background(target.id);
     Ok(StatusCode::NO_CONTENT)
 }

@@ -479,21 +479,32 @@ async fn revoke_found(db: &SqlitePool, found: RevokeRow, now: i64) -> Result<(),
     Ok(())
 }
 
+/// O resultado de usar um convite.
+#[derive(Debug)]
+pub struct Redeemed {
+    pub user: User,
+    /// O token da sessão aberta neste dispositivo.
+    pub token: String,
+    /// Se o convite criou um membro (convite novo) ou devolveu um que já
+    /// existia (recuperação). Só o membro novo vira o `member.joined`.
+    pub new_member: bool,
+}
+
 /// Usa um convite com a chave deste dispositivo.
 ///
 /// - Convite novo: cria o membro com `nick` e vincula o dispositivo.
 /// - Recuperação: `nick` é ignorado; o membro do convite passa a usar este
 ///   dispositivo, e o anterior (com a sessão dele) deixa de valer.
 ///
-/// Devolve o membro e o token de sessão. Tudo numa transação: se algo falhar,
-/// o uso não conta.
+/// Devolve o membro, o token de sessão e se o membro é novo. Tudo numa
+/// transação: se algo falhar, o uso não conta.
 pub async fn redeem(
     db: &SqlitePool,
     code: &str,
     device_key: &str,
     nick: Option<&str>,
     now: i64,
-) -> Result<(User, String), ApiError> {
+) -> Result<Redeemed, ApiError> {
     let code = secret::normalize_invite_code(code).ok_or(ApiError::InvalidInvite)?;
     devices::validate_device_key(device_key)?;
 
@@ -510,7 +521,7 @@ pub async fn redeem(
         return Err(ApiError::DeviceAlreadyLinked);
     }
 
-    let user: User = match (invite.kind.as_str(), invite.target_user_id) {
+    let (user, new_member): (User, bool) = match (invite.kind.as_str(), invite.target_user_id) {
         ("recovery", Some(target_id)) => {
             let user: Option<User> = sqlx::query_as(
                 "SELECT id, nick, is_owner, display_name, created_at, removed_at FROM users
@@ -519,11 +530,11 @@ pub async fn redeem(
             .bind(&target_id)
             .fetch_optional(&mut *tx)
             .await?;
-            user.ok_or(ApiError::InvalidInvite)?
+            (user.ok_or(ApiError::InvalidInvite)?, false)
         }
         _ => {
             let nick = users::validate_nick(nick.unwrap_or_default())?;
-            users::insert(&mut tx, &nick, false, now).await?
+            (users::insert(&mut tx, &nick, false, now).await?, true)
         }
     };
 
@@ -537,7 +548,11 @@ pub async fn redeem(
         .await?;
 
     tx.commit().await?;
-    Ok((user, token))
+    Ok(Redeemed {
+        user,
+        token,
+        new_member,
+    })
 }
 
 /// Um convite que ainda vale, achado pelo código.

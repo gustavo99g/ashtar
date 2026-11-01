@@ -202,6 +202,30 @@ async fn get(db: &SqlitePool, id: &str) -> Result<Message, ApiError> {
     Ok(row.into())
 }
 
+/// A mensagem mais nova de um canal de texto, como o `ready` do tempo real
+/// leva: na volta de uma queda, o app compara com a última que tem e só chama o
+/// `?after=` dos canais que andaram.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS, FromRow)]
+#[ts(export, export_to = "index.ts")]
+pub struct ChannelHead {
+    pub channel_id: String,
+    /// `None` no canal que ainda não tem mensagem.
+    pub last_message_id: Option<String>,
+}
+
+/// O último id de cada canal de texto aberto, em ordem de id do canal.
+pub async fn heads(db: &SqlitePool) -> Result<Vec<ChannelHead>, ApiError> {
+    Ok(sqlx::query_as(
+        "SELECT c.id AS channel_id,
+                (SELECT MAX(m.id) FROM messages m WHERE m.channel_id = c.id) AS last_message_id
+         FROM channels c
+         WHERE c.kind = 'text' AND c.archived_at IS NULL
+         ORDER BY c.id",
+    )
+    .fetch_all(db)
+    .await?)
+}
+
 /// Uma página do histórico.
 #[derive(Debug, Serialize, TS)]
 #[ts(export, export_to = "index.ts")]

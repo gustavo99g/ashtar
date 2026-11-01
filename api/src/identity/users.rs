@@ -122,6 +122,31 @@ pub async fn find_owner(db: &SqlitePool) -> Result<Option<User>, ApiError> {
 }
 /// Um membro como a lista do Painel mostra: o computador, o beta, o convite com
 /// que entrou e a recuperação que ainda vale.
+/// Um membro ativo, como a coluna de membros do chat mostra (`GET /api/people`
+/// e o `member.joined` do tempo real). Só o que todo membro pode ver.
+#[derive(Debug, Clone, Serialize, TS)]
+#[ts(export, export_to = "index.ts")]
+pub struct Person {
+    pub id: String,
+    pub nick: String,
+    pub display_name: Option<String>,
+    pub is_owner: bool,
+    /// Com pelo menos um WebSocket aberto (ou caído há menos de 10 segundos).
+    pub online: bool,
+}
+
+impl Person {
+    pub fn new(user: &User, online: bool) -> Self {
+        Self {
+            id: user.id.clone(),
+            nick: user.nick.clone(),
+            display_name: user.display_name.clone(),
+            is_owner: user.is_owner,
+            online,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct MemberDetails {
     pub user: User,

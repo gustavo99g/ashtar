@@ -17,6 +17,17 @@ export type BetaGrant = { origin: Origin,
 granted_at: number | null, };
 
 /**
+ * A mensagem mais nova de um canal de texto, como o `ready` do tempo real
+ * leva: na volta de uma queda, o app compara com a última que tem e só chama o
+ * `?after=` dos canais que andaram.
+ */
+export type ChannelHead = { channel_id: string, 
+/**
+ * `None` no canal que ainda não tem mensagem.
+ */
+last_message_id: string | null, };
+
+/**
  * O tipo do canal. A chave em texto é a do banco.
  */
 export type ChannelKind = "text" | "voice";
@@ -191,9 +202,16 @@ screen_sharing: boolean, };
 export type PendingRecovery = { invite_id: string, expires_at: number, };
 
 /**
- * Um membro ativo, como a coluna de membros mostra.
+ * Um membro como a lista do Painel mostra: o computador, o beta, o convite com
+ * que entrou e a recuperação que ainda vale.
+ * Um membro ativo, como a coluna de membros do chat mostra (`GET /api/people`
+ * e o `member.joined` do tempo real). Só o que todo membro pode ver.
  */
-export type Person = { id: string, nick: string, display_name: string | null, is_owner: boolean, };
+export type Person = { id: string, nick: string, display_name: string | null, is_owner: boolean, 
+/**
+ * Com pelo menos um WebSocket aberto (ou caído há menos de 10 segundos).
+ */
+online: boolean, };
 
 /**
  * O modelo de um convite novo, como a tela mostra. A chave em texto vai para o
@@ -201,11 +219,22 @@ export type Person = { id: string, nick: string, display_name: string | null, is
  */
 export type Preset = "person" | "group" | "custom";
 
+export type RealtimeTicket = { ticket: string, 
+/**
+ * Em segundos.
+ */
+expires_in: number, };
+
 export type SendMessageRequest = { 
 /**
  * Gerado pelo app antes de enviar (um UUID); o mesmo valor não duplica.
  */
 client_id: string, body: string, };
+
+/**
+ * Tudo o que a API manda pelo WebSocket. O `type` é o nome do evento.
+ */
+export type ServerEvent = { "type": "ready", user_id: string, online: Array<string>, channels: Array<ChannelHead>, } | { "type": "pong" } | { "type": "message.created", message: Message, } | { "type": "presence.changed", user_id: string, online: boolean, } | { "type": "voice.participants", channel_id: string, participants: Array<ParticipantView>, } | { "type": "member.joined", person: Person, } | { "type": "member.left", user_id: string, };
 
 /**
  * A resposta do `redeem` e do `login`. No app, quem recebe é o Rust, que a

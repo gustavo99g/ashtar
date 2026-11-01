@@ -9,8 +9,10 @@ pub mod download;
 pub mod error;
 pub mod identity;
 pub mod limiter;
+pub mod realtime;
 pub mod routes;
 pub mod secret;
+pub mod voice;
 
 use std::sync::Arc;
 
@@ -26,6 +28,9 @@ use client_policy::ClientPolicy;
 use download::DownloadLink;
 use identity::invites::InviteKind;
 use limiter::{AttemptLimiter, SendLimiter};
+use livekit_api::access_token::TokenVerifier;
+use livekit_api::webhooks::WebhookReceiver;
+use realtime::Hub;
 
 /// Estado compartilhado pelas rotas. Clonar é barato: o pool e os `Arc` só
 /// contam referências.
@@ -35,6 +40,11 @@ pub struct AppState {
     pub limiter: Arc<AttemptLimiter>,
     /// O limite de envio do chat, por pessoa.
     pub send_limiter: Arc<SendLimiter>,
+    /// O tempo real: os WebSockets abertos, os tickets e quem está online.
+    pub hub: Arc<Hub>,
+    /// Confere a assinatura do webhook do LiveKit. `None` sem as chaves no
+    /// ambiente: a rota responde 503.
+    pub webhook: Option<Arc<WebhookReceiver>>,
     /// O endereço público da API (`PUBLIC_URL`), sem a barra final. Monta o
     /// link dos convites.
     pub public_url: Arc<str>,
@@ -48,6 +58,10 @@ impl AppState {
             db,
             limiter: Arc::new(AttemptLimiter::default_for_api()),
             send_limiter: Arc::new(SendLimiter::default_for_chat()),
+            hub: Arc::new(Hub::default()),
+            webhook: TokenVerifier::new()
+                .ok()
+                .map(|verifier| Arc::new(WebhookReceiver::new(verifier))),
             public_url: public_url.trim_end_matches('/').into(),
             download: Arc::new(DownloadLink::default()),
         }
@@ -111,16 +125,24 @@ pub fn app(state: AppState, policy: Arc<ClientPolicy>) -> Router {
             get(routes::messages::list).post(routes::messages::send),
         )
         .route("/people", get(routes::people::list))
+        .route("/realtime/ticket", post(routes::realtime::ticket))
         .layer(middleware::from_fn_with_state(
             policy,
             client_policy::enforce,
         ))
+        .with_state(state.clone());
+    // Fora da `ClientPolicy`: o WebSocket do navegador não manda cabeçalho, e o
+    // webhook vem do LiveKit. Cada um confere quem chama do seu jeito.
+    let outside_policy = Router::new()
+        .route("/api/realtime", get(routes::realtime::connect))
+        .route("/webhooks/livekit", post(routes::webhooks::livekit))
         .with_state(state);
 
     Router::new()
         .route("/health", get(health))
         .nest("/api", api)
         .merge(pages)
+        .merge(outside_policy)
         .layer(CorsLayer::permissive())
 }
 

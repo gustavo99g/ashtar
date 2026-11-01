@@ -5,4 +5,6 @@ pub mod members;
 pub mod messages;
 pub mod pages;
 pub mod people;
+pub mod realtime;
 pub mod voice;
+pub mod webhooks;

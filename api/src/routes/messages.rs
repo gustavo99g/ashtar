@@ -18,6 +18,7 @@ use crate::chat::messages::{
 };
 use crate::db::now;
 use crate::error::ApiError;
+use crate::realtime::ServerEvent;
 
 #[derive(Debug, Deserialize)]
 pub struct PageQuery {
@@ -92,6 +93,10 @@ pub async fn send(
     )
     .await?;
     let status = if created {
+        // Só a nova vai para o WebSocket: a repetida todo mundo já recebeu.
+        state.hub.publish(&ServerEvent::MessageCreated {
+            message: message.clone(),
+        });
         StatusCode::CREATED
     } else {
         StatusCode::OK
