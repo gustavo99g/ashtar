@@ -34,15 +34,22 @@ limite de envio de sempre. O WebSocket só leva o que vem do servidor para o app
 pelo `Bearer` e pela `ClientPolicy`) e abre `GET /api/realtime?ticket=…`. O ticket vale 30 s e uma vez
 só; o token nunca vai na URL, onde acabaria nos logs.
 
-- A API manda um ping a cada 25 s; o app reabre se passar 60 s sem nada.
+- O app manda `ping` (texto) a cada 25 s e a API responde `pong`; a API fecha a conexão depois de
+  60 s sem nada do app, e o app reabre se o `pong` não vier. O ping sai do app porque o `WebSocket` do
+  navegador não deixa o JavaScript ver o ping do protocolo: com ele saindo da API, o app não saberia
+  que a conexão morreu.
 - Na queda, o app tenta de novo em 1, 2, 4, 8, 16 e 30 s, com variação aleatória, sempre com um ticket
   novo. Na volta, busca o que perdeu com `?after=` e recarrega a sala e as pessoas.
 - A distribuição é um `tokio::sync::broadcast` no `AppState`: um processo só, sem Redis.
-- Remover ou desvincular alguém fecha o socket dessa pessoa com o código 4001.
+- Códigos de fechamento: 4001 quando a pessoa é removida ou desvinculada (o app não tenta de novo
+  sem sessão), 4000 quando a conexão fica para trás no `broadcast` (o app reconecta e busca o que
+  perdeu) e 1011 quando a API não consegue montar o `ready`.
 
-**Os eventos.** `ready` (ao abrir: quem está online e o último id de cada canal), `message.created`,
-`presence.changed`, `voice.participants`, `member.joined` e `channels.changed` (ADR 0016).
-`message.updated` e `message.deleted` ficam reservados para a v0.7.
+**Os eventos.** `ready` (ao abrir: quem é, quem está online e o último id de cada canal de texto),
+`pong`, `message.created`, `presence.changed`, `voice.participants`, `member.joined`, `member.left`
+(alguém removido sai da coluna de membros) e `channels.changed` (ADR 0016). `message.updated` e
+`message.deleted` ficam reservados para a v0.7. Com o último id de cada canal, o app só chama o
+`?after=` dos canais que andaram enquanto ele estava fora.
 
 **Presença é ter pelo menos uma conexão aberta.** A API conta conexões por pessoa na memória e só avisa
 "offline" depois de 10 s sem nenhuma, para uma reconexão não piscar na lista. Só online e offline; os
@@ -50,7 +57,9 @@ status são da v0.5.
 
 **A sala de voz pelo webhook do LiveKit.** `POST /webhooks/livekit`, fora do `/api` e da `ClientPolicy`,
 com a assinatura conferida. O webhook só diz que algo mudou: a API relê a sala pelo `RoomClient` (a mesma
-leitura do `GET /api/voice/participants`) e manda a lista inteira no `voice.participants`.
+leitura do `GET /api/voice/participants`) e manda a lista inteira no `voice.participants`; o
+`room_finished` manda a lista vazia sem perguntar. As releituras de uma sala são numeradas, e uma
+resposta que chega depois de uma mais nova é descartada.
 
 **As consultas repetidas viram reserva.** O `refetchInterval` de 5 s e o de 30 s da v0.2.2 continuam no
 código, mas só rodam enquanto o socket não está aberto.

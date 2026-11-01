@@ -14,10 +14,12 @@ conscientemente adiado (marcar como tal) antes de fechar a fase. A lista da fase
 
 ## Riscos para conferir
 
-- [ ] **O Tailscale Funnel e uma conexão parada:** o socket pode cair a cada poucos minutos. O ping da API
-      a cada 25 s deve segurar; medir na API de casa na Etapa 3.
+- [ ] **O Tailscale Funnel e uma conexão parada:** o socket pode cair a cada poucos minutos. O `ping` do
+      app a cada 25 s deve segurar; medir na API de casa (a Etapa 3 deixou a API pronta; o ping do app
+      chega na Etapa 5).
 - [ ] **O webhook do LiveKit até o computador de casa:** um evento perdido com o socket aberto só se corrige
       no próximo. Medir na Etapa 10, com o LiveKit Cloud configurado.
-- [ ] **A assinatura do webhook no `livekit-api` 0.7.1:** se a crate não verificar, a API confere o JWT
-      por conta própria. Etapa 3.
+- [x] **A assinatura do webhook no `livekit-api`:** a 0.10.0 confere (o `WebhookReceiver`, com o SHA-256
+      do corpo), e o `tests/realtime.rs` recusa a falta de assinatura, o corpo trocado e outra chave.
+      Etapa 3.
 - [ ] **CPU do RNNoise com um jogo aberto.** Etapa 9.
