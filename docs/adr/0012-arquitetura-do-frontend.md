@@ -93,3 +93,5 @@ colar o convite), rodando no CI do desktop.
   tema, com o contraste conferido.
 - Rever quando chegar o chat (`lib/realtime` e o fim da consulta repetida), um segundo tema, uma segunda
   janela (a transmissão destacada, por exemplo) ou se o `tauri-specta` sair estável.
+- Desde a v0.2.3, o tempo real é o WebSocket da ADR 0015 (`lib/realtime` e um `realtime.ts` por feature), e
+  as consultas repetidas só rodam com ele fora.
