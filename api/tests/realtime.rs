@@ -215,6 +215,38 @@ async fn o_ready_traz_a_ultima_mensagem_de_cada_canal() {
 }
 
 #[tokio::test]
+async fn mudar_a_lista_de_canais_avisa_com_a_versao_nova() {
+    let ctx = setup().await;
+    let (mut socket, _) = connect(&ctx, &ctx.owner_token).await;
+
+    let (status, created) = post(
+        &ctx,
+        "/api/channels",
+        Some(&ctx.owner_token),
+        json!({ "name": "jogos" }),
+    )
+    .await;
+    assert_eq!(status, 201, "{created}");
+    let event = next_of(&mut socket, "channels.changed").await;
+    assert_eq!(event, json!({ "type": "channels.changed", "version": 2 }));
+
+    // Arquivar duas vezes: só a primeira muda a lista e avisa.
+    let path = format!("/api/channels/{}/archive", created["id"].as_str().unwrap());
+    assert_eq!(
+        post(&ctx, &path, Some(&ctx.owner_token), json!({})).await.0,
+        204
+    );
+    assert_eq!(
+        post(&ctx, &path, Some(&ctx.owner_token), json!({})).await.0,
+        204
+    );
+    let event = next_of(&mut socket, "channels.changed").await;
+    assert_eq!(event["version"], 3);
+    socket.send(Message::text("ping")).await.unwrap();
+    assert_eq!(next(&mut socket).await, json!({ "type": "pong" }));
+}
+
+#[tokio::test]
 async fn ping_recebe_pong() {
     let ctx = setup().await;
     let (mut socket, _) = connect(&ctx, &ctx.owner_token).await;

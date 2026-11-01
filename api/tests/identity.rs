@@ -1326,7 +1326,13 @@ mod regras {
         let effective = permissions::effective(&pool, &kid).await.unwrap();
         assert_eq!(effective, [(beta, Origin::Direct)]);
         let owners = permissions::effective(&pool, &owner).await.unwrap();
-        assert_eq!(owners, [(beta, Origin::Owner)]);
+        assert_eq!(
+            owners,
+            [
+                (beta, Origin::Owner),
+                (Permission::ManageChannels, Origin::Owner)
+            ]
+        );
 
         permissions::set(&pool, &owner, &kid, beta, false, NOW)
             .await
@@ -2336,6 +2342,7 @@ mod painel {
             keys,
             [
                 "atualizacoes.beta",
+                "canais.gerenciar",
                 "convites.criar",
                 "convites.recuperacao",
                 "convites.revogar",
@@ -2356,7 +2363,10 @@ mod painel {
                 "granted_at": null,
             })
         );
-        for grant in list.as_array().unwrap()[1..].iter() {
+        assert_eq!(list[1]["key"], "canais.gerenciar");
+        assert_eq!(list[1]["kind"], "permission");
+        // As permissões vêm antes das ações.
+        for grant in list.as_array().unwrap()[2..].iter() {
             assert_eq!(grant["kind"], "action");
             assert_eq!(grant["granted"], true);
             assert_eq!(grant["origin"], "owner");

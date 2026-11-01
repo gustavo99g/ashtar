@@ -13,6 +13,7 @@ use ts_rs::TS;
 use super::auth::CurrentUser;
 use super::extract::ApiJson;
 use crate::AppState;
+use crate::chat::channels;
 use crate::error::ApiError;
 use crate::voice::{ParticipantView, join_participants, list_room, livekit_env};
 
@@ -38,10 +39,12 @@ pub struct VoiceTokenRequest {
 /// do avatar sai do nick. Trocar o nome visível vale na próxima entrada, porque
 /// o nome vai dentro do token.
 pub async fn voice_token(
+    State(state): State<AppState>,
     CurrentUser(user): CurrentUser,
     ApiJson(request): ApiJson<VoiceTokenRequest>,
 ) -> Result<Json<JoinVoiceResponse>, ApiError> {
     validate_channel_id(&request.channel_id)?;
+    channels::get_open_voice(&state.db, &request.channel_id).await?;
     let (api_key, api_secret, url) = livekit_env().map_err(ApiError::Config)?;
     let token = create_voice_token(
         &api_key,
@@ -73,6 +76,7 @@ pub async fn participants(
     let Query(query) = query
         .map_err(|_| ApiError::InvalidRequest("O pedido não está no formato esperado.".into()))?;
     validate_channel_id(&query.channel_id)?;
+    channels::get_open_voice(&state.db, &query.channel_id).await?;
     let room = list_room(&query.channel_id).await?;
     Ok(Json(join_participants(&state.db, room).await?))
 }
@@ -81,8 +85,9 @@ pub async fn participants(
 const CHANNEL_ID_MAX: usize = 64;
 
 /// O id do canal vira o nome da sala no LiveKit, que cria a sala sozinho na
-/// primeira entrada. Sem lista de canais no banco, a barreira é o formato: de 1
-/// a 64 caracteres, só letras ASCII, números, `_` e `-` (como `general_voice`).
+/// primeira entrada. A primeira barreira é o formato, sem ir ao banco: de 1 a 64
+/// caracteres, só letras ASCII, números, `_` e `-` (como `general_voice`). A
+/// segunda é a sala existir no banco ([`channels::get_open_voice`]).
 fn validate_channel_id(channel_id: &str) -> Result<(), ApiError> {
     let ok = (1..=CHANNEL_ID_MAX).contains(&channel_id.len())
         && channel_id

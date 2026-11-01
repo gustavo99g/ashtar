@@ -18,7 +18,7 @@ use std::sync::Arc;
 
 use axum::{
     Json, Router, middleware,
-    routing::{delete, get, post, put},
+    routing::{delete, get, patch, post, put},
 };
 use serde::Serialize;
 use sqlx::SqlitePool;
@@ -115,6 +115,10 @@ pub fn app(state: AppState, policy: Arc<ClientPolicy>) -> Router {
             get(routes::members::permissions),
         )
         .route("/members/{id}/beta", put(routes::members::set_beta))
+        .route(
+            "/members/{id}/permissions/{key}",
+            put(routes::members::set_permission),
+        )
         .route("/members/{id}/unlink", post(routes::members::unlink))
         .route(
             "/members/{id}/recovery-invite",
@@ -125,6 +129,28 @@ pub fn app(state: AppState, policy: Arc<ClientPolicy>) -> Router {
             get(routes::messages::list).post(routes::messages::send),
         )
         .route("/people", get(routes::people::list))
+        .route(
+            "/channels",
+            get(routes::channels::list).post(routes::channels::create),
+        )
+        .route("/channels/archived", get(routes::channels::archived))
+        .route("/channels/layout", put(routes::channels::set_layout))
+        .route("/channels/{id}", patch(routes::channels::update))
+        .route("/channels/{id}/archive", post(routes::channels::archive))
+        .route(
+            "/channels/{id}/unarchive",
+            post(routes::channels::unarchive),
+        )
+        .route("/categories", post(routes::channels::create_category))
+        .route("/categories/{id}", patch(routes::channels::rename_category))
+        .route(
+            "/categories/{id}/archive",
+            post(routes::channels::archive_category),
+        )
+        .route(
+            "/categories/{id}/unarchive",
+            post(routes::channels::unarchive_category),
+        )
         .route("/realtime/ticket", post(routes::realtime::ticket))
         .layer(middleware::from_fn_with_state(
             policy,

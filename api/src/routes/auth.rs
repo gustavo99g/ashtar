@@ -84,6 +84,8 @@ pub struct MeResponse {
     pub can_create_invite: bool,
     /// Se o menu mostra o Painel de controle.
     pub can_view_panel: bool,
+    /// Se a lista de canais mostra criar, editar, arquivar e arrastar.
+    pub can_manage_channels: bool,
 }
 
 #[derive(Debug, Deserialize, TS)]
@@ -178,6 +180,9 @@ async fn me_response(state: &AppState, user: &User) -> Result<MeResponse, ApiErr
 
         can_create_invite: permissions::can(user, Action::CreateInvite),
         can_view_panel: permissions::can(user, Action::ViewPanel),
+        can_manage_channels: effective
+            .iter()
+            .any(|(p, _)| *p == Permission::ManageChannels),
     })
 }
 

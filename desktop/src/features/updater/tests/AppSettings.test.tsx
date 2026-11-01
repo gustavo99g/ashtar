@@ -31,6 +31,7 @@ function meWith(
 		update_channel: channel,
 		can_create_invite: isOwner,
 		can_view_panel: isOwner,
+		can_manage_channels: isOwner,
 	};
 }
 

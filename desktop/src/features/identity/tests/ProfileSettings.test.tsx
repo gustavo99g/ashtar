@@ -24,6 +24,7 @@ function me(displayName: string | null): MeResponse {
 		update_channel: "beta",
 		can_create_invite: true,
 		can_view_panel: true,
+		can_manage_channels: true,
 	};
 }
 

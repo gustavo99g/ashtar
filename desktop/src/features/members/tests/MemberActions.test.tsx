@@ -70,6 +70,7 @@ beforeEach(() => {
 		update_channel: "beta",
 		can_create_invite: true,
 		can_view_panel: true,
+		can_manage_channels: true,
 	});
 	vi.mocked(listMembers).mockResolvedValue([owner, juju]);
 });

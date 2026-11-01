@@ -2,5 +2,7 @@
 //!
 //! Como em `identity`, as rotas (`routes/`) só chamam as regras daqui.
 
+pub mod categories;
 pub mod channels;
+pub mod layout;
 pub mod messages;

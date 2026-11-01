@@ -34,6 +34,7 @@ function me(canViewPanel: boolean): MeResponse {
 		update_channel: "stable",
 		can_create_invite: canViewPanel,
 		can_view_panel: canViewPanel,
+		can_manage_channels: false,
 	};
 }
 

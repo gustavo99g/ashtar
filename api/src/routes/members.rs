@@ -144,6 +144,40 @@ pub async fn set_beta(
     .await?;
     Ok(StatusCode::NO_CONTENT)
 }
+
+/// O corpo do `PUT /api/members/{id}/permissions/{key}`.
+#[derive(Debug, Deserialize, TS)]
+#[ts(export, export_to = "index.ts")]
+pub struct SetPermissionRequest {
+    pub enabled: bool,
+}
+
+/// `PUT /api/members/{id}/permissions/{key}` com `{ "enabled": true }`: liga ou
+/// desliga qualquer [`Permission`] pela chave (`canais.gerenciar`,
+/// `atualizacoes.beta`). Chave que não existe: 404. A rota do beta continua,
+/// porque o app da 0.2.2 usa ela.
+pub async fn set_permission(
+    State(state): State<AppState>,
+    CurrentUser(user): CurrentUser,
+    Path((id, key)): Path<(String, String)>,
+    ApiJson(request): ApiJson<SetPermissionRequest>,
+) -> Result<StatusCode, ApiError> {
+    require(&user, Action::ManagePermissions)?;
+    let permission = Permission::from_key(&key)
+        .ok_or_else(|| ApiError::NotFound("Nenhuma permissão com essa chave.".into()))?;
+    let target = users::get_by_id(&state.db, &id).await?;
+    permissions::set(
+        &state.db,
+        &user,
+        &target,
+        permission,
+        request.enabled,
+        now(),
+    )
+    .await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
 /// `POST /api/members/{id}/unlink`: tira o computador do membro, derruba a
 /// sessão, fecha o WebSocket (4001) e o tira da sala de voz. Para voltar, ele precisa de uma recuperação,
 /// que o app cria logo em seguida quando a caixa "Já criar o convite de

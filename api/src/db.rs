@@ -113,6 +113,7 @@ mod tests {
             tables,
             [
                 "categories",
+                "channel_layout",
                 "channels",
                 "devices",
                 "invite_uses",

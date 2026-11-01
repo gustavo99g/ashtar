@@ -62,6 +62,10 @@ pub enum ServerEvent {
     /// Alguém foi removido: sai da coluna de membros.
     #[serde(rename = "member.left")]
     MemberLeft { user_id: String },
+    /// A lista de canais mudou (criar, editar, arquivar, reordenar): o app
+    /// recarrega o `GET /api/channels`.
+    #[serde(rename = "channels.changed")]
+    ChannelsChanged { version: i64 },
 }
 
 /// O que passa pelo `broadcast`: um evento já em JSON, ou a ordem de fechar as
