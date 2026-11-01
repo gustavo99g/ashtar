@@ -21,7 +21,7 @@ Base: a `feature/0.2.3`, commit `b428171`. Em cada etapa, `cargo fmt --check`, `
 
 | Etapa | Descrição | Status |
 |---|---|---|
-| 0 | Decisões: ADRs 0015 e 0016, roadmap, BACKLOG | Pendente |
+| 0 | Decisões: ADRs 0015 e 0016, roadmap, BACKLOG | Concluída (`e3174bf`) |
 | 2 | API: banco do chat, mensagens, `GET /api/people`, limite de envio | Pendente |
 | 3 | API: WebSocket, presença, eventos, webhook do LiveKit | Pendente |
 | 4 | API: canais e categorias, layout, arquivar, `canais.gerenciar` | Pendente |
