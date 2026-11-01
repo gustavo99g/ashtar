@@ -8,21 +8,21 @@
 O roadmap punha os vários canais de texto na v0.5 e um canal só, o `#geral`, na v0.2.3. No levantamento
 (31/10), o pedido mudou: a v0.2.3 já sai com vários canais de texto, agrupados em categorias que também vão
 guardar as salas de voz (e, um dia, outros tipos de canal), arrumados arrastando, e com uma permissão para
-quem pode criá-los e editá-los. A sala de voz Jogatina, até aqui, é só uma constante no app.
+quem pode criá-los e editá-los. A sala de voz Sala, até aqui, é só uma constante no app (`SALA`).
 
 ## Decisão
 
 **Uma árvore de dois níveis.** Categorias (`categories`) guardam canais (`channels`), cada um com um `kind`
 (`text` ou `voice`; outro tipo entra por migração). Canal sem categoria fica no topo. A ordem é um campo
-`position` em cada um. A migração cria a categoria "Texto" com o `#geral` e a "Voz" com a Jogatina, que
-vira uma linha do banco com o mesmo id `jogatina` (o nome da sala no LiveKit não muda).
+`position` em cada um. A migração cria a categoria "Texto" com o `#geral` e a "Voz" com a Sala, que
+vira uma linha do banco com o mesmo id `sala` (o nome da sala no LiveKit não muda).
 
-**Só canais de texto são criados agora.** Criar sala de voz continua na v0.5; na v0.2.3, a Jogatina só é
+**Só canais de texto são criados agora.** Criar sala de voz continua na v0.5; na v0.2.3, a Sala só é
 movida e renomeada.
 
 **Arquivar, e não apagar.** Arquivar esconde o canal (ou a categoria) de todos e guarda as mensagens;
 desarquivar devolve com o histórico. Arquivar uma categoria manda os canais dela para o topo. O `#geral` e
-a Jogatina não podem ser arquivados, para sempre existir um canal de cada tipo.
+a Sala não podem ser arquivados, para sempre existir um canal de cada tipo.
 
 **Arrumar é mandar a árvore inteira.** Depois de um arrasto, o app manda `PUT /api/channels/layout` com
 todas as categorias e canais em ordem, mais a versão da árvore que tinha. A API grava numa transação só;
@@ -52,7 +52,7 @@ que também funciona pelo teclado, e o menu de cada item tem Mover para cima e M
 
 ## Consequências
 
-- O `GET /api/channels` passa a ser a fonte de quais canais e salas existem; a constante `JOGATINA` do app
+- O `GET /api/channels` passa a ser a fonte de quais canais e salas existem; a constante `SALA` do app
   sai.
 - A v0.5 só acrescenta criar sala de voz e o resto da presença; os canais de texto já existem.
 - Canal que só algumas pessoas veem (a primeira permissão por canal, v0.3) entra como uma regra nova, sem

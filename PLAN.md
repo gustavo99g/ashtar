@@ -53,7 +53,7 @@ permissão). Abaixo, o que foi combinado para esta fase e não cabe numa ADR.
   para a sala;
 - miniatura da transmissão quando se sai da sala assistindo alguém: arrasta, gruda no canto mais próximo,
   some nas configurações;
-- na coluna de membros, "Na Jogatina" ou "Transmitindo" embaixo do nome; rascunho guardado por canal;
+- na coluna de membros, "Na Sala" ou "Transmitindo" embaixo do nome; rascunho guardado por canal;
   "(saiu do grupo)" ao lado do nome de quem foi removido; o app reabre no último canal aberto; o tópico do
   canal no cabeçalho;
 - um script de desenvolvimento que enche um canal do banco local com mensagens falsas;
