@@ -110,6 +110,36 @@ describe("catchUp", () => {
 		expect(listMessages).not.toHaveBeenCalled();
 	});
 
+	it("sem o ready (tempo real fora), pergunta em todos os canais em cache", async () => {
+		const client = new QueryClient();
+		cache(client, "geral", [page(["m1", "m2"])]);
+		cache(client, "jogos", [page(["m3"])]);
+		vi.mocked(listMessages).mockImplementation(async (channelId) =>
+			channelId === "geral" ? page(["m4"]) : page([]),
+		);
+
+		await catchUp(client);
+		expect(listMessages).toHaveBeenCalledWith("geral", { after: "m2" });
+		expect(listMessages).toHaveBeenCalledWith("jogos", { after: "m3" });
+		expect(ids(client)).toEqual(["m1", "m2", "m4"]);
+		expect(ids(client, "jogos")).toEqual(["m3"]);
+	});
+
+	it("sem o ready, o canal vazio só recomeça se ganhou mensagem", async () => {
+		const client = new QueryClient();
+		cache(client, "geral", [page([])]);
+		cache(client, "jogos", [page([])]);
+		vi.mocked(listMessages).mockImplementation(async (channelId) =>
+			channelId === "geral" ? page(["m1"]) : page([]),
+		);
+
+		await catchUp(client);
+		expect(listMessages).toHaveBeenCalledWith("geral");
+		expect(client.getQueryData(chatKeys.messages("geral"))).toBeUndefined();
+		expect(ids(client, "jogos")).toEqual([]);
+		expect(client.getQueryData(chatKeys.messages("jogos"))).toBeDefined();
+	});
+
 	it("canal que não veio no ready (arquivado) fica como está", async () => {
 		const client = new QueryClient();
 		cache(client, "velho", [page(["m1"])]);

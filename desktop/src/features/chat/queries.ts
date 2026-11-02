@@ -18,7 +18,7 @@ import {
 	useQuery,
 	useQueryClient,
 } from "@tanstack/react-query";
-import { useCallback } from "react";
+import { useCallback, useEffect } from "react";
 import { useSession } from "@/features/identity";
 import {
 	ApiError,
@@ -105,30 +105,38 @@ function cachedHistories(queryClient: QueryClient) {
 }
 
 /**
- * Depois de uma queda: busca o que chegou depois da última mensagem de cada canal em cache. Só
- * pergunta nos canais que andaram: o `ready` traz o último id de cada um (`heads`). Mais de 200
- * perdidas, recomeça o canal pelas mais recentes. Canal que não está no `ready` foi arquivado: a
- * lista de canais o tira da tela, e aqui não há o que buscar.
+ * Busca o que chegou depois da última mensagem de cada canal em cache. Mais de 200 perdidas,
+ * recomeça o canal pelas mais recentes.
+ *
+ * Com `heads` (o `channels` do `ready`, na volta de uma queda), só pergunta nos canais que
+ * andaram; canal que não está no `ready` foi arquivado e fica como está. Sem `heads` (o tempo real
+ * fora, de tempos em tempos), pergunta em todos: num canal vazio, pela página mais recente.
  */
 export async function catchUp(
 	queryClient: QueryClient,
-	heads: ChannelHead[],
+	heads?: ChannelHead[],
 ): Promise<void> {
-	const latest = new Map(
-		heads.map((head) => [head.channel_id, head.last_message_id]),
-	);
+	const latest =
+		heads &&
+		new Map(heads.map((head) => [head.channel_id, head.last_message_id]));
 	await Promise.all(
 		cachedHistories(queryClient).map(async ([key, data]) => {
 			const channelId = key[2] as string;
-			if (!latest.has(channelId)) return;
 			const lastPage = data?.pages[data.pages.length - 1];
 			const newest = lastPage?.messages[lastPage.messages.length - 1];
-			if ((latest.get(channelId) ?? null) === (newest?.id ?? null)) return;
-			if (!newest) {
-				await queryClient.resetQueries({ queryKey: key, exact: true });
-				return;
+			if (latest) {
+				if (!latest.has(channelId)) return;
+				if ((latest.get(channelId) ?? null) === (newest?.id ?? null)) return;
 			}
 			try {
+				if (!newest) {
+					// Sem `heads`, só dá para saber se o canal vazio ganhou mensagem perguntando.
+					if (!latest && (await listMessages(channelId)).messages.length === 0) {
+						return;
+					}
+					await queryClient.resetQueries({ queryKey: key, exact: true });
+					return;
+				}
 				const page = await listMessages(channelId, { after: newest.id });
 				if (page.has_more) {
 					await queryClient.resetQueries({ queryKey: key, exact: true });
@@ -140,6 +148,30 @@ export async function catchUp(
 			}
 		}),
 	);
+}
+
+/** De quanto em quanto tempo o histórico pergunta o que chegou, com o tempo real fora. */
+export const OFFLINE_CATCH_UP_MS = 15_000;
+
+/**
+ * Com o tempo real fora (voltando, ou encerrado), o histórico não recebe nada por evento e não pode
+ * ser invalidado (ver o começo do arquivo): então, de 15 em 15 segundos, enquanto o app está à
+ * vista, busca o que chegou em cada canal em cache (`catchUp` sem `heads`). Fica no
+ * `RealtimeBridge`, um só para o app.
+ */
+export function useOfflineCatchUp(): void {
+	const queryClient = useQueryClient();
+	const connected = useSession().status === "connected";
+	const visible = useAppVisible();
+	const live = useRealtimeOpen();
+	useEffect(() => {
+		if (!connected || !visible || live) return;
+		const timer = setInterval(
+			() => void catchUp(queryClient),
+			OFFLINE_CATCH_UP_MS,
+		);
+		return () => clearInterval(timer);
+	}, [connected, visible, live, queryClient]);
 }
 
 /**

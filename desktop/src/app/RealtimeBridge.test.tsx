@@ -22,6 +22,7 @@ vi.mock("@/lib/realtime", () => ({
 	restartRealtime: vi.fn(),
 	subscribeRealtime: vi.fn(() => () => {}),
 	useRealtimeStatus: vi.fn(() => "idle"),
+	useRealtimeOpen: vi.fn(() => false),
 }));
 
 const user: UserView = {

@@ -13,9 +13,14 @@ export {
 export {
 	chatKeys,
 	useMessages,
+	useOfflineCatchUp,
 	usePeople,
 	useSendMessage,
 } from "./queries";
 export { handleChatRealtime } from "./realtime";
 export { setDraft, useDraft } from "./stores/draftStore";
-export { type PendingMessage, usePending } from "./stores/outboxStore";
+export {
+	clearOutbox,
+	type PendingMessage,
+	usePending,
+} from "./stores/outboxStore";
