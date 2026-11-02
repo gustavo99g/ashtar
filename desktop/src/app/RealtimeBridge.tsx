@@ -13,6 +13,8 @@
  */
 import { type QueryClient, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
+import { handleChannelsRealtime } from "@/features/channels";
+import { handleChatRealtime } from "@/features/chat";
 import { useSession } from "@/features/identity";
 import { handleMembersRealtime } from "@/features/members";
 import { handleVoiceRealtime } from "@/features/voice";
@@ -38,11 +40,13 @@ type Handler = (
  */
 export const RESTART_GAP_MS = 30_000;
 
-/**
- * O `realtime.ts` de cada feature. Faltam a presença (`presence.changed` e o `online` do `ready`,
- * para a coluna de membros) e o chat na Etapa 6, e os canais (`channels.changed`) na Etapa 7.
- */
-const HANDLERS: Handler[] = [handleVoiceRealtime, handleMembersRealtime];
+/** O `realtime.ts` de cada feature. */
+const HANDLERS: Handler[] = [
+	handleVoiceRealtime,
+	handleMembersRealtime,
+	handleChatRealtime,
+	handleChannelsRealtime,
+];
 
 export function RealtimeBridge() {
 	const queryClient = useQueryClient();
