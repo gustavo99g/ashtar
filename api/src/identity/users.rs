@@ -341,6 +341,15 @@ pub async fn create_owner(db: &SqlitePool, nick: &str, now: i64) -> Result<User,
     insert(&mut conn, &nick, true, now).await
 }
 
+/// Cria um membro sem computador e sem convite. Só para o `admin semear`, que
+/// enche o banco de desenvolvimento: no grupo de verdade, todo mundo entra por
+/// convite.
+pub async fn create_seed_member(db: &SqlitePool, nick: &str, now: i64) -> Result<User, ApiError> {
+    let nick = validate_nick(nick)?;
+    let mut conn = db.acquire().await?;
+    insert(&mut conn, &nick, false, now).await
+}
+
 /// Troca o nome visível do próprio membro. Texto vazio ou `None` volta para o
 /// nick. Devolve o membro já com o nome novo.
 pub async fn set_display_name(
