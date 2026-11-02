@@ -6,7 +6,7 @@ conscientemente adiado (marcar como tal) antes de fechar a fase. A lista da fase
 
 ## Vindos do BACKLOG
 
-- [ ] **Consultas repetidas** (adiadas da v0.2.2): a lista da sala a cada 5 s e o aviso de quem entrou a
+- [x] **Consultas repetidas** (adiadas da v0.2.2): a lista da sala a cada 5 s e o aviso de quem entrou a
       cada 30 s viram eventos do WebSocket, e as consultas só rodam com o socket fora. Etapas 3 e 5.
 - [ ] **Quadro "Canal de texto"** do canvas como referência visual. Etapas 6 e 7, só com o que esta fase
       leva.
