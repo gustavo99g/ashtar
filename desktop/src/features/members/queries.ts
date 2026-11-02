@@ -8,11 +8,13 @@ import { useMe, useSession } from "@/features/identity";
 import { invitesKeys } from "@/features/invites";
 import {
 	createRecoveryInvite,
+	type GrantView,
 	getMemberPermissions,
 	listMembers,
 	type MemberView,
 	removeMember,
 	setMemberBeta,
+	setMemberPermission,
 	unlinkMember,
 } from "@/lib/api";
 import { useRealtimeOpen } from "@/lib/realtime";
@@ -99,6 +101,55 @@ export function useSetMemberBeta() {
 		onError: (_error, _variables, result) => {
 			if (result?.before)
 				queryClient.setQueryData(membersKeys.list(), result.before);
+		},
+		onSettled: (_data, _error, { id }) =>
+			Promise.all([
+				queryClient.invalidateQueries({ queryKey: membersKeys.list() }),
+				queryClient.invalidateQueries({
+					queryKey: membersKeys.permissions(id),
+				}),
+			]),
+	});
+}
+
+/**
+ * Liga ou desliga uma permissão de alguém (`PUT /api/members/{id}/permissions/{key}`):
+ * `mutate({ id, key, enabled })`. Como o beta, a chave muda na hora e volta se a API recusar. O
+ * beta também é uma permissão, então a lista (a coluna Beta) é recarregada junto.
+ */
+export function useSetMemberPermission() {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: ({
+			id,
+			key,
+			enabled,
+		}: {
+			id: string;
+			key: string;
+			enabled: boolean;
+		}) => setMemberPermission(id, key, enabled),
+		onMutate: async ({ id, key, enabled }) => {
+			const queryKey = membersKeys.permissions(id);
+			await queryClient.cancelQueries({ queryKey });
+			const before = queryClient.getQueryData<GrantView[]>(queryKey);
+			queryClient.setQueryData<GrantView[]>(queryKey, (list) =>
+				list?.map((grant) =>
+					grant.key === key
+						? {
+								...grant,
+								granted: enabled,
+								origin: enabled ? "direct" : null,
+								granted_at: enabled ? Math.floor(Date.now() / 1000) : null,
+							}
+						: grant,
+				),
+			);
+			return { before };
+		},
+		onError: (_error, { id }, result) => {
+			if (result?.before)
+				queryClient.setQueryData(membersKeys.permissions(id), result.before);
 		},
 		onSettled: (_data, _error, { id }) =>
 			Promise.all([

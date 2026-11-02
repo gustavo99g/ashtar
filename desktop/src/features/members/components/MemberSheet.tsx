@@ -20,6 +20,7 @@ import {
 	SheetTitle,
 } from "@/components/ui/sheet";
 import { Spinner } from "@/components/ui/spinner";
+import { Switch } from "@/components/ui/switch";
 import { Avatar, nickColor } from "@/features/identity";
 import type { GrantView, MemberView } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -30,7 +31,7 @@ import {
 	type MemberFact,
 	memberName,
 } from "../model/members";
-import { useMemberPermissions } from "../queries";
+import { useMemberPermissions, useSetMemberPermission } from "../queries";
 import type { MemberActions } from "./MemberMenu";
 import { OwnerBadge } from "./MemberRow";
 
@@ -141,7 +142,11 @@ function MemberDetails({
 				</Section>
 
 				<Section title="Permissões">
-					<Permissions memberId={member.id} />
+					<Permissions
+						memberId={member.id}
+						name={memberName(member)}
+						editable={!member.is_owner && !removed}
+					/>
 				</Section>
 
 				{!removed && (
@@ -214,9 +219,22 @@ function originLabel(grant: GrantView): string {
 	return grant.kind === "permission" ? "Desligado" : "Só o dono";
 }
 
-function Permissions({ memberId }: { memberId: string }) {
+/**
+ * As permissões do membro. As de `kind: "permission"` (Gerenciar canais, Beta) têm uma chave para o
+ * dono ligar e desligar; as ações (`kind: "action"`) são só do dono e não mudam. No dono e em quem
+ * foi removido, nada muda: só o selo.
+ */
+function Permissions({
+	memberId,
+	name,
+	editable,
+}: {
+	memberId: string;
+	name: string;
+	editable: boolean;
+}) {
 	const permissions = useMemberPermissions(memberId);
-
+	const setPermission = useSetMemberPermission();
 	if (permissions.isPending) {
 		return (
 			<div className="flex h-20 items-center justify-center rounded-xl border border-border">
@@ -242,42 +260,63 @@ function Permissions({ memberId }: { memberId: string }) {
 	}
 
 	return (
-		<ul
-			aria-label="Permissões"
-			className="overflow-hidden rounded-xl border border-border bg-card"
-		>
-			{permissions.data.map((grant) => (
-				<li
-					key={grant.key}
-					className="flex items-center gap-2.5 border-t border-border px-3.5 py-2.5 first:border-t-0"
-				>
-					{grant.granted ? (
-						<CircleCheckIcon
-							aria-label="Tem"
-							className="size-4 shrink-0 text-success"
-						/>
-					) : (
-						<CircleSlashIcon
-							aria-label="Não tem"
-							className="size-4 shrink-0 text-foreground-faint"
-						/>
-					)}
-					<span
-						className={cn(
-							"min-w-0 flex-1 text-[13px]",
-							grant.granted ? "text-foreground" : "text-foreground-subtle",
+		<div className="flex flex-col gap-2">
+			{setPermission.isError && (
+				<p role="alert" className="text-[13px] text-destructive-text">
+					Não deu para mudar a permissão. {setPermission.error.message}
+				</p>
+			)}
+			<ul
+				aria-label="Permissões"
+				className="overflow-hidden rounded-xl border border-border bg-card"
+			>
+				{permissions.data.map((grant) => (
+					<li
+						key={grant.key}
+						className="flex items-center gap-2.5 border-t border-border px-3.5 py-2.5 first:border-t-0"
+					>
+						{grant.granted ? (
+							<CircleCheckIcon
+								aria-label="Tem"
+								className="size-4 shrink-0 text-success"
+							/>
+						) : (
+							<CircleSlashIcon
+								aria-label="Não tem"
+								className="size-4 shrink-0 text-foreground-faint"
+							/>
 						)}
-					>
-						{grant.label}
-					</span>
-					<Badge
-						tone={grant.granted ? "gold" : "neutral"}
-						className="px-2 py-px text-[11px]"
-					>
-						{originLabel(grant)}
-					</Badge>
-				</li>
-			))}
-		</ul>
+						<span
+							className={cn(
+								"min-w-0 flex-1 text-[13px]",
+								grant.granted ? "text-foreground" : "text-foreground-subtle",
+							)}
+						>
+							{grant.label}
+						</span>
+						{editable && grant.kind === "permission" ? (
+							<Switch
+								checked={grant.granted}
+								onCheckedChange={(enabled) =>
+									setPermission.mutate({
+										id: memberId,
+										key: grant.key,
+										enabled,
+									})
+								}
+								aria-label={`${grant.label} para ${name}`}
+							/>
+						) : (
+							<Badge
+								tone={grant.granted ? "gold" : "neutral"}
+								className="px-2 py-px text-[11px]"
+							>
+								{originLabel(grant)}
+							</Badge>
+						)}
+					</li>
+				))}
+			</ul>
+		</div>
 	);
 }

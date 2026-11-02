@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -13,6 +13,7 @@ import {
 	getMemberPermissions,
 	listMembers,
 	removeMember,
+	setMemberPermission,
 	unlinkMember,
 } from "@/lib/api";
 import { MembersSettings } from "../components/MembersSettings";
@@ -26,6 +27,7 @@ vi.mock("@/lib/api", async (importOriginal) => ({
 	unlinkMember: vi.fn(),
 	createRecoveryInvite: vi.fn(),
 	removeMember: vi.fn(),
+	setMemberPermission: vi.fn(),
 }));
 
 const juju = member("juliana", { display_name: "juju" });
@@ -111,9 +113,72 @@ describe("ações do membro", () => {
 		expect(
 			await screen.findByText("Uma ação que a API acabou de criar"),
 		).toBeInTheDocument();
-		expect(screen.getByText("Desligado")).toBeInTheDocument();
+		// A permissão vira uma chave; a ação continua só com o selo.
+		expect(
+			screen.getByRole("switch", { name: "Receber o beta para juju" }),
+		).not.toBeChecked();
 		expect(screen.getByText("Só o dono")).toBeInTheDocument();
 		expect(getMemberPermissions).toHaveBeenCalledWith("juliana");
+	});
+
+	it("a chave de Gerenciar canais liga a permissão na hora", async () => {
+		const off: GrantView = {
+			key: "canais.gerenciar",
+			kind: "permission",
+			label: "Gerenciar canais",
+			granted: false,
+			origin: null,
+			granted_at: null,
+		};
+		vi.mocked(getMemberPermissions)
+			.mockResolvedValueOnce([off])
+			.mockResolvedValue([
+				{ ...off, granted: true, origin: "direct", granted_at: NOW },
+			]);
+		vi.mocked(setMemberPermission).mockResolvedValue();
+		const user = userEvent.setup();
+		renderPage();
+
+		await user.click(
+			await screen.findByRole("button", { name: "Detalhes de juju" }),
+		);
+		const toggle = await screen.findByRole("switch", {
+			name: "Gerenciar canais para juju",
+		});
+		await user.click(toggle);
+
+		expect(toggle).toBeChecked();
+		expect(setMemberPermission).toHaveBeenCalledWith(
+			"juliana",
+			"canais.gerenciar",
+			true,
+		);
+	});
+
+	it("no dono não tem chave: só o selo", async () => {
+		vi.mocked(getMemberPermissions).mockResolvedValue([
+			{
+				key: "canais.gerenciar",
+				kind: "permission",
+				label: "Gerenciar canais",
+				granted: true,
+				origin: "owner",
+				granted_at: null,
+			},
+		]);
+		const user = userEvent.setup();
+		renderPage();
+
+		await user.click(
+			await screen.findByRole("button", { name: "Detalhes de kid" }),
+		);
+
+		expect(await screen.findByText("Gerenciar canais")).toBeInTheDocument();
+		expect(
+			screen.queryByRole("switch", { name: /Gerenciar canais/ }),
+		).toBeNull();
+		const list = screen.getByRole("list", { name: "Permissões" });
+		expect(within(list).getByText("Dono")).toBeInTheDocument();
 	});
 
 	it("desvincula e já cria a recuperação, nas duas chamadas em sequência", async () => {
