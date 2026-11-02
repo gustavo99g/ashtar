@@ -10,9 +10,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { identityKeys, useSessionStore } from "@/features/identity";
 import { VoiceProvider } from "@/features/voice";
 import { ApiError, type MeResponse, type UserView } from "@/lib/api";
+import { DEFAULT_CHANNEL_ID } from "@/features/channels";
 import { paths } from "@/lib/paths";
 import { accountMarker, login } from "@/lib/tauri/commands";
 import { routes } from "./router";
+
+/** Para onde o `/server` leva: o último canal de texto, o #geral na primeira vez. */
+const HOME = paths.channel(DEFAULT_CHANNEL_ID);
 
 vi.mock("@/lib/tauri/commands", () => ({
 	login: vi.fn(),
@@ -104,7 +108,7 @@ describe("router", () => {
 		expect(router.state.location.pathname).toBe(paths.settings.members);
 
 		fireEvent.keyDown(window, { key: "Escape" });
-		expect(router.state.location.pathname).toBe(paths.server);
+		expect(router.state.location.pathname).toBe(HOME);
 	});
 
 	it("o ESC que um diálogo já usou não fecha as configurações", () => {
@@ -150,7 +154,7 @@ describe("a abertura", () => {
 		const router = renderAt([paths.start]);
 
 		await screen.findByRole("complementary");
-		expect(router.state.location.pathname).toBe(paths.server);
+		expect(router.state.location.pathname).toBe(HOME);
 		expect(login).toHaveBeenCalledTimes(1);
 	});
 
@@ -181,7 +185,7 @@ describe("a abertura", () => {
 		vi.mocked(login).mockResolvedValue({ token: "tok", user });
 		fireEvent.click(retry);
 		await screen.findByRole("complementary");
-		expect(router.state.location.pathname).toBe(paths.server);
+		expect(router.state.location.pathname).toBe(HOME);
 		expect(login).toHaveBeenCalledTimes(2);
 	});
 });
@@ -222,6 +226,15 @@ describe("endereços e rotas", () => {
 		for (const path of leafPaths(routes)) {
 			expect(known, `${path} está no router mas não em paths`).toContain(path);
 		}
+	});
+
+	it("o canal vai como parâmetro, escapado, e bate com o padrão de paths", () => {
+		const matches = matchRoutes(routes, paths.channel("geral"));
+		expect(last(matches)?.route.path).toBe(paths.channelPattern);
+		expect(last(matches)?.params.channelId).toBe("geral");
+
+		const odd = matchRoutes(routes, paths.channel("a b/c"));
+		expect(last(odd)?.params.channelId).toBe("a b/c");
 	});
 
 	it("o código do convite vai como parâmetro", () => {

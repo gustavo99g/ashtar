@@ -12,6 +12,7 @@ import {
 } from "@/features/identity";
 import { VoiceProvider } from "@/features/voice";
 import { ApiError, type InvitePreviewView, type UserView } from "@/lib/api";
+import { DEFAULT_CHANNEL_ID } from "@/features/channels";
 import { paths } from "@/lib/paths";
 import {
 	accountMarker,
@@ -20,6 +21,9 @@ import {
 	pendingUpdate,
 	redeem,
 } from "@/lib/tauri/commands";
+
+/** Para onde o `/server` leva: o último canal de texto, o #geral na primeira vez. */
+const HOME = paths.channel(DEFAULT_CHANNEL_ID);
 
 // O aviso no canto: o teste confere o pedido, sem desenhar o `Toaster`.
 vi.mock("@/components/ui/toast", async (importOriginal) => ({
@@ -114,7 +118,7 @@ describe("a abertura com um link", () => {
 		await screen.findByRole("heading", { name: "Você já está no Ashtar" });
 		expect(router.state.location.pathname).toBe(paths.entry.alreadyIn);
 		fireEvent.click(screen.getByRole("button", { name: "Continuar como kid" }));
-		expect(router.state.location.pathname).toBe(paths.server);
+		expect(router.state.location.pathname).toBe(HOME);
 		expect(redeem).not.toHaveBeenCalled();
 	});
 
@@ -193,7 +197,7 @@ describe("quem já tem conta não vê as telas de convite", () => {
 		const router = renderAt(path, { status: "connected", user: kid });
 
 		await screen.findByRole("complementary");
-		expect(router.state.location.pathname).toBe(paths.server);
+		expect(router.state.location.pathname).toBe(HOME);
 	});
 
 	it("Você já está no Ashtar continua aberta a quem tem conta", async () => {
@@ -326,7 +330,7 @@ describe("entrar", () => {
 		fireEvent.click(screen.getByRole("button", { name: "Entrar no Ashtar" }));
 
 		await vi.waitFor(() =>
-			expect(router.state.location.pathname).toBe(paths.server),
+			expect(router.state.location.pathname).toBe(HOME),
 		);
 		expect(redeem).toHaveBeenCalledWith(NEW_CODE, "lua");
 		expect(useSessionStore.getState().session).toEqual({
@@ -452,7 +456,7 @@ describe("entrar", () => {
 		await screen.findByRole("heading", { name: "Boas-vindas de volta, juju" });
 		expect(redeem).toHaveBeenCalledWith(RECOVERY_CODE, null);
 		fireEvent.click(screen.getByRole("button", { name: "Abrir o Ashtar" }));
-		expect(router.state.location.pathname).toBe(paths.server);
+		expect(router.state.location.pathname).toBe(HOME);
 	});
 
 	it("o código de um convite novo na rota da recuperação vai para o nick", async () => {
@@ -503,7 +507,7 @@ describe("estados e erros", () => {
 		fireEvent.click(screen.getByRole("button", { name: "Tentar de novo" }));
 
 		await vi.waitFor(() =>
-			expect(router.state.location.pathname).toBe(paths.server),
+			expect(router.state.location.pathname).toBe(HOME),
 		);
 		expect(login).toHaveBeenCalledTimes(2);
 	});
@@ -569,7 +573,7 @@ describe("estados e erros", () => {
 		fireEvent.click(screen.getByRole("button", { name: "Tentar de novo" }));
 
 		await vi.waitFor(() =>
-			expect(router.state.location.pathname).toBe(paths.server),
+			expect(router.state.location.pathname).toBe(HOME),
 		);
 		expect(redeem).toHaveBeenNthCalledWith(2, NEW_CODE, "lua");
 	});
