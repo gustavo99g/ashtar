@@ -3,7 +3,7 @@
  * Sem React, para testar no Vitest. A lista vem inteira numa chamada só (os removidos inclusive),
  * e os chips filtram aqui.
  */
-import { shortDate } from "@/features/invites";
+import { shortDate } from "@/lib/date";
 import type { MemberView } from "@/lib/api";
 
 export type MemberFilter = "all" | "beta" | "noDevice" | "removed";

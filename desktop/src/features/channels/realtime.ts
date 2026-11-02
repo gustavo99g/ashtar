@@ -20,6 +20,8 @@ export function handleChannelsRealtime(
 		return;
 	}
 	if (event.type !== "channels.changed") return;
+	// Os arquivados não têm versão: qualquer mudança pode ter mexido neles.
+	void queryClient.invalidateQueries({ queryKey: channelsKeys.archived() });
 	const cached = queryClient.getQueryData<Layout>(channelsKeys.layout());
 	if (cached && cached.version >= event.version) return;
 	void queryClient.invalidateQueries({ queryKey: channelsKeys.layout() });

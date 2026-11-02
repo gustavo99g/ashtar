@@ -11,11 +11,13 @@ import {
 import {
 	DEFAULT_CHANNEL_ID,
 	findChannel,
+	openChannelDialog,
 	setLastChannel,
+	useCanManageChannels,
 	useChannelLayout,
 } from "@/features/channels";
 import { useSession } from "@/features/identity";
-import { isApiError } from "@/lib/api";
+import { type ChannelView, isApiError } from "@/lib/api";
 import { paths } from "@/lib/paths";
 import { useMessages, usePeople, useSendMessage } from "../queries";
 import { usePending } from "../stores/outboxStore";
@@ -64,26 +66,53 @@ export function ChatView({ channelId }: { channelId: string }) {
 					<h1 className="shrink-0 text-[15px] font-bold text-foreground">
 						{channel.name}
 					</h1>
-					{channel.topic && (
-						<>
-							<span
-								aria-hidden="true"
-								className="mx-1 h-5 w-px shrink-0 bg-border"
-							/>
-
-							<p
-								title={channel.topic}
-								className="min-w-0 truncate text-[13px] text-muted-foreground"
-							>
-								{channel.topic}
-							</p>
-						</>
-					)}
+					<ChannelTopic channel={channel} />
 				</header>
 				<Conversation channelId={channel.id} channelName={channel.name} />
 			</section>
 			<PeopleColumn />
 		</div>
+	);
+}
+
+/**
+ * O tópico ao lado do nome. Para quem gerencia os canais ele é um botão que abre o Editar canal já
+ * no campo do tópico; sem tópico, mostra "Adicionar um tópico". Para os outros, é só texto.
+ */
+function ChannelTopic({ channel }: { channel: ChannelView }) {
+	const canManage = useCanManageChannels();
+	if (!channel.topic && !canManage) return null;
+	const separator = (
+		<span aria-hidden="true" className="mx-1 h-5 w-px shrink-0 bg-border" />
+	);
+	if (!canManage) {
+		return (
+			<>
+				{separator}
+				<p
+					title={channel.topic ?? undefined}
+					className="min-w-0 truncate text-[13px] text-muted-foreground"
+				>
+					{channel.topic}
+				</p>
+			</>
+		);
+	}
+	return (
+		<>
+			{separator}
+			<button
+				type="button"
+				title={channel.topic ?? undefined}
+				aria-label={channel.topic ? "Editar o tópico" : "Adicionar um tópico"}
+				onClick={() =>
+					openChannelDialog({ kind: "editChannel", channel, focus: "topic" })
+				}
+				className="min-w-0 truncate rounded px-1 text-left text-[13px] text-muted-foreground hover:bg-secondary hover:text-foreground"
+			>
+				{channel.topic ?? "Adicionar um tópico"}
+			</button>
+		</>
 	);
 }
 

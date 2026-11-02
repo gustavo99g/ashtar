@@ -20,3 +20,10 @@ export function findChannel(
 ): ChannelView | undefined {
 	return allChannels(layout).find((channel) => channel.id === id);
 }
+
+/** O `#geral` e a Sala não se arquivam (a API recusa; o menu nem oferece). */
+const PROTECTED = new Set(["geral", "sala"]);
+
+export function canArchive(channel: ChannelView): boolean {
+	return !PROTECTED.has(channel.id);
+}

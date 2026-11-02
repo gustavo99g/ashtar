@@ -2,6 +2,7 @@
  * Os textos de data e de prazo dos convites a partir do que a API devolve. As datas da API vêm em
  * segundos (Unix); o "agora" vem em milissegundos (`Date.now()`), como no resto do app.
  */
+import { shortDate } from "@/lib/date";
 
 /** O endereço sem o protocolo e sem o código, em letra miúda no bilhete: `ashtar.exemplo.ts.net/invite/`. */
 export function inviteAddress(link: string, code: string): string {
@@ -21,34 +22,12 @@ export function expiryTime(expiresAt: number): string {
 	return timeFormat.format(new Date(expiresAt * 1000));
 }
 
-/** Como no canvas: "24 out", sem o "de" e sem o ponto que o `Intl` põe. */
-const MONTHS = [
-	"jan",
-	"fev",
-	"mar",
-	"abr",
-	"mai",
-	"jun",
-	"jul",
-	"ago",
-	"set",
-	"out",
-	"nov",
-	"dez",
-];
-
 const DAY_MS = 86_400_000;
 
 function startOfDay(ms: number): number {
 	const day = new Date(ms);
 	day.setHours(0, 0, 0, 0);
 	return day.getTime();
-}
-
-/** "24 out". `at` em segundos. */
-export function shortDate(at: number): string {
-	const date = new Date(at * 1000);
-	return `${date.getDate()} ${MONTHS[date.getMonth()]}`;
 }
 
 /** "hoje, 12:20", "amanhã, 12:15", "ontem, 18:40" ou "24 out, 12:15". */

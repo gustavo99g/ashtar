@@ -26,6 +26,7 @@ import {
 import { ServerRoute } from "@/routes/server";
 import {
 	AppSettingsRoute,
+	ArchivedSettingsRoute,
 	InvitesSettingsRoute,
 	MembersSettingsRoute,
 	ProfileSettingsRoute,
@@ -71,6 +72,7 @@ export const routes: RouteObject[] = [
 							{ path: "app", element: <AppSettingsRoute /> },
 							{ path: "invites", element: <InvitesSettingsRoute /> },
 							{ path: "members", element: <MembersSettingsRoute /> },
+							{ path: "archived", element: <ArchivedSettingsRoute /> },
 						],
 					},
 				],

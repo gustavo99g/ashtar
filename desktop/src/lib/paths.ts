@@ -27,5 +27,7 @@ export const paths = {
 		app: "/settings/app",
 		invites: "/settings/invites",
 		members: "/settings/members",
+		/** Servidor › Arquivados: só no menu de quem gerencia os canais. */
+		archived: "/settings/archived",
 	},
 } as const;

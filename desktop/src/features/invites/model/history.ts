@@ -4,7 +4,8 @@
  * quem entrou e a situação.
  */
 import type { InviteView, MemberRef } from "@/lib/api";
-import { createdWhen, duration, shortDate } from "./format";
+import { shortDate } from "@/lib/date";
+import { createdWhen, duration } from "./format";
 
 /** O ícone e a cor da linha. */
 export type InviteRowKind = "person" | "group" | "recovery";

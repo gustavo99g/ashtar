@@ -3,7 +3,8 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { useSessionStore } from "@/features/identity";
+import { useChannelDialog } from "@/features/channels";
+import { identityKeys, useSessionStore } from "@/features/identity";
 import {
 	ApiError,
 	getChannelLayout,
@@ -68,9 +69,17 @@ function message(id: string, body: string, clientId = id): Message {
 	};
 }
 
-function renderChat(channelId = "geral") {
+function renderChat(channelId = "geral", { manage = false } = {}) {
 	const client = new QueryClient({
 		defaultOptions: { queries: { retry: false } },
+	});
+	client.setQueryData(identityKeys.me(), {
+		user: kid,
+		permissions: [],
+		update_channel: "stable",
+		can_create_invite: true,
+		can_view_panel: true,
+		can_manage_channels: manage,
 	});
 	render(
 		<QueryClientProvider client={client}>
@@ -142,6 +151,38 @@ describe("ChatView", () => {
 		expect(within(rest).getByRole("heading")).toHaveTextContent("Resto — 1");
 		const offline = screen.getByRole("region", { name: "Offline" });
 		expect(within(offline).getByText("bia")).toBeInTheDocument();
+	});
+
+	it("quem gerencia os canais clica no tópico e abre o Editar já nele", async () => {
+		useChannelDialog.setState({ dialog: null });
+		const user = userEvent.setup();
+		renderChat("geral", { manage: true });
+
+		await user.click(
+			await screen.findByRole("button", { name: "Editar o tópico" }),
+		);
+
+		expect(useChannelDialog.getState().dialog).toMatchObject({
+			kind: "editChannel",
+			channel: { id: "geral" },
+			focus: "topic",
+		});
+	});
+
+	it("sem tópico, quem gerencia vê Adicionar um tópico", async () => {
+		vi.mocked(getChannelLayout).mockResolvedValue({
+			...layout,
+			categories: [
+				{
+					...layout.categories[0],
+					channels: [{ ...layout.categories[0].channels[0], topic: null }],
+				},
+			],
+		});
+		renderChat("geral", { manage: true });
+		expect(
+			await screen.findByRole("button", { name: "Adicionar um tópico" }),
+		).toBeInTheDocument();
 	});
 
 	it("Enter manda na hora, apagada até a API confirmar", async () => {

@@ -1,3 +1,4 @@
+import { ArchivedSettings } from "@/features/channels";
 import { ProfileSettings } from "@/features/identity";
 import { InvitesSettings } from "@/features/invites";
 import { MembersSettings } from "@/features/members";
@@ -30,4 +31,7 @@ export function InvitesSettingsRoute() {
 
 export function MembersSettingsRoute() {
 	return <MembersSettings />;
+}
+export function ArchivedSettingsRoute() {
+	return <ArchivedSettings />;
 }

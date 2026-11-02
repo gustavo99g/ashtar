@@ -126,6 +126,15 @@ describe("router", () => {
 		expect(router.state.location.pathname).toBe(paths.settings.profile);
 	});
 
+	it("o AppShell não deixa texto solto ao lado das colunas", () => {
+		renderAt([paths.server]);
+		const shell = screen.getByRole("complementary").parentElement;
+		const loose = Array.from(shell?.childNodes ?? []).filter(
+			(node) => node.nodeType === Node.TEXT_NODE && node.textContent?.trim(),
+		);
+		expect(loose).toEqual([]);
+	});
+
 	it("o botão de configurações da coluna abre o Perfil", () => {
 		const router = renderAt([paths.server]);
 		const column = screen.getByRole("complementary");
@@ -142,6 +151,26 @@ describe("router", () => {
 		expect(
 			screen.queryByRole("link", { name: "Membros" }),
 		).not.toBeInTheDocument();
+	});
+});
+
+describe("Servidor › Arquivados", () => {
+	it("só aparece no menu de quem gerencia os canais", () => {
+		renderAt([paths.server, paths.settings.profile]);
+		expect(screen.queryByRole("link", { name: "Arquivados" })).toBeNull();
+	});
+
+	it("com can_manage_channels, o menu leva para a página", () => {
+		const router = renderAt([paths.server, paths.settings.profile], {
+			me: { ...me(true), can_manage_channels: true },
+		});
+
+		fireEvent.click(screen.getByRole("link", { name: "Arquivados" }));
+
+		expect(router.state.location.pathname).toBe(paths.settings.archived);
+		expect(
+			screen.getByRole("heading", { name: "Arquivados" }),
+		).toBeInTheDocument();
 	});
 });
 

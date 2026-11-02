@@ -1,7 +1,7 @@
 import { CrownIcon, LockIcon } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Avatar } from "@/features/identity";
-import { shortDate } from "@/features/invites";
+import { shortDate } from "@/lib/date";
 import type { MemberView } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import {

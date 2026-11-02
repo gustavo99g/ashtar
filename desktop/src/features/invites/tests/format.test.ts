@@ -6,7 +6,6 @@ import {
 	expiryTime,
 	inviteAddress,
 	peopleText,
-	shortDate,
 } from "../model/format";
 
 /** 17 out de 2026, 12:15, no fuso do computador: o "agora" dos quadros. */
@@ -28,11 +27,6 @@ describe("textos do bilhete", () => {
 });
 
 describe("datas e prazos", () => {
-	it("escreve a data curta como no canvas", () => {
-		expect(shortDate(at(24, 12, 15))).toBe("24 out");
-		expect(shortDate(at(3, 8, 0, 2))).toBe("3 mar");
-	});
-
 	it("diz hoje, amanhã e ontem pelo dia do calendário", () => {
 		expect(dayAndTime(at(17, 12, 20), now)).toBe("hoje, 12:20");
 		expect(dayAndTime(at(18, 0, 5), now)).toBe("amanhã, 00:05");

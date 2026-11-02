@@ -1,5 +1,6 @@
 import { Outlet } from "react-router-dom";
 import logo from "@/assets/ashtar.svg";
+import { ChannelDialogs } from "@/features/channels";
 import { JoinNotices } from "@/features/members";
 import { ChannelNav } from "@/features/server";
 import { VoiceDock } from "@/features/voice";
@@ -31,6 +32,8 @@ export function AppShell() {
 				<JoinNotices />
 				<Outlet />
 			</main>
+			{/* Os diálogos de criar, editar e arquivar canais: abrem pela lista ou pelo cabeçalho do chat. */}
+			<ChannelDialogs />
 		</div>
 	);
 }
