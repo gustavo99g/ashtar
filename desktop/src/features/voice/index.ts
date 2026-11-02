@@ -11,6 +11,7 @@ export {
 	peopleNowLabel,
 } from "./members/model/members";
 export { useVoiceParticipants } from "./members/queries";
+export { handleVoiceRealtime } from "./members/realtime";
 export {
 	type VoiceConnectionState,
 	type VoiceError,

@@ -26,3 +26,12 @@ export function apiUrl(path: string): string {
 
 	return `${base.replace(/\/+$/, "")}${path}`;
 }
+
+/**
+ * O endereço do WebSocket da API com o ticket: o mesmo da `VITE_API_URL`, com `ws` no lugar de
+ * `http` (`https` vira `wss`).
+ */
+export function realtimeUrl(ticket: string): string {
+	const query = new URLSearchParams({ ticket });
+	return apiUrl(`/api/realtime?${query}`).replace(/^http/, "ws");
+}

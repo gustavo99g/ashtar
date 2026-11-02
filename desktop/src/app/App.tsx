@@ -4,7 +4,8 @@
  * O `VoiceProvider` fica acima do router para a chamada sobreviver à troca de rota. O cache da
  * API (`QueryClientProvider`) fica acima de tudo. Quando este computador sai do grupo, o
  * `SessionWatcher` limpa o cache e chama `goToLeftGroup`, e o `VoiceProvider`, que acompanha a
- * sessão, derruba a chamada.
+ * sessão, derruba a chamada. O `RealtimeBridge` liga o WebSocket da API enquanto a sessão está
+ * conectada.
  */
 import "@/styles/App.css";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -18,6 +19,7 @@ import { UpdateNotice, WhatsNewDialog } from "@/features/updater";
 import { useVoice, VoiceProvider } from "@/features/voice";
 import { paths } from "@/lib/paths";
 import { queryClient } from "@/lib/query";
+import { RealtimeBridge } from "./RealtimeBridge";
 import { router } from "./router";
 
 function goToLeftGroup() {
@@ -38,6 +40,7 @@ export function App() {
 		<QueryClientProvider client={queryClient}>
 			<VoiceProvider>
 				<SessionWatcher onLeftGroup={goToLeftGroup} />
+				<RealtimeBridge />
 				<TooltipProvider>
 					<AppToaster>
 						<RouterProvider router={router} />

@@ -15,6 +15,7 @@ import {
 	setMemberBeta,
 	unlinkMember,
 } from "@/lib/api";
+import { useRealtimeOpen } from "@/lib/realtime";
 import { useAppVisible } from "@/lib/visibility";
 
 export const membersKeys = {
@@ -33,7 +34,10 @@ export function useMembers() {
 	});
 }
 
-/** De quanto em quanto tempo o app do dono pergunta de novo, para o aviso de quem entrou. */
+/**
+ * De quanto em quanto tempo o app do dono pergunta de novo, para o aviso de quem entrou. Só com o
+ * tempo real fora: aberto, o `member.joined` avisa (`realtime.ts`).
+ */
 export const MEMBERS_WATCH_MS = 30_000;
 
 /**
@@ -45,11 +49,12 @@ export function useMembersWatch() {
 	const visible = useAppVisible();
 	const connected = useSession().status === "connected";
 	const canView = useMe().data?.can_view_panel === true;
+	const live = useRealtimeOpen();
 	return useQuery({
 		queryKey: membersKeys.list(),
 		queryFn: listMembers,
 		enabled: connected && canView,
-		refetchInterval: visible ? MEMBERS_WATCH_MS : false,
+		refetchInterval: visible && !live ? MEMBERS_WATCH_MS : false,
 	});
 }
 

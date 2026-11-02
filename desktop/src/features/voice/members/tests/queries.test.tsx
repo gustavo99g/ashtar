@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useSessionStore } from "@/features/identity";
 import { listVoiceParticipants, type UserView } from "@/lib/api";
+import { useRealtimeOpen } from "@/lib/realtime";
 import { useAppVisible } from "@/lib/visibility";
 import { PARTICIPANTS_REFRESH_MS, useVoiceParticipants } from "../queries";
 
@@ -12,6 +13,7 @@ vi.mock("@/lib/api", async (importOriginal) => ({
 	listVoiceParticipants: vi.fn(),
 }));
 vi.mock("@/lib/visibility", () => ({ useAppVisible: vi.fn() }));
+vi.mock("@/lib/realtime", () => ({ useRealtimeOpen: vi.fn(() => false) }));
 
 const user: UserView = {
 	id: "u1",
@@ -59,6 +61,16 @@ describe("useVoiceParticipants", () => {
 
 		await advance(PARTICIPANTS_REFRESH_MS);
 		expect(listVoiceParticipants).toHaveBeenCalledTimes(3);
+	});
+
+	it("com o tempo real aberto, não repete: a lista chega por evento", async () => {
+		vi.mocked(useRealtimeOpen).mockReturnValue(true);
+		renderHook(() => useVoiceParticipants("sala"), { wrapper });
+		await advance(0);
+		expect(listVoiceParticipants).toHaveBeenCalledTimes(1);
+		await advance(PARTICIPANTS_REFRESH_MS * 3);
+		expect(listVoiceParticipants).toHaveBeenCalledTimes(1);
+		vi.mocked(useRealtimeOpen).mockReturnValue(false);
 	});
 
 	it("para com o app fora de vista e busca na hora quando ele volta", async () => {

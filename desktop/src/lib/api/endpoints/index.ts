@@ -8,4 +8,5 @@ export {
 	setMemberBeta,
 	unlinkMember,
 } from "./members";
+export { createRealtimeTicket } from "./realtime";
 export { createVoiceToken, listVoiceParticipants } from "./voice";
