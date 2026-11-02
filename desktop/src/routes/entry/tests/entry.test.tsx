@@ -118,7 +118,9 @@ describe("a abertura com um link", () => {
 		await screen.findByRole("heading", { name: "Você já está no Ashtar" });
 		expect(router.state.location.pathname).toBe(paths.entry.alreadyIn);
 		fireEvent.click(screen.getByRole("button", { name: "Continuar como kid" }));
-		expect(router.state.location.pathname).toBe(HOME);
+		await vi.waitFor(() =>
+			expect(router.state.location.pathname).toBe(HOME),
+		);
 		expect(redeem).not.toHaveBeenCalled();
 	});
 
@@ -197,7 +199,9 @@ describe("quem já tem conta não vê as telas de convite", () => {
 		const router = renderAt(path, { status: "connected", user: kid });
 
 		await screen.findByRole("complementary");
-		expect(router.state.location.pathname).toBe(HOME);
+		await vi.waitFor(() =>
+			expect(router.state.location.pathname).toBe(HOME),
+		);
 	});
 
 	it("Você já está no Ashtar continua aberta a quem tem conta", async () => {
@@ -456,7 +460,9 @@ describe("entrar", () => {
 		await screen.findByRole("heading", { name: "Boas-vindas de volta, juju" });
 		expect(redeem).toHaveBeenCalledWith(RECOVERY_CODE, null);
 		fireEvent.click(screen.getByRole("button", { name: "Abrir o Ashtar" }));
-		expect(router.state.location.pathname).toBe(HOME);
+		await vi.waitFor(() =>
+			expect(router.state.location.pathname).toBe(HOME),
+		);
 	});
 
 	it("o código de um convite novo na rota da recuperação vai para o nick", async () => {

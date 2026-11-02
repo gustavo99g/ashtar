@@ -101,14 +101,16 @@ describe("router", () => {
 		).toBeInTheDocument();
 	});
 
-	it("o ESC fecha as configurações e volta para onde estava, mesmo depois de trocar de página", () => {
+	it("o ESC fecha as configurações e volta para onde estava, mesmo depois de trocar de página", async () => {
 		const router = renderAt([paths.server, paths.settings.profile]);
 
 		fireEvent.click(screen.getByRole("link", { name: "Membros" }));
 		expect(router.state.location.pathname).toBe(paths.settings.members);
 
 		fireEvent.keyDown(window, { key: "Escape" });
-		expect(router.state.location.pathname).toBe(HOME);
+		await vi.waitFor(() =>
+			expect(router.state.location.pathname).toBe(HOME),
+		);
 	});
 
 	it("o ESC que um diálogo já usou não fecha as configurações", () => {
@@ -154,7 +156,9 @@ describe("a abertura", () => {
 		const router = renderAt([paths.start]);
 
 		await screen.findByRole("complementary");
-		expect(router.state.location.pathname).toBe(HOME);
+		await vi.waitFor(() =>
+			expect(router.state.location.pathname).toBe(HOME),
+		);
 		expect(login).toHaveBeenCalledTimes(1);
 	});
 
@@ -185,7 +189,9 @@ describe("a abertura", () => {
 		vi.mocked(login).mockResolvedValue({ token: "tok", user });
 		fireEvent.click(retry);
 		await screen.findByRole("complementary");
-		expect(router.state.location.pathname).toBe(HOME);
+		await vi.waitFor(() =>
+			expect(router.state.location.pathname).toBe(HOME),
+		);
 		expect(login).toHaveBeenCalledTimes(2);
 	});
 });
