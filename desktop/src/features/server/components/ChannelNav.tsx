@@ -1,13 +1,17 @@
-import { HeadphoneOffIcon, MicOffIcon, Volume2Icon } from "lucide-react";
+import {
+	HashIcon,
+	HeadphoneOffIcon,
+	MicOffIcon,
+	Volume2Icon,
+} from "lucide-react";
 import { useMatch, useNavigate } from "react-router-dom";
 import {
 	Popover,
 	PopoverContent,
 	PopoverTrigger,
 } from "@/components/ui/popover";
+import { textChannels, useChannelLayout } from "@/features/channels";
 import { Avatar, useSession } from "@/features/identity";
-import { paths } from "@/lib/paths";
-import { cn } from "@/lib/utils";
 import {
 	type ChannelMember,
 	LiveBadge,
@@ -18,10 +22,13 @@ import {
 	useVoice,
 	useVoiceParticipants,
 } from "@/features/voice";
+import { paths } from "@/lib/paths";
+import { cn } from "@/lib/utils";
 
 /*
- * A coluna do servidor: a sala e quem está nela. Sem canais de texto na 0.2.2. Clicar na sala
- * entra na chamada, como o Entrar da tela do servidor; quem já está nela só volta para a chamada.
+ * A coluna do servidor: os canais de texto, a sala e quem está nela. Clicar num canal abre a
+ * conversa; clicar na sala entra na chamada, e quem já está nela só volta para a chamada.
+ * A Etapa 7 troca esta lista pela árvore com as categorias.
  * Fora da chamada a lista vem da API (de 5 em 5 segundos); dentro, do LiveKit, com quem fala, sem
  * microfone e sem áudio.
  */
@@ -55,9 +62,8 @@ function ChannelEntries({
 	const { join } = useVoice();
 	const navigate = useNavigate();
 	const onRoom = useMatch(paths.voiceRoom) !== null;
-	const onServer = useMatch(paths.server) !== null;
-	// A sala fica marcada na tela dela: a chamada, ou a do servidor para quem está fora.
-	const selected = inCall ? onRoom : onServer;
+	// A sala fica marcada só na tela da chamada: a do servidor agora é o canal de texto.
+	const selected = inCall && onRoom;
 
 	function openRoom() {
 		if (!inCall) join(SALA.id);
@@ -69,6 +75,7 @@ function ChannelEntries({
 			aria-label="Salas"
 			className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto py-2"
 		>
+			<TextChannels />
 			<div className="px-4 pt-3 pb-1 text-[11px] font-bold tracking-[0.06em] text-muted-foreground uppercase">
 				Sala de voz
 			</div>
@@ -105,6 +112,40 @@ function ChannelEntries({
 				</ul>
 			)}
 		</nav>
+	);
+}
+
+function TextChannels() {
+	const { data } = useChannelLayout();
+	const navigate = useNavigate();
+	const match = useMatch(paths.channelPattern);
+	if (!data) return null;
+	return (
+		<>
+			<div className="px-4 pt-3 pb-1 text-[11px] font-bold tracking-[0.06em] text-muted-foreground uppercase">
+				Canais de texto
+			</div>
+			{textChannels(data).map((channel) => {
+				const selected = match?.params.channelId === channel.id;
+				return (
+					<button
+						key={channel.id}
+						type="button"
+						aria-current={selected ? "page" : undefined}
+						onClick={() => void navigate(paths.channel(channel.id))}
+						className={cn(
+							"mx-2 flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm font-semibold",
+							selected
+								? "bg-selected text-selected-foreground"
+								: "text-muted-foreground hover:bg-secondary hover:text-foreground",
+						)}
+					>
+						<HashIcon aria-hidden="true" className="size-[18px] shrink-0" />
+						<span className="truncate">{channel.name}</span>
+					</button>
+				);
+			})}
+		</>
 	);
 }
 

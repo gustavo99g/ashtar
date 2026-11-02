@@ -15,7 +15,10 @@ import { VoiceDock } from "@/features/voice";
 export function AppShell() {
 	return (
 		<div className="relative flex h-full">
-			<aside className="flex w-[304px] shrink-0 flex-col bg-card">
+			<aside
+				aria-label="Servidor"
+				className="flex w-[304px] shrink-0 flex-col bg-card"
+			>
 				<div className="flex h-12 shrink-0 items-center gap-2.5 border-b border-border px-4 text-[15px] font-bold">
 					<img src={logo} alt="" className="size-7 rounded-lg" />
 					Ashtar
