@@ -22,11 +22,11 @@ Base: a `feature/0.2.3`, commit `b428171`. Em cada etapa, `cargo fmt --check`, `
 | Etapa | Descrição | Status |
 |---|---|---|
 | 0 | Decisões: ADRs 0015 e 0016, roadmap, BACKLOG | Concluída (`e3174bf`) |
-| 2 | API: banco do chat, mensagens, `GET /api/people`, limite de envio | Pendente |
-| 3 | API: WebSocket, presença, eventos, webhook do LiveKit | Pendente |
-| 4 | API: canais e categorias, layout, arquivar, `canais.gerenciar` | Pendente |
-| 5 | App: `lib/realtime` e o fim das consultas repetidas com o socket aberto | Pendente |
-| 6 | App: o chat | Pendente |
+| 2 | API: banco do chat, mensagens, `GET /api/people`, limite de envio | Concluída (`e2f19d2`; o `admin semear` em `732db0f`) |
+| 3 | API: WebSocket, presença, eventos, webhook do LiveKit | Concluída (`4d590b1`) |
+| 4 | API: canais e categorias, layout, arquivar, `canais.gerenciar` | Concluída (`994cd4b`) |
+| 5 | App: `lib/realtime` e o fim das consultas repetidas com o socket aberto | Concluída (`e317915`) |
+| 6 | App: o chat | Em andamento (sem as telas: cache, envio, rascunho e tempo real em `11f4cba`) |
 | 7 | App: a árvore de canais | Pendente |
 | 8 | App: a miniatura da transmissão | Pendente |
 | 9 | App: a supressão de ruído (RNNoise) | Pendente |
