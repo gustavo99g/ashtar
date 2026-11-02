@@ -82,6 +82,11 @@ export function timeLabel(seconds: number): string {
 	return TIME.format(new Date(seconds * 1000));
 }
 
+/** A hora ao lado do nome, como no quadro: "Hoje às 09:14", "Ontem às 21:03", "29 de outubro às 10:00". */
+export function stampLabel(seconds: number, now = new Date()): string {
+	return `${dayLabel(seconds, now)} às ${timeLabel(seconds)}`;
+}
+
 /** "Hoje", "Ontem", "29 de outubro" e, de outro ano, "29 de outubro de 2025". */
 export function dayLabel(seconds: number, now = new Date()): string {
 	const date = new Date(seconds * 1000);
@@ -101,7 +106,19 @@ export type BodyPart =
 	| { kind: "link"; url: string };
 
 /** Pontuação que costuma colar no fim do link sem fazer parte dele ("veja https://x.com."). */
-const TRAILING = new Set([".", ",", ";", ":", "!", "?", ")", "]", "}", "'", '"']);
+const TRAILING = new Set([
+	".",
+	",",
+	";",
+	":",
+	"!",
+	"?",
+	")",
+	"]",
+	"}",
+	"'",
+	'"',
+]);
 const OPENING: Record<string, string> = { ")": "(", "]": "[", "}": "{" };
 
 function count(text: string, char: string): number {

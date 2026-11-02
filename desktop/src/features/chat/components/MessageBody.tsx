@@ -8,7 +8,7 @@ import { bodyParts } from "../model/messages";
  */
 export function MessageBody({ body }: { body: string }) {
 	return (
-		<p className="text-[15px] leading-[1.375] break-words whitespace-pre-wrap text-foreground">
+		<p className="text-sm leading-[1.55] break-words whitespace-pre-wrap text-secondary-foreground">
 			{bodyParts(body).map((part, index) =>
 				part.kind === "text" ? (
 					<span key={index}>{part.text}</span>

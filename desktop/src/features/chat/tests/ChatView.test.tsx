@@ -99,6 +99,13 @@ beforeEach(() => {
 			online: true,
 		},
 		{
+			id: "u2",
+			nick: "ana",
+			display_name: null,
+			is_owner: false,
+			online: true,
+		},
+		{
 			id: "u3",
 			nick: "bia",
 			display_name: null,
@@ -123,9 +130,16 @@ describe("ChatView", () => {
 		expect(screen.getByText("(saiu do grupo)")).toBeInTheDocument();
 		expect(screen.getByText("Bem-vindo a #geral")).toBeInTheDocument();
 
-		const online = await screen.findByRole("region", { name: "Online" });
-		expect(within(online).getByText("Kid")).toBeInTheDocument();
-		expect(await within(online).findByText("Na Sala")).toBeInTheDocument();
+		// O dono online fica sozinho em cima, com a coroa; o resto de quem está online vem abaixo;
+		// o Offline segue como estava.
+		const owner = await screen.findByRole("region", { name: "Dono" });
+		expect(within(owner).getByText("Kid")).toBeInTheDocument();
+		expect(await within(owner).findByText("Na Sala")).toBeInTheDocument();
+		expect(within(owner).queryByText("ana")).not.toBeInTheDocument();
+		const rest = screen.getByRole("region", { name: "Resto" });
+		expect(within(rest).getByText("ana")).toBeInTheDocument();
+		expect(within(rest).queryByText("Kid")).not.toBeInTheDocument();
+		expect(within(rest).getByRole("heading")).toHaveTextContent("Resto — 1");
 		const offline = screen.getByRole("region", { name: "Offline" });
 		expect(within(offline).getByText("bia")).toBeInTheDocument();
 	});
@@ -211,6 +225,39 @@ describe("ChatView", () => {
 		});
 		await userEvent.type(field, "pela metade");
 		expect(useDrafts.getState().drafts).toEqual({ geral: "pela metade" });
+	});
+
+	it("o dono fica sempre no topo, mesmo offline", async () => {
+		vi.mocked(listPeople).mockResolvedValue([
+			{
+				id: "u1",
+				nick: "kid",
+				display_name: "Kid",
+				is_owner: true,
+				online: false,
+			},
+			{
+				id: "u2",
+				nick: "ana",
+				display_name: null,
+				is_owner: false,
+				online: true,
+			},
+		]);
+		renderChat();
+		const owner = await screen.findByRole("region", { name: "Dono" });
+		expect(within(owner).getByText("Kid")).toBeInTheDocument();
+		const rest = screen.getByRole("region", { name: "Resto" });
+		expect(within(rest).getByText("ana")).toBeInTheDocument();
+		// Sem ninguém offline além do dono, o grupo Offline nem aparece.
+		expect(
+			screen.queryByRole("region", { name: "Offline" }),
+		).not.toBeInTheDocument();
+		// A ordem na coluna: Dono, Resto.
+		const regions = screen
+			.getAllByRole("region")
+			.map((region) => region.getAttribute("aria-label"));
+		expect(regions.indexOf("Dono")).toBeLessThan(regions.indexOf("Resto"));
 	});
 
 	it("canal arquivado oferece voltar para o #geral", async () => {

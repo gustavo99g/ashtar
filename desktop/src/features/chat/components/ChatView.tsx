@@ -58,8 +58,9 @@ export function ChatView({ channelId }: { channelId: string }) {
 				<header className="flex h-12 shrink-0 items-center gap-2 border-b border-border px-4">
 					<HashIcon
 						aria-hidden="true"
-						className="size-[18px] shrink-0 text-muted-foreground"
+						className="size-5 shrink-0 text-muted-foreground"
 					/>
+
 					<h1 className="shrink-0 text-[15px] font-bold text-foreground">
 						{channel.name}
 					</h1>
@@ -67,11 +68,12 @@ export function ChatView({ channelId }: { channelId: string }) {
 						<>
 							<span
 								aria-hidden="true"
-								className="h-6 w-px shrink-0 bg-border"
+								className="mx-1 h-5 w-px shrink-0 bg-border"
 							/>
+
 							<p
 								title={channel.topic}
-								className="min-w-0 truncate text-sm text-muted-foreground"
+								className="min-w-0 truncate text-[13px] text-muted-foreground"
 							>
 								{channel.topic}
 							</p>

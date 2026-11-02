@@ -8,11 +8,14 @@ import {
 	dayLabel,
 	draftProblem,
 	GROUP_GAP_SECONDS,
+	stampLabel,
 } from "../model/messages";
 
 /** Segundos de uma data local. */
 function at(year: number, month: number, day: number, hour = 12, minute = 0) {
-	return Math.floor(new Date(year, month - 1, day, hour, minute).getTime() / 1000);
+	return Math.floor(
+		new Date(year, month - 1, day, hour, minute).getTime() / 1000,
+	);
 }
 
 let next = 0;
@@ -22,7 +25,12 @@ function message(authorId: string, created_at: number): Message {
 		id: `m${String(next).padStart(4, "0")}`,
 		channel_id: "geral",
 		client_id: `c${next}`,
-		author: { id: authorId, nick: authorId, display_name: null, removed: false },
+		author: {
+			id: authorId,
+			nick: authorId,
+			display_name: null,
+			removed: false,
+		},
 		body: "oi",
 		created_at,
 	};
@@ -79,12 +87,31 @@ describe("conversationRows", () => {
 			message("bia", at(2026, 11, 1, 0, 1)), // virou o dia
 		];
 		const rows = conversationRows(messages, now);
-		expect(rows.map((r) => r.startsGroup)).toEqual([true, false, true, true, true]);
+		expect(rows.map((r) => r.startsGroup)).toEqual([
+			true,
+			false,
+			true,
+			true,
+			true,
+		]);
 		expect(rows.map((r) => r.day)).toEqual(["Ontem", null, null, null, "Hoje"]);
 	});
 
 	it("sem mensagens, sem linhas", () => {
 		expect(conversationRows([], now)).toEqual([]);
+	});
+});
+
+describe("stampLabel", () => {
+	it("junta o dia e a hora, como no quadro", () => {
+		const now = new Date(2026, 9, 31, 12, 0);
+		const at = (date: Date) => Math.floor(date.getTime() / 1000);
+		expect(stampLabel(at(new Date(2026, 9, 31, 9, 14)), now)).toBe(
+			"Hoje às 09:14",
+		);
+		expect(stampLabel(at(new Date(2026, 9, 29, 21, 3)), now)).toBe(
+			"29 de outubro às 21:03",
+		);
 	});
 });
 

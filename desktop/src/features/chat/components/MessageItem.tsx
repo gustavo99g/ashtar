@@ -1,13 +1,15 @@
+import { Badge } from "@/components/ui/badge";
 import { Avatar, PersonName } from "@/features/identity";
 import type { Message } from "@/lib/api";
 import { cn } from "@/lib/utils";
-import { authorName, timeLabel } from "../model/messages";
+import { authorName, stampLabel, timeLabel } from "../model/messages";
 import type { PendingMessage } from "../stores/outboxStore";
 import { MessageBody } from "./MessageBody";
 
 /**
- * Uma mensagem. A primeira do grupo leva o avatar, o nome e a hora; as seguintes do mesmo autor
- * só o texto, com a hora aparecendo ao passar o mouse.
+ * Uma mensagem, como no quadro "Canal de texto": a primeira do grupo leva o avatar, o nome (dourado
+ * e com o selo Dono, no dono) e "Hoje às 09:14"; as seguintes do mesmo autor só o texto, com a hora
+ * aparecendo ao passar o mouse.
  */
 export function MessageItem({
 	message,
@@ -24,7 +26,7 @@ export function MessageItem({
 		<li
 			className={cn(
 				"group relative flex gap-4 px-4 hover:bg-secondary/40",
-				startsGroup ? "mt-[17px] py-0.5" : "py-px",
+				startsGroup ? "mt-3 py-1" : "py-px",
 			)}
 		>
 			<div className="w-10 shrink-0">
@@ -43,16 +45,21 @@ export function MessageItem({
 			<div className="min-w-0 flex-1">
 				{startsGroup && (
 					<div className="flex items-baseline gap-2">
-						<PersonName owner={author.id === ownerId} className="text-[15px]">
+						<PersonName owner={author.id === ownerId} className="text-sm">
 							{name}
 						</PersonName>
+						{author.id === ownerId && (
+							<Badge tone="gold" className="px-1.5 py-px text-[11px]">
+								Dono
+							</Badge>
+						)}
 						{author.removed && (
 							<span className="text-xs text-muted-foreground">
 								(saiu do grupo)
 							</span>
 						)}
 						<time className="text-xs text-muted-foreground">
-							{timeLabel(message.created_at)}
+							{stampLabel(message.created_at)}
 						</time>
 					</div>
 				)}

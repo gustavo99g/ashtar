@@ -52,14 +52,14 @@ export function Composer({
 	}
 
 	return (
-		<div className="shrink-0 px-4 pb-6">
-			<div className="flex items-end rounded-lg bg-input px-4">
+		<div className="shrink-0 px-4 pb-[30px]">
+			<div className="flex items-end rounded-[10px] border border-border bg-secondary px-3.5 focus-within:border-primary">
 				<textarea
 					ref={ref}
 					rows={1}
 					value={draft}
 					aria-label={`Mensagem para #${channelName}`}
-					placeholder={`Conversar em #${channelName}`}
+					placeholder={`Mensagem para #${channelName}`}
 					onChange={(event) => {
 						setDraft(channelId, event.target.value);
 						if (problem) setProblem(null);
@@ -74,12 +74,12 @@ export function Composer({
 							submit();
 						}
 					}}
-					className="min-h-11 flex-1 resize-none bg-transparent py-[11px] text-[15px] leading-[1.375] text-foreground outline-none placeholder:text-muted-foreground"
+					className="min-h-[46px] flex-1 resize-none bg-transparent py-3 text-sm leading-[1.55] text-foreground outline-none placeholder:text-muted-foreground"
 				/>
 				{length >= COUNTER_FROM && (
 					<span
 						className={cn(
-							"shrink-0 pb-3 pl-2 font-mono text-xs",
+							"shrink-0 pb-3.5 pl-2 font-mono text-xs",
 							length > BODY_MAX
 								? "text-destructive-text"
 								: "text-muted-foreground",
