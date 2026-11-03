@@ -1,7 +1,7 @@
 import { UserIcon } from "lucide-react";
 import { TextField } from "@/components/ui/text-field";
 import { Avatar } from "@/features/identity";
-import { checkNick, NICK_MAX } from "../nickRules";
+import { checkNick, NICK_MAX } from "@/features/identity";
 
 interface NickFieldProps {
 	value: string;

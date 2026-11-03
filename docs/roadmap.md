@@ -243,7 +243,7 @@ versões"), e cada uma ganha um plano detalhado próprio antes de começar.
 v0.2.0  Base de entrega       auto-update + pipeline + canal beta + versão mínima + logs
 v0.2.1  Identidade            convites + identidade do dispositivo + permissões + banco (sem mudança visível)
 v0.2.2  UI nova               passa a usar as rotas da identidade
-v0.2.3  Chat real + áudio     chat com histórico + supressão de ruído e cancelamento de eco
+v0.2.3  Chat real + áudio     canais de texto com histórico + supressão de ruído + Painel da v0.2.2
 v0.2.4  Servidor              VPS (LiveKit, API e banco) + domínio + backup + alerta
 v0.2.5  Publicador nativo
 ```
@@ -390,6 +390,9 @@ sem identidade válida → nenhum token do LiveKit
 
 ### v0.2.2 — UI nova
 
+> Publicada como `0.2.20` e `0.2.21` (31/10), **menos o Painel de controle**, que sai junto com o chat,
+> na v0.2.3 (`0.2.30`). O plano e o andamento estão no `PLAN.md`.
+
 Refazer a interface a partir do novo protótipo, depois da identidade (v0.2.1) e antes do chat, para que as
 telas de convite, de nick e de conversa sejam construídas uma única vez em cima da interface definitiva. É
 aqui que o grupo passa a ver a identidade: a UI nova usa as rotas de convite e de sessão da v0.2.1 e desliga
@@ -407,16 +410,21 @@ v0.1 deixou (seletor de fontes, trava de uma transmissão por vez, textos dos pr
 
 ### v0.2.3 — Chat real e supressão de ruído
 
-Duas partes, entregues juntas. A segunda é pequena e não depende da primeira.
+Sai numa versão só, a `0.2.30`, junto com o Painel de controle da v0.2.2 (Convites, Membros e o aviso de
+quem entrou), que não é publicado antes. O plano e o andamento estão no `PLAN.md`; as decisões, nas ADRs
+0015 e 0016.
 
 **Chat real**
 
-* enviar, receber e persistir mensagens;
+* enviar, receber e persistir mensagens de texto, com o estado de envio e o "Tentar de novo";
 * histórico ordenado e carregamento incremental;
-* estado de envio e tratamento de erro;
-* WebSocket próprio para eventos do aplicativo (`message.created`, `message.updated`,
-  `message.deleted`, `presence.changed`); a mídia continua no LiveKit;
-* reconexão do canal de eventos.
+* vários canais de texto, em categorias que também guardam as salas de voz, arrumados arrastando, com a
+  permissão "Gerenciar canais" dada por pessoa (adiantado da v0.5, pedido de 31/10);
+* WebSocket próprio para eventos do aplicativo (`message.created`, `presence.changed`, a sala de voz pelo
+  webhook do LiveKit, quem entrou no grupo e as mudanças de canais); a mídia continua no LiveKit;
+* reconexão do canal de eventos;
+* presença online e offline na coluna de membros;
+* miniatura da transmissão para quem sai da sala assistindo alguém.
 
 Até a v0.2.4, o histórico fica no banco do computador que hospeda a API: com ele desligado, não há chat
 nem histórico.
@@ -425,20 +433,17 @@ nem histórico.
 enviar mensagem → o outro receber → fechar e reabrir → ver o histórico
 ```
 
-**Supressão de ruído e cancelamento de eco**
+**Supressão de ruído**
 
-* supressão de ruído, cancelamento de eco e controle automático de ganho do microfone, pelos filtros
-  do próprio WebView (opções de captura do `livekit-client`);
-* ligados por padrão, com opção de desligar (o `livekit-client` 2.22 já pede os filtros por padrão, então
-  falta a opção e conferir no WebView2, com `getSettings()`, se foram aplicados);
-* o eco de quem assiste a uma tela inteira compartilhada **não espera esta entrega**: é um bug que o grupo
-  já sentiu e sai como correção, fora de ordem (ver "Correções fora de ordem"). O modo "Todo o sistema"
-  exclui o PID do app, o que não cobre o WebView2 quando há duas instâncias abertas; a correção é excluir o
-  processo-navegador real do WebView2 (`BrowserProcessId`). Evidências e hipóteses no `BACKLOG.md`;
-* se o filtro do WebView não bastar, avaliar um filtro mais forte (ex.: RNNoise num worklet de áudio).
+* RNNoise como processador da trilha do microfone, ligado por padrão, com um interruptor "Supressão de
+  ruído" em Configurações › Voz e vídeo que volta à supressão do navegador, na hora, também no meio da
+  chamada (as outras opções da aba ficam para a v0.6); com o RNNoise ligado, o filtro de ruído do WebView
+  fica desligado (os dois juntos abafam a voz), e o cancelamento de eco e o ganho automático dele continuam;
+* o filtro do WebView sozinho não bastou na conversa (teclado e voz de fundo passavam), e o Krisp depende
+  do LiveKit Cloud, que sai na v0.2.4.
 
 ```text
-microfone sem ruído de teclado nem eco de quem usa caixa de som
+microfone sem ruído de teclado durante uma conversa
 ```
 
 ### v0.2.4 — Servidor
@@ -617,8 +622,7 @@ Sair da sala e do canal únicos e mostrar quem está fazendo o quê.
 
 ## Canais
 
-* múltiplos canais de texto, com histórico por canal;
-* múltiplas salas de voz;
+* múltiplas salas de voz, criadas como os canais de texto da v0.2.3, nas mesmas categorias;
 * conexão de voz independente do canal de texto selecionado.
 
 ```text
@@ -991,7 +995,7 @@ v0.2
     + logs em arquivo + código de acesso provisório
 08. v0.2.1 Convites + identidade do dispositivo + permissões + segurança mínima + banco
 09. v0.2.2 UI nova
-10. v0.2.3 Chat real + WebSocket + supressão de ruído e cancelamento de eco
+10. v0.2.3 Chat real + canais de texto + WebSocket + supressão de ruído + Painel
 11. v0.2.4 VPS (LiveKit, API e banco) + domínio + migração + alerta
 12. v0.2.5 Publicador nativo + medição
 
@@ -1005,7 +1009,7 @@ v0.4
 17. Experiência de quem assiste
 
 v0.5
-18. Canais e salas
+18. Salas de voz
 19. Status + digitando + menções + silenciar canal
 20. Sons, speaking indicator e volume por usuário
 

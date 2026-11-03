@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatValidUntil } from "../validUntil";
+import { formatValidUntil } from "../model/validUntil";
 
 /** Segundos Unix de uma data na hora local, como a API manda o `expires_at`. */
 function unix(...parts: [number, number, number, number, number]): number {

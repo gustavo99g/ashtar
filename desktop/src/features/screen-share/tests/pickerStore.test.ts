@@ -4,8 +4,8 @@ import type {
 	ScreenShareController,
 	ScreenShareState,
 	ShareRequest,
-} from "../controller";
-import { restartShare, startShare } from "../pickerStore";
+} from "../model/controller";
+import { restartShare, startShare } from "../stores/pickerStore";
 
 const source: CaptureSource = {
 	source: { kind: "window", id: 1 },

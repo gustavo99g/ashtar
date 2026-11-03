@@ -105,6 +105,7 @@ cargo run --bin admin -- remover <nick>
 cargo run --bin admin -- desvincular <nick>
 cargo run --bin admin -- beta <nick> ligar|desligar
 cargo run --bin admin -- permissoes <nick>
+cargo run --bin admin -- semear [--mensagens 1200]      # só no desenvolvimento: ana, bia, caio e o #geral cheio
 ```
 
 O código de um convite aparece uma vez só, na criação: copie na hora.

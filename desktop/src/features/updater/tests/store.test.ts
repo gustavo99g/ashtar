@@ -10,7 +10,7 @@ import {
 	updateFailed,
 	updateReady,
 	useUpdaterStore,
-} from "../store";
+} from "../stores/updaterStore";
 
 vi.mock("@/lib/tauri/commands", () => ({
 	installUpdate: vi.fn(),
@@ -25,6 +25,7 @@ beforeEach(() => {
 		notice: null,
 		whatsNew: null,
 		whatsNewOpen: false,
+		lastSeenVersion: null,
 	});
 	localStorage.clear();
 	vi.mocked(installUpdate).mockReset();
@@ -109,18 +110,29 @@ describe("o que há de novo", () => {
 
 		closeWhatsNew();
 		expect(useUpdaterStore.getState().whatsNewOpen).toBe(false);
-		expect(localStorage.getItem("ashtar.lastSeenVersion")).toBe("0.2.21");
+		expect(useUpdaterStore.getState().lastSeenVersion).toBe("0.2.21");
+		expect(localStorage.getItem("ashtar-updater")).toContain("0.2.21");
 
 		await showWhatsNewOnce();
 		expect(useUpdaterStore.getState().whatsNewOpen).toBe(false);
 	});
 
 	it("o link da tela Aplicativo abre mesmo depois de visto", async () => {
-		localStorage.setItem("ashtar.lastSeenVersion", "0.2.21");
+		useUpdaterStore.setState({ lastSeenVersion: "0.2.21" });
 		vi.mocked(whatsNew).mockResolvedValue(NOTES);
 
 		await openWhatsNew();
 		expect(useUpdaterStore.getState().whatsNewOpen).toBe(true);
+	});
+
+	it("quem já viu antes do persist não vê de novo", async () => {
+		localStorage.setItem("ashtar.lastSeenVersion", "0.2.21");
+		await useUpdaterStore.persist.rehydrate();
+		vi.mocked(whatsNew).mockResolvedValue(NOTES);
+
+		await showWhatsNewOnce();
+
+		expect(useUpdaterStore.getState().whatsNewOpen).toBe(false);
 	});
 
 	it("sem seção no CHANGELOG.md, não abre", async () => {

@@ -1,11 +1,10 @@
-//! O endereço da API e o código de acesso, gravados no app na hora do build (ADR 0013).
+//! O endereço da API, gravado no app na hora do build (ADR 0013).
 //!
 //! São as mesmas variáveis do frontend (`desktop/src/lib/api/config.ts`): vêm do ambiente ou do
 //! `.env` da raiz, pelo `build.rs`. O JavaScript não escolhe para onde o Rust manda a chave.
 //! Mudou o `.env`: o próximo `pnpm tauri dev` recompila com o valor novo.
 
 const API_URL: Option<&str> = option_env!("VITE_API_URL");
-const ACCESS_CODE: Option<&str> = option_env!("VITE_ACCESS_CODE");
 
 /// Só no desenvolvimento: a API local, como no frontend.
 const DEV_API_URL: &str = "http://127.0.0.1:3000";
@@ -13,11 +12,6 @@ const DEV_API_URL: &str = "http://127.0.0.1:3000";
 /// O endereço da API, sem barra no fim. `None` num app gerado sem `VITE_API_URL`.
 pub fn api_url() -> Option<String> {
     resolve_api_url(API_URL, cfg!(debug_assertions))
-}
-
-/// O código de acesso para o `X-Access-Code`, se configurado. Sai na etapa 8.
-pub fn access_code() -> Option<&'static str> {
-    ACCESS_CODE.map(str::trim).filter(|code| !code.is_empty())
 }
 
 /// A regra do `apiUrl` do frontend: a variável, se tiver texto; senão, a API local só no

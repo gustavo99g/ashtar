@@ -6,7 +6,7 @@ use std::fs;
 use std::path::PathBuf;
 
 /// As variáveis do `.env` da raiz que o Rust também lê, com `option_env!` (`src/api/config.rs`).
-const SHARED_VARS: [&str; 2] = ["VITE_API_URL", "VITE_ACCESS_CODE"];
+const SHARED_VARS: [&str; 1] = ["VITE_API_URL"];
 
 fn main() {
     forward_dotenv();

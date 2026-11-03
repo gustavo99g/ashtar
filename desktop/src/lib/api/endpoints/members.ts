@@ -8,6 +8,7 @@ import type {
 	GrantView,
 	MemberView,
 	SetBetaRequest,
+	SetPermissionRequest,
 } from "../generated";
 
 function memberPath(id: string, rest = ""): string {
@@ -31,6 +32,22 @@ export async function setMemberBeta(
 ): Promise<void> {
 	const request: SetBetaRequest = { enabled };
 	await apiFetch(memberPath(id, "/beta"), jsonRequest("PUT", request));
+}
+
+/**
+ * `PUT /api/members/{id}/permissions/{key}`: liga ou desliga qualquer permissão pela chave
+ * (`canais.gerenciar`, `atualizacoes.beta`). Chave que não existe: `not_found`.
+ */
+export async function setMemberPermission(
+	id: string,
+	key: string,
+	enabled: boolean,
+): Promise<void> {
+	const request: SetPermissionRequest = { enabled };
+	await apiFetch(
+		memberPath(id, `/permissions/${encodeURIComponent(key)}`),
+		jsonRequest("PUT", request),
+	);
 }
 
 /** `POST /api/members/{id}/unlink`: tira o computador do membro e derruba a sessão dele. */

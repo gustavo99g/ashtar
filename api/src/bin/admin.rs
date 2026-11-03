@@ -8,11 +8,13 @@
 
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
+use std::time::Duration;
 
 use api::db::{self, now};
 use api::error::ApiError;
 use api::identity::permissions::{self, Origin, Permission};
 use api::identity::{User, devices, invites, users};
+use api::limiter::SendLimiter;
 use chrono::{DateTime, Local};
 use clap::{Parser, Subcommand, ValueEnum};
 use sqlx::SqlitePool;
@@ -57,6 +59,13 @@ enum Command {
     Beta { nick: String, estado: Estado },
     /// Mostra as permissões de um membro e de onde cada uma vem.
     Permissoes { nick: String },
+    /// Só no desenvolvimento: cria três membros de teste e enche o #geral de
+    /// mensagens dos últimos dias, para ver o chat com histórico.
+    Semear {
+        /// Quantas mensagens (de 1 a 2000).
+        #[arg(long, default_value_t = 300, value_parser = clap::value_parser!(u16).range(1..=2000))]
+        mensagens: u16,
+    },
     /// Copia o banco para a pasta, com data no nome, e apaga as cópias mais antigas.
     Backup {
         pasta: PathBuf,
@@ -119,6 +128,7 @@ async fn run(db: &SqlitePool, command: Command) -> Result<(), ApiError> {
 
     match command {
         Command::Dono { .. } => unreachable!("tratado acima"),
+        Command::Semear { mensagens } => seed(db, &owner, mensagens.into(), now).await?,
         Command::Convite { validade, usos } => {
             let invite = invites::create(
                 db,
@@ -349,4 +359,80 @@ async fn backup(db: &SqlitePool, folder: &Path, keep: usize) -> Result<PathBuf, 
         let _ = std::fs::remove_file(old);
     }
     Ok(file)
+}
+
+/// Os nicks dos membros de teste do `semear`.
+const SEED_NICKS: [&str; 3] = ["ana", "bia", "caio"];
+
+/// Frases para as mensagens de teste, com links e linhas quebradas no meio.
+const SEED_LINES: [&str; 8] = [
+    "bora jogar hoje?",
+    "alguém viu o patch novo?",
+    "https://github.com/gustavo99g/discord",
+    "to entrando na sala",
+    "kkkkkkk",
+    "primeira linha\nsegunda linha",
+    "amanhã eu não consigo, tenho prova",
+    "fechou, 21h então",
+];
+
+/// Enche o banco de desenvolvimento. Recusa se a `PUBLIC_URL` não for local:
+/// no computador de casa, isso criaria gente de mentira no grupo de verdade.
+async fn seed(db: &SqlitePool, owner: &User, count: usize, now: i64) -> Result<(), ApiError> {
+    let public_url = std::env::var("PUBLIC_URL").unwrap_or_default();
+    if !(public_url.contains("127.0.0.1") || public_url.contains("localhost")) {
+        return Err(ApiError::Config(
+            "O semear é só para o desenvolvimento: a PUBLIC_URL precisa ser local.".into(),
+        ));
+    }
+    let mut people = vec![owner.clone()];
+    for nick in SEED_NICKS {
+        let user = match users::find_active_by_nick(db, nick).await? {
+            Some(user) => user,
+            None => users::create_seed_member(db, nick, now).await?,
+        };
+        people.push(user);
+    }
+    let channel = api::chat::channels::get_open_text(db, "geral").await?;
+    // O id (UUID v7) sai com a hora da gravação e o `created_at` vai para o passado: num #geral
+    // que já tem mensagens, as novas ficariam no fim da lista com datas de dias atrás.
+    let existing: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM messages WHERE channel_id = ?")
+        .bind(&channel.id)
+        .fetch_one(db)
+        .await?;
+    if existing > 0 {
+        return Err(ApiError::Conflict(format!(
+            "O #geral já tem {existing} mensagens: o semear só roda nele vazio, para a ordem \
+             do histórico bater com as datas. Comece de um banco novo."
+        )));
+    }
+    // O limite de envio é do app; aqui as mensagens saem todas de uma vez.
+    let limiter = SendLimiter::new(usize::MAX, Duration::from_secs(1));
+    // Espalhadas pelos últimos três dias, da mais antiga para a mais nova (o id
+    // UUID v7 sai em ordem de inserção, igual ao tempo).
+    let span = 3 * 24 * 60 * 60;
+    for i in 0..count {
+        let author = &people[(i * 7 + i / 3) % people.len()];
+        let line = SEED_LINES[(i * 5) % SEED_LINES.len()];
+        let at = now - span + (span * i as i64) / count as i64;
+        api::chat::messages::create(
+            db,
+            &limiter,
+            &channel,
+            author,
+            &format!("semear-{now}-{i}"),
+            &format!("{line} ({})", i + 1),
+            at,
+        )
+        .await?;
+    }
+    println!(
+        "{count} mensagens no #geral, de {}.",
+        people
+            .iter()
+            .map(|p| p.nick.as_str())
+            .collect::<Vec<_>>()
+            .join(", ")
+    );
+    Ok(())
 }

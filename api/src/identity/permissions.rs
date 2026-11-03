@@ -3,7 +3,7 @@
 //! Duas ideias separadas:
 //!
 //! - [`Permission`]: uma permissão que se dá a um usuário e fica guardada no
-//!   banco (`user_permissions`). Hoje só existe o beta.
+//!   banco (`user_permissions`): o beta e gerenciar os canais.
 //! - [`Action`]: uma ação de administração. Quem decide se alguém pode fazê-la
 //!   é [`can`], e só ela. Hoje a resposta é "só o dono"; quando os cargos
 //!   chegarem, muda o miolo de `can` e o resto do código continua igual.
@@ -24,14 +24,17 @@ use crate::error::ApiError;
 pub enum Permission {
     /// Recebe as versões do canal beta.
     BetaUpdates,
+    /// Cria, renomeia, arquiva e reordena canais e categorias (ADR 0016).
+    ManageChannels,
 }
 
 impl Permission {
-    pub const ALL: [Permission; 1] = [Permission::BetaUpdates];
+    pub const ALL: [Permission; 2] = [Permission::BetaUpdates, Permission::ManageChannels];
 
     pub fn key(self) -> &'static str {
         match self {
             Self::BetaUpdates => "atualizacoes.beta",
+            Self::ManageChannels => "canais.gerenciar",
         }
     }
 
@@ -39,6 +42,7 @@ impl Permission {
     pub fn label(self) -> &'static str {
         match self {
             Self::BetaUpdates => "Receber o beta",
+            Self::ManageChannels => "Gerenciar canais",
         }
     }
 
@@ -168,6 +172,20 @@ pub async fn has(db: &SqlitePool, user: &User, permission: Permission) -> Result
         .await?
         .iter()
         .any(|(p, _)| *p == permission))
+}
+
+/// `Err(Forbidden)` se `user` não tem `permission` (o dono sempre tem). É o
+/// [`require`] das permissões guardadas no banco, como "Gerenciar canais".
+pub async fn require_permission(
+    db: &SqlitePool,
+    user: &User,
+    permission: Permission,
+) -> Result<(), ApiError> {
+    if has(db, user, permission).await? {
+        Ok(())
+    } else {
+        Err(ApiError::Forbidden)
+    }
 }
 
 /// Dá (`granted = true`) ou tira uma permissão direta. Repetir não é erro.

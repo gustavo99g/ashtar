@@ -10,9 +10,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { identityKeys, useSessionStore } from "@/features/identity";
 import { VoiceProvider } from "@/features/voice";
 import { ApiError, type MeResponse, type UserView } from "@/lib/api";
+import { DEFAULT_CHANNEL_ID } from "@/features/channels";
 import { paths } from "@/lib/paths";
 import { accountMarker, login } from "@/lib/tauri/commands";
 import { routes } from "./router";
+
+/** Para onde o `/server` leva: o último canal de texto, o #geral na primeira vez. */
+const HOME = paths.channel(DEFAULT_CHANNEL_ID);
 
 vi.mock("@/lib/tauri/commands", () => ({
 	login: vi.fn(),
@@ -34,6 +38,7 @@ function me(canViewPanel: boolean): MeResponse {
 		update_channel: "stable",
 		can_create_invite: canViewPanel,
 		can_view_panel: canViewPanel,
+		can_manage_channels: false,
 	};
 }
 
@@ -96,14 +101,16 @@ describe("router", () => {
 		).toBeInTheDocument();
 	});
 
-	it("o ESC fecha as configurações e volta para onde estava, mesmo depois de trocar de página", () => {
+	it("o ESC fecha as configurações e volta para onde estava, mesmo depois de trocar de página", async () => {
 		const router = renderAt([paths.server, paths.settings.profile]);
 
 		fireEvent.click(screen.getByRole("link", { name: "Membros" }));
 		expect(router.state.location.pathname).toBe(paths.settings.members);
 
 		fireEvent.keyDown(window, { key: "Escape" });
-		expect(router.state.location.pathname).toBe(paths.server);
+		await vi.waitFor(() =>
+			expect(router.state.location.pathname).toBe(HOME),
+		);
 	});
 
 	it("o ESC que um diálogo já usou não fecha as configurações", () => {
@@ -117,6 +124,42 @@ describe("router", () => {
 		window.dispatchEvent(event);
 
 		expect(router.state.location.pathname).toBe(paths.settings.profile);
+	});
+
+	it("as configurações cobrem a moldura inteira: nenhum ancestral posicionado entre elas e a moldura", () => {
+		renderAt([paths.server, paths.settings.profile]);
+		// A raiz das configurações é `absolute inset-0`: ela cobre o ancestral posicionado mais
+		// perto. Se algum `relative` ficar entre ela e a moldura (o `main`, por exemplo), ela cobre
+		// só a área do meio e a coluna do servidor continua à mostra.
+		let root: HTMLElement | null = screen.getByRole("link", { name: "Perfil" });
+		while (root && !/(^|\s)inset-0(\s|$)/.test(root.className)) {
+			root = root.parentElement;
+		}
+		expect(root, "a raiz das configurações").not.toBeNull();
+
+		const shell = document.querySelector(
+			'aside[aria-label="Servidor"]',
+		)?.parentElement;
+		const positioned = /(^|\s)(relative|absolute|fixed|sticky)(\s|$)/;
+		for (
+			let ancestor = root?.parentElement ?? null;
+			ancestor && ancestor !== shell;
+			ancestor = ancestor.parentElement
+		) {
+			expect(
+				ancestor.className,
+				`${ancestor.tagName.toLowerCase()} fica entre as configurações e a moldura`,
+			).not.toMatch(positioned);
+		}
+	});
+
+	it("o AppShell não deixa texto solto ao lado das colunas", () => {
+		renderAt([paths.server]);
+		const shell = screen.getByRole("complementary").parentElement;
+		const loose = Array.from(shell?.childNodes ?? []).filter(
+			(node) => node.nodeType === Node.TEXT_NODE && node.textContent?.trim(),
+		);
+		expect(loose).toEqual([]);
 	});
 
 	it("o botão de configurações da coluna abre o Perfil", () => {
@@ -138,6 +181,26 @@ describe("router", () => {
 	});
 });
 
+describe("Servidor › Arquivados", () => {
+	it("só aparece no menu de quem gerencia os canais", () => {
+		renderAt([paths.server, paths.settings.profile]);
+		expect(screen.queryByRole("link", { name: "Arquivados" })).toBeNull();
+	});
+
+	it("com can_manage_channels, o menu leva para a página", () => {
+		const router = renderAt([paths.server, paths.settings.profile], {
+			me: { ...me(true), can_manage_channels: true },
+		});
+
+		fireEvent.click(screen.getByRole("link", { name: "Arquivados" }));
+
+		expect(router.state.location.pathname).toBe(paths.settings.archived);
+		expect(
+			screen.getByRole("heading", { name: "Arquivados" }),
+		).toBeInTheDocument();
+	});
+});
+
 describe("a abertura", () => {
 	beforeEach(() => {
 		useSessionStore.setState({ session: { status: "entering" } });
@@ -149,7 +212,9 @@ describe("a abertura", () => {
 		const router = renderAt([paths.start]);
 
 		await screen.findByRole("complementary");
-		expect(router.state.location.pathname).toBe(paths.server);
+		await vi.waitFor(() =>
+			expect(router.state.location.pathname).toBe(HOME),
+		);
 		expect(login).toHaveBeenCalledTimes(1);
 	});
 
@@ -180,7 +245,9 @@ describe("a abertura", () => {
 		vi.mocked(login).mockResolvedValue({ token: "tok", user });
 		fireEvent.click(retry);
 		await screen.findByRole("complementary");
-		expect(router.state.location.pathname).toBe(paths.server);
+		await vi.waitFor(() =>
+			expect(router.state.location.pathname).toBe(HOME),
+		);
 		expect(login).toHaveBeenCalledTimes(2);
 	});
 });
@@ -221,6 +288,15 @@ describe("endereços e rotas", () => {
 		for (const path of leafPaths(routes)) {
 			expect(known, `${path} está no router mas não em paths`).toContain(path);
 		}
+	});
+
+	it("o canal vai como parâmetro, escapado, e bate com o padrão de paths", () => {
+		const matches = matchRoutes(routes, paths.channel("geral"));
+		expect(last(matches)?.route.path).toBe(paths.channelPattern);
+		expect(last(matches)?.params.channelId).toBe("geral");
+
+		const odd = matchRoutes(routes, paths.channel("a b/c"));
+		expect(last(odd)?.params.channelId).toBe("a b/c");
 	});
 
 	it("o código do convite vai como parâmetro", () => {

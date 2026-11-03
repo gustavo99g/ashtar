@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { CaptureSource } from "@/lib/tauri/commands";
-import type { ScreenShareState } from "../controller";
-import { shareNotice } from "../notices";
+import type { ScreenShareState } from "../model/controller";
+import { shareNotice } from "../model/notices";
 
 const source: CaptureSource = {
 	source: { kind: "window", id: 1 },

@@ -7,7 +7,7 @@ import {
 	setLeftGroup,
 	startSession,
 	useSessionStore,
-} from "../session";
+} from "../stores/sessionStore";
 
 vi.mock("@/lib/tauri/commands", () => ({
 	login: vi.fn(),

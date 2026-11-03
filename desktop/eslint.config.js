@@ -28,7 +28,7 @@ const ROOM_ONLY_IN_VOICE = {
 	message: "Só src/features/voice cria a Room. Use o useVoice().",
 };
 
-/** Dentro de `lib/tauri`, só o `commands.ts` chama `invoke`. */
+/** Dentro de `lib/tauri`, só a pasta `commands/` chama `invoke`. */
 const INVOKE_ONLY_IN_COMMANDS = {
 	name: "@tauri-apps/api/core",
 	importNames: ["invoke"],
@@ -148,7 +148,7 @@ export default tseslint.config(
 		},
 	},
 	{
-		files: ["src/lib/tauri/commands.ts"],
+		files: ["src/lib/tauri/commands/**/*.ts"],
 		rules: {
 			"@typescript-eslint/no-restricted-imports": [
 				"error",

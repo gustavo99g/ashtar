@@ -1,8 +1,8 @@
 import { renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it } from "vitest";
 import { DEFAULT_THEME } from "@/styles/themes";
-import { useSettingsStore } from "../store";
-import { useApplyTheme } from "../useApplyTheme";
+import { useSettingsStore } from "../stores/settingsStore";
+import { useApplyTheme } from "../hooks/useApplyTheme";
 
 describe("configurações", () => {
 	beforeEach(() => {
