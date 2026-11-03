@@ -126,6 +126,33 @@ describe("router", () => {
 		expect(router.state.location.pathname).toBe(paths.settings.profile);
 	});
 
+	it("as configurações cobrem a moldura inteira: nenhum ancestral posicionado entre elas e a moldura", () => {
+		renderAt([paths.server, paths.settings.profile]);
+		// A raiz das configurações é `absolute inset-0`: ela cobre o ancestral posicionado mais
+		// perto. Se algum `relative` ficar entre ela e a moldura (o `main`, por exemplo), ela cobre
+		// só a área do meio e a coluna do servidor continua à mostra.
+		let root: HTMLElement | null = screen.getByRole("link", { name: "Perfil" });
+		while (root && !/(^|\s)inset-0(\s|$)/.test(root.className)) {
+			root = root.parentElement;
+		}
+		expect(root, "a raiz das configurações").not.toBeNull();
+
+		const shell = document.querySelector(
+			'aside[aria-label="Servidor"]',
+		)?.parentElement;
+		const positioned = /(^|\s)(relative|absolute|fixed|sticky)(\s|$)/;
+		for (
+			let ancestor = root?.parentElement ?? null;
+			ancestor && ancestor !== shell;
+			ancestor = ancestor.parentElement
+		) {
+			expect(
+				ancestor.className,
+				`${ancestor.tagName.toLowerCase()} fica entre as configurações e a moldura`,
+			).not.toMatch(positioned);
+		}
+	});
+
 	it("o AppShell não deixa texto solto ao lado das colunas", () => {
 		renderAt([paths.server]);
 		const shell = screen.getByRole("complementary").parentElement;

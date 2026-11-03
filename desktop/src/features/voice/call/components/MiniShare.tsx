@@ -43,7 +43,9 @@ import { LiveBadge } from "./LiveBadge";
  * A miniatura arrasta e, solta, vai para o canto mais perto, que fica gravado. Nas configurações
  * ela some, e a tela deixa de ser baixada até a pessoa sair delas (`shown` do `roomView`).
  *
- * Montada uma vez, no `AppShell`, dentro da área do canal (o `main`, com `relative`).
+ * Montada uma vez, no `AppShell`, numa camada do tamanho da área do canal (empilhada sobre o `main`,
+ * que não pode ser posicionado: ver o `AppShell`). A camada deixa o clique passar, e a miniatura o
+ * recebe (`pointer-events-auto`).
  */
 export function MiniShare() {
 	const { room } = useVoice();
@@ -169,7 +171,7 @@ function MiniShareFrame({
 			style={drag ?? undefined}
 			data-corner={corner}
 			className={cn(
-				"group/mini absolute z-20 flex touch-none items-center justify-center overflow-hidden rounded-[10px] border border-border-strong bg-rail shadow-xl select-none",
+				"group/mini pointer-events-auto absolute z-20 flex touch-none items-center justify-center overflow-hidden rounded-[10px] border border-border-strong bg-rail shadow-xl select-none",
 				"h-[180px] w-[320px]",
 				drag ? "cursor-grabbing" : cn("cursor-grab", CORNER_CLASS[corner]),
 			)}
