@@ -1,5 +1,4 @@
 import { type TrackReference, VideoTrack } from "@livekit/components-react";
-import { RemoteAudioTrack, Track, TrackEvent } from "livekit-client";
 import {
 	MaximizeIcon,
 	MinimizeIcon,
@@ -19,13 +18,9 @@ import { Spinner } from "@/components/ui/spinner";
 import { Avatar } from "@/features/identity";
 import { cn } from "@/lib/utils";
 import type { ChannelMember } from "../../members/model/members";
-import { setOnStage } from "../stores/roomViewStore";
-import {
-	audibleVolume,
-	setShareVolume,
-	toggleShareMuted,
-	useShareVolume,
-} from "../stores/shareVolumeStore";
+import { useShareAudio } from "../hooks/useShareAudio";
+import { setShown } from "../stores/roomViewStore";
+import { setShareVolume, toggleShareMuted } from "../stores/shareVolumeStore";
 import { LiveBadge } from "./LiveBadge";
 
 /*
@@ -54,33 +49,15 @@ export function ScreenStage({
 	onStop,
 }: ScreenStageProps) {
 	const [fullscreen, setFullscreen] = useState(false);
-	const heard = useShareVolume(audibleVolume);
 
-	// Marca no palco ao aparecer e desmarca ao sair: o `VoiceProvider` assina e cancela a tela.
+	// Marca ao aparecer e desmarca ao sair: o `VoiceProvider` assina e cancela a tela.
 	const sharerId = share.participant.identity;
 	useEffect(() => {
-		setOnStage(sharerId);
-		return () => setOnStage(null);
+		setShown(sharerId);
+		return () => setShown(null);
 	}, [sharerId]);
 
-	const audioTrack = share.participant.getTrackPublication(
-		Track.Source.ScreenShareAudio,
-	)?.track;
-	const remoteAudio =
-		audioTrack instanceof RemoteAudioTrack ? audioTrack : undefined;
-
-	useEffect(() => {
-		if (!remoteAudio) return;
-		const apply = () => remoteAudio.setVolume(heard / 100);
-		apply();
-		// O `RoomAudio` pode ligar o elemento de áudio depois deste efeito, e o LiveKit não
-		// reaplica um volume zero ao ligar: aplica de novo nessa hora.
-		remoteAudio.on(TrackEvent.ElementAttached, apply);
-		return () => {
-			remoteAudio.off(TrackEvent.ElementAttached, apply);
-		};
-	}, [remoteAudio, heard]);
-
+	const { remoteAudio, heard } = useShareAudio(share);
 	useEffect(() => {
 		const onChange = () =>
 			setFullscreen(document.fullscreenElement === fullscreenTarget.current);

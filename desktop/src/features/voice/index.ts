@@ -1,4 +1,5 @@
 export { LiveBadge } from "./call/components/LiveBadge";
+export { MiniShare } from "./call/components/MiniShare";
 export { VoiceRoom } from "./call/components/VoiceRoom";
 export { watchShare } from "./call/stores/roomViewStore";
 export { VoiceSettings } from "./devices/components/VoiceSettings";

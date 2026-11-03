@@ -3,7 +3,7 @@ import logo from "@/assets/ashtar.svg";
 import { ChannelDialogs } from "@/features/channels";
 import { JoinNotices } from "@/features/members";
 import { ChannelNav } from "@/features/server";
-import { VoiceDock } from "@/features/voice";
+import { MiniShare, VoiceDock } from "@/features/voice";
 /*
  * A moldura de quem já entrou: a coluna do servidor à esquerda e a rota no meio. As
  * configurações também são filhas daqui e se desenham por cima de tudo (o `SettingsLayout` ocupa
@@ -27,10 +27,12 @@ export function AppShell() {
 				<ChannelNav />
 				<VoiceDock />
 			</aside>
-			<main className="flex min-w-0 flex-1 flex-col">
+			<main className="relative flex min-w-0 flex-1 flex-col">
 				{/* O aviso de quem entrou (só para quem vê o Painel): vive enquanto a moldura vive. */}
 				<JoinNotices />
 				<Outlet />
+				{/* A transmissão assistida, em miniatura, quando a pessoa sai da sala. */}
+				<MiniShare />
 			</main>
 			{/* Os diálogos de criar, editar e arquivar canais: abrem pela lista ou pelo cabeçalho do chat. */}
 			<ChannelDialogs />

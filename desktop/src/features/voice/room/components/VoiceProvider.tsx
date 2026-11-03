@@ -13,7 +13,7 @@
  * `useTracks`...), que funcionam porque a árvore está dentro do `RoomContext`.
  *
  * Entra sem assinar nada sozinho (`autoSubscribe: false`): a voz de todo mundo é assinada aqui, e a
- * tela transmitida só enquanto aparece no Foco (`subscriptions.ts`).
+ * tela transmitida só enquanto aparece, no Foco ou na miniatura (`subscriptions.ts`).
  *
  * Entra com o microfone e a saída de Configurações › Voz e vídeo (`deviceChoiceStore.ts`) e troca na hora
  * quando a escolha muda, ou quando o escolhido some e volta (`roomDevices.ts`).
@@ -38,20 +38,24 @@ import {
 	IpcScreenShare,
 	type ScreenShareController,
 } from "@/features/screen-share";
-import { RoomAudio } from "./RoomAudio";
-import { effectiveDevice, knownDevices } from "../../devices/model/devices";
-import { useDeviceChoice } from "../../devices/stores/deviceChoiceStore";
-import { type DeviceIds, roomOptions, switchDevice } from "../../devices/model/roomDevices";
 import { useRoomView } from "../../call/stores/roomViewStore";
-import { syncSubscription, syncSubscriptions } from "../model/subscriptions";
-import { checkSession, requestVoiceToken } from "../queries";
 import { useAudioDevices } from "../../devices/hooks/useAudioDevices";
+import { effectiveDevice, knownDevices } from "../../devices/model/devices";
+import {
+	type DeviceIds,
+	roomOptions,
+	switchDevice,
+} from "../../devices/model/roomDevices";
+import { useDeviceChoice } from "../../devices/stores/deviceChoiceStore";
+import { syncSubscription, syncSubscriptions } from "../model/subscriptions";
 import {
 	encodeVoiceState,
 	parseVoiceState,
 	VOICE_STATE_TOPIC,
 	withDeafened,
 } from "../model/voiceState";
+import { checkSession, requestVoiceToken } from "../queries";
+import { RoomAudio } from "./RoomAudio";
 
 export type VoiceConnectionState =
 	| "disconnected"
@@ -206,13 +210,9 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 					console.warn("Erro ao avisar o deafen:", sendError),
 				);
 		});
-		// Trilha nova de alguém: a voz é assinada; a tela, só se essa pessoa está no palco do Foco.
+		// Trilha nova de alguém: a voz é assinada; a tela, só se a transmissão dessa pessoa aparece.
 		nextRoom.on(RoomEvent.TrackPublished, (publication, participant) => {
-			syncSubscription(
-				publication,
-				participant,
-				useRoomView.getState().onStage,
-			);
+			syncSubscription(publication, participant, useRoomView.getState().shown);
 		});
 
 		// Só dispara quando a sala cai sozinha: no cleanup as escutas saem antes do disconnect.
@@ -235,7 +235,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 				const { url, token } = await requestVoiceToken(channelId);
 				if (cancelled) return;
 
-				// Nada é assinado sozinho: quem decide é o efeito do `onStage`, mais abaixo.
+				// Nada é assinado sozinho: quem decide é o efeito do `shown`, mais abaixo.
 				await nextRoom.connect(url, token, { autoSubscribe: false });
 				if (cancelled) return;
 
@@ -309,11 +309,12 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 			);
 	}, [room, isDeafened]);
 
-	// Ao entrar, e a cada troca do palco do Foco: assina a voz de todos e a tela de quem está nele.
-	const onStage = useRoomView((state) => state.onStage);
+	// Ao entrar, e a cada troca do que aparece (o palco do Foco ou a miniatura): assina a voz de
+	// todos e a tela de quem aparece.
+	const shown = useRoomView((state) => state.shown);
 	useEffect(() => {
-		if (room) syncSubscriptions(room, onStage);
-	}, [room, onStage]);
+		if (room) syncSubscriptions(room, shown);
+	}, [room, shown]);
 
 	// No meio da chamada, a escolha nova vale na hora, e o escolhido que some ou volta também.
 	useEffect(() => {
