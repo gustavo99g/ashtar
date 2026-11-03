@@ -151,6 +151,16 @@ describe("ChatView", () => {
 		expect(within(rest).getByRole("heading")).toHaveTextContent("Resto — 1");
 		const offline = screen.getByRole("region", { name: "Offline" });
 		expect(within(offline).getByText("bia")).toBeInTheDocument();
+		// Quem está offline fica apagado, com o avatar e o nome juntos; quem está online, não.
+		expect(within(offline).getByText("bia").closest("li")).toHaveClass(
+			"opacity-50",
+		);
+		expect(within(rest).getByText("ana").closest("li")).not.toHaveClass(
+			"opacity-50",
+		);
+		expect(within(owner).getByText("Kid").closest("li")).not.toHaveClass(
+			"opacity-50",
+		);
 	});
 
 	it("quem gerencia os canais clica no tópico e abre o Editar já nele", async () => {
@@ -288,6 +298,10 @@ describe("ChatView", () => {
 		renderChat();
 		const owner = await screen.findByRole("region", { name: "Dono" });
 		expect(within(owner).getByText("Kid")).toBeInTheDocument();
+		// O dono offline continua no topo, só que apagado, com as cores de sempre.
+		expect(within(owner).getByText("Kid").closest("li")).toHaveClass(
+			"opacity-50",
+		);
 		const rest = screen.getByRole("region", { name: "Resto" });
 		expect(within(rest).getByText("ana")).toBeInTheDocument();
 		// Sem ninguém offline além do dono, o grupo Offline nem aparece.
