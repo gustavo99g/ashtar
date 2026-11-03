@@ -8,6 +8,9 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { setSuppression, useNoiseChoice } from "../../noise/stores/noiseStore";
+import { useAudioDevices } from "../hooks/useAudioDevices";
 import {
 	type AudioDevice,
 	type AudioDevices,
@@ -15,13 +18,12 @@ import {
 	isMissing,
 	knownDevices,
 } from "../model/devices";
-import { useAudioDevices } from "../hooks/useAudioDevices";
 import { chooseDevice, useDeviceChoice } from "../stores/deviceChoiceStore";
 
 /*
- * Configurações › Voz e vídeo (quadro "Configurações — voz e vídeo"). Na 0.2.2, só o bloco
- * Dispositivos: a entrada (microfone) e a saída (fone ou alto-falante). O resto do quadro fica para
- * a v0.2.5 e a v0.6 (BACKLOG).
+ * Configurações › Voz e vídeo (quadro "Configurações — voz e vídeo"). O bloco Dispositivos (a
+ * entrada e a saída) e, desde a 0.2.3, a Supressão de ruído do bloco Processamento de voz. O resto
+ * do quadro (eco, ganho, modo de entrada, tela) fica para a v0.2.5 e a v0.6 (BACKLOG).
  *
  * A escolha vale na hora, também no meio de uma chamada (`VoiceProvider`). Um dispositivo escolhido
  * que está desconectado continua escolhido, apagado e com "(desconectado)", e o aviso embaixo diz
@@ -54,6 +56,33 @@ export function VoiceSettings() {
 					<DevicePicker kind="output" label="Saída" devices={devices} />
 				</div>
 			</Section>
+			<Section title="Processamento de voz">
+				<NoiseSwitch />
+			</Section>
+		</div>
+	);
+}
+
+/** Ligada: o RNNoise. Desligada: a supressão do navegador, como antes. Vale na hora. */
+function NoiseSwitch() {
+	const labelId = useId();
+	const suppression = useNoiseChoice((state) => state.suppression);
+	return (
+		<div className="flex items-center justify-between gap-6 border-b border-border py-3">
+			<span className="flex flex-col gap-[3px]">
+				<span id={labelId} className="text-sm font-medium text-foreground">
+					Supressão de ruído
+				</span>
+				<span className="text-xs text-muted-foreground">
+					Reduz sons de fundo como teclado e ventilador.
+				</span>
+			</span>
+			<Switch
+				checked={suppression}
+				onCheckedChange={setSuppression}
+				aria-labelledby={labelId}
+				variant={"blue"}
+			/>
 		</div>
 	);
 }

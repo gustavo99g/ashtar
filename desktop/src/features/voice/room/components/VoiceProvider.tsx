@@ -15,6 +15,10 @@
  * Entra sem assinar nada sozinho (`autoSubscribe: false`): a voz de todo mundo é assinada aqui, e a
  * tela transmitida só enquanto aparece, no Foco ou na miniatura (`subscriptions.ts`).
  *
+ * O microfone sai com a supressão de ruído do RNNoise (`noise/rnnoise.ts`) quando a opção de
+ * Configurações › Voz e vídeo está ligada: ele entra na trilha assim que o microfone é publicado, e
+ * entra ou sai na hora quando a opção muda.
+ *
  * Entra com o microfone e a saída de Configurações › Voz e vídeo (`deviceChoiceStore.ts`) e troca na hora
  * quando a escolha muda, ou quando o escolhido some e volta (`roomDevices.ts`).
  */
@@ -24,6 +28,7 @@ import {
 	DisconnectReason,
 	Room,
 	RoomEvent,
+	Track,
 } from "livekit-client";
 import {
 	createContext,
@@ -47,6 +52,8 @@ import {
 	switchDevice,
 } from "../../devices/model/roomDevices";
 import { useDeviceChoice } from "../../devices/stores/deviceChoiceStore";
+import { switchNoiseSuppression } from "../../noise/rnnoise";
+import { useNoiseChoice } from "../../noise/stores/noiseStore";
 import { syncSubscription, syncSubscriptions } from "../model/subscriptions";
 import {
 	encodeVoiceState,
@@ -159,6 +166,10 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 	/** Os dispositivos de agora, para a conexão ler ao criar a sala. */
 	const deviceIds = useRef<DeviceIds>({ input: inputId, output: outputId });
 	deviceIds.current = { input: inputId, output: outputId };
+	const suppression = useNoiseChoice((state) => state.suppression);
+	/** A opção de agora, para os eventos da sala lerem sem recriar a sala. */
+	const noise = useRef(suppression);
+	noise.current = suppression;
 
 	// Sem sessão não há chamada: saiu do grupo, o token da API já não vale.
 	const sessionConnected = useSession().status === "connected";
@@ -211,6 +222,14 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 				);
 		});
 		// Trilha nova de alguém: a voz é assinada; a tela, só se a transmissão dessa pessoa aparece.
+		// O microfone publicado (ao entrar, ou ao voltar depois de a trilha ser refeita): põe o RNNoise
+		// nele, se a opção está ligada. Não dá para passar o processador nas opções da sala: o LiveKit o
+		// aplica antes de a trilha ter o `AudioContext` e recusa.
+		nextRoom.on(RoomEvent.LocalTrackPublished, (publication) => {
+			if (publication.source === Track.Source.Microphone) {
+				void switchNoiseSuppression(nextRoom, noise.current);
+			}
+		});
 		nextRoom.on(RoomEvent.TrackPublished, (publication, participant) => {
 			syncSubscription(publication, participant, useRoomView.getState().shown);
 		});
@@ -323,6 +342,10 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 	useEffect(() => {
 		if (room) void switchDevice(room, "output", outputId);
 	}, [room, outputId]);
+
+	useEffect(() => {
+		if (room) void switchNoiseSuppression(room, suppression);
+	}, [room, suppression]);
 
 	const value = useMemo<VoiceContextValue>(() => {
 		async function setMicrophone(enabled: boolean) {

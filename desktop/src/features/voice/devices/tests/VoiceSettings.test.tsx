@@ -1,6 +1,7 @@
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { useNoiseChoice } from "../../noise/stores/noiseStore";
 import { VoiceSettings } from "../components/VoiceSettings";
 import type { DeviceInfo } from "../model/devices";
 import { chooseDevice, useDeviceChoice } from "../stores/deviceChoiceStore";
@@ -65,6 +66,7 @@ beforeEach(() => {
 	});
 	localStorage.clear();
 	useDeviceChoice.setState({ input: null, output: null });
+	useNoiseChoice.setState({ suppression: true });
 });
 
 afterEach(() => {
@@ -109,6 +111,22 @@ describe("Voz e vídeo", () => {
 		);
 
 		expect(useDeviceChoice.getState().input).toBeNull();
+	});
+
+	it("a supressão de ruído começa ligada; desligar guarda neste computador", async () => {
+		const user = userEvent.setup();
+		render(<VoiceSettings />);
+
+		const toggle = screen.getByRole("switch", { name: "Supressão de ruído" });
+		expect(toggle).toBeChecked();
+		await user.click(toggle);
+		expect(toggle).not.toBeChecked();
+		expect(useNoiseChoice.getState().suppression).toBe(false);
+		expect(
+			JSON.parse(localStorage.getItem("ashtar-noise") ?? "{}"),
+		).toMatchObject({
+			state: { suppression: false },
+		});
 	});
 
 	it("o fone escolhido desconectado aparece assim, com o padrão no lugar, até voltar", async () => {
