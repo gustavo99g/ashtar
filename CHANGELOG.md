@@ -2,6 +2,12 @@
 
 ## 0.2.30
 
+- Chat de texto: converse nos canais do servidor, com o histórico guardado. As mensagens chegam na hora, os links abrem no navegador, o que você começou a escrever fica guardado em cada canal, e uma mensagem que não saiu tem "Tentar de novo".
+- A lista de membros mostra quem está online, com o dono em cima, e a lista da sala e os avisos de quem entrou chegam sem demora.
+- Canais e categorias: quem tem a permissão "Gerenciar canais" cria, edita (nome e tópico), arrasta e arquiva canais e categorias, e desarquiva em Configurações › Servidor › Arquivados. O dono liga essa permissão em Membros, no Painel.
+- O app abre no último canal que você estava lendo, e cada um recolhe as categorias que quiser.
+- Quem assiste a uma transmissão e sai da sala continua vendo numa miniatura, que você arrasta para o canto que preferir. Ela some nas configurações.
+- Supressão de ruído no microfone (teclado, ventilador, o jogo ao fundo), ligada por padrão. Dá para desligar em Configurações › Voz e vídeo, na hora, mesmo no meio da chamada.
 - Painel de controle (só para o dono): em Convites, crie convites para uma pessoa, para o grupo ou do seu jeito, copie o link e veja o histórico, com Revogar. Em Membros, veja quem está no grupo, ligue o beta de cada um, crie um convite de recuperação, desvincule o computador ou remova alguém.
 - O dono recebe um aviso quando alguém entra no grupo.
 - Quem é removido do grupo ou tem o computador desvinculado sai da sala na hora.
