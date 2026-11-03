@@ -60,8 +60,8 @@ Bugs que saem assim que ficarem prontos, pelo auto-update, sem esperar a entrega
 ## v0.6 — Voz e vídeo
 
 - [ ] A aba "Voz e vídeo" das configurações saiu na v0.2.2 só com os dispositivos, Entrada e Saída (Etapa
-      5b). O resto do quadro dela fica guardado para a v0.6: a escolha da supressão de ruído (na v0.2.3 o
-      RNNoise fica sempre ligado), os volumes de entrada e de saída, o teste de microfone, a detecção de voz com a
+      5b). O resto do quadro dela fica guardado para a v0.6: as outras opções da supressão de ruído (na
+      v0.2.3 só entra o interruptor liga/desliga do RNNoise), os volumes de entrada e de saída, o teste de microfone, a detecção de voz com a
       sensibilidade, o pressionar para falar com o atalho, os atalhos globais e os padrões do
       compartilhamento de tela (qualidade e áudio) na v0.6. O
       pressionar para falar com um jogo em foco pede um gancho de teclado em Rust: o atalho global comum do

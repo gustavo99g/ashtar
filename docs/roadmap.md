@@ -435,9 +435,10 @@ enviar mensagem → o outro receber → fechar e reabrir → ver o histórico
 
 **Supressão de ruído**
 
-* RNNoise como processador da trilha do microfone, sempre ligado, sem opção na tela (as opções ficam na
-  aba Voz e vídeo da v0.6); o filtro de ruído do WebView sai, e o cancelamento de eco e o ganho automático
-  dele continuam;
+* RNNoise como processador da trilha do microfone, ligado por padrão, com um interruptor "Supressão de
+  ruído" em Configurações › Voz e vídeo que volta à supressão do navegador, na hora, também no meio da
+  chamada (as outras opções da aba ficam para a v0.6); com o RNNoise ligado, o filtro de ruído do WebView
+  fica desligado (os dois juntos abafam a voz), e o cancelamento de eco e o ganho automático dele continuam;
 * o filtro do WebView sozinho não bastou na conversa (teclado e voz de fundo passavam), e o Krisp depende
   do LiveKit Cloud, que sai na v0.2.4.
 

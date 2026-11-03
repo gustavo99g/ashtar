@@ -11,7 +11,7 @@ vista; e o microfone deixa de levar o teclado e o barulho de fundo.
 
 **Fora do escopo:** editar, excluir, responder, reações, anexos, markdown e busca (v0.7); "digitando…",
 menções, status como Ausente e criar sala de voz (v0.5); não lidas e notificações (v0.3); canal que só
-algumas pessoas veem (v0.3); as opções da aba Voz e vídeo (v0.6).
+algumas pessoas veem (v0.3); as outras opções da aba Voz e vídeo (v0.6).
 
 Base: a `feature/0.2.3`, commit `b428171`. Em cada etapa, `cargo fmt --check`, `cargo clippy --all-targets
 -- -D warnings` e `cargo test` (em `api/` e em `desktop/src-tauri/`) e `pnpm lint`, `pnpm build` e
@@ -29,7 +29,7 @@ Base: a `feature/0.2.3`, commit `b428171`. Em cada etapa, `cargo fmt --check`, `
 | 6 | App: o chat | Concluída (`11f4cba`, `0f8d0dc`, `3ab6649` e `5716e2f`) |
 | 7 | App: a árvore de canais | Concluída (`a7f424b`, `2f6d6d8` e `cd696d9`) |
 | 8 | App: a miniatura da transmissão | Concluída (`fe90e61`) |
-| 9 | App: a supressão de ruído (RNNoise) | Pendente |
+| 9 | App: a supressão de ruído (RNNoise) | Concluída (`54103d4`; falta medir a CPU com um jogo aberto, no `NOTES.md`) |
 | 10 | Lançamento: webhook no LiveKit Cloud, roteiro, `0.2.30` | Pendente |
 
 A numeração pula a 1: a correção do eco que ela teria já saiu (`webview_process.rs`).
@@ -59,5 +59,6 @@ permissão). Abaixo, o que foi combinado para esta fase e não cabe numa ADR.
 - um script de desenvolvimento que enche um canal do banco local com mensagens falsas;
 - categoria recolhida mostra o canal aberto, a sala em que você está e as salas com gente, só com os
   avatares (até 5 e um "+N");
-- supressão de ruído sempre ligada, com RNNoise, sem opção na tela; o Krisp foi descartado porque depende
-  do LiveKit Cloud, que sai na v0.2.4.
+- supressão de ruído com RNNoise, ligada por padrão, com um interruptor em Configurações › Voz e vídeo que
+  volta à supressão do navegador (decidido na Etapa 9; as outras opções da aba ficam na v0.6); o Krisp foi
+  descartado porque depende do LiveKit Cloud, que sai na v0.2.4.

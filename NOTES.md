@@ -10,7 +10,8 @@ conscientemente adiado (marcar como tal) antes de fechar a fase. A lista da fase
       cada 30 s viram eventos do WebSocket, e as consultas só rodam com o socket fora. Etapas 3 e 5.
 - [x] **Quadro "Canal de texto"** do canvas como referência visual. Etapas 6 e 7, só com o que esta fase
       leva.
-- [ ] **Supressão de ruído** (a parte da v0.2.3 da aba Voz e vídeo): sempre ligada, com RNNoise. Etapa 9.
+- [x] **Supressão de ruído** (a parte da v0.2.3 da aba Voz e vídeo): RNNoise, ligado por padrão, com um
+      interruptor em Voz e vídeo que volta à supressão do navegador. Etapa 9.
 
 ## Riscos para conferir
 
@@ -22,4 +23,5 @@ conscientemente adiado (marcar como tal) antes de fechar a fase. A lista da fase
 - [x] **A assinatura do webhook no `livekit-api`:** a 0.10.0 confere (o `WebhookReceiver`, com o SHA-256
       do corpo), e o `tests/realtime.rs` recusa a falta de assinatura, o corpo trocado e outra chave.
       Etapa 3.
-- [ ] **CPU do RNNoise com um jogo aberto.** Etapa 9.
+- [ ] **CPU do RNNoise com um jogo aberto.** Medir com a chamada e um jogo; o interruptor em Voz e vídeo
+      é a saída se pesar. Etapa 9.
