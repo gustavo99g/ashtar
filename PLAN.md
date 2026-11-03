@@ -28,7 +28,7 @@ Base: a `feature/0.2.3`, commit `b428171`. Em cada etapa, `cargo fmt --check`, `
 | 5 | App: `lib/realtime` e o fim das consultas repetidas com o socket aberto | Concluída (`e317915`) |
 | 6 | App: o chat | Concluída (`11f4cba`, `0f8d0dc`, `3ab6649` e `5716e2f`) |
 | 7 | App: a árvore de canais | Concluída (`a7f424b`, `2f6d6d8` e `cd696d9`) |
-| 8 | App: a miniatura da transmissão | Pendente |
+| 8 | App: a miniatura da transmissão | Concluída (`fe90e61`) |
 | 9 | App: a supressão de ruído (RNNoise) | Pendente |
 | 10 | Lançamento: webhook no LiveKit Cloud, roteiro, `0.2.30` | Pendente |
 
