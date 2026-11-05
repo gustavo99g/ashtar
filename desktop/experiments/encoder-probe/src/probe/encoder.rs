@@ -16,7 +16,7 @@ use windows::Win32::Foundation::{VARIANT_FALSE, VARIANT_TRUE};
 use windows::Win32::Graphics::Direct3D11::{ID3D11Device, ID3D11Texture2D};
 use windows::Win32::Media::MediaFoundation::*;
 use windows::Win32::System::Com::CoTaskMemFree;
-use windows::Win32::System::Variant::{VARIANT, VT_BOOL, VT_UI4};
+use windows::Win32::System::Variant::{VARIANT, VT_BOOL, VT_UI4, VT_UI8};
 
 use super::args::Profile;
 
@@ -222,6 +222,13 @@ impl Encoder {
                     &CODECAPI_AVEncMPVGOPSize,
                     u32_variant(config.gop_frames),
                 );
+                // O AMDh264Encoder orçou o bitrate como se fossem 30 fps mesmo com o
+                // MF_MT_FRAME_RATE e o nível certos; este é o outro lugar onde o fps é informado.
+                set(
+                    "fps (codec API)",
+                    &CODECAPI_AVEncVideoOutputFrameRate,
+                    u64_variant((u64::from(config.fps) << 32) | 1),
+                );
             }
 
             transform.ProcessMessage(MFT_MESSAGE_NOTIFY_BEGIN_STREAMING, 0)?;
@@ -380,6 +387,17 @@ impl Drop for Encoder {
             }
         }
     }
+}
+
+fn u64_variant(value: u64) -> VARIANT {
+    let mut v = VARIANT::default();
+    // SAFETY: preenche o tipo e o campo correspondente do union, como um VT_UI8 exige.
+    unsafe {
+        let inner = &mut *v.Anonymous.Anonymous;
+        inner.vt = VT_UI8;
+        inner.Anonymous.ullVal = value;
+    }
+    v
 }
 
 fn u32_variant(value: u32) -> VARIANT {
