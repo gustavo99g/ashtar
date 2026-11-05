@@ -74,12 +74,34 @@ fn measure(args: &Args) -> Result<(), String> {
             let primary = if m.primary { " (principal)" } else { "" };
             println!("  [{i}] {} {}x{}{primary}", m.name, m.width, m.height);
         }
+        let adapters = gpu::adapters();
+        let adapter_of = |luid: Option<u64>| match luid {
+            None => "placa não informada".to_string(),
+            Some(l) => adapters
+                .iter()
+                .find(|(a, _)| *a == l)
+                .map_or_else(|| format!("placa {l:#x}"), |(_, name)| name.clone()),
+        };
+        println!("\nPlacas:");
+        for (luid, name) in &adapters {
+            let mark = if *luid == gpu.luid() {
+                " (a do teste)"
+            } else {
+                ""
+            };
+            println!("  {name}{mark}");
+        }
         println!("\nEncoders de hardware H.264:");
         if h264.is_empty() {
             println!("  nenhum");
         }
         for (i, e) in h264.iter().enumerate() {
-            println!("  [{i}] {}", e.name);
+            let mark = if e.luid == Some(gpu.luid()) {
+                " ← usado por padrão"
+            } else {
+                ""
+            };
+            println!("  [{i}] {} — {}{mark}", e.name, adapter_of(e.luid));
         }
         for (label, codec) in [("HEVC", MFVideoFormat_HEVC), ("AV1", MFVideoFormat_AV1)] {
             let names: Vec<String> = encoder::hardware_encoders(codec)
@@ -109,11 +131,23 @@ fn measure(args: &Args) -> Result<(), String> {
             .or(monitors.first())
             .ok_or("nenhuma tela encontrada")?,
     };
-    let info = h264.get(args.encoder).ok_or(if h264.is_empty() {
+    // Por padrão, o encoder da mesma placa do dispositivo D3D11: um encoder de outra placa
+    // (ex.: a integrada) não recebe as texturas desta.
+    let index = args.encoder.unwrap_or_else(|| {
+        h264.iter()
+            .position(|e| e.luid == Some(gpu.luid()))
+            .unwrap_or(0)
+    });
+    let info = h264.get(index).ok_or(if h264.is_empty() {
         "nenhum encoder H.264 de hardware encontrado".to_string()
     } else {
-        format!("não há encoder {} (veja --list)", args.encoder)
+        format!("não há encoder {index} (veja --list)")
     })?;
+    if info.luid.is_some_and(|l| l != gpu.luid()) {
+        println!(
+            "atenção: o encoder escolhido é de outra placa; o teste deve falhar ou ficar lento"
+        );
+    }
 
     let capture = Capture::monitor(&gpu.device, monitor.handle).map_err(err("WGC"))?;
     let (out_w, out_h) = args::fit_in_box(capture.width, capture.height, args.size);
@@ -142,7 +176,7 @@ fn measure(args: &Args) -> Result<(), String> {
     .map_err(err("encoder"))?;
 
     println!("Adaptador:  {}", gpu.adapter_name());
-    println!("Encoder:    {}", info.name);
+    println!("Encoder:    [{index}] {}", info.name);
     println!(
         "Tela:       {} {}x{} → saída {}x{} @ {} fps, {} kbps, perfil {:?}",
         monitor.name,

@@ -13,7 +13,9 @@ use windows::Win32::Graphics::Direct3D11::{
     D3D11CreateDevice, ID3D11Device, ID3D11DeviceContext, ID3D11Multithread,
     D3D11_CREATE_DEVICE_BGRA_SUPPORT, D3D11_CREATE_DEVICE_VIDEO_SUPPORT, D3D11_SDK_VERSION,
 };
-use windows::Win32::Graphics::Dxgi::{IDXGIDevice, DXGI_ADAPTER_DESC};
+use windows::Win32::Graphics::Dxgi::{
+    CreateDXGIFactory1, IDXGIDevice, IDXGIFactory1, DXGI_ADAPTER_DESC, DXGI_ADAPTER_DESC1,
+};
 use windows::Win32::Graphics::Gdi::{
     EnumDisplayMonitors, GetMonitorInfoW, HDC, HMONITOR, MONITORINFO, MONITORINFOEXW,
 };
@@ -63,6 +65,37 @@ impl Gpu {
     pub fn adapter_name(&self) -> String {
         wide(&self.adapter.Description)
     }
+
+    pub fn luid(&self) -> u64 {
+        let l = self.adapter.AdapterLuid;
+        ((l.HighPart as u32 as u64) << 32) | u64::from(l.LowPart)
+    }
+}
+
+/// Todas as placas do sistema, como (LUID, nome).
+pub fn adapters() -> Vec<(u64, String)> {
+    let mut list = Vec::new();
+    // SAFETY: chamadas DXGI em interfaces válidas; a enumeração para no primeiro erro
+    // (DXGI_ERROR_NOT_FOUND = fim da lista).
+    unsafe {
+        let Ok(factory) = CreateDXGIFactory1::<IDXGIFactory1>() else {
+            return list;
+        };
+        let mut i = 0;
+        while let Ok(adapter) = factory.EnumAdapters1(i) {
+            let desc: DXGI_ADAPTER_DESC1 = match adapter.GetDesc1() {
+                Ok(desc) => desc,
+                Err(_) => break,
+            };
+            let l = desc.AdapterLuid;
+            list.push((
+                ((l.HighPart as u32 as u64) << 32) | u64::from(l.LowPart),
+                wide(&desc.Description),
+            ));
+            i += 1;
+        }
+    }
+    list
 }
 
 pub struct Monitor {

@@ -15,7 +15,7 @@ OPÇÕES
     --fps N              quadros por segundo (padrão: 60)
     --bitrate KBPS       bitrate alvo em kbps (padrão: 8000)
     --seconds N          duração da medição (padrão: 20)
-    --encoder N          encoder de hardware pelo índice do --list (padrão: 0)
+    --encoder N          encoder de hardware pelo índice do --list (padrão: o da placa do teste)
     --profile P          base | main | high (padrão: high)
     --keyframe-every S   pede um keyframe a cada S segundos, 0 desliga (padrão: 3)
     --no-bitrate-change  não troca o bitrate pela metade no meio da medição
@@ -45,7 +45,7 @@ pub struct Args {
     pub fps: u32,
     pub bitrate_kbps: u32,
     pub seconds: u32,
-    pub encoder: usize,
+    pub encoder: Option<usize>,
     pub profile: Profile,
     pub keyframe_every_s: u32,
     pub bitrate_change: bool,
@@ -65,7 +65,7 @@ impl Default for Args {
             fps: 60,
             bitrate_kbps: 8000,
             seconds: 20,
-            encoder: 0,
+            encoder: None,
             profile: Profile::High,
             keyframe_every_s: 3,
             bitrate_change: true,
@@ -96,7 +96,7 @@ pub fn parse() -> Result<Option<Args>, String> {
             "--fps" => args.fps = number(&value("--fps")?)?,
             "--bitrate" => args.bitrate_kbps = number(&value("--bitrate")?)?,
             "--seconds" => args.seconds = number(&value("--seconds")?)?,
-            "--encoder" => args.encoder = number(&value("--encoder")?)?,
+            "--encoder" => args.encoder = Some(number(&value("--encoder")?)?),
             "--profile" => {
                 args.profile = match value("--profile")?.as_str() {
                     "base" | "baseline" => Profile::Baseline,

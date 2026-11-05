@@ -22,6 +22,9 @@ use super::args::Profile;
 
 pub struct EncoderInfo {
     pub name: String,
+    /// LUID do adaptador (placa) a que o encoder pertence. Os MFTs de hardware são um por placa,
+    /// e o encoder precisa ser da mesma placa do dispositivo D3D11 que produz as texturas.
+    pub luid: Option<u64>,
     pub activate: IMFActivate,
 }
 
@@ -56,6 +59,8 @@ pub fn hardware_encoders(codec: GUID) -> Result<Vec<EncoderInfo>> {
             found.push(EncoderInfo {
                 name: string_attribute(&activate, &MFT_FRIENDLY_NAME_Attribute)
                     .unwrap_or_else(|| "(sem nome)".into()),
+                // SAFETY: leitura de atributo em interface válida.
+                luid: unsafe { activate.GetUINT64(&MFT_ENUM_ADAPTER_LUID) }.ok(),
                 activate,
             });
         }
