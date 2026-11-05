@@ -17,6 +17,7 @@ OPÇÕES
     --seconds N          duração da medição (padrão: 20)
     --encoder N          encoder de hardware pelo índice do --list (padrão: o da placa do teste)
     --profile P          base | main | high (padrão: high)
+    --level L            auto | none | nível H.264 ×10, ex.: 42 (padrão: auto, pelo tamanho e fps)
     --keyframe-every S   pede um keyframe a cada S segundos, 0 desliga (padrão: 3)
     --no-bitrate-change  não troca o bitrate pela metade no meio da medição
     --only-new           só codifica quando o WGC entrega imagem nova (como o app faria)
@@ -37,6 +38,37 @@ pub enum Profile {
     High,
 }
 
+/// Nível H.264. Sem ele, o encoder pode escolher um nível que não comporta o fps pedido
+/// (o 4.1 vai só até 1080p30) e calcular o bitrate como se fosse o fps máximo do nível.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Level {
+    Auto,
+    Unset,
+    Fixed(u32),
+}
+
+/// Menor nível H.264 que comporta `width`×`height` a `fps` (tabela A-1 da norma).
+pub fn required_level(width: u32, height: u32, fps: u32) -> u32 {
+    // (nível ×10, macroblocos por segundo, macroblocos por frame)
+    const LEVELS: [(u32, u64, u64); 9] = [
+        (30, 40_500, 1_620),
+        (31, 108_000, 3_600),
+        (32, 216_000, 5_120),
+        (40, 245_760, 8_192),
+        (41, 245_760, 8_192),
+        (42, 522_240, 8_704),
+        (50, 589_824, 22_080),
+        (51, 983_040, 36_864),
+        (52, 2_073_600, 36_864),
+    ];
+    let frame = u64::from(width.div_ceil(16)) * u64::from(height.div_ceil(16));
+    let per_second = frame * u64::from(fps);
+    LEVELS
+        .iter()
+        .find(|(_, mbps, fs)| per_second <= *mbps && frame <= *fs)
+        .map_or(52, |(level, _, _)| *level)
+}
+
 #[derive(Debug, Clone)]
 pub struct Args {
     pub list: bool,
@@ -47,6 +79,7 @@ pub struct Args {
     pub seconds: u32,
     pub encoder: Option<usize>,
     pub profile: Profile,
+    pub level: Level,
     pub keyframe_every_s: u32,
     pub bitrate_change: bool,
     pub only_new: bool,
@@ -67,6 +100,7 @@ impl Default for Args {
             seconds: 20,
             encoder: None,
             profile: Profile::High,
+            level: Level::Auto,
             keyframe_every_s: 3,
             bitrate_change: true,
             only_new: false,
@@ -103,6 +137,13 @@ pub fn parse() -> Result<Option<Args>, String> {
                     "main" => Profile::Main,
                     "high" => Profile::High,
                     other => return Err(format!("perfil desconhecido: {other}")),
+                }
+            }
+            "--level" => {
+                args.level = match value("--level")?.as_str() {
+                    "auto" => Level::Auto,
+                    "none" => Level::Unset,
+                    n => Level::Fixed(number(n)?),
                 }
             }
             "--keyframe-every" => args.keyframe_every_s = number(&value("--keyframe-every")?)?,

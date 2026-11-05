@@ -114,6 +114,8 @@ pub struct EncoderConfig {
     pub fps: u32,
     pub bitrate_bps: u32,
     pub profile: Profile,
+    /// Nível H.264 ×10 (ex.: 42), ou `None` para deixar o encoder escolher.
+    pub level: Option<u32>,
     pub gop_frames: u32,
 }
 
@@ -161,6 +163,9 @@ impl Encoder {
                 Profile::High => eAVEncH264VProfile_High,
             };
             output.SetUINT32(&MF_MT_MPEG2_PROFILE, profile.0 as u32)?;
+            if let Some(level) = config.level {
+                output.SetUINT32(&MF_MT_MPEG2_LEVEL, level)?;
+            }
             transform.SetOutputType(0, &output, 0)?;
 
             let input = MFCreateMediaType()?;
@@ -171,6 +176,17 @@ impl Encoder {
             input.SetUINT64(&MF_MT_PIXEL_ASPECT_RATIO, (1 << 32) | 1)?;
             input.SetUINT32(&MF_MT_INTERLACE_MODE, MFVideoInterlace_Progressive.0 as u32)?;
             transform.SetInputType(0, &input, 0)?;
+
+            // O que o encoder ficou entendendo do tipo de saída.
+            if let Ok(current) = transform.GetOutputCurrentType(0) {
+                let level = current.GetUINT32(&MF_MT_MPEG2_LEVEL).ok();
+                let rate = current.GetUINT64(&MF_MT_FRAME_RATE).ok();
+                notes.push(format!(
+                    "saída negociada: nível {} · fps {}",
+                    level.map_or("?".into(), |l| format!("{:.1}", f64::from(l) / 10.0)),
+                    rate.map_or("?".into(), |r| format!("{}/{}", r >> 32, r & 0xffff_ffff)),
+                ));
+            }
 
             // Depois dos tipos e antes de começar o fluxo, como o Chromium faz com os MFTs de hardware.
             if let Some(api) = &codec_api {

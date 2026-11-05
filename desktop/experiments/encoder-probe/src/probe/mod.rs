@@ -169,6 +169,11 @@ fn measure(args: &Args) -> Result<(), String> {
             fps: args.fps,
             bitrate_bps,
             profile: args.profile,
+            level: match args.level {
+                args::Level::Auto => Some(args::required_level(out_w, out_h, args.fps)),
+                args::Level::Unset => None,
+                args::Level::Fixed(level) => Some(level),
+            },
             // Keyframe natural raro: no WebRTC eles vêm sob pedido (quem entra, perda de pacote).
             gop_frames: args.fps * 10,
         },
