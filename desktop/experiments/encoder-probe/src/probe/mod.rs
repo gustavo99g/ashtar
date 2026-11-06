@@ -228,7 +228,11 @@ fn measure(args: &Args) -> Result<(), String> {
     // Espera o primeiro frame, para a medição não começar com a fila vazia.
     let waiting = Instant::now();
     loop {
-        if capture.latest(|t| converter.store(t)).map_err(err("WGC"))? {
+        if capture
+            .latest(|t| converter.store(t))
+            .map_err(err("WGC"))?
+            .is_some()
+        {
             break;
         }
         if waiting.elapsed() > FIRST_FRAME_TIMEOUT {
@@ -251,6 +255,7 @@ fn measure(args: &Args) -> Result<(), String> {
     let mut pending_keyframe: Option<i64> = None;
     let mut next_keyframe = keyframe_every;
     let mut bitrate_changed = false;
+    let mut last_composed: Option<i64> = None;
 
     let cpu = CpuClock::start();
     let start = Instant::now();
@@ -329,9 +334,17 @@ fn measure(args: &Args) -> Result<(), String> {
         r.ticks += 1;
 
         let work = Instant::now();
-        let new = capture.latest(|t| converter.store(t)).map_err(err("WGC"))?;
-        if new {
+        let composed = capture.latest(|t| converter.store(t)).map_err(err("WGC"))?;
+        if let Some(composed) = composed {
             r.new_frames += 1;
+            // Idade da imagem ao chegar até nós, e o intervalo desde a imagem nova anterior.
+            let age = capture::now_100ns() - composed;
+            r.frame_age
+                .push(Duration::from_nanos(age.max(0) as u64 * 100));
+            if let Some(prev) = last_composed.replace(composed) {
+                r.composed_gap
+                    .push(Duration::from_nanos((composed - prev).max(0) as u64 * 100));
+            }
         } else if args.only_new {
             r.skipped_same += 1;
             continue;
@@ -420,6 +433,8 @@ struct Report {
     cpu_per_frame: Series,
     latency: Series,
     output_gap: Series,
+    frame_age: Series,
+    composed_gap: Series,
 }
 
 impl Report {
@@ -462,6 +477,8 @@ impl Report {
         println!("CPU por frame (laço):     {}", self.cpu_per_frame.summary());
         println!("Captura → H.264 pronto:   {}", self.latency.summary());
         println!("Intervalo entre saídas:   {}", self.output_gap.summary());
+        println!("WGC: entre imagens novas: {}", self.composed_gap.summary());
+        println!("WGC: idade ao pegar:      {}", self.frame_age.summary());
         if self.unmatched > 0 {
             println!(
                 "  atenção: {} saídas com tempo diferente do enviado (latência sem esses)",

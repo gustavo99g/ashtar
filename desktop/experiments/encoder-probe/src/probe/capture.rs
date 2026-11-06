@@ -13,6 +13,7 @@ use windows::Graphics::DirectX::DirectXPixelFormat;
 use windows::Win32::Graphics::Direct3D11::{ID3D11Device, ID3D11Texture2D};
 use windows::Win32::Graphics::Dxgi::IDXGIDevice;
 use windows::Win32::Graphics::Gdi::HMONITOR;
+use windows::Win32::System::Performance::{QueryPerformanceCounter, QueryPerformanceFrequency};
 use windows::Win32::System::WinRT::Direct3D11::{
     CreateDirect3D11DeviceFromDXGIDevice, IDirect3DDxgiInterfaceAccess,
 };
@@ -79,7 +80,10 @@ impl Capture {
     ///
     /// A textura só vale durante `use_frame`: depois o frame volta ao pool e o WGC pode
     /// escrever nela de novo. Por isso quem chama copia ali dentro.
-    pub fn latest(&self, use_frame: impl FnOnce(&ID3D11Texture2D)) -> Result<bool> {
+    ///
+    /// Devolve `Some(t)` com o horário em que o Windows compôs a imagem (`SystemRelativeTime`,
+    /// em unidades de 100 ns no relógio do QueryPerformanceCounter), ou `None` se não mudou.
+    pub fn latest(&self, use_frame: impl FnOnce(&ID3D11Texture2D)) -> Result<Option<i64>> {
         let mut newest = None;
         // `TryGetNextFrame` devolve nulo (erro no windows-rs) quando não há frame na fila.
         while let Ok(frame) = self.pool.TryGetNextFrame() {
@@ -88,15 +92,28 @@ impl Capture {
             }
         }
         let Some(frame) = newest else {
-            return Ok(false);
+            return Ok(None);
         };
+        let composed = frame.SystemRelativeTime().map_or(0, |t| t.Duration);
         let access: IDirect3DDxgiInterfaceAccess = frame.Surface()?.cast()?;
         // SAFETY: a superfície de um frame do WGC é sempre uma ID3D11Texture2D.
         let texture: ID3D11Texture2D = unsafe { access.GetInterface()? };
         use_frame(&texture);
         let _ = frame.Close();
-        Ok(true)
+        Ok(Some(composed))
     }
+}
+
+/// Agora, no mesmo relógio do `SystemRelativeTime` (100 ns, QueryPerformanceCounter).
+pub fn now_100ns() -> i64 {
+    let (mut counter, mut frequency) = (0i64, 0i64);
+    // SAFETY: os dois ponteiros apontam para variáveis locais; as chamadas não falham no
+    // Windows XP em diante.
+    unsafe {
+        let _ = QueryPerformanceCounter(&mut counter);
+        let _ = QueryPerformanceFrequency(&mut frequency);
+    }
+    (counter as i128 * 10_000_000 / frequency.max(1) as i128) as i64
 }
 
 impl Drop for Capture {
