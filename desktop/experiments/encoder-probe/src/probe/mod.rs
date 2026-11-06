@@ -176,6 +176,8 @@ fn measure(args: &Args) -> Result<(), String> {
             },
             // Keyframe natural raro: no WebRTC eles vêm sob pedido (quem entra, perda de pacote).
             gop_frames: args.fps * 10,
+            codec_api_first: args.codec_api_first,
+            low_latency: args.low_latency,
         },
     )
     .map_err(err("encoder"))?;

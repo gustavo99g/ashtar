@@ -117,6 +117,9 @@ pub struct EncoderConfig {
     /// Nível H.264 ×10 (ex.: 42), ou `None` para deixar o encoder escolher.
     pub level: Option<u32>,
     pub gop_frames: u32,
+    /// Aplica a codec API antes dos tipos de mídia (o padrão é depois).
+    pub codec_api_first: bool,
+    pub low_latency: bool,
 }
 
 impl Encoder {
@@ -144,6 +147,15 @@ impl Encoder {
             let codec_api = transform.cast::<ICodecAPI>().ok();
             if codec_api.is_none() {
                 notes.push("sem ICodecAPI: keyframe e bitrate não ajustáveis".into());
+            }
+
+            // O AMDh264Encoder grava 30 fps no SPS e orça o bitrate para 30 fps mesmo com o
+            // MF_MT_FRAME_RATE certo. Suspeita: a codec API depois dos tipos reinicia a
+            // configuração interna com o fps padrão. `--codec-api-first` testa a outra ordem.
+            if config.codec_api_first {
+                if let Some(api) = &codec_api {
+                    apply_codec_api(api, config, &mut notes);
+                }
             }
 
             let size = (u64::from(config.width) << 32) | u64::from(config.height);
@@ -188,47 +200,10 @@ impl Encoder {
                 ));
             }
 
-            // Depois dos tipos e antes de começar o fluxo, como o Chromium faz com os MFTs de hardware.
-            if let Some(api) = &codec_api {
-                let mut set = |name: &str, key: &GUID, value: VARIANT| {
-                    let result = api.SetValue(key, &value);
-                    notes.push(format!(
-                        "{name}: {}",
-                        if result.is_ok() { "ok" } else { "recusado" }
-                    ));
-                };
-                set(
-                    "baixa latência",
-                    &CODECAPI_AVLowLatencyMode,
-                    bool_variant(true),
-                );
-                set(
-                    "CBR",
-                    &CODECAPI_AVEncCommonRateControlMode,
-                    u32_variant(eAVEncCommonRateControlMode_CBR.0 as u32),
-                );
-                set(
-                    "bitrate",
-                    &CODECAPI_AVEncCommonMeanBitRate,
-                    u32_variant(config.bitrate_bps),
-                );
-                set(
-                    "sem B-frames",
-                    &CODECAPI_AVEncMPVDefaultBPictureCount,
-                    u32_variant(0),
-                );
-                set(
-                    "GOP",
-                    &CODECAPI_AVEncMPVGOPSize,
-                    u32_variant(config.gop_frames),
-                );
-                // O AMDh264Encoder orçou o bitrate como se fossem 30 fps mesmo com o
-                // MF_MT_FRAME_RATE e o nível certos; este é o outro lugar onde o fps é informado.
-                set(
-                    "fps (codec API)",
-                    &CODECAPI_AVEncVideoOutputFrameRate,
-                    u64_variant((u64::from(config.fps) << 32) | 1),
-                );
+            if !config.codec_api_first {
+                if let Some(api) = &codec_api {
+                    apply_codec_api(api, config, &mut notes);
+                }
             }
 
             transform.ProcessMessage(MFT_MESSAGE_NOTIFY_BEGIN_STREAMING, 0)?;
@@ -386,6 +361,59 @@ impl Drop for Encoder {
                 let _ = shutdown.Shutdown();
             }
         }
+    }
+}
+
+/// Baixa latência, CBR, bitrate, sem B-frames, GOP e fps pela codec API, anotando o que o
+/// encoder aceitou.
+///
+/// # Safety
+///
+/// `api` precisa ser a ICodecAPI de um encoder ainda vivo.
+unsafe fn apply_codec_api(api: &ICodecAPI, config: &EncoderConfig, notes: &mut Vec<String>) {
+    // SAFETY: garantido por quem chama; os VARIANT são locais.
+    unsafe {
+        let mut set = |name: &str, key: &GUID, value: VARIANT| {
+            let result = api.SetValue(key, &value);
+            notes.push(format!(
+                "{name}: {}",
+                if result.is_ok() { "ok" } else { "recusado" }
+            ));
+        };
+        if config.low_latency {
+            set(
+                "baixa latência",
+                &CODECAPI_AVLowLatencyMode,
+                bool_variant(true),
+            );
+        }
+        set(
+            "CBR",
+            &CODECAPI_AVEncCommonRateControlMode,
+            u32_variant(eAVEncCommonRateControlMode_CBR.0 as u32),
+        );
+        set(
+            "bitrate",
+            &CODECAPI_AVEncCommonMeanBitRate,
+            u32_variant(config.bitrate_bps),
+        );
+        set(
+            "sem B-frames",
+            &CODECAPI_AVEncMPVDefaultBPictureCount,
+            u32_variant(0),
+        );
+        set(
+            "GOP",
+            &CODECAPI_AVEncMPVGOPSize,
+            u32_variant(config.gop_frames),
+        );
+        // O AMDh264Encoder orçou o bitrate como se fossem 30 fps mesmo com o
+        // MF_MT_FRAME_RATE e o nível certos; este é o outro lugar onde o fps é informado.
+        set(
+            "fps (codec API)",
+            &CODECAPI_AVEncVideoOutputFrameRate,
+            u64_variant((u64::from(config.fps) << 32) | 1),
+        );
     }
 }
 
