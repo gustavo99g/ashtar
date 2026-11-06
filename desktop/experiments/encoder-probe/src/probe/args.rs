@@ -20,7 +20,8 @@ OPÇÕES
     --level L            auto | none | nível H.264 ×10, ex.: 42 (padrão: auto, pelo tamanho e fps)
     --keyframe-every S   pede um keyframe a cada S segundos, 0 desliga (padrão: 3)
     --no-bitrate-change  não troca o bitrate pela metade no meio da medição
-    --codec-api-first    configura a codec API antes dos tipos de mídia (o padrão é depois)
+    --codec-api-last     configura a codec API depois dos tipos de mídia (no AMD, isso volta o
+                         encoder para 30 fps no SPS e no orçamento de bitrate)
     --no-low-latency     não liga o modo de baixa latência
     --only-new           só codifica quando o WGC entrega imagem nova (como o app faria)
     --out ARQUIVO        grava o H.264 (Annex B) para conferir no VLC/ffplay
@@ -108,7 +109,7 @@ impl Default for Args {
             keyframe_every_s: 3,
             bitrate_change: true,
             only_new: false,
-            codec_api_first: false,
+            codec_api_first: true,
             low_latency: true,
             out: None,
         }
@@ -155,7 +156,7 @@ pub fn parse() -> Result<Option<Args>, String> {
             "--keyframe-every" => args.keyframe_every_s = number(&value("--keyframe-every")?)?,
             "--no-bitrate-change" => args.bitrate_change = false,
             "--only-new" => args.only_new = true,
-            "--codec-api-first" => args.codec_api_first = true,
+            "--codec-api-last" => args.codec_api_first = false,
             "--no-low-latency" => args.low_latency = false,
             "--out" => args.out = Some(PathBuf::from(value("--out")?)),
             other => return Err(format!("opção desconhecida: {other} (veja --help)")),

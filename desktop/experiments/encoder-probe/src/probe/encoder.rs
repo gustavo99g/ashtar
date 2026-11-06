@@ -149,9 +149,9 @@ impl Encoder {
                 notes.push("sem ICodecAPI: keyframe e bitrate não ajustáveis".into());
             }
 
-            // O AMDh264Encoder grava 30 fps no SPS e orça o bitrate para 30 fps mesmo com o
-            // MF_MT_FRAME_RATE certo. Suspeita: a codec API depois dos tipos reinicia a
-            // configuração interna com o fps padrão. `--codec-api-first` testa a outra ordem.
+            // A codec API vem antes dos tipos de mídia. Depois deles, o AMDh264Encoder reinicia a
+            // configuração com o fps padrão: grava 30 fps no SPS e orça o bitrate para 30 fps,
+            // mesmo com o MF_MT_FRAME_RATE certo (medido na RX 9060 XT; `--codec-api-last`).
             if config.codec_api_first {
                 if let Some(api) = &codec_api {
                     apply_codec_api(api, config, &mut notes);
