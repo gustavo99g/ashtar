@@ -12,6 +12,7 @@
 //! - Fonte fechada encerra com `SourceClosed`. Janela minimizada não é capturada:
 //!   a captura continua, reenviando o último frame.
 
+use super::video::fit_in_box;
 use livekit::webrtc::native::yuv_helper::argb_to_i420;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc;
@@ -83,30 +84,6 @@ pub enum WindowState {
     Minimized,
     /// Não existe mais (fechou).
     Gone,
-}
-
-/// Tamanho final de um frame `width` × `height` para caber na caixa, mantendo a proporção.
-///
-/// Nunca amplia, e devolve sempre dimensões pares: no I420 cada amostra de cor
-/// cobre um bloco de 2×2 pixels, e os encoders exigem lados pares.
-fn fit_in_box(width: u32, height: u32, max_width: u32, max_height: u32) -> (u32, u32) {
-    // Em u64, as multiplicações abaixo não têm como estourar.
-    let (w, h) = (u64::from(width), u64::from(height));
-    let (mw, mh) = (u64::from(max_width), u64::from(max_height));
-
-    let (w, h) = if w <= mw && h <= mh {
-        (w, h) // já cabe: fica como está
-    } else if w * mh > h * mw {
-        (mw, h * mw / w) // proporcionalmente mais larga que a caixa: a largura
-    } else {
-        (w * mh / h, mh) // mais alta que a caixa: a altura limita
-    };
-    (even(w), even(h))
-}
-
-/// Arredonda para baixo até um número par, com mínimo de 2.
-fn even(side: u64) -> u32 {
-    (side as u32 & !1).max(2)
 }
 
 /// O que o callback do `DesktopCapturer` entregou numa chamada de `capture_frame`.
@@ -368,29 +345,6 @@ mod tests {
             max_height,
             fps,
         }
-    }
-
-    #[test]
-    fn reduz_para_caber_na_caixa() {
-        assert_eq!(fit_in_box(1920, 1080, 1280, 720), (1280, 720));
-        assert_eq!(fit_in_box(2560, 1440, 1600, 900), (1600, 900));
-        // Ultrawide: a largura limita. 1440 × 1280 / 3440 = 535,8 → 535 → par: 534.
-        assert_eq!(fit_in_box(3440, 1440, 1280, 720), (1280, 534));
-        // Janela alta e estreita: a altura limita.
-        assert_eq!(fit_in_box(500, 2000, 1280, 720), (180, 720));
-    }
-
-    #[test]
-    fn nunca_amplia() {
-        assert_eq!(fit_in_box(1280, 720, 1920, 1080), (1280, 720));
-        assert_eq!(fit_in_box(800, 600, 1280, 720), (800, 600));
-    }
-
-    #[test]
-    fn dimensoes_sempre_pares_e_nunca_zero() {
-        assert_eq!(fit_in_box(1001, 601, 1280, 720), (1000, 600));
-        // Tão estreita que a largura reduzida daria 1: o mínimo é 2.
-        assert_eq!(fit_in_box(16, 10_000, 1280, 720), (2, 720));
     }
 
     #[test]

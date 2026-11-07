@@ -13,8 +13,10 @@
 #![allow(dead_code, unused_imports)]
 
 pub mod audio;
+pub mod bitrate;
 mod capture;
 pub mod diagnostics;
+pub mod encoded;
 pub mod focus;
 mod gate;
 pub mod ipc_sink;
@@ -23,6 +25,7 @@ pub mod quality;
 pub mod session;
 mod sink;
 pub mod sources;
+pub mod video;
 pub mod video_capture;
 
 pub use capture::{spawn_capture, CaptureContext, CaptureHandle, EndReason, OnEnd, ReadySignal};

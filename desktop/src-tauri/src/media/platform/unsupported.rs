@@ -6,7 +6,9 @@
 //! AppError::Unsupported, ja que nao ha captura de audio sem plataforma.
 
 use crate::error::AppError;
+use crate::media::encoded::PacketSink;
 use crate::media::sources::{MonitorEntry, MonitorInfo, WindowDetails, WindowEntry};
+use crate::media::video::{VideoConfig, VideoControl, VideoStats};
 
 use crate::media::video_capture::WindowState;
 use crate::media::{audio::AudioTarget, AudioSink, CaptureHandle, OnEnd};
@@ -66,3 +68,13 @@ pub fn bring_to_front(_id: u64) -> bool {
 
 /// Não faz nada: sem implementação de plataforma, não há captura de que sair.
 pub fn exclude_from_capture(_hwnd: usize) {}
+
+/// Sempre `Err(Unsupported)`: sem implementação de plataforma, não há captura de vídeo.
+pub fn spawn_video(
+    _config: VideoConfig,
+    _force_software: bool,
+    _sink: impl PacketSink,
+    _on_end: OnEnd,
+) -> Result<(CaptureHandle, VideoControl, VideoStats), AppError> {
+    Err(AppError::Unsupported("captura de vídeo"))
+}
