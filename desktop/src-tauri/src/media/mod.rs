@@ -21,8 +21,12 @@ pub mod focus;
 mod gate;
 pub mod ipc_sink;
 pub mod platform;
+pub mod publisher;
 pub mod quality;
 pub mod session;
+pub mod share;
+#[cfg(test)]
+mod share_e2e;
 mod sink;
 pub mod sources;
 pub mod video;

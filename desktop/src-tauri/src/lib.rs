@@ -59,6 +59,8 @@ pub fn run(log_file: logging::LateFile) {
 
             app.manage(commands::screen_share::create_manager(app.handle()));
             app.manage(commands::updater::create_auto_update(app.handle()));
+            app.manage(commands::share::create_manager(app.handle()));
+
             updater::spawn_periodic_check(app.handle().clone());
             deep_link::register_schemes(app);
             permissions::allow_microphone(app);
@@ -75,7 +77,10 @@ pub fn run(log_file: logging::LateFile) {
             commands::screen_share::list_capture_sources,
             commands::screen_share::ipc_screen_share_start,
             commands::screen_share::ipc_screen_share_ack,
-            commands::screen_share::screen_share_stop,
+            commands::screen_share::ipc_screen_share_stop,
+            commands::share::screen_share_start,
+            commands::share::screen_share_update,
+            commands::share::screen_share_stop,
             commands::updater::pending_update,
             commands::updater::install_update,
             commands::updater::check_for_update,

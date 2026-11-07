@@ -151,8 +151,9 @@ struct Pipeline {
     output: Output,
     stats: VideoStats,
     format: VideoFormat,
-    /// O alvo atual da LiveKit (começa no do preset).
-    target_bps: u32,
+    /// O último alvo da estimativa de banda da LiveKit. O encoder segue o menor entre ele e o
+    /// bitrate do preset ([`Pipeline::target_bps`]): a trilha anuncia o teto do preset mais caro.
+    network_bps: u32,
     force_software: bool,
     cursor: bool,
     paused: bool,
@@ -184,7 +185,7 @@ impl Pipeline {
             output,
             stats,
             format: config.format,
-            target_bps: config.format.bitrate_bps,
+            network_bps: u32::MAX,
             force_software,
             cursor: config.cursor,
             paused: false,
@@ -245,14 +246,14 @@ impl Pipeline {
                 self.stats.keyframe_requested();
             }
             VideoCommand::TargetBitrate(bps) => {
-                // O teto é o bitrate do preset: a estimativa da LiveKit não passa dele.
-                self.target_bps = bps.clamp(1, self.format.bitrate_bps);
-                self.stats.set_target(self.target_bps);
+                self.network_bps = bps.max(1);
+                let target = self.target_bps();
+                self.stats.set_target(target);
                 if let Output::Hardware {
                     encoder, bitrate, ..
                 } = &mut self.output
                 {
-                    if let Some(value) = bitrate.set_target(self.target_bps, now) {
+                    if let Some(value) = bitrate.set_target(target, now) {
                         encoder.set_bitrate(value);
                     }
                 }
@@ -266,7 +267,6 @@ impl Pipeline {
                     "preset novo"
                 );
                 self.format = format;
-                self.target_bps = self.target_bps.min(format.bitrate_bps);
                 self.rebuild()?;
             }
             VideoCommand::Source(source) => {
@@ -274,9 +274,18 @@ impl Pipeline {
                     SourceRef::Window(_) => "janela",
                     SourceRef::Monitor(_) => "tela",
                 };
-                tracing::info!(target: "media", fonte = label, "fonte nova");
-                self.capture = WgcCapture::new(&self.gpu, source, self.cursor)?;
-                self.rebuild()?;
+                // Uma fonte que sumiu entre o seletor e aqui não derruba a transmissão: fica a
+                // que estava.
+                match WgcCapture::new(&self.gpu, source, self.cursor) {
+                    Ok(capture) => {
+                        tracing::info!(target: "media", fonte = label, "fonte nova");
+                        self.capture = capture;
+                        self.rebuild()?;
+                    }
+                    Err(error) => {
+                        tracing::warn!(target: "media", %error, "a fonte nova não abriu; segue a antiga");
+                    }
+                }
             }
             VideoCommand::Cursor(enabled) => {
                 self.capture.set_cursor(enabled);
@@ -293,18 +302,24 @@ impl Pipeline {
         Ok(())
     }
 
+    /// O que o encoder persegue: o menor entre a estimativa da LiveKit e o bitrate do preset.
+    fn target_bps(&self) -> u32 {
+        self.network_bps.min(self.format.bitrate_bps)
+    }
+
     /// Recria a conversão e o encoder para o formato e a fonte atuais.
     fn rebuild(&mut self) -> Result<(), AppError> {
         let (converter, output) = build_output(
             &self.gpu,
             &self.capture,
             self.format,
-            self.target_bps,
+            self.target_bps(),
             self.force_software,
             &self.stats,
         )?;
         self.converter = converter;
         self.output = output;
+        self.stats.set_target(self.target_bps());
         self.has_image = false;
         self.keyframe_pending = true;
         self.last_sent = None;

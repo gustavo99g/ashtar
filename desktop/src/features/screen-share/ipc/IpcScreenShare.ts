@@ -14,12 +14,12 @@ import { AudioPresets, type Room, Track } from "livekit-client";
 import {
 	ipcScreenShareAck,
 	ipcScreenShareStart,
+	ipcScreenShareStop,
 	isAppError,
 	listCaptureSources,
 	onScreenShareAudioEnded,
 	onScreenShareEnded,
 	type ScreenShareEnded,
-	screenShareStop,
 } from "@/lib/tauri/commands";
 import type {
 	ScreenShareController,
@@ -51,7 +51,7 @@ interface Session {
 	/** Eventos que chegaram durante o início, tratados quando ele termina. */
 	endedDuringStart: ScreenShareEnded[];
 	audioEndedDuringStart: ScreenShareEnded[];
-	/** O Rust já encerrou a sessão; não precisa chamar `screenShareStop`. */
+	/** O Rust já encerrou a sessão; não precisa chamar `ipcScreenShareStop`. */
 	endedByRust: boolean;
 	teardown: Promise<void> | null;
 }
@@ -406,7 +406,7 @@ export class IpcScreenShare implements ScreenShareController {
 		// Primeiro para a fonte, para não chegarem mais frames nem blocos de áudio.
 		if (session.id !== null && !session.endedByRust) {
 			try {
-				await screenShareStop(session.id);
+				await ipcScreenShareStop(session.id);
 			} catch (error) {
 				console.warn("Erro ao parar o compartilhamento no Rust:", error);
 			}

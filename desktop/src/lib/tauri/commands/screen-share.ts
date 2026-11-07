@@ -83,8 +83,8 @@ export function ipcScreenShareAck(sessionId: number) {
 	return call<void>("ipc_screen_share_ack", { sessionId });
 }
 
-export function screenShareStop(sessionId: number) {
-	return call<void>("screen_share_stop", { sessionId });
+export function ipcScreenShareStop(sessionId: number) {
+	return call<void>("ipc_screen_share_stop", { sessionId });
 }
 
 /**

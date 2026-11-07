@@ -5,6 +5,7 @@
 //! em trânsito no caminho IPC. Bitrate e dicas ao encoder são do frontend,
 //! que é quem publica a trilha.
 
+use super::video::VideoFormat;
 use serde::Deserialize;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
@@ -28,6 +29,8 @@ pub struct QualityPreset {
     pub fps: u32,
     /// Máximo de frames em trânsito no caminho IPC (limite do `FrameGate`).
     pub max_in_flight: u32,
+    /// O bitrate do preset no caminho nativo (o mesmo `maxBitrate` do `presets.ts`).
+    pub bitrate_bps: u32,
 }
 
 impl Quality {
@@ -40,19 +43,35 @@ impl Quality {
                 max_height: 720,
                 fps: 60,
                 max_in_flight: 5,
+                bitrate_bps: 3_500_000,
             },
             Self::Balanced => QualityPreset {
                 max_width: 1600,
                 max_height: 900,
                 fps: 60,
                 max_in_flight: 5,
+                bitrate_bps: 8_000_000,
             },
             Self::Detail => QualityPreset {
                 max_width: 1920,
                 max_height: 1080,
                 fps: 30,
                 max_in_flight: 3,
+                bitrate_bps: 8_000_000,
             },
+        }
+    }
+}
+
+impl Quality {
+    /// O que o preset pede ao vídeo do caminho nativo.
+    pub const fn format(self) -> VideoFormat {
+        let preset = self.preset();
+        VideoFormat {
+            max_width: preset.max_width,
+            max_height: preset.max_height,
+            fps: preset.fps,
+            bitrate_bps: preset.bitrate_bps,
         }
     }
 }
@@ -63,6 +82,13 @@ mod tests {
 
     /// Ida e volta de um frame medida em dev (decisão 16): ~70 ms.
     const MEASURED_ROUND_TRIP_S: f64 = 0.070;
+
+    #[test]
+    fn todo_preset_e_um_formato_valido() {
+        for q in Quality::ALL {
+            assert!(q.format().validate().is_ok(), "{q:?}");
+        }
+    }
 
     #[test]
     fn le_os_nomes_enviados_pelo_frontend() {

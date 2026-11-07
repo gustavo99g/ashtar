@@ -78,6 +78,12 @@ reqwest = { version = "0.13.4", default-features = false, features = ["json", "r
 rustls = { version = "0.23.45", default-features = false, features = ["ring", "std"] }
 tauri-plugin-deep-link = "2.6.2"
 tauri-plugin-single-instance = { version = "2.5.4", features = ["deep-link"] }
+
+
+[dev-dependencies]
+# Só para o teste de ponta a ponta (`media/share_e2e.rs`): o token do LiveKit local e o assinante.
+livekit-api = { version = "0.10.0", default-features = false, features = ["access-token"] }
+futures-util = "0.3"
 [profile.dev.package.image]
 
 opt-level = 3

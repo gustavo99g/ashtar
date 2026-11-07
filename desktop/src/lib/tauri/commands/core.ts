@@ -13,6 +13,7 @@ export type AppErrorKind =
 	| "AlreadySharing"
 	| "VideoCapture"
 	| "AudioCapture"
+	| "Publish"
 	| "Internal"
 	| "Unsupported"
 	| "Update";

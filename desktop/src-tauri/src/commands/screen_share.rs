@@ -1,8 +1,8 @@
 //! Comandos do compartilhamento de tela (Etapa 4 do `docs/plans/v0.1-reorganizacao.md`).
 //!
 //! O prefixo `ipc_` marca o que é específico do caminho atual (frames pelo
-//! IPC do Tauri). `list_capture_sources`, `screen_share_stop` e os eventos de
-//! fim também vão servir ao publicador nativo.
+//! IPC do Tauri), que sai na Etapa 5 da v0.2.4. `list_capture_sources` e os
+//! eventos de fim também servem à transmissão nativa (`share.rs`).
 
 use std::sync::Arc;
 
@@ -78,7 +78,7 @@ impl ShareEndedPayload {
 }
 
 /// Traduz um evento do manager para o evento Tauri correspondente.
-fn emit_share_event(app: &AppHandle, event: ShareEvent) {
+pub fn emit_share_event(app: &AppHandle, event: ShareEvent) {
     let (name, payload) = match event {
         ShareEvent::Ended { session_id, reason } => (
             SCREEN_SHARE_ENDED,
@@ -163,9 +163,9 @@ pub async fn ipc_screen_share_ack(
     Ok(())
 }
 
-/// Encerra o compartilhamento. Idempotente: um id que já acabou não é erro.
+/// Encerra o compartilhamento pelo caminho IPC. Idempotente: um id que já acabou não é erro.
 #[tauri::command]
-pub async fn screen_share_stop(
+pub async fn ipc_screen_share_stop(
     manager: State<'_, Arc<ScreenShareManager>>,
     session_id: u64,
 ) -> Result<(), AppError> {
