@@ -21,7 +21,7 @@ Base: a `dev` no `773d66a` (`0.2.30`), mais o `encoder-probe` da Etapa 0. Em cad
 
 | Etapa | Descrição | Status |
 |---|---|---|
-| 0 | Decisões: experimento (`6472945`), ADRs 0017 a 0019, roadmap, BACKLOG | Experimento concluído |
+| 0 | Decisões: experimento (`6472945`), ADRs 0017 a 0019, roadmap, BACKLOG | Concluída |
 | 1 | Captura própria pelo WGC, lista de janelas, foco e exclusão do app | Pendente |
 | 2 | Vídeo na GPU: conversão, encoder, plano B, bitrate e destinos | Pendente |
 | 3 | Publicador `:screen` (vídeo e áudio), sessão, comandos, logs e teste de ponta a ponta | Pendente |
