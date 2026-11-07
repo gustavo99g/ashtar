@@ -6,7 +6,10 @@
 
 pub mod audio_capture;
 pub mod focus;
+pub mod gpu;
+pub mod hr;
 pub mod sources;
+pub mod wgc;
 pub mod window_capture;
 
 pub use audio_capture::spawn_audio_capture;
