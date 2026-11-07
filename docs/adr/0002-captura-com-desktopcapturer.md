@@ -1,6 +1,6 @@
 # 0002 — Captura de vídeo com o `DesktopCapturer`
 
-- **Status:** aceita
+- **Status:** substituída por 0018 (v0.2.4)
 - **Data:** 2026-09
 
 ## Contexto
