@@ -2,7 +2,7 @@ import { renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { MeResponse, UpdateChannel } from "@/lib/api";
 import { setUpdateChannel } from "@/lib/tauri/commands";
-import { useUpdateChannelSync } from "../useUpdateChannelSync";
+import { useUpdateChannelSync } from "../hooks/useUpdateChannelSync";
 
 vi.mock("@/lib/tauri/commands", () => ({
 	setUpdateChannel: vi.fn(() => Promise.resolve()),

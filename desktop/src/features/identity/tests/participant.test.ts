@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { avatarInitial, nickColor } from "../nickColor";
-import { nickFromMetadata, participantPerson } from "../participant";
+import { avatarInitial, nickColor } from "../model/nickColor";
+import { nickFromMetadata, participantPerson } from "../model/participant";
 
 describe("nickFromMetadata", () => {
 	it("lê o nick que a API põe no token", () => {

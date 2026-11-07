@@ -18,7 +18,7 @@ vi.mock("@/lib/tauri/commands", () => ({
 let me: MeResponse | undefined;
 vi.mock("@/features/identity", () => ({ useMe: () => ({ data: me }) }));
 vi.mock("@/features/voice", () => ({
-	useVoice: () => ({ connectionState: "disconnected" }),
+	useInCall: () => false,
 }));
 
 function meWith(
@@ -31,6 +31,7 @@ function meWith(
 		update_channel: channel,
 		can_create_invite: isOwner,
 		can_view_panel: isOwner,
+		can_manage_channels: isOwner,
 	};
 }
 

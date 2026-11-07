@@ -37,7 +37,7 @@ flowchart LR
     CMD[commands] --> S
   end
   subgraph React["React (webview)"]
-    TS[lib/tauri/commands.ts] --> CMD
+    TS[lib/tauri/commands/] --> CMD
     IPC -- "Channel, bytes crus" --> SS[features/screen-share]
     SS --> TS
     V[features/voice] --> SS
@@ -85,16 +85,28 @@ flowchart LR
 
 ### Frontend do app (`desktop/src/`)
 
-- **`lib/tauri/commands.ts`**: o único arquivo que importa `@tauri-apps/api`. Tem os tipos do
-  contrato (`AppError`, `CaptureSource`, `SourceRef`) e um wrapper tipado por comando e evento.
-- **`features/voice/`**: a conexão com a sala do LiveKit, mute e deafen.
+- **`lib/tauri/commands/`**: a única pasta que importa `@tauri-apps/api`, com um arquivo por assunto
+  (`core`, `screen-share`, `updater`, `app`, `identity`). Tem os tipos do contrato (`AppError`,
+  `CaptureSource`, `SourceRef`) e um wrapper tipado por comando e evento.
+- **`features/voice/`**: a conexão com a sala do LiveKit, em subdomínios: `room` (a conexão, mute e
+  deafen), `devices` (microfone e saída), `members` (quem está na sala), `call` (a sala por dentro) e
+  `dock` (o pé da coluna). O padrão das pastas de cada feature está na ADR 0014.
+- **`features/server/`**: a coluna e a tela do servidor, sobre a `voice`.
+- **`features/chat/`**: o histórico de cada canal (uma consulta infinita "para trás", que nunca é
+  invalidada, só recomeçada), o envio com a caixa de saída e o `client_id`, o rascunho por canal e
+  quem está no grupo com a presença.
+- **`features/channels/`**: a lista de canais e categorias, com a versão, e o último canal aberto.
+- **`lib/realtime/`**: o WebSocket da API (ADR 0015), sem React: ticket, `ping`, reconexão com espera
+  crescente e o aviso de cada evento, com `resumed` no `ready` da volta de uma queda. A única pasta
+  que abre `WebSocket`. Quem liga a conexão à sessão e passa cada evento ao `realtime.ts` de cada
+  feature é o `app/RealtimeBridge.tsx`; com o socket fora, as consultas repetidas voltam a rodar.
 - **`features/screen-share/`**: a interface `ScreenShareController` e suas implementações; hoje, a
   `IpcScreenShare`, que recebe os dados do Rust e os publica no LiveKit.
 
 ### API (`api/`)
 
 Backend em Rust com Axum e SQLite (`sqlx`). O desktop fala com ela por HTTP e nunca recebe as chaves do
-LiveKit, só tokens já assinados. Canais, mensagens e a administração pela UI entram conforme o roadmap
+LiveKit, só tokens já assinados. O que ainda falta entra conforme o roadmap
 ([`docs/roadmap.md`](docs/roadmap.md)).
 
 A crate é uma biblioteca (`lib.rs`) com dois binários: o servidor (`main.rs`) e o `admin` temporário
@@ -103,18 +115,28 @@ A crate é uma biblioteca (`lib.rs`) com dois binários: o servidor (`main.rs`) 
 - **`identity/`**: as regras de membros, dispositivo, sessão, convites e permissões. Toda ação de
   administração recebe quem a faz (`actor`) e passa por `permissions::can`, o único lugar que decide quem
   pode o quê. As rotas e o `admin` chamam as mesmas funções.
-- **`routes/`**: as rotas HTTP, finas sobre `identity/`: `/api/auth/redeem` (usar convite),
-  `/api/auth/login`, `/api/me`, `/api/voice/token` (token do LiveKit com identidade e nome vindos do banco) e
-  a rota antiga `/api/voice/join`, que continua até o app usar as novas. Autenticação por
-  `Authorization: Bearer <token>`.
-- **`client_policy.rs`**: versão mínima do cliente e código de acesso provisório, antes de toda rota de `/api`.
-- **`limiter.rs`**: até 20 convites errados a cada 10 minutos, somando todo mundo.
+- **`chat/`**: as regras do chat. `messages` (texto, envio sem duplicar pelo `client_id`, histórico
+  em páginas pelo id UUID v7), `channels` e `categories` (criar, editar, arquivar, com "Gerenciar
+  canais" conferido dentro, como em `identity/`) e `layout` (a árvore e a versão que dá o 409).
+- **`realtime/`**: o `Hub` do tempo real: o `broadcast` dos eventos, os tickets de uso único e
+  quem está online.
+- **`voice.rs`**: o que fala com o LiveKit: quem está numa sala e tirar alguém de todas.
+- **`routes/`**: as rotas HTTP, finas sobre as regras: a identidade (`/api/auth/*`, `/api/me`), o
+  Painel (`/api/invites`, `/api/members`), a voz (`/api/voice/token` e `/participants`, só para uma
+  sala aberta do banco), o chat (`/api/channels/...`, `/api/categories/...`, `/api/people`), o
+  WebSocket (`/api/realtime/ticket` e `/api/realtime`) e o webhook do LiveKit (`/webhooks/livekit`).
+  Autenticação por `Authorization: Bearer <token>`; o WebSocket, que não manda cabeçalho, entra com
+  o ticket.
+- **`client_policy.rs`**: a versão mínima do cliente, antes de toda rota de `/api`.
+- **`limiter.rs`**: até 20 convites errados a cada 10 minutos, somando todo mundo, e 5 mensagens a
+  cada 5 segundos por pessoa.
 - **`db.rs`** e **`migrations/`**: o banco em modo WAL, com as migrações embutidas no binário.
 - **`secret.rs`**: segredos só como SHA-256 no banco; **`error.rs`**: os erros e o formato `{ kind, message }`.
 
-As decisões estão nas ADRs [0010](docs/adr/0010-banco-sqlite.md) e
-[0011](docs/adr/0011-identidade-sessao-convites.md). Os testes de integração ficam em
-`api/tests/identity.rs`.
+As decisões estão nas ADRs [0010](docs/adr/0010-banco-sqlite.md),
+[0011](docs/adr/0011-identidade-sessao-convites.md), [0015](docs/adr/0015-chat-e-tempo-real.md) e
+[0016](docs/adr/0016-canais-e-categorias.md). Os testes de integração ficam em `api/tests/`
+(`identity.rs`, `chat.rs`, `channels.rs` e `realtime.rs`, este com a API numa porta de verdade).
 
 ## Fluxos
 
@@ -165,7 +187,7 @@ Regras que atravessam módulos. Quebrar uma delas costuma produzir bugs longe da
   encerra é o manager, de fora da thread.
 - **Só os pontos de entrada comuns chamam `platform::`.** `media/sources.rs` e `media/audio.rs`
   escolhem a implementação; o resto do código nunca usa `platform::win32` diretamente.
-- **Só o `commands.ts` importa `@tauri-apps/api`.** A regra de lint impede o contrário. Isso mantém
+- **Só a pasta `commands/` importa `@tauri-apps/api`.** A regra de lint impede o contrário. Isso mantém
   aberta a possibilidade de uma versão web.
 - **Dados binários atravessam o IPC como bytes crus** (`InvokeResponseBody::Raw`), nunca como
   `Vec<u8>` serializado em JSON.

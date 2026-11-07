@@ -1,2 +1,2 @@
-export { useSettingsStore } from "./store";
-export { useApplyTheme } from "./useApplyTheme";
+export { useApplyTheme } from "./hooks/useApplyTheme";
+export { useSettingsStore } from "./stores/settingsStore";

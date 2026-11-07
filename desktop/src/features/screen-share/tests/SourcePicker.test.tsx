@@ -2,8 +2,8 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import type { CaptureSource } from "@/lib/tauri/commands";
-import type { ScreenShareController } from "../controller";
-import { SourcePicker } from "../SourcePicker";
+import type { ScreenShareController } from "../model/controller";
+import { SourcePicker } from "../components/SourcePicker";
 
 const sources: CaptureSource[] = [
 	{

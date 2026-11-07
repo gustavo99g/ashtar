@@ -31,11 +31,11 @@ pub enum ErrorKind {
     NotFound,
     Conflict,
     TooManyAttempts,
+    /// Mensagens demais em pouco tempo (o limite de envio do chat).
+    TooManyMessages,
     Internal,
     /// Da `ClientPolicy`: o app está abaixo da versão mínima (426).
     ClientOutdated,
-    /// Da `ClientPolicy`: o código de acesso não confere (401).
-    AccessDenied,
 }
 
 /// O corpo de toda resposta de erro.
@@ -79,6 +79,8 @@ pub enum ApiError {
     Conflict(String),
     #[error("Muitas tentativas. Espere alguns minutos e tente de novo.")]
     TooManyAttempts,
+    #[error("Calma: muitas mensagens seguidas.")]
+    TooManyMessages,
     #[error("Erro interno no servidor.")]
     Internal(#[from] sqlx::Error),
     /// Falta configuração no servidor (uma variável do `.env`, por exemplo).
@@ -113,6 +115,7 @@ impl ApiError {
             Self::NotFound(_) => (StatusCode::NOT_FOUND, ErrorKind::NotFound),
             Self::Conflict(_) => (StatusCode::CONFLICT, ErrorKind::Conflict),
             Self::TooManyAttempts => (StatusCode::TOO_MANY_REQUESTS, ErrorKind::TooManyAttempts),
+            Self::TooManyMessages => (StatusCode::TOO_MANY_REQUESTS, ErrorKind::TooManyMessages),
             Self::Internal(_) | Self::Config(_) | Self::LiveKit(_) => {
                 (StatusCode::INTERNAL_SERVER_ERROR, ErrorKind::Internal)
             }

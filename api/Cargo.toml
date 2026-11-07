@@ -6,18 +6,18 @@ edition = "2024"
 default-run = "api"
 
 [dependencies]
-axum = "0.8.9"
+axum = { version = "0.8.9", features = ["ws"] }
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.151"
 tokio = { version = "1.53.1", features = ["full"] }
 dotenvy = "0.15.7"
-livekit-api = "0.9.1"
+livekit-api = "0.10.0"
 livekit-protocol = "0.8.2"
 reqwest = { version = "0.13.5", default-features = false, features = ["rustls"] }
 tower-http = { version = "0.7.1", features = ["cors"] }
 semver = "1"
 sqlx = { version = "0.9.0", default-features = false, features = ["runtime-tokio", "sqlite", "migrate", "macros"] }
-uuid = { version = "1.28.0", features = ["v4"] }
+uuid = { version = "1.28.0", features = ["v4", "v7"] }
 sha2 = "0.11.1"
 hex = "0.4.3"
 getrandom = "0.4.3"
@@ -29,3 +29,6 @@ ts-rs = "12.0.1"
 [dev-dependencies]
 http-body-util = "0.1.5"
 tower = { version = "0.5.3", features = ["util"] }
+tokio-tungstenite = "0.30.0"
+futures-util = "0.3.34"
+base64 = "0.23.1"

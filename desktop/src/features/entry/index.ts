@@ -7,21 +7,22 @@ export {
 	EntryScreen,
 	OrPasteDivider,
 } from "./components/EntryScreen";
+export { InviteFlow } from "./components/InviteFlow";
+export { LinkWatcher } from "./components/LinkWatcher";
 export { NickField } from "./components/NickField";
 export { PasteInvite } from "./components/PasteInvite";
 export { PersonCard } from "./components/PersonCard";
+export { RecoveryFlow } from "./components/RecoveryFlow";
+export { RequireNoAccount } from "./components/RequireNoAccount";
 export {
 	type InviteLink,
 	type InviteLinkKind,
 	parseInviteLink,
-} from "./inviteLink";
-export { LinkWatcher } from "./LinkWatcher";
-export { checkNick, sameNick } from "./nickRules";
+} from "./model/inviteLink";
+export { formatValidUntil } from "./model/validUntil";
 export {
 	loadOpeningLink,
 	nextEntryPath,
 	useOpeningLinkReady,
 	usePendingLinkStore,
-} from "./pendingLink";
-export { RequireNoAccount } from "./RequireNoAccount";
-export { formatValidUntil } from "./validUntil";
+} from "./stores/pendingLinkStore";

@@ -6,8 +6,8 @@ import {
 	onUpdateFailed,
 	onUpdateReady,
 } from "@/lib/tauri/commands";
-import { useUpdaterStore } from "../store";
-import { UpdateNotice } from "../UpdateNotice";
+import { useUpdaterStore } from "../stores/updaterStore";
+import { UpdateNotice } from "../components/UpdateNotice";
 
 vi.mock("@/lib/tauri/commands", () => ({
 	installUpdate: vi.fn(() => new Promise(() => {})),
@@ -21,7 +21,8 @@ vi.mock("@/features/identity", () => ({ useMe: () => ({ data: undefined }) }));
 let connectionState: VoiceConnectionState = "disconnected";
 vi.mock("@/features/voice", () => ({
 	SALA: { id: "sala", name: "Sala" },
-	useVoice: () => ({ connectionState }),
+	useInCall: () =>
+		connectionState !== "disconnected" && connectionState !== "error",
 }));
 
 /** O que o Rust manda pelo evento, pela função que o componente registrou. */

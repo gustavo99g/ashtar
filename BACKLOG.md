@@ -16,33 +16,14 @@ Ao resolver um item, apague-o daqui e registre o resultado no ADR ou no commit.
 
 Bugs que saem assim que ficarem prontos, pelo auto-update, sem esperar a entrega da ordem.
 
-- [ ] Eco no compartilhamento da tela inteira com "Todo o sistema". Num teste com amigos (2026-10-06), um
-      amigo compartilhou o monitor e quem assistia ouviu a própria voz; só mutar o próprio microfone
-      parava. **Correção fora de ordem** ("Correções fora de ordem" no `docs/roadmap.md`): sai assim que ficar pronta, sem esperar a v0.2.3.
-      **Evidências (medidas nesta máquina; o teste do Brave rodou no perfil de debug, a árvore do app foi vista no
-      executável de release):**
-      - O código exclui o PID do app (`std::process::id()`) com `EXCLUDE_TARGET_PROCESS_TREE`; conferido na
-        crate `wasapi` (`include_tree = false`).
-      - Com uma instância, o WebView2 do app é todo descendente do `desktop.exe`: o `browser` é filho dele;
-        renderer, GPU, rede e armazenamento, filhos do `browser`.
-      - Um Brave isolado tocando um tom (mesma arquitetura de áudio do WebView2, com o
-        `audio.mojom.AudioService` filho da raiz): excluir a raiz funciona. RMS 0,0022 com o tom excluído,
-        contra 0,0021 de fundo sem tom e 0,0046 com o tom incluído.
-      - **Com duas instâncias do app abertas há um só conjunto de processos do WebView2, e ele pertence à
-        primeira** (a pasta de dados é a mesma, `%LOCALAPPDATA%\gustavo99g\EBWebView`). Com `desktop.exe` 25504
-        e 2436, os dois renderizadores ficaram sob o 25504 e nada sob o 2436. Para a segunda instância,
-        excluir o próprio PID não exclui nenhum processo do WebView2: a chamada entra no loopback.
-      **Não verificado:** se o amigo tinha duas instâncias (ou um WebView2 remanescente de uma execução
-      anterior) abertas. Outra explicação possível é o eco acústico (a voz sai da caixa de som e volta pelo
-      microfone dele); mutar o próprio microfone resolveria nos dois casos, então isso não distingue. Teste
-      para separar: o amigo compartilha com "Sem áudio"; se o eco continuar, vem do microfone dele. Também
-      não se observou o processo de áudio do WebView2 do próprio app tocando.
-      **Ideia de correção (não implementada):** excluir o processo-navegador real do WebView2
-      (`ICoreWebView2::BrowserProcessId`, obtido pelo `with_webview` do Tauri; existe no webview2-com 0.38.2)
-      em vez do PID do app, caindo no PID do app se não for possível obtê-lo. Assim a segunda instância
-      exclui a árvore do navegador que ela de fato usa. Mexe na assinatura do `start` do manager e em
-      `commands/screen_share.rs`. O teste `mede_a_exclusao_de_um_chromium` (ignorado) repete a medição com
-      qualquer Chromium tocando áudio (`EXCLUDE_PID=<pid da raiz>`).
+- [ ] **Enxugar o `admin`** (o que sobrou da Etapa 8; o código de acesso e a rota `/api/voice/join`
+      já saíram): o Painel de controle cobre `convite`, `convites`, `revogar`, `membros`, `remover`,
+      `desvincular`, `beta` e `permissoes`. **Não tirar o `recuperacao`**: se o dono perde o computador, ele
+      não consegue abrir o Painel, e esse comando é o único jeito de criar a recuperação dele. Ficariam
+      `dono`, `backup`, `recuperacao` e, de preferência, `membros`, só para conferir o banco. Se for feito,
+      atualizar o `README.md`, o `scripts/local/admin-shell.ps1` (a lista de comandos) e os testes.
+- [ ] **Subir o `MIN_CLIENT_VERSION`** no `.env` de produção (`0.2.20`, a primeira versão com conta): um
+      app mais velho passa a receber o pedido de atualização, em vez de erro de rota. É só configuração.
 
 ## v0.2.2 — UI nova
 
@@ -72,23 +53,15 @@ Bugs que saem assim que ficarem prontos, pelo auto-update, sem esperar a entrega
 - [ ] Tela de usuários em que o dono marca quem recebe o beta. A API (devolver o canal e a permissão no
       `admin`) sai na v0.2.1 (`NOTES.md`); a tela e o app guardando o último valor vêm aqui, e substituem a
       variável `ASHTAR_UPDATE_CHANNEL`. Papel de dono ("supremo"), acima de administrador; só ele marca o beta.
+- [x] Organizar as features do front pelo padrão da ADR 0014 (gavetas `components/`, `hooks/`, `stores/`,
+      `model/`; a `voice` em subdomínios e a `server` separada). Feito em 31/10, sem regra de ESLint: é
+      convenção. O que difere do plano está na seção "Como ficou" da ADR.
 
-## v0.2.3 — Chat real
-
-Itens que a UI nova (v0.2.2) deixou para o chat, porque dependem do WebSocket próprio.
-
-- [ ] Trocar as consultas repetidas da v0.2.2 por eventos: a lista de quem está na sala (hoje a cada 5 s,
-      `GET /api/voice/participants`) pelos webhooks do LiveKit levados pelo WebSocket, e o aviso de quem
-      entrou (hoje o app do dono compara `GET /api/members` a cada 30 s) por um evento. Cada feature ganha um
-      `realtime.ts` que atualiza o cache do TanStack Query (ADR 0012).
-- [ ] O quadro "Canal de texto" do canvas é a referência visual do chat; a rota e o espaço no `AppShell`
-      já existem desde a v0.2.2.
-
-## v0.2.3 e v0.6 — Voz e vídeo
+## v0.6 — Voz e vídeo
 
 - [ ] A aba "Voz e vídeo" das configurações saiu na v0.2.2 só com os dispositivos, Entrada e Saída (Etapa
-      5b). O resto do quadro dela fica guardado: supressão de ruído, cancelamento de eco e ganho automático
-      na v0.2.3; os volumes de entrada e de saída, o teste de microfone, a detecção de voz com a
+      5b). O resto do quadro dela fica guardado para a v0.6: as outras opções da supressão de ruído (na
+      v0.2.3 só entra o interruptor liga/desliga do RNNoise), os volumes de entrada e de saída, o teste de microfone, a detecção de voz com a
       sensibilidade, o pressionar para falar com o atalho, os atalhos globais e os padrões do
       compartilhamento de tela (qualidade e áudio) na v0.6. O
       pressionar para falar com um jogo em foco pede um gancho de teclado em Rust: o atalho global comum do

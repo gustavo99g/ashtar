@@ -25,9 +25,9 @@ import type {
 	ScreenShareController,
 	ScreenShareState,
 	ShareRequest,
-} from "../controller";
-import { QUALITY_PRESETS } from "../presets";
-import { shareTrackName } from "../shareInfo";
+} from "../model/controller";
+import { QUALITY_PRESETS } from "../model/presets";
+import { shareTrackName } from "../model/shareInfo";
 import { ScreenShareAudio } from "./ScreenShareAudio";
 
 /**

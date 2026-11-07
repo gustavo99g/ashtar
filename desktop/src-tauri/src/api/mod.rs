@@ -5,7 +5,7 @@
 //! `apiFetch` do frontend, com o token que esses comandos devolvem.
 //!
 //! O que vale igual ao `apiFetch` (`desktop/src/lib/api/client.ts`), para o frontend tratar os
-//! dois do mesmo jeito: os cabeçalhos `X-App-Version` e `X-Access-Code`, o limite de 10 segundos
+//! dois do mesmo jeito: o cabeçalho `X-App-Version`, o limite de 10 segundos
 //! e o erro [`ApiError`].
 //!
 //! O log diz o caminho e o `kind` de cada falha; nunca o corpo do pedido (que tem a chave) nem o
@@ -40,13 +40,10 @@ where
     })?;
 
     // A versão do app é a do tauri.conf.json, que vem do package.json: a mesma do frontend.
-    let mut request = client()?
+    let request = client()?
         .post(format!("{base}{path}"))
         .header("X-App-Version", app.package_info().version.to_string())
         .json(body);
-    if let Some(code) = config::access_code() {
-        request = request.header("X-Access-Code", code);
-    }
 
     let response = request
         .send()

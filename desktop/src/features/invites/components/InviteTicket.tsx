@@ -31,6 +31,11 @@ interface InviteTicketProps {
 	status?: ReactNode;
 	/** O que resta do prazo, de 0 a 1, para a barra debaixo da validade. Sem ele, sem barra. */
 	timeLeft?: number;
+	/**
+	 * A cor de onde o bilhete está, para os recortes do picote: a página (`background`) ou um
+	 * cartão, diálogo ou popover (`card`). Sem ela, a página no tamanho normal e o cartão no compacto.
+	 */
+	surface?: "background" | "card";
 	size?: "default" | "compact";
 	className?: string;
 }
@@ -43,7 +48,7 @@ const SIZES = {
 		title: "gap-2 text-[11px] [&_svg]:size-3.5",
 		address: "gap-1",
 		url: "text-[13px]",
-		code: "text-[30px] tracking-[0.06em]",
+		code: "text-2xl tracking-[0.06em] @xs/ticket:text-[30px]",
 		validity: "gap-2 text-[13px] [&_svg]:size-3.5",
 		divider: "my-4",
 		notch: "-left-3 size-[22px]",
@@ -85,6 +90,7 @@ function InviteTicket({
 	notice = "O código aparece só agora.",
 	status,
 	timeLeft,
+	surface,
 	size = "default",
 	className,
 }: InviteTicketProps) {
@@ -93,7 +99,9 @@ function InviteTicket({
 	/** O semicírculo recortado em cima e embaixo do picote. Tem a cor do fundo de onde está. */
 	const notch = cn(
 		"absolute rounded-full border border-gold-border",
-		compact ? "bg-card" : "bg-background",
+		(surface ?? (compact ? "card" : "background")) === "card"
+			? "bg-card"
+			: "bg-background",
 		s.notch,
 	);
 
@@ -113,7 +121,9 @@ function InviteTicket({
 				aria-hidden="true"
 				className="pointer-events-none absolute inset-y-0 -left-40 w-30 bg-linear-90 from-transparent via-gold-text/16 to-transparent animate-ticket-shine"
 			/>
-			<div className={cn("flex min-w-0 grow flex-col", s.body)}>
+			<div
+				className={cn("@container/ticket flex min-w-0 grow flex-col", s.body)}
+			>
 				<div className={cn("flex items-center justify-between", s.header)}>
 					<span
 						className={cn(
@@ -167,7 +177,7 @@ function InviteTicket({
 					)}
 				</div>
 				{!compact && (
-					<div className="flex items-center gap-2.5 pt-0.5">
+					<div className="flex flex-wrap items-center gap-2.5 pt-0.5">
 						{actions}
 						<span className="ml-auto flex items-center gap-1.5 text-xs text-foreground-subtle">
 							<EyeOffIcon className="size-[13px]" />
