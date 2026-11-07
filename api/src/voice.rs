@@ -39,17 +39,37 @@ pub struct RoomParticipant {
     pub screen_sharing: bool,
 }
 
+/// O fim da identidade da conexão que transmite a tela de alguém (`{user_id}:screen`): o app
+/// entra na sala duas vezes, a voz e a tela, e a LiveKit não aceita duas conexões com a mesma
+/// identidade (ADR 0017).
+pub const SCREEN_SUFFIX: &str = ":screen";
+
+/// A identidade da tela de `user_id`.
+pub fn screen_identity(user_id: &str) -> String {
+    format!("{user_id}{SCREEN_SUFFIX}")
+}
+
 /// Da resposta do LiveKit para o que a lista usa, na ordem em que entraram.
+/// A `:screen` de alguém não vira participante: só marca o dono como transmitindo. Sem o dono na
+/// sala (ele saiu e a tela ainda não), ela fica de fora.
 pub fn room_participants(mut infos: Vec<ParticipantInfo>) -> Vec<RoomParticipant> {
     infos.sort_by_key(|info| (info.joined_at, info.joined_at_ms));
+    let shares_screen = |info: &ParticipantInfo| {
+        info.tracks
+            .iter()
+            .any(|track| track.source() == TrackSource::ScreenShare)
+    };
+    let screens: Vec<&str> = infos
+        .iter()
+        .filter(|info| shares_screen(info))
+        .filter_map(|info| info.identity.strip_suffix(SCREEN_SUFFIX))
+        .collect();
     infos
-        .into_iter()
+        .iter()
+        .filter(|info| !info.identity.ends_with(SCREEN_SUFFIX))
         .map(|info| RoomParticipant {
-            screen_sharing: info
-                .tracks
-                .iter()
-                .any(|track| track.source() == TrackSource::ScreenShare),
-            identity: info.identity,
+            screen_sharing: shares_screen(info) || screens.contains(&info.identity.as_str()),
+            identity: info.identity.clone(),
         })
         .collect()
 }
@@ -139,19 +159,22 @@ impl VoiceRooms for RoomClient {
     }
 }
 
-/// Tira `identity` de toda sala em que estiver e devolve de quantas saiu. Quem
-/// não está numa sala (o "não existe" do LiveKit) não é erro. O LiveKit também
-/// recusa o token antigo dessa pessoa numa nova entrada; o novo, a API já não dá.
+/// Tira `identity` (e a tela dela, `{identity}:screen`) de toda sala em que estiver e devolve
+/// quantas conexões caíram. Quem não está numa sala (o "não existe" do LiveKit) não é erro. O
+/// LiveKit também recusa o token antigo dessa pessoa numa nova entrada; o novo, a API já não dá.
 pub(crate) async fn kick_from(
     rooms: &impl VoiceRooms,
     identity: &str,
 ) -> Result<usize, ServiceError> {
+    let screen = screen_identity(identity);
     let mut removed = 0;
     for room in rooms.names().await? {
-        match rooms.remove(&room, identity).await {
-            Ok(()) => removed += 1,
-            Err(error) if is_not_found(&error) => {}
-            Err(error) => return Err(error),
+        for who in [identity, screen.as_str()] {
+            match rooms.remove(&room, who).await {
+                Ok(()) => removed += 1,
+                Err(error) if is_not_found(&error) => {}
+                Err(error) => return Err(error),
+            }
         }
     }
     Ok(removed)
@@ -189,6 +212,28 @@ pub(crate) fn livekit_env() -> Result<(String, String, String), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_tela_de_alguem_so_marca_o_dono() {
+        let room = room_participants(vec![
+            participant("kid", 10, &[TrackSource::Microphone]),
+            participant("juju", 11, &[TrackSource::Microphone]),
+            participant(
+                "kid:screen",
+                12,
+                &[TrackSource::ScreenShare, TrackSource::ScreenShareAudio],
+            ),
+            // A tela de quem já saiu da voz fica de fora.
+            participant("marcao:screen", 13, &[TrackSource::ScreenShare]),
+            // Entrou, mas ainda não publicou: o dono não está transmitindo.
+            participant("juju:screen", 14, &[]),
+        ]);
+        let sharing: Vec<(&str, bool)> = room
+            .iter()
+            .map(|p| (p.identity.as_str(), p.screen_sharing))
+            .collect();
+        assert_eq!(sharing, [("kid", true), ("juju", false)]);
+    }
 
     fn participant(identity: &str, joined_at: i64, sources: &[TrackSource]) -> ParticipantInfo {
         ParticipantInfo {
@@ -297,12 +342,15 @@ mod tests {
     #[tokio::test]
     async fn tirar_da_sala_passa_por_todas_e_ignora_onde_nao_esta() {
         let rooms = fake(vec![
-            ("sala", vec!["kid", "juju"]),
+            ("sala", vec!["kid", "juju", "kid:screen"]),
             ("papo", vec!["kid"]),
             ("afk", vec!["marcao"]),
         ]);
-        assert_eq!(kick_from(&rooms, "kid").await.unwrap(), 2);
-        assert_eq!(*rooms.removed.lock().unwrap(), ["sala/kid", "papo/kid"]);
+        assert_eq!(kick_from(&rooms, "kid").await.unwrap(), 3);
+        assert_eq!(
+            *rooms.removed.lock().unwrap(),
+            ["sala/kid", "sala/kid:screen", "papo/kid"]
+        );
 
         // Fora de todas as salas, ou sem sala nenhuma: nada a fazer, sem erro.
         assert_eq!(kick_from(&rooms, "ninguem").await.unwrap(), 0);

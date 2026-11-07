@@ -641,6 +641,7 @@ async fn corpo_invalido_responde_no_formato_da_api() {
         ("/api/auth/redeem", None, json, r#"{"code": "AAAA"}"#),
         ("/api/voice/token", Some(token.as_str()), json, "{}"),
         ("/api/voice/token", Some(token.as_str()), json, "[1, 2]"),
+        ("/api/voice/screen-token", Some(token.as_str()), json, "{}"),
     ];
     for (uri, token, content_type, body) in cases {
         let (status, response) = call_raw(&ctx.router, uri, token, content_type, body).await;
@@ -706,6 +707,35 @@ async fn canal_de_voz_invalido_e_recusado_antes_de_tudo() {
         "/api/voice/token",
         None,
         Some(json!({ "channel_id": "" })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn token_da_tela_pede_sessao_e_canal_valido() {
+    let ctx = setup().await;
+    let token = session(&ctx, "Fulano", 1).await;
+
+    for channel in ["", "com espaco", "../outra", &"a".repeat(65)] {
+        let (status, body) = call(
+            &ctx.router,
+            "POST",
+            "/api/voice/screen-token",
+            Some(&token),
+            Some(json!({ "channel_id": channel })),
+        )
+        .await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{channel:?}");
+        assert_eq!(body["kind"], "invalid_request", "{channel:?}");
+    }
+
+    let (status, _) = call(
+        &ctx.router,
+        "POST",
+        "/api/voice/screen-token",
+        None,
+        Some(json!({ "channel_id": "geral" })),
     )
     .await;
     assert_eq!(status, StatusCode::UNAUTHORIZED);
