@@ -64,6 +64,10 @@ pub fn run(log_file: logging::LateFile) {
             permissions::allow_microphone(app);
             webview_process::refresh(app.handle());
             tray::create(app);
+            // O Ashtar nunca aparece numa captura, nem na da própria transmissão (ADR 0019).
+            if let Some(window) = app.get_webview_window("main") {
+                media::focus::exclude_from_capture(&window);
+            }
             Ok(())
         })
         .plugin(tauri_plugin_opener::init())

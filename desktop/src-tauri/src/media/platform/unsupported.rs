@@ -6,7 +6,8 @@
 //! AppError::Unsupported, ja que nao ha captura de audio sem plataforma.
 
 use crate::error::AppError;
-use crate::media::sources::{MonitorInfo, WindowDetails};
+use crate::media::sources::{MonitorEntry, MonitorInfo, WindowDetails, WindowEntry};
+
 use crate::media::video_capture::WindowState;
 use crate::media::{audio::AudioTarget, AudioSink, CaptureHandle, OnEnd};
 
@@ -48,3 +49,20 @@ pub fn prepare_window_capture_thread() {}
 pub fn window_state(_id: u64) -> WindowState {
     WindowState::Visible
 }
+/// Sempre vazia: sem implementação de plataforma, não há janelas para listar.
+pub fn list_windows() -> Vec<WindowEntry> {
+    Vec::new()
+}
+
+/// Sempre vazia: sem implementação de plataforma, não há telas para listar.
+pub fn list_monitors() -> Vec<MonitorEntry> {
+    Vec::new()
+}
+
+/// Não faz nada: sem implementação de plataforma, não há janela para trazer.
+pub fn bring_to_front(_id: u64) -> bool {
+    false
+}
+
+/// Não faz nada: sem implementação de plataforma, não há captura de que sair.
+pub fn exclude_from_capture(_hwnd: usize) {}

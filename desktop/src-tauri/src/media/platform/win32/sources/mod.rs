@@ -4,6 +4,7 @@
 //! contrato que platform::mod.rs espera); icon.rs e gdi.rs sao detalhe de
 //! implementacao, privados a este modulo.
 
+pub mod list;
 pub mod monitor;
 pub mod thumbnail;
 pub mod window;

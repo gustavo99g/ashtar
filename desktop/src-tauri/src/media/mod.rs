@@ -12,16 +12,16 @@
 // quando os comandos novos usarem tudo.
 #![allow(dead_code, unused_imports)]
 
-mod capture;
-mod gate;
-mod sink;
-
 pub mod audio;
+mod capture;
 pub mod diagnostics;
+pub mod focus;
+mod gate;
 pub mod ipc_sink;
 pub mod platform;
 pub mod quality;
 pub mod session;
+mod sink;
 pub mod sources;
 pub mod video_capture;
 
