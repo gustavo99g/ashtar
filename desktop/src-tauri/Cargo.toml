@@ -30,7 +30,9 @@ tracing-appender = "0.2"
 wasapi = "0.27.0"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
 base64 = "0.23.1"
-livekit = "0.10.1"
+# `native-tls` (o SChannel do Windows): sem uma das features de TLS, a 0.10 não abre `wss://`
+# ("TLS support not compiled in"), e o LiveKit Cloud só atende por `wss://`.
+livekit = { version = "0.10.1", features = ["native-tls"] }
 windows-sys = { version = "0.61.2", features = [
     "Win32_Foundation",
     "Win32_UI_WindowsAndMessaging",

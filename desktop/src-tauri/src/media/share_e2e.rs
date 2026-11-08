@@ -187,3 +187,21 @@ fn transmite_assiste_pausa_e_para() {
     ));
     async_runtime::block_on(viewer.close()).ok();
 }
+
+/// Regressão: sem uma feature de TLS na `livekit`, o `wss://` do LiveKit Cloud falhava com "TLS
+/// support not compiled in". Aqui o servidor `--dev` fala só `ws://`: o `wss://` conecta no TCP e
+/// falha no aperto de mão do TLS, que é a prova de que o TLS está compilado.
+#[test]
+#[ignore = "precisa de um livekit-server --dev"]
+fn wss_tem_suporte_a_tls() {
+    let result = async_runtime::block_on(Room::connect(
+        "wss://127.0.0.1:7880",
+        &viewer_token(),
+        RoomOptions::default(),
+    ));
+    let error = result
+        .expect_err("o servidor local não fala TLS")
+        .to_string();
+    println!("{error}");
+    assert!(!error.contains("not compiled in"), "{error}");
+}
