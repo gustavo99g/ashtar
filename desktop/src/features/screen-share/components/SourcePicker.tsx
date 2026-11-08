@@ -516,7 +516,11 @@ function useVisibleCards() {
 		};
 	}, []);
 
-	// Um `ref` por chave, sempre o mesmo: um novo a cada desenho tiraria e poria o card de volta.
+	// Um `ref` por chave, sempre o mesmo: um novo a cada desenho tiraria e poria o card de volta,
+	// e o card sairia e voltaria da lista de visíveis a cada desenho (e, com ela, as miniaturas
+	// pedidas ao Rust, que recomeçaria todas as capturas). O `ref` nunca sai deste mapa: o
+	// `StrictMode` do dev solta e põe o `ref` de novo na montagem, e tirar do mapa nessa hora fazia
+	// o `ref` seguinte ser outro, e o ciclo não parava.
 	const refs = useRef(
 		new Map<string, (element: HTMLElement | null) => () => void>(),
 	);
@@ -535,7 +539,6 @@ function useVisibleCards() {
 						);
 				}
 				return () => {
-					refs.current.delete(key);
 					if (!element) return;
 					elements.current.delete(element);
 					observer.current?.unobserve(element);
