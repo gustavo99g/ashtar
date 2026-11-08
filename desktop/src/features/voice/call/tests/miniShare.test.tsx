@@ -24,11 +24,15 @@ vi.mock("@/features/screen-share", () => ({ useScreenShares: vi.fn() }));
 vi.mock("@livekit/components-react", () => ({
 	VideoTrack: () => <video aria-label="vídeo" />,
 }));
+vi.mock("@/features/screen-share", () => ({
+	useScreenShares: vi.fn(),
+	shareOwner: (identity: string) => identity.replace(/:screen$/, ""),
+}));
 
 /** A transmissão da juju, já assinada, sem áudio. */
 const share = {
 	participant: {
-		identity: "juju",
+		identity: "juju:screen",
 		isLocal: false,
 		getTrackPublication: () => undefined,
 	},
@@ -60,9 +64,11 @@ beforeEach(() => {
 	useRoomView.setState({ watching: null, shown: null });
 	vi.mocked(useVoice).mockReturnValue({ room: {} } as never);
 	vi.mocked(useLiveMembers).mockReturnValue([juju] as never);
+	const jujuShare = { track: share, ownerId: "juju", isOwn: false };
+
 	vi.mocked(useScreenShares).mockReturnValue({
-		shares: [share],
-		winner: share,
+		shares: [jujuShare],
+		winner: jujuShare,
 	});
 });
 
@@ -71,6 +77,22 @@ afterEach(() => {
 });
 
 describe("a miniatura da transmissão", () => {
+	it("a transmissão pausada (a trilha silenciada) mostra o aviso", () => {
+		const paused = {
+			...share,
+			publication: { ...share.publication, isMuted: true },
+		} as unknown as TrackReference;
+		const pausedShare = { track: paused, ownerId: "juju", isOwn: false };
+		vi.mocked(useScreenShares).mockReturnValue({
+			shares: [pausedShare],
+			winner: pausedShare,
+		});
+		act(() => watchShare("juju"));
+		renderAt(paths.channel("geral"));
+
+		expect(screen.getByText("Transmissão pausada")).toBeInTheDocument();
+	});
+
 	it("aparece fora da sala para quem estava assistindo, e baixa a tela", () => {
 		act(() => watchShare("juju"));
 		renderAt(paths.channel("geral"));

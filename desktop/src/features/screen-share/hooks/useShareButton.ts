@@ -1,8 +1,13 @@
-import type { Participant } from "livekit-client";
+import { type ParticipantPerson, participantPerson } from "@/features/identity";
 import type { ScreenShareController } from "../model/controller";
 import { openSourcePicker } from "../stores/pickerStore";
 import { useScreenShareState } from "./useScreenShareState";
-import { useScreenShares } from "./useScreenShares";
+import { type ScreenShare, useScreenShares } from "./useScreenShares";
+
+/** Quem transmite `share`: o nome e o nick vêm da `:screen` (a API repete os do dono), o id é o dono. */
+export function sharePerson(share: ScreenShare): ParticipantPerson {
+	return { ...participantPerson(share.track.participant), id: share.ownerId };
+}
 
 /**
  * O comportamento do botão Tela, para a barra da sala e o painel "Voz conectada" desenharem cada
@@ -16,10 +21,8 @@ export function useShareButton(controller: ScreenShareController) {
 
 	const active = state.status === "active";
 	const starting = state.status === "starting";
-	const busyWith: Participant | null =
-		!active && winner && !winner.participant.isLocal
-			? winner.participant
-			: null;
+	const busyWith: ParticipantPerson | null =
+		!active && winner && !winner.isOwn ? sharePerson(winner) : null;
 
 	return {
 		active,

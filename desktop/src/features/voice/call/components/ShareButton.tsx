@@ -9,7 +9,7 @@ import {
 	PopoverTitle,
 	PopoverTrigger,
 } from "@/components/ui/popover";
-import { Avatar, AvatarBadge, participantPerson } from "@/features/identity";
+import { Avatar, AvatarBadge } from "@/features/identity";
 import {
 	type ScreenShareController,
 	useShareButton,
@@ -33,7 +33,7 @@ export function ShareButton({
 	const navigate = useNavigate();
 	const { active, starting, busyWith, onClick } = useShareButton(controller);
 	const [open, setOpen] = useState(false);
-	const sharer = busyWith ? participantPerson(busyWith) : null;
+	const sharer = busyWith;
 
 	const label = active
 		? "Parar de transmitir a tela"

@@ -17,7 +17,7 @@ import {
 import { useMatch, useNavigate } from "react-router-dom";
 import { Slider } from "@/components/ui/slider";
 import { Spinner } from "@/components/ui/spinner";
-import { useScreenShares } from "@/features/screen-share";
+import { shareOwner, useScreenShares } from "@/features/screen-share";
 import { paths } from "@/lib/paths";
 import { cn } from "@/lib/utils";
 import { useLiveMembers } from "../../members/hooks/useLiveMembers";
@@ -34,6 +34,7 @@ import { setMiniCorner, useMiniShare } from "../stores/miniShareStore";
 import { setShown, stopWatching, useRoomView } from "../stores/roomViewStore";
 import { setShareVolume, toggleShareMuted } from "../stores/shareVolumeStore";
 import { LiveBadge } from "./LiveBadge";
+import { PausedCover } from "./PausedCover";
 
 /*
  * A miniatura da transmissão: quem assiste alguém no Foco e sai da sala (para um canal de texto)
@@ -61,10 +62,8 @@ function WatchedShare({ watching }: { watching: string }) {
 	const { winner } = useScreenShares();
 	const members = useLiveMembers();
 	const watched =
-		winner &&
-		!winner.participant.isLocal &&
-		winner.participant.identity === watching
-			? winner
+		winner && !winner.isOwn && winner.ownerId === watching
+			? winner.track
 			: undefined;
 	const sharer = members.find((member) => member.id === watching);
 
@@ -97,7 +96,7 @@ function MiniShareFrame({
 	const [drag, setDrag] = useState<{ left: number; top: number } | null>(null);
 	const grab = useRef<{ x: number; y: number } | null>(null);
 
-	const sharerId = share.participant.identity;
+	const sharerId = shareOwner(share.participant.identity);
 	useEffect(() => {
 		setShown(sharerId);
 		return () => setShown(null);
@@ -184,6 +183,8 @@ function MiniShareFrame({
 			) : (
 				<Spinner className="size-5 text-primary" />
 			)}
+			{ready && share.publication.isMuted && <PausedCover compact />}
+
 			<LiveBadge className="absolute top-2 left-2" />
 			<div className="absolute inset-x-0 bottom-0 flex items-center gap-1.5 bg-gradient-to-t from-rail/95 to-transparent px-2 pt-6 pb-2 opacity-0 transition-opacity group-hover/mini:opacity-100 group-focus-within/mini:opacity-100">
 				<span className="min-w-0 flex-1 truncate text-xs font-semibold text-foreground">

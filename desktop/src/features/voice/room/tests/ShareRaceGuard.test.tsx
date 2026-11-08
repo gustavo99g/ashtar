@@ -12,6 +12,11 @@ import { ShareRaceGuard } from "../components/ShareRaceGuard";
 vi.mock("@/features/screen-share", () => ({
 	useScreenShareState: vi.fn(),
 	useScreenShares: vi.fn(),
+	sharePerson: (share: { ownerId: string; name: string }) => ({
+		id: share.ownerId,
+		nick: share.name,
+		name: share.name,
+	}),
 }));
 vi.mock("@/components/ui/toast", () => ({
 	toast: { add: vi.fn(() => "toast-1"), close: vi.fn() },
@@ -21,11 +26,10 @@ const controller = {
 	stop: vi.fn(() => Promise.resolve()),
 } as unknown as ScreenShareController;
 
-/** Uma publicação de tela: `local` é a minha; `name` é o nome visível de quem publicou. */
-function share(identity: string, local: boolean, name = identity) {
-	return { participant: { identity, isLocal: local, name } };
+/** Uma transmissão: `own` é a minha; `name` é o nome visível de quem transmite. */
+function share(ownerId: string, own: boolean, name = ownerId) {
+	return { ownerId, isOwn: own, name };
 }
-
 const mine = share("u1", true, "Eu");
 const theirs = share("u2", false, "Lua");
 

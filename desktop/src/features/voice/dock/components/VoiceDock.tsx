@@ -1,15 +1,17 @@
 import { SourcePickerHost } from "@/features/screen-share";
-import { SALA } from "../../room/model/channel";
-import { useVoice } from "../../room/hooks/useVoice";
 import { ShareNotices } from "../../call/components/ShareNotices";
 import { ShareRaceGuard } from "../../room/components/ShareRaceGuard";
+import { useVoice } from "../../room/hooks/useVoice";
+import { SALA } from "../../room/model/channel";
+import { ShareHost } from "./ShareHost";
+import { TrayShare } from "./TrayShare";
 import { UserPanel } from "./UserPanel";
 import { VoiceConnection } from "./VoiceConnection";
 
 /**
  * O pé da coluna do servidor: o painel "Voz conectada" enquanto há chamada e o cartão de quem está
- * usando. O seletor de fonte, os avisos do compartilhamento e a regra de uma transmissão por vez
- * moram aqui porque a coluna fica montada em todas as telas da chamada.
+ * usando. O seletor de fonte, o painel da transmissão, os avisos, a regra de uma transmissão por
+ * vez e as opções da bandeja moram aqui porque a coluna fica montada em todas as telas da chamada.
  */
 export function VoiceDock() {
 	const { voiceChannelId, room, screenShare } = useVoice();
@@ -20,10 +22,18 @@ export function VoiceDock() {
 				{voiceChannelId && <VoiceConnection />}
 				<UserPanel />
 			</div>
-			{screenShare && (
-				<SourcePickerHost controller={screenShare} channelName={SALA.name} />
-			)}
+			{screenShare &&
+				(room ? (
+					<ShareHost room={room} controller={screenShare} />
+				) : (
+					<SourcePickerHost
+						controller={screenShare}
+						channelName={SALA.name}
+						viewers={[]}
+					/>
+				))}
 			{screenShare && <ShareNotices controller={screenShare} />}
+			{screenShare && <TrayShare controller={screenShare} />}
 			{room && screenShare && <ShareRaceGuard controller={screenShare} />}
 		</div>
 	);

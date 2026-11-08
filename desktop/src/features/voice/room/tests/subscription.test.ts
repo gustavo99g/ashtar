@@ -28,19 +28,38 @@ function roomWith(
 			} as unknown as RemoteParticipant,
 		]),
 	);
-	return { remoteParticipants } as unknown as Room;
+	return {
+		remoteParticipants,
+		localParticipant: { identity: "eu" },
+	} as unknown as Room;
 }
 
 describe("o que a sala baixa", () => {
 	it("a voz sempre; a tela e o áudio dela só de quem está no palco", () => {
-		expect(wantsTrack(Track.Source.Microphone, "juju", null)).toBe(true);
-		expect(wantsTrack(Track.Source.ScreenShare, "juju", null)).toBe(false);
-		expect(wantsTrack(Track.Source.ScreenShareAudio, "juju", null)).toBe(false);
-		expect(wantsTrack(Track.Source.ScreenShare, "juju", "juju")).toBe(true);
-		expect(wantsTrack(Track.Source.ScreenShareAudio, "juju", "juju")).toBe(
+		const want = (
+			source: Track.Source,
+			identity: string,
+			shown: string | null,
+		) => wantsTrack(source, identity, shown, "eu");
+		expect(want(Track.Source.Microphone, "juju", null)).toBe(true);
+		expect(want(Track.Source.ScreenShare, "juju:screen", null)).toBe(false);
+		expect(want(Track.Source.ScreenShareAudio, "juju:screen", null)).toBe(
+			false,
+		);
+		expect(want(Track.Source.ScreenShare, "juju:screen", "juju")).toBe(true);
+		expect(want(Track.Source.ScreenShareAudio, "juju:screen", "juju")).toBe(
 			true,
 		);
-		expect(wantsTrack(Track.Source.ScreenShare, "juju", "marcao")).toBe(false);
+		expect(want(Track.Source.ScreenShare, "juju:screen", "marcao")).toBe(false);
+	});
+
+	it("nunca a própria tela, nem o áudio dela", () => {
+		for (const source of [
+			Track.Source.ScreenShare,
+			Track.Source.ScreenShareAudio,
+		]) {
+			expect(wantsTrack(source, "eu:screen", "eu", "eu")).toBe(false);
+		}
 	});
 
 	it("assina e cancela só o que muda", () => {
@@ -49,7 +68,8 @@ describe("o que a sala baixa", () => {
 		const screenAudio = publication(Track.Source.ScreenShareAudio, false);
 		const otherMic = publication(Track.Source.Microphone, true);
 		const room = roomWith({
-			juju: [mic, screen, screenAudio],
+			juju: [mic],
+			"juju:screen": [screen, screenAudio],
 			marcao: [otherMic],
 		});
 

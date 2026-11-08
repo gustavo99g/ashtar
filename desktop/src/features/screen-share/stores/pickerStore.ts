@@ -1,23 +1,43 @@
 /**
- * Se o seletor de fonte está aberto, e o último pedido que ele fez. Um store, e não um estado de
- * componente, porque mais de um lugar abre o mesmo seletor: o botão Tela da barra da sala, o do
- * painel "Voz conectada" e a ação de um aviso ("Compartilhar outra"), que roda fora da árvore do
- * React. O último pedido serve ao "Tentar de novo" do aviso de áudio.
+ * Se o seletor de fonte e o painel da transmissão estão abertos, e o último pedido. Um store, e
+ * não um estado de componente, porque mais de um lugar abre os dois: o botão Tela da barra da
+ * sala, o do painel "Voz conectada", o lugar da própria transmissão na Grade, a bandeja e a ação
+ * de um aviso ("Compartilhar outra"), que roda fora da árvore do React. O último pedido serve ao
+ * "Tentar de novo" do aviso de áudio.
  */
 import { create } from "zustand";
+import type { CaptureSource } from "@/lib/tauri/commands";
 import type { ScreenShareController, ShareRequest } from "../model/controller";
+
+/** `start`: começa uma transmissão. `change`: troca a fonte da que está no ar. */
+export type PickerMode = "start" | "change";
 
 export const usePickerStore = create<{
 	open: boolean;
+	mode: PickerMode;
+	panelOpen: boolean;
 	lastRequest: ShareRequest | null;
-}>()(() => ({ open: false, lastRequest: null }));
+}>()(() => ({
+	open: false,
+	mode: "start",
+	panelOpen: false,
+	lastRequest: null,
+}));
 
-export function openSourcePicker(): void {
-	usePickerStore.setState({ open: true });
+export function openSourcePicker(mode: PickerMode = "start"): void {
+	usePickerStore.setState({ open: true, mode });
 }
 
 export function closeSourcePicker(): void {
 	usePickerStore.setState({ open: false });
+}
+
+export function openSharePanel(): void {
+	usePickerStore.setState({ panelOpen: true });
+}
+
+export function closeSharePanel(): void {
+	usePickerStore.setState({ panelOpen: false });
 }
 
 /** Começa o compartilhamento e guarda o pedido. */
@@ -29,18 +49,19 @@ export function startShare(
 	return controller.start(request);
 }
 
-/**
- * Recomeça o compartilhamento ativo com o mesmo pedido: a captura do áudio começa de novo junto
- * com a do vídeo, porque o controller não tem como religar só o áudio.
- */
+/** Troca a fonte da transmissão no ar; quem assiste não sai da tela. */
+export function changeSource(
+	controller: ScreenShareController,
+	source: CaptureSource,
+): Promise<void> {
+	return controller.update({ kind: "source", source });
+}
+
+/** Religa o áudio da transmissão ativa, o mesmo de antes; o vídeo segue sem parar. */
 export async function restartShare(
 	controller: ScreenShareController,
 ): Promise<void> {
-	const request = usePickerStore.getState().lastRequest;
 	const state = controller.getState();
-	if (!request || state.status !== "active") return;
-	if (state.source.source.kind !== request.source.source.kind) return;
-	if (state.source.source.id !== request.source.source.id) return;
-	await controller.stop();
-	await controller.start(request);
+	if (state.status !== "active") return;
+	await controller.update({ kind: "audio", audio: state.audioMode });
 }

@@ -9,6 +9,7 @@ const source: CaptureSource = {
 	processId: 7,
 	icon: null,
 	monitor: null,
+	minimized: false,
 };
 const active = (
 	audio: "off" | "on" | "lost",
@@ -18,6 +19,10 @@ const active = (
 	sessionId,
 	source,
 	audio,
+	quality: "1080p30",
+	audioMode: { mode: "application", processId: 7 },
+	cursor: true,
+	paused: false,
 });
 
 describe("shareNotice", () => {
