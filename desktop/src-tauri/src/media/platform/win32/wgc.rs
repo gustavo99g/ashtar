@@ -18,7 +18,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use windows::core::{factory, Interface};
-use windows::Foundation::TypedEventHandler;
+use windows::Foundation::{TimeSpan, TypedEventHandler};
 use windows::Graphics::Capture::{
     Direct3D11CaptureFramePool, GraphicsCaptureItem, GraphicsCaptureSession,
 };
@@ -44,6 +44,9 @@ use crate::media::sources::SourceRef;
 
 /// Quantos frames o pool guarda. Com 2, o WGC escreve um enquanto o outro é copiado.
 const POOL_FRAMES: i32 = 2;
+/// O intervalo mínimo entre imagens que [`WgcCapture::allow_full_rate`] pede: 2 ms, abaixo do
+/// ciclo de qualquer monitor, para o WGC entregar uma imagem a cada ciclo.
+const MIN_UPDATE_INTERVAL_100NS: i64 = 20_000;
 const FORMAT: DirectXPixelFormat = DirectXPixelFormat::B8G8R8A8UIntNormalized;
 
 /// Prepara a thread atual para o WGC: WinRT (e COM) em modo multithread.
@@ -177,6 +180,22 @@ impl WgcCapture {
             .is_some_and(|hwnd| !unsafe { IsWindow(Some(hwnd)) }.as_bool())
     }
 
+    /// Tira o limite de ~60 imagens por segundo que o Windows põe no WGC.
+    ///
+    /// Por padrão, as imagens saem com pelo menos ~16,7 ms entre si, e só nos ciclos do monitor:
+    /// num monitor de 144 Hz (ciclo de 6,9 ms) isso dá uma imagem a cada 3 ciclos, **48 por
+    /// segundo**, e a transmissão não passa disso. Com um intervalo menor, o pipeline (que pega a
+    /// imagem mais nova a cada volta) chega aos 60. Precisa do Windows 11 22H2; num mais antigo,
+    /// fica o padrão.
+    pub fn allow_full_rate(&self) {
+        let interval = TimeSpan {
+            Duration: MIN_UPDATE_INTERVAL_100NS,
+        };
+        if let Err(error) = self.session.SetMinUpdateInterval(interval) {
+            tracing::info!(%error, "este Windows não deixa tirar o limite de imagens do WGC");
+        }
+    }
+
     /// Liga ou desliga o cursor na imagem, no meio da captura.
     pub fn set_cursor(&self, enabled: bool) {
         if let Err(error) = self.session.SetIsCursorCaptureEnabled(enabled) {
@@ -255,6 +274,10 @@ mod tests {
         init_thread();
         let gpu = GpuDevice::new().expect("dispositivo");
         let mut capture = WgcCapture::new(&gpu, source, true).expect("a captura deveria começar");
+        // Como o pipeline faz: sem isto, um monitor de 144 Hz entrega só 48 imagens por segundo.
+        if std::env::var("WGC_CAPPED").is_err() {
+            capture.allow_full_rate();
+        }
         println!("tamanho: {:?}", capture.size());
         let (mut frames, mut last) = (0, None);
         let until = Instant::now() + Duration::from_secs(seconds);

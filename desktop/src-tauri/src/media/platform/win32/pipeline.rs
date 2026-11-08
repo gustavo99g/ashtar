@@ -169,6 +169,7 @@ impl Pipeline {
         let gpu = GpuDevice::new()?;
         stats.set_adapter(gpu.adapter_name().to_string());
         let capture = WgcCapture::new(&gpu, config.source, config.cursor)?;
+        capture.allow_full_rate();
         let (converter, output) = build_output(
             &gpu,
             &capture,
@@ -277,6 +278,7 @@ impl Pipeline {
                 // que estava.
                 match WgcCapture::new(&self.gpu, source, self.cursor) {
                     Ok(capture) => {
+                        capture.allow_full_rate();
                         tracing::info!(target: "media", fonte = label, "fonte nova");
                         self.capture = capture;
                         self.rebuild()?;
