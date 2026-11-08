@@ -234,18 +234,6 @@ impl Converter {
         unsafe { self.context.CopyResource(&self.input, frame) };
     }
 
-    /// Escreve na entrada uma imagem BGRA da memória (a da pausa), do tamanho da entrada.
-    pub fn store_pixels(&self, bgra: &[u8]) {
-        let (width, height) = self.input_size;
-        debug_assert_eq!(bgra.len(), (width * height * 4) as usize);
-        // SAFETY: `bgra` tem `width × height × 4` bytes, com linhas de `width × 4`, e vive
-        // durante a chamada; a textura de entrada tem esse tamanho e é do mesmo dispositivo.
-        unsafe {
-            self.context
-                .UpdateSubresource(&self.input, 0, None, bgra.as_ptr().cast(), width * 4, 0)
-        };
-    }
-
     /// Reduz e converte a última imagem guardada para a textura `slot` do anel, e a devolve.
     pub fn convert(&self, slot: usize) -> Result<&ID3D11Texture2D, AppError> {
         let (texture, view) = &self.outputs[slot % RING];

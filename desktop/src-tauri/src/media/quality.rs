@@ -1,77 +1,52 @@
-//! Presets de qualidade do compartilhamento (decisão 16 do `docs/plans/v0.1-reorganizacao.md`).
+//! Os presets da transmissão (ADR 0018).
 //!
-//! O frontend manda só o nome (`"720p60"`). Aqui ele vira o que o Rust
-//! precisa: a caixa máxima e o fps da captura, e quantos frames podem estar
-//! em trânsito no caminho IPC. Bitrate e dicas ao encoder são do frontend,
-//! que é quem publica a trilha.
+//! O frontend manda só o nome (`"1080p60"`). Aqui ele vira o formato do vídeo: a caixa máxima, o
+//! fps e o bitrate. A imagem é reduzida para caber na caixa, nunca ampliada. Os textos do seletor
+//! ficam no `presets.ts`, com as mesmas chaves.
+
+use serde::Deserialize;
 
 use super::video::VideoFormat;
-use serde::Deserialize;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
 pub enum Quality {
-    /// Movimento: 1280×720 a 60 fps.
+    /// Leve: 1280×720 a 60 fps, para upload fraco ou placa de vídeo antiga.
     #[serde(rename = "720p60")]
+    Light,
+    /// Movimento: 1920×1080 a 60 fps, para jogos e vídeos.
+    #[serde(rename = "1080p60")]
     Motion,
-    /// Equilibrado: 1600×900 a 60 fps.
-    #[serde(rename = "900p60")]
-    Balanced,
-    /// Nitidez: 1920×1080 a 30 fps.
+    /// Nitidez: 1920×1080 a 30 fps, com mais bits por frame, para texto.
     #[serde(rename = "1080p30")]
     Detail,
 }
 
-/// O que um preset significa para o Rust.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct QualityPreset {
-    pub max_width: u32,
-    pub max_height: u32,
-    pub fps: u32,
-    /// Máximo de frames em trânsito no caminho IPC (limite do `FrameGate`).
-    pub max_in_flight: u32,
-    /// O bitrate do preset no caminho nativo (o mesmo `maxBitrate` do `presets.ts`).
-    pub bitrate_bps: u32,
-}
-
 impl Quality {
-    pub const ALL: [Quality; 3] = [Self::Motion, Self::Balanced, Self::Detail];
+    #[cfg(test)]
+    pub const ALL: [Quality; 3] = [Self::Light, Self::Motion, Self::Detail];
 
-    pub const fn preset(self) -> QualityPreset {
+    /// O que o preset pede ao vídeo. Os bitrates são o ponto de partida; a medição da Etapa 6 da
+    /// v0.2.4 escolhe os definitivos.
+    pub const fn format(self) -> VideoFormat {
         match self {
-            Self::Motion => QualityPreset {
+            Self::Light => VideoFormat {
                 max_width: 1280,
                 max_height: 720,
                 fps: 60,
-                max_in_flight: 5,
-                bitrate_bps: 3_500_000,
+                bitrate_bps: 4_000_000,
             },
-            Self::Balanced => QualityPreset {
-                max_width: 1600,
-                max_height: 900,
+            Self::Motion => VideoFormat {
+                max_width: 1920,
+                max_height: 1080,
                 fps: 60,
-                max_in_flight: 5,
                 bitrate_bps: 8_000_000,
             },
-            Self::Detail => QualityPreset {
+            Self::Detail => VideoFormat {
                 max_width: 1920,
                 max_height: 1080,
                 fps: 30,
-                max_in_flight: 3,
-                bitrate_bps: 8_000_000,
+                bitrate_bps: 6_000_000,
             },
-        }
-    }
-}
-
-impl Quality {
-    /// O que o preset pede ao vídeo do caminho nativo.
-    pub const fn format(self) -> VideoFormat {
-        let preset = self.preset();
-        VideoFormat {
-            max_width: preset.max_width,
-            max_height: preset.max_height,
-            fps: preset.fps,
-            bitrate_bps: preset.bitrate_bps,
         }
     }
 }
@@ -79,48 +54,43 @@ impl Quality {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    /// Ida e volta de um frame medida em dev (decisão 16): ~70 ms.
-    const MEASURED_ROUND_TRIP_S: f64 = 0.070;
-
-    #[test]
-    fn todo_preset_e_um_formato_valido() {
-        for q in Quality::ALL {
-            assert!(q.format().validate().is_ok(), "{q:?}");
-        }
-    }
+    use crate::media::publisher::MAX_BITRATE_BPS;
 
     #[test]
     fn le_os_nomes_enviados_pelo_frontend() {
         let q: Quality = serde_json::from_str(r#""720p60""#).unwrap();
+        assert_eq!(q, Quality::Light);
+        let q: Quality = serde_json::from_str(r#""1080p60""#).unwrap();
         assert_eq!(q, Quality::Motion);
-        let q: Quality = serde_json::from_str(r#""900p60""#).unwrap();
-        assert_eq!(q, Quality::Balanced);
         let q: Quality = serde_json::from_str(r#""1080p30""#).unwrap();
         assert_eq!(q, Quality::Detail);
 
-        assert!(serde_json::from_str::<Quality>(r#""1080p60""#).is_err());
+        // O Equilibrado do caminho IPC saiu.
+        assert!(serde_json::from_str::<Quality>(r#""900p60""#).is_err());
     }
 
     #[test]
-    fn caixas_tem_dimensoes_pares() {
+    fn todo_preset_e_um_formato_valido_dentro_do_teto() {
         for q in Quality::ALL {
-            let p = q.preset();
-            assert!(p.max_width % 2 == 0 && p.max_height % 2 == 0, "{q:?}");
-        }
-    }
-
-    #[test]
-    fn gate_nao_limita_o_fps_do_preset() {
-        // Com N frames em trânsito, o fps máximo é N / ida e volta.
-        for q in Quality::ALL {
-            let p = q.preset();
-            let max_fps = p.max_in_flight as f64 / MEASURED_ROUND_TRIP_S;
+            let format = q.format();
+            assert!(format.validate().is_ok(), "{q:?}");
             assert!(
-                max_fps >= p.fps as f64,
-                "{q:?}: {} em trânsito dá no máximo {max_fps:.0} fps",
-                p.max_in_flight
+                format.max_width % 2 == 0 && format.max_height % 2 == 0,
+                "{q:?}"
             );
+            // A trilha anuncia o teto: um preset acima dele nunca chegaria ao bitrate.
+            assert!(format.bitrate_bps <= MAX_BITRATE_BPS, "{q:?}");
         }
+    }
+
+    #[test]
+    fn leve_gasta_menos_que_movimento() {
+        assert!(Quality::Light.format().bitrate_bps < Quality::Motion.format().bitrate_bps);
+    }
+
+    #[test]
+    fn nitidez_tem_mais_bits_por_frame() {
+        let per_frame = |q: Quality| q.format().bitrate_bps / q.format().fps;
+        assert!(per_frame(Quality::Detail) > per_frame(Quality::Motion));
     }
 }

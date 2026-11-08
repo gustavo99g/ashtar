@@ -59,7 +59,7 @@ pub fn run(log_file: logging::LateFile) {
 
             app.manage(commands::screen_share::create_manager(app.handle()));
             app.manage(commands::updater::create_auto_update(app.handle()));
-            app.manage(commands::share::create_manager(app.handle()));
+            app.manage(commands::thumbnails::Thumbnails::default());
 
             updater::spawn_periodic_check(app.handle().clone());
             deep_link::register_schemes(app);
@@ -75,12 +75,12 @@ pub fn run(log_file: logging::LateFile) {
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             commands::screen_share::list_capture_sources,
-            commands::screen_share::ipc_screen_share_start,
-            commands::screen_share::ipc_screen_share_ack,
-            commands::screen_share::ipc_screen_share_stop,
-            commands::share::screen_share_start,
-            commands::share::screen_share_update,
-            commands::share::screen_share_stop,
+            commands::screen_share::screen_share_start,
+            commands::screen_share::screen_share_update,
+            commands::screen_share::screen_share_stop,
+            commands::thumbnails::thumbnails_start,
+            commands::thumbnails::thumbnails_update,
+            commands::thumbnails::thumbnails_stop,
             commands::updater::pending_update,
             commands::updater::install_update,
             commands::updater::check_for_update,
@@ -88,6 +88,7 @@ pub fn run(log_file: logging::LateFile) {
             commands::updater::check_for_update_now,
             commands::app::whats_new,
             commands::app::open_log_dir,
+            commands::app::tray_share_state,
             commands::identity::login,
             commands::identity::redeem,
             commands::identity::account_marker

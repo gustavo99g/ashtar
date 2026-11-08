@@ -94,6 +94,7 @@ impl H264File {
         })
     }
 
+    #[cfg(test)]
     pub fn frames(&self) -> u64 {
         self.frames
     }
@@ -119,6 +120,7 @@ impl Drop for H264File {
         if let Some(out) = self.out.as_mut() {
             let _ = out.flush();
         }
+        tracing::info!(target: "media", frames = self.frames, "o .h264 de diagnóstico foi fechado");
     }
 }
 

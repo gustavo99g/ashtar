@@ -20,6 +20,7 @@
 //! - `start`, `update` e `stop` bloqueiam: chamar só dentro de `spawn_blocking`.
 
 use std::{
+    path::Path,
     sync::{mpsc, Arc, Mutex, MutexGuard, PoisonError},
     thread,
 };
@@ -30,6 +31,7 @@ use crate::{
     error::AppError,
     media::{
         audio::{spawn_audio_capture, AudioMode},
+        encoded::{Fanout, H264File},
         publisher::{Publisher, ShareTarget},
         sources::SourceRef,
         video::{self, VideoCommand, VideoConfig, VideoControl, VideoFormat, VideoStats},
@@ -493,7 +495,15 @@ fn start_native(
     ends: Ends,
 ) -> Result<Started, AppError> {
     let mut publisher = Publisher::connect(target, ends.link_lost)?;
-    let sink = publisher.video_sink();
+    let mut sink = Fanout::new().with(publisher.video_sink());
+    // Para conferir a imagem que saiu do encoder: `ASHTAR_DUMP_H264=C:\caminho\tela.h264` grava
+    // o H.264 da transmissão (abre com o ffplay).
+    if let Some(path) = std::env::var_os("ASHTAR_DUMP_H264") {
+        match H264File::create(Path::new(&path)) {
+            Ok(file) => sink = sink.with(file),
+            Err(error) => warn!(%error, "não deu para criar o .h264 de diagnóstico"),
+        }
+    }
     let (video, control, stats) = match video::spawn_video(config, sink, ends.video) {
         Ok(started) => started,
         Err(error) => {

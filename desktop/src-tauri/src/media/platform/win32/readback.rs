@@ -101,6 +101,44 @@ impl Readback {
 mod tests {
     use super::*;
     use crate::media::platform::win32::convert::Converter;
+    use windows::Win32::Graphics::Direct3D11::{
+        D3D11_BIND_SHADER_RESOURCE, D3D11_SUBRESOURCE_DATA, D3D11_USAGE_DEFAULT,
+    };
+    use windows::Win32::Graphics::Dxgi::Common::DXGI_FORMAT_B8G8R8A8_UNORM;
+
+    /// Uma textura BGRA do tamanho `size` toda de um pixel só, escrita pela CPU.
+    fn bgra_texture(gpu: &GpuDevice, size: (u32, u32), pixel: [u8; 4]) -> ID3D11Texture2D {
+        let pixels = pixel.repeat((size.0 * size.1) as usize);
+        let desc = D3D11_TEXTURE2D_DESC {
+            Width: size.0,
+            Height: size.1,
+            MipLevels: 1,
+            ArraySize: 1,
+            Format: DXGI_FORMAT_B8G8R8A8_UNORM,
+            SampleDesc: DXGI_SAMPLE_DESC {
+                Count: 1,
+                Quality: 0,
+            },
+            Usage: D3D11_USAGE_DEFAULT,
+            BindFlags: D3D11_BIND_SHADER_RESOURCE.0 as u32,
+            CPUAccessFlags: 0,
+            MiscFlags: 0,
+        };
+        let data = D3D11_SUBRESOURCE_DATA {
+            pSysMem: pixels.as_ptr().cast(),
+            SysMemPitch: size.0 * 4,
+            SysMemSlicePitch: 0,
+        };
+        let mut texture = None;
+        // SAFETY: `desc` e `data` são locais e vivem durante a chamada; `pixels` tem
+        // `width × height × 4` bytes, com linhas de `width × 4`.
+        unsafe {
+            gpu.device()
+                .CreateTexture2D(&desc, Some(&data), Some(&mut texture))
+        }
+        .expect("textura");
+        texture.expect("textura")
+    }
 
     /// Uma imagem toda vermelha (BGRA) vira NV12 com o Y, o U e o V do vermelho em BT.709 de
     /// faixa limitada: confere onde o plano UV começa e a conversão de cor, não só o tamanho.
@@ -111,8 +149,7 @@ mod tests {
         let size = (64, 64);
         let converter =
             Converter::new(&gpu, size, size, OutputFormat::Nv12, 60).expect("conversor");
-        let red = [0u8, 0, 255, 255].repeat((size.0 * size.1) as usize);
-        converter.store_pixels(&red);
+        converter.store(&bgra_texture(&gpu, size, [0, 0, 255, 255]));
         let texture = converter.convert(0).expect("conversão");
 
         let nv12 = Readback::new(&gpu, size, OutputFormat::Nv12)

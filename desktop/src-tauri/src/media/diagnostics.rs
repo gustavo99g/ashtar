@@ -1,114 +1,16 @@
-//! Sinks de diagnóstico: não enviam nada, só registram no log (target "perf")
-//! um resumo do que recebem, uma vez por segundo.
-//!
-//! Servem para testar cada captura isoladamente, sem IPC nem LiveKit no meio.
-//! As métricas seguem o critério da linha de base (plan.md, Etapa 6): a média de
-//! fps sozinha engana, então o sink de vídeo também conta os intervalos longos
-//! entre frames.
+//! O destino de diagnóstico do áudio: não envia nada, só registra no log (target "perf") um
+//! resumo do que recebe, uma vez por segundo. Serve para testar a captura de áudio sozinha, sem a
+//! LiveKit no meio. (O do vídeo é o `H264File`, em `encoded.rs`.)
 //!
 //! Para ver os relatórios: `RUST_LOG=info,perf=debug`.
 
-use livekit::webrtc::video_frame::VideoBuffer;
 use std::time::{Duration, Instant};
 
 use tracing::debug;
 
-use super::{AudioSink, CapturedFrame, SinkStatus, VideoSink, AUDIO_CHANNELS};
+use super::{AudioSink, SinkStatus, AUDIO_CHANNELS};
 
 const REPORT_EVERY: Duration = Duration::from_secs(1);
-
-// ============================================================================
-// Vídeo
-// ============================================================================
-
-/// Estatísticas dos intervalos entre frames numa janela de tempo.
-///
-/// Os limites são cumulativos: um intervalo de 60 ms conta nos três.
-/// - acima de 20 ms: passou de um frame a 60 fps (16,7 ms), ou seja, atrasou;
-/// - acima de 34 ms: passou de um frame a 30 fps (33,3 ms);
-/// - acima de 50 ms: travada visível para quem assiste.
-#[derive(Debug, Default, PartialEq)]
-struct GapStats {
-    max_us: i64,
-    over_20ms: u32,
-    over_34ms: u32,
-    over_50ms: u32,
-}
-
-impl GapStats {
-    fn record(&mut self, gap_us: i64) {
-        self.max_us = self.max_us.max(gap_us);
-        if gap_us > 20_000 {
-            self.over_20ms += 1;
-        }
-        if gap_us > 34_000 {
-            self.over_34ms += 1;
-        }
-        if gap_us > 50_000 {
-            self.over_50ms += 1;
-        }
-    }
-}
-
-/// Registra fps, resolução e intervalos entre frames.
-///
-/// O relatório só sai quando chega um frame: se a captura parar de entregar,
-/// os logs param, e isso já é o sinal de que algo travou.
-pub struct LogVideoSink {
-    frames: u32,
-    gaps: GapStats,
-    last_timestamp_us: Option<i64>,
-    last_report: Instant,
-}
-impl LogVideoSink {
-    pub fn new() -> Self {
-        Self {
-            frames: 0,
-            gaps: GapStats::default(),
-            last_timestamp_us: None,
-            last_report: Instant::now(),
-        }
-    }
-}
-impl Default for LogVideoSink {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl VideoSink for LogVideoSink {
-    fn push(&mut self, frame: &CapturedFrame) -> SinkStatus {
-        self.frames += 1;
-
-        if let Some(previous) = self.last_timestamp_us {
-            self.gaps.record(frame.timestamp_us - previous);
-        }
-        self.last_timestamp_us = Some(frame.timestamp_us);
-
-        let elapsed = self.last_report.elapsed();
-        if elapsed >= REPORT_EVERY {
-            // Esvazia as estatísticas e as devolve, deixando um GapStats::default() no lugar.
-            let gaps = std::mem::take(&mut self.gaps);
-
-            debug!(
-                target: "perf",
-                fps = round1(self.frames as f64 / elapsed.as_secs_f64()),
-                width = frame.buffer.width(),
-                height = frame.buffer.height(),
-                max_gap_ms = round1(gaps.max_us as f64 / 1000.0),
-                gaps_over_20ms = gaps.over_20ms,
-                gaps_over_34ms = gaps.over_34ms,
-                gaps_over_50ms = gaps.over_50ms,
-                "video sink"
-            );
-
-            self.frames = 0;
-            self.last_report = Instant::now();
-        }
-
-        SinkStatus::Continue
-    }
-}
 
 // ============================================================================
 // Áudio
@@ -192,36 +94,6 @@ fn round1(value: f64) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn intervalos_sao_contados_de_forma_cumulativa() {
-        let mut gaps = GapStats::default();
-        gaps.record(16_700); // frame no ritmo de 60 fps: não conta
-        gaps.record(25_000); // atrasou: só acima de 20 ms
-        gaps.record(40_000); // acima de 20 e de 34 ms
-        gaps.record(80_000); // acima dos três
-
-        assert_eq!(
-            gaps,
-            GapStats {
-                max_us: 80_000,
-                over_20ms: 3,
-                over_34ms: 2,
-                over_50ms: 1,
-            }
-        );
-    }
-
-    #[test]
-    fn take_zera_as_estatisticas() {
-        let mut gaps = GapStats::default();
-        gaps.record(60_000);
-
-        let taken = std::mem::take(&mut gaps);
-
-        assert_eq!(taken.over_50ms, 1);
-        assert_eq!(gaps, GapStats::default());
-    }
 
     #[test]
     fn converte_niveis_para_dbfs() {

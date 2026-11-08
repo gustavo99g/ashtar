@@ -52,10 +52,12 @@ impl BitrateController {
     }
 
     /// O valor que deve estar configurado no encoder.
+    #[cfg(test)]
     pub fn setpoint(&self) -> u32 {
         self.setpoint
     }
 
+    #[cfg(test)]
     pub fn target(&self) -> u32 {
         self.target
     }
@@ -72,11 +74,6 @@ impl BitrateController {
         self.target = target_bps;
         self.restart(now);
         self.apply(f64::from(target_bps) * ratio)
-    }
-
-    /// O encoder foi recriado (outro preset): volta ao alvo, sem correção, com o fps novo.
-    pub fn reset(&mut self, target_bps: u32, fps: u32, now: Instant) {
-        *self = Self::new(target_bps, fps, now);
     }
 
     /// Um frame codificado com `bytes` bytes. Devolve o valor novo do encoder, se for hora de

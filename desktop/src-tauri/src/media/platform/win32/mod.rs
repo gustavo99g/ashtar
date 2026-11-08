@@ -13,12 +13,11 @@ pub mod mf_encoder;
 pub mod pipeline;
 pub mod readback;
 pub mod sources;
+pub mod thumbnails;
 pub mod wgc;
-pub mod window_capture;
 
 pub use audio_capture::spawn_audio_capture;
 pub use focus::{bring_to_front, exclude_from_capture};
 pub use pipeline::spawn_video;
 pub use sources::list::{list_monitors, list_windows};
-pub use sources::{monitor_details, window_details};
-pub use window_capture::{prepare_window_capture_thread, window_state};
+pub use thumbnails::spawn_thumbnails;

@@ -26,7 +26,6 @@ use windows::Win32::Media::{timeBeginPeriod, timeEndPeriod};
 
 use super::convert::{Converter, OutputFormat, RING};
 use super::gpu::GpuDevice;
-use super::hr::hr;
 use super::mf_encoder::{EncoderSettings, MfEncoder};
 use super::readback::Readback;
 use super::wgc::{self, WgcCapture};
