@@ -8,6 +8,7 @@ import {
 	useSharePanelOpen,
 } from "@/features/screen-share";
 import { useLiveMembers } from "../../members/hooks/useLiveMembers";
+import { useAnnounceShareQuality } from "../../room/hooks/useShareQuality";
 import { useShareViewers } from "../../room/hooks/useShareViewers";
 import { SALA } from "../../room/model/channel";
 import { usePing } from "../hooks/usePing";
@@ -15,7 +16,7 @@ import { usePing } from "../hooks/usePing";
 /**
  * O seletor e o painel da transmissão, com o que só a sala sabe: quem está assistindo, pelo nome e
  * desde quando (escrito no store que o popover e o painel leem), e o ping, medido só com o painel
- * aberto.
+ * aberto. Também avisa a sala da qualidade, para quem assiste ver a troca.
  */
 export function ShareHost({
 	room,
@@ -24,8 +25,10 @@ export function ShareHost({
 	room: Room;
 	controller: ScreenShareController;
 }) {
-	const active = useScreenShareState(controller).status === "active";
+	const state = useScreenShareState(controller);
+	const active = state.status === "active";
 	const viewers = useShareViewers(room, active);
+	useAnnounceShareQuality(room, active ? state.quality : null, viewers);
 	const members = useLiveMembers();
 	const ping = usePing(useSharePanelOpen() ? room : null);
 
