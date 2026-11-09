@@ -16,7 +16,7 @@ JSON. Com a captura própria (ADR 0018), as duas coisas ficam ao alcance.
 aparecem com o selo "Minimizada" e o ícone; as telas pelo `EnumDisplayMonitors`, com o tamanho real do WGC. Os ids
 são o `HWND` e o `HMONITOR`.
 
-**Miniaturas ao vivo:** uma captura do WGC por card visível (no máximo 24), reduzida na GPU para 320×180,
+**Miniaturas ao vivo:** uma captura do WGC por card visível (no máximo 24), reduzida na GPU para 480×270,
 comprimida em JPEG a 8 fps, só quando a imagem muda, e enviada como bytes crus pelo `Channel` do Tauri. O seletor
 diz quais cards estão à vista (`IntersectionObserver`). O preview de quem transmite é a miniatura da fonte em
 uso.
@@ -27,7 +27,7 @@ uso.
 
 ## Alternativas consideradas
 
-- **Miniaturas em RGBA cru.** 230 KB por imagem a 320×180, várias vezes o JPEG de qualidade 70; com 24 cards a
+- **Miniaturas em RGBA cru.** 520 KB por imagem a 480×270, várias vezes o JPEG de qualidade 80; com 24 cards a
   8 fps, seriam ~44 MB/s pelo `Channel`. O custo do JPEG é pequeno perto do da captura.
 - **Uma imagem estática por janela, tirada ao abrir o seletor.** Mais barato, mas um jogo ou um vídeo pareceria
   parado, e a pessoa escolhe pelo que vê.

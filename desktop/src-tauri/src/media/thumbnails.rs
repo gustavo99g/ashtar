@@ -14,13 +14,14 @@ use super::{platform, CaptureHandle, SinkStatus};
 use crate::error::AppError;
 
 /// O tamanho de cada miniatura, com bordas pretas quando a fonte tem outra proporção.
-pub const THUMB_SIZE: (u32, u32) = (320, 180);
+pub const THUMB_SIZE: (u32, u32) = (480, 270);
 /// Quantas vezes por segundo as miniaturas são lidas.
 pub const THUMB_FPS: u32 = 8;
 /// O máximo de fontes ao mesmo tempo: o seletor só pede as dos cards visíveis.
 pub const MAX_SOURCES: usize = 24;
-/// Qualidade do JPEG (0 a 100): o bastante para reconhecer a janela.
-const JPEG_QUALITY: u8 = 70;
+/// Qualidade do JPEG (0 a 100): o painel da transmissão mostra a miniatura grande, e abaixo disso
+/// o texto e as bordas ganham blocos.
+const JPEG_QUALITY: u8 = 80;
 
 /// O que recebe cada miniatura nova. Devolver `Stop` encerra as miniaturas.
 pub type OnThumbnail = Box<dyn FnMut(SourceRef, &[u8]) -> SinkStatus + Send + 'static>;
