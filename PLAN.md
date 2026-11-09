@@ -22,14 +22,14 @@ Base: a `dev` no `773d66a` (`0.2.30`), mais o `encoder-probe` da Etapa 0. Em cad
 | Etapa | Descrição | Status |
 |---|---|---|
 | 0 | Decisões: experimento (`6472945`), ADRs 0017 a 0019, roadmap, BACKLOG | Concluída |
-| 1 | Captura própria pelo WGC, lista de janelas, foco e exclusão do app | Pendente |
-| 2 | Vídeo na GPU: conversão, encoder, plano B, bitrate e destinos | Pendente |
-| 3 | Publicador `:screen` (vídeo e áudio), sessão, comandos, logs e teste de ponta a ponta | Pendente |
-| 4 | API: token da `:screen`, participantes e kick | Pendente |
-| 5 | App: transmissão nativa, seletor com miniaturas, painel e bandeja; sai o IPC | Pendente |
+| 1 | Captura própria pelo WGC, lista de janelas, foco e exclusão do app | Concluída |
+| 2 | Vídeo na GPU: conversão, encoder, plano B, bitrate e destinos | Concluída |
+| 3 | Publicador `:screen` (vídeo e áudio), sessão, comandos, logs e teste de ponta a ponta | Concluída |
+| 4 | API: token da `:screen`, participantes e kick | Concluída |
+| 5 | App: transmissão nativa, seletor com miniaturas, painel e bandeja; sai o IPC | Concluída |
 | 5c | Nivelador no áudio da transmissão e volume de quem assiste até 200% | Concluída |
-| 6 | Medição contra a `0.2.30` e bitrates dos presets | Pendente |
-| 7 | Lançamento: `0.2.40` no beta e no estável | Pendente |
+| 6 | Medição contra a `0.2.30` e bitrates dos presets | Parcial: só na AMD; o resto segue no beta |
+| 7 | Lançamento: `0.2.40` no beta e no estável | Em andamento: `0.2.40` pronta para o beta |
 
 A 2 usa a captura da 1, a 3 usa o vídeo da 2, e a 5 usa os comandos da 3 e o token da 4. A 4 pode andar em
 paralelo desde o começo. O caminho de hoje (IPC) continua funcionando até a Etapa 5, que é onde ele sai.

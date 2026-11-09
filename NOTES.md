@@ -6,21 +6,21 @@ conscientemente adiado (marcar como tal) antes de fechar a fase. A lista da fase
 
 ## Vindos do BACKLOG
 
-- [ ] **Publicador de vídeo e áudio nativo em Rust:** as duas peças, a redução na GPU antes de copiar para a
+- [x] **Publicador de vídeo e áudio nativo em Rust:** as duas peças, a redução na GPU antes de copiar para a
       memória e o publicador em si, são as Etapas 2 e 3.
-- [ ] **Redução da imagem no caminho do IPC** (o `scale` do libyuv, 5–10 ms no 1080p): deixa de existir com o
+- [x] **Redução da imagem no caminho do IPC** (o `scale` do libyuv, 5–10 ms no 1080p): deixa de existir com o
       IPC (Etapa 5). O `fast_image_resize` sai do `Cargo.toml`.
-- [ ] **Divisão do `capture_frame` em readback, redução e conversão:** sai com o IPC. O caminho novo tem os
+- [x] **Divisão do `capture_frame` em readback, redução e conversão:** sai com o IPC. O caminho novo tem os
       próprios números e logs (Etapa 3).
 - [ ] **Linha de base de desempenho em release por preset** (CPU, memória e histograma de intervalos entre
       frames): a medição da Etapa 6, contra a `0.2.30`.
 - [ ] **Medição e comparação estruturada:** a mesma Etapa 6, com o roteiro e os números na ADR 0017.
-- [ ] **Janelas minimizadas no seletor:** lista própria por `EnumWindows`, o selo "Minimizada" e a janela
+- [x] **Janelas minimizadas no seletor:** lista própria por `EnumWindows`, o selo "Minimizada" e a janela
       restaurada ao escolher (Etapas 1 e 5). Remedir o tempo da lista com muitas janelas: hoje leva ~95 ms com
       4, por causa dos ícones.
-- [ ] **Miniaturas no seletor** (v0.8 do roadmap, adiantadas): pelo WGC, só dos cards visíveis, sem `Vec<u8>` em
+- [x] **Miniaturas no seletor** (v0.8 do roadmap, adiantadas): pelo WGC, só dos cards visíveis, sem `Vec<u8>` em
       JSON, pelo `Channel` do Tauri (Etapa 5).
-- [ ] **Janela parada custa uma conversão por volta:** o WGC só entrega imagem quando algo muda, e o caminho novo
+- [x] **Janela parada custa uma conversão por volta:** o WGC só entrega imagem quando algo muda, e o caminho novo
       só codifica imagens novas (Etapa 2).
 
 ## Antes do beta
@@ -49,8 +49,10 @@ conscientemente adiado (marcar como tal) antes de fechar a fase. A lista da fase
 ## A decidir durante a fase
 
 - [ ] **Atalho do pausar:** uma tecla global ou só pela bandeja e pelo painel.
-- [ ] **Miniaturas em JPEG ou em RGBA cru** pelo `Channel`: o plano parte do JPEG; medir na Etapa 5.
-- [ ] **Codec do plano B:** VP8 ou H.264 em software. Quem assiste decodifica os dois.
+- [x] **Miniaturas em JPEG ou em RGBA cru** pelo `Channel`: JPEG (480×270, qualidade 80): leve o
+      bastante para 24 cards a 8 fps.
+- [x] **Codec do plano B:** VP8 ou H.264 em software. Ficou o VP8, pela
+      `NativeVideoSource` da livekit; quem assiste decodifica os dois.
 
 ## Riscos e cuidados
 
