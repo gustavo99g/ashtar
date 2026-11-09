@@ -104,6 +104,8 @@ pub struct ShareOptions {
     pub quality: Quality,
     pub audio: AudioMode,
     pub cursor: bool,
+    /// O nivelador do áudio (`media/leveler.rs`), ligado por padrão no app.
+    pub leveler: bool,
     pub target: ShareTarget,
 }
 
@@ -121,6 +123,7 @@ pub enum ShareUpdate {
     Audio { audio: AudioMode },
     Cursor { enabled: bool },
     Paused { paused: bool },
+    Leveler { enabled: bool },
 }
 
 impl ShareUpdate {
@@ -130,6 +133,7 @@ impl ShareUpdate {
             Self::Source { source } => ShareChange::Source(source),
             Self::Audio { audio } => ShareChange::Audio(audio),
             Self::Cursor { enabled } => ShareChange::Cursor(enabled),
+            Self::Leveler { enabled } => ShareChange::Leveler(enabled),
             Self::Paused { paused } => ShareChange::Paused(paused),
         }
     }
@@ -226,12 +230,14 @@ pub async fn screen_share_start(
             cursor: options.cursor,
         },
         audio: options.audio,
+        leveler: options.leveler,
         target: options.target,
     };
     info!(
         target: "media",
         quality = ?options.quality,
         audio = ?options.audio,
+        leveler = options.leveler,
         "começando a transmissão"
     );
     let starting = Arc::clone(&manager);
@@ -283,11 +289,13 @@ mod tests {
             "quality": "1080p30",
             "audio": { "mode": "system" },
             "cursor": true,
+            "leveler": true,
             "target": { "url": "wss://sala", "token": "abc", "trackName": "screen-share:{}" }
         }"#;
         let options: ShareOptions = serde_json::from_str(json).unwrap();
         assert_eq!(options.source, SourceRef::Window(123));
         assert_eq!(options.quality, Quality::Detail);
+        assert!(options.leveler);
         assert_eq!(options.target.url, "wss://sala");
     }
 
@@ -319,6 +327,10 @@ mod tests {
             (
                 r#"{ "kind": "paused", "paused": true }"#,
                 ShareUpdate::Paused { paused: true },
+            ),
+            (
+                r#"{ "kind": "leveler", "enabled": false }"#,
+                ShareUpdate::Leveler { enabled: false },
             ),
         ];
         for (json, expected) in cases {

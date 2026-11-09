@@ -8,7 +8,8 @@
 //!   (`NativeVideoSource::new_encoded`, `VideoEncoderBackend::PreEncoded`), sem simulcast. Os
 //!   pedidos de keyframe e de bitrate da LiveKit voltam para o pipeline pelo [`VideoControl`]. No
 //!   plano B, a trilha é a comum (NV12, VP8 codificado pelo libwebrtc).
-//! - **Áudio:** o WASAPI entrega f32; aqui vira i16 em pedaços de 10 ms para o `NativeAudioSource`.
+//! - **Áudio:** o WASAPI entrega f32; aqui passa pelo [`Leveler`] (se a chave estiver ligada) e vira
+//!   i16 em pedaços de 10 ms para o `NativeAudioSource`.
 //! - **Pausa:** a trilha de vídeo é silenciada (`mute`); quem assiste vê "Transmissão pausada".
 //!
 //! Tudo que é assíncrono roda no runtime do Tauri. As funções daqui bloqueiam: chamar só dentro
@@ -35,6 +36,7 @@ use tauri::async_runtime;
 use tracing::{info, warn};
 
 use super::encoded::{PacketSink, VideoPacket};
+use super::leveler::Leveler;
 use super::video::{EncoderKind, VideoCommand, VideoControl, VideoFormat, MAX_FPS};
 use super::{AudioSink, SinkStatus, AUDIO_CHANNELS, AUDIO_SAMPLE_RATE};
 use crate::error::AppError;
@@ -131,17 +133,23 @@ fn copy_plane(src: &[u8], dst: &mut [u8], width: usize, stride: usize) {
     }
 }
 
-/// O destino do áudio na LiveKit: f32 intercalado vira i16, em pedaços de 10 ms.
+/// O destino do áudio na LiveKit: f32 intercalado, nivelado, vira i16 em pedaços de 10 ms.
 pub struct LiveKitAudioSink {
     source: NativeAudioSource,
+    leveler: Leveler,
+    /// As amostras da vez, para o nivelador trabalhar sem alocar a cada pedaço.
+    scratch: Vec<f32>,
     pending: Vec<i16>,
     failed: bool,
 }
 
 impl AudioSink for LiveKitAudioSink {
     fn push(&mut self, samples: &[f32]) -> SinkStatus {
+        self.scratch.clear();
+        self.scratch.extend_from_slice(samples);
+        self.leveler.process(&mut self.scratch);
         self.pending.extend(
-            samples
+            self.scratch
                 .iter()
                 .map(|s| (s.clamp(-1.0, 1.0) * f32::from(i16::MAX)) as i16),
         );
@@ -166,6 +174,17 @@ impl AudioSink for LiveKitAudioSink {
         }
         self.pending.drain(..start);
         SinkStatus::Continue
+    }
+}
+
+impl Drop for LiveKitAudioSink {
+    fn drop(&mut self) {
+        // Para conferir no log se o nivelador estava subindo o som, e quanto.
+        info!(
+            target: "media",
+            gain_db = format_args!("{:.1}", self.leveler.gain_db()),
+            "áudio da transmissão encerrado"
+        );
     }
 }
 
@@ -216,6 +235,8 @@ pub struct Publisher {
     slot: VideoSlot,
     video: Option<LocalVideoTrack>,
     audio: Option<LocalAudioTrack>,
+    /// A chave do nivelador, dividida com o áudio publicado: vale na hora, sem republicar.
+    leveler: Arc<AtomicBool>,
     _requests: Option<Requests>,
 }
 
@@ -256,6 +277,7 @@ impl Publisher {
             slot: VideoSlot::default(),
             video: None,
             audio: None,
+            leveler: Arc::new(AtomicBool::new(true)),
             _requests: None,
         })
     }
@@ -374,9 +396,16 @@ impl Publisher {
         self.audio = Some(track);
         Ok(LiveKitAudioSink {
             source,
+            leveler: Leveler::new(Arc::clone(&self.leveler)),
+            scratch: Vec::new(),
             pending: Vec::new(),
             failed: false,
         })
+    }
+
+    /// Liga ou desliga o nivelador do áudio, publicado ou não.
+    pub fn set_leveler(&self, enabled: bool) {
+        self.leveler.store(enabled, Ordering::Relaxed);
     }
 
     /// Tira o áudio da sala, se estiver publicado.

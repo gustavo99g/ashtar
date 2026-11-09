@@ -15,6 +15,7 @@ pub mod bitrate;
 mod diagnostics;
 pub mod encoded;
 pub mod focus;
+pub mod leveler;
 pub mod platform;
 pub mod publisher;
 pub mod quality;

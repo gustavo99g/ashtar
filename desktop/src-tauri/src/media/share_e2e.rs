@@ -147,6 +147,7 @@ fn transmite_assiste_pausa_e_para() {
                 cursor: true,
             },
             audio: AudioMode::System,
+            leveler: true,
             target: ShareTarget {
                 url: url(),
                 token: screen_token(),

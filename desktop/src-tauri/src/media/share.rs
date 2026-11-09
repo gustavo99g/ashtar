@@ -48,6 +48,8 @@ use crate::{
 pub struct ShareRequest {
     pub video: VideoConfig,
     pub audio: AudioMode,
+    /// O nivelador do áudio (`leveler.rs`) começa ligado ou não.
+    pub leveler: bool,
     pub target: ShareTarget,
 }
 
@@ -60,6 +62,7 @@ pub enum ShareChange {
     Cursor(bool),
     Paused(bool),
     Audio(AudioMode),
+    Leveler(bool),
 }
 
 /// Aviso do manager para fora; os comandos transformam em eventos do Tauri.
@@ -87,6 +90,8 @@ pub trait Link: Send + 'static {
     /// Tira o áudio da sala (a captura já parou).
     fn stop_audio(&mut self);
     fn set_paused(&self, paused: bool);
+    /// Liga ou desliga o nivelador do áudio. Vale para o áudio de agora e para os próximos.
+    fn set_leveler(&self, enabled: bool);
     /// Sai da sala.
     fn close(self: Box<Self>);
 }
@@ -279,9 +284,10 @@ impl ShareManager {
         let ShareRequest {
             video,
             audio,
+            leveler,
             target,
         } = request;
-        self.start_with(|ends| start_native(video, &target, ends), audio)
+        self.start_with(|ends| start_native(video, &target, leveler, ends), audio)
     }
 
     /// Inicia uma sessão com `start` (que entrega o vídeo e a conexão) e, depois, o áudio.
@@ -364,6 +370,7 @@ impl ShareManager {
                 session.control.send(VideoCommand::Paused(paused));
                 session.link.set_paused(paused);
             }
+            ShareChange::Leveler(enabled) => session.link.set_leveler(enabled),
             ShareChange::Audio(mode) => {
                 // Parada por nós: o `AudioEnded` que ela gera não encontra o áudio e não avisa.
                 if let Some(audio) = session.audio.take() {
@@ -483,6 +490,10 @@ impl Link for NativeLink {
         self.publisher.set_paused(paused);
     }
 
+    fn set_leveler(&self, enabled: bool) {
+        self.publisher.set_leveler(enabled);
+    }
+
     fn close(self: Box<Self>) {
         self.publisher.close();
     }
@@ -492,9 +503,11 @@ impl Link for NativeLink {
 fn start_native(
     config: VideoConfig,
     target: &ShareTarget,
+    leveler: bool,
     ends: Ends,
 ) -> Result<Started, AppError> {
     let mut publisher = Publisher::connect(target, ends.link_lost)?;
+    publisher.set_leveler(leveler);
     let mut sink = Fanout::new().with(publisher.video_sink());
     // Para conferir a imagem que saiu do encoder: `ASHTAR_DUMP_H264=C:\caminho\tela.h264` grava
     // o H.264 da transmissão (abre com o ffplay).
@@ -659,6 +672,13 @@ mod tests {
                 .lock()
                 .unwrap()
                 .push(format!("pausa {paused}"));
+        }
+        fn set_leveler(&self, enabled: bool) {
+            self.record
+                .calls
+                .lock()
+                .unwrap()
+                .push(format!("nivela {enabled}"));
         }
         fn close(self: Box<Self>) {
             self.record.calls.lock().unwrap().push("sai da sala".into());
@@ -862,6 +882,7 @@ mod tests {
             .update(id, ShareChange::Source(SourceRef::Window(7)))
             .unwrap();
         manager.update(id, ShareChange::Paused(true)).unwrap();
+        manager.update(id, ShareChange::Leveler(false)).unwrap();
 
         assert_eq!(
             setup.commands(),
@@ -871,7 +892,8 @@ mod tests {
                 VideoCommand::Paused(true),
             ]
         );
-        assert_eq!(setup.record.calls(), ["pausa true"]);
+        // O nivelador vai para a conexão, que divide a chave com o áudio: o vídeo não sabe dele.
+        assert_eq!(setup.record.calls(), ["pausa true", "nivela false"]);
         manager.stop(id).unwrap();
     }
 
