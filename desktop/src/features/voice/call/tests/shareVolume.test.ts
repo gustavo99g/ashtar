@@ -54,6 +54,20 @@ describe("volume da transmissão", () => {
 		expect(volume()).toBe(60);
 	});
 
+	it("vai até 200%, para reforçar uma transmissão que chega baixa", async () => {
+		setShareVolume(180);
+		expect(volume()).toBe(180);
+		setShareVolume(350);
+		expect(volume()).toBe(200);
+
+		localStorage.setItem(
+			"ashtar-share-volume",
+			JSON.stringify({ state: { volume: 150, muted: false }, version: 1 }),
+		);
+		await useShareVolume.persist.rehydrate();
+		expect(volume()).toBe(150);
+	});
+
 	it("um valor estranho no disco volta para 100%", async () => {
 		localStorage.setItem(
 			"ashtar-share-volume",

@@ -99,6 +99,7 @@ pub fn app(state: AppState, policy: Arc<ClientPolicy>) -> Router {
     let api = Router::new()
         .route("/voice/token", post(routes::voice::voice_token))
         .route("/voice/participants", get(routes::voice::participants))
+        .route("/voice/screen-token", post(routes::voice::screen_token))
         .route("/auth/redeem", post(routes::auth::redeem))
         .route("/auth/login", post(routes::auth::login))
         .route("/me", get(routes::auth::me).patch(routes::auth::update_me))

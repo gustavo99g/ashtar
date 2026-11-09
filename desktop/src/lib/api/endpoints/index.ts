@@ -24,4 +24,9 @@ export {
 	unlinkMember,
 } from "./members";
 export { createRealtimeTicket } from "./realtime";
-export { createVoiceToken, listVoiceParticipants } from "./voice";
+
+export {
+	createScreenToken,
+	createVoiceToken,
+	listVoiceParticipants,
+} from "./voice";

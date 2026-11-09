@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 
 interface BarButtonProps extends Omit<ComponentProps<"button">, "children"> {
 	label: string;
-	tone?: "default" | "off" | "on" | "exit";
+	tone?: "default" | "off" | "on" | "exit" | "live" | "paused";
 	children: ReactNode;
 }
 
@@ -17,6 +17,9 @@ const circleTones = {
 	off: "bg-destructive-subtle text-destructive-border",
 	on: "bg-primary text-primary-foreground group-hover:bg-primary-hover",
 	exit: "bg-destructive text-destructive-foreground group-hover:bg-destructive-hover",
+	live: "bg-live text-live-foreground group-hover:brightness-110",
+	paused:
+		"bg-secondary text-live ring-1 ring-live ring-inset group-hover:bg-secondary-hover",
 };
 
 export function BarButton({
@@ -38,7 +41,7 @@ export function BarButton({
 		>
 			<span
 				className={cn(
-					"flex size-10 items-center justify-center rounded-full transition-colors [&_svg]:size-5",
+					"relative flex size-10 items-center justify-center rounded-full transition-colors [&_svg]:size-5",
 					circleTones[tone],
 				)}
 			>

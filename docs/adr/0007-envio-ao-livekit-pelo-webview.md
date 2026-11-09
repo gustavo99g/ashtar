@@ -1,6 +1,6 @@
 # 0007 — Compartilhamento publicado pelo webview, via IPC
 
-- **Status:** aceita, provisória (revisão prevista numa versão seguinte)
+- **Status:** substituída por 0017 (v0.2.4)
 - **Data:** 2026-09
 
 ## Contexto

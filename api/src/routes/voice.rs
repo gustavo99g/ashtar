@@ -1,4 +1,5 @@
-//! Rotas de voz: o token para entrar na sala e a lista de quem já está nela.
+//! Rotas de voz: o token para entrar na sala, o da transmissão de tela e a lista de quem já está
+//! nela.
 //! O que fala com o LiveKit (a lista da sala, tirar alguém dela) fica em
 //! [`crate::voice`].
 
@@ -8,6 +9,7 @@ use axum::extract::{Query, State};
 use livekit_api::access_token::{AccessToken, VideoGrants};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use std::time::Duration;
 use ts_rs::TS;
 
 use super::auth::CurrentUser;
@@ -15,7 +17,9 @@ use super::extract::ApiJson;
 use crate::AppState;
 use crate::chat::channels;
 use crate::error::ApiError;
-use crate::voice::{ParticipantView, join_participants, list_room, livekit_env};
+use crate::voice::{
+    ParticipantView, RoomParticipant, join_participants, list_room, livekit_env, screen_identity,
+};
 
 /// A resposta do `voice/token`.
 #[derive(Debug, Serialize, TS)]
@@ -58,11 +62,80 @@ pub async fn voice_token(
     Ok(Json(JoinVoiceResponse { token, url }))
 }
 
+/// Quanto tempo o token da tela vale para entrar. Depois de entrar, a conexão segue: a LiveKit só
+/// confere o token na entrada (e o app pede outro a cada transmissão).
+const SCREEN_TOKEN_TTL: Duration = Duration::from_secs(5 * 60);
+
+/// `POST /api/voice/screen-token`: o token da conexão `{user_id}:screen`, que o app usa para
+/// transmitir a tela direto do Rust (ADR 0017). Só para quem já está na sala de voz: 409 para os
+/// outros.
+pub async fn screen_token(
+    State(state): State<AppState>,
+    CurrentUser(user): CurrentUser,
+    ApiJson(request): ApiJson<VoiceTokenRequest>,
+) -> Result<Json<JoinVoiceResponse>, ApiError> {
+    validate_channel_id(&request.channel_id)?;
+    channels::get_open_voice(&state.db, &request.channel_id).await?;
+    let room = list_room(&request.channel_id).await?;
+    if !in_room(&room, &user.id) {
+        return Err(ApiError::Conflict(
+            "Entre na sala de voz antes de transmitir.".into(),
+        ));
+    }
+    let (api_key, api_secret, url) = livekit_env().map_err(ApiError::Config)?;
+    let token = create_screen_token(
+        &api_key,
+        &api_secret,
+        &request.channel_id,
+        &user.id,
+        user.shown_name(),
+        &user.nick,
+    )
+    .map_err(ApiError::Config)?;
+    Ok(Json(JoinVoiceResponse { token, url }))
+}
+
+/// Se `user_id` está na sala pela voz (a `:screen` não conta: ela some da lista).
+fn in_room(room: &[RoomParticipant], user_id: &str) -> bool {
+    room.iter().any(|p| p.identity == user_id)
+}
+
 #[derive(Debug, Deserialize)]
 pub struct ParticipantsQuery {
     /// Ausente vira texto vazio, que o `validate_channel_id` recusa com 422.
     #[serde(default)]
     pub channel_id: String,
+}
+
+/// Monta o token da tela: publica só a tela e o áudio dela, não assina nada (quem transmite já
+/// ouve a sala pela voz) e não manda dados. O dono e o nick dele vão nos metadados
+/// (`{"screenOf": id, "nick": "..."}`), com o mesmo nome da voz: o app mostra a tela como de quem
+/// transmite.
+fn create_screen_token(
+    api_key: &str,
+    api_secret: &str,
+    channel_id: &str,
+    user_id: &str,
+    display_name: &str,
+    nick: &str,
+) -> Result<String, String> {
+    AccessToken::with_api_key(api_key, api_secret)
+        .with_identity(&screen_identity(user_id))
+        .with_name(display_name)
+        .with_metadata(&json!({ "screenOf": user_id, "nick": nick }).to_string())
+        .with_ttl(SCREEN_TOKEN_TTL)
+        .with_grants(VideoGrants {
+            room_join: true,
+            room: channel_id.to_owned(),
+            can_publish: Some(true),
+            can_subscribe: Some(false),
+            can_publish_data: Some(false),
+            can_publish_sources: vec!["screen_share".into(), "screen_share_audio".into()],
+            can_update_own_metadata: Some(false),
+            ..Default::default()
+        })
+        .to_jwt()
+        .map_err(|error| error.to_string())
 }
 
 /// `GET /api/voice/participants?channel_id=sala`: quem está na sala agora,
@@ -134,6 +207,51 @@ mod tests {
     use livekit_api::access_token::TokenVerifier;
 
     #[test]
+    fn token_da_tela_so_publica_a_tela() {
+        let token = create_screen_token(
+            "chave",
+            "segredo-de-teste-comprido",
+            "geral",
+            "id-1",
+            "Kid",
+            "kid",
+        )
+        .unwrap();
+        let claims = TokenVerifier::with_api_key("chave", "segredo-de-teste-comprido")
+            .verify(&token)
+            .unwrap();
+        assert_eq!(claims.sub, "id-1:screen");
+        assert_eq!(claims.name, "Kid");
+        assert_eq!(claims.metadata, r#"{"nick":"kid","screenOf":"id-1"}"#);
+        assert_eq!(claims.video.room, "geral");
+        assert_eq!(claims.video.can_publish, Some(true));
+        assert_eq!(claims.video.can_subscribe, Some(false));
+        assert_eq!(claims.video.can_publish_data, Some(false));
+        assert_eq!(
+            claims.video.can_publish_sources,
+            ["screen_share", "screen_share_audio"]
+        );
+        assert_eq!(claims.exp - claims.nbf, 5 * 60);
+    }
+
+    #[test]
+    fn so_transmite_quem_esta_na_sala_pela_voz() {
+        let room = [
+            RoomParticipant {
+                identity: "kid".into(),
+                screen_sharing: false,
+            },
+            RoomParticipant {
+                identity: "juju".into(),
+                screen_sharing: true,
+            },
+        ];
+        assert!(in_room(&room, "kid"));
+        assert!(!in_room(&room, "marcao"));
+        assert!(!in_room(&[], "kid"));
+    }
+
+    #[test]
     fn id_de_canal_valido_e_invalido() {
         for ok in ["general_voice", "gaming", "sala-1", "A", &"a".repeat(64)] {
             assert!(validate_channel_id(ok).is_ok(), "{ok}");
@@ -158,7 +276,7 @@ mod tests {
             "segredo-de-teste-comprido",
             "geral",
             "id-1",
-            "Kid Bengala",
+            "Kid",
             r#"{"nick":"kid"}"#,
         )
         .unwrap();
@@ -166,7 +284,7 @@ mod tests {
             .verify(&token)
             .unwrap();
         assert_eq!(claims.sub, "id-1");
-        assert_eq!(claims.name, "Kid Bengala");
+        assert_eq!(claims.name, "Kid");
         assert_eq!(claims.metadata, r#"{"nick":"kid"}"#);
         assert_eq!(claims.video.room, "geral");
         assert_eq!(claims.video.can_update_own_metadata, Some(false));

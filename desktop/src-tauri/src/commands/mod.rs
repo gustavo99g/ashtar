@@ -12,6 +12,7 @@
 pub mod app;
 pub mod identity;
 pub mod screen_share;
+pub mod thumbnails;
 pub mod updater;
 
 use crate::error::AppError;

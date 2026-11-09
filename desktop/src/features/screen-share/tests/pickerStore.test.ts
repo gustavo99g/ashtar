@@ -1,10 +1,7 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import type { CaptureSource } from "@/lib/tauri/commands";
-import type {
-	ScreenShareController,
-	ScreenShareState,
-	ShareRequest,
-} from "../model/controller";
+import { fakeShareController } from "@/test/fakeShareController";
+import type { ShareRequest } from "../model/controller";
 import { restartShare, startShare } from "../stores/pickerStore";
 
 const source: CaptureSource = {
@@ -13,47 +10,46 @@ const source: CaptureSource = {
 	processId: 7,
 	icon: null,
 	monitor: null,
+	minimized: false,
 };
 const request: ShareRequest = {
 	source,
-	quality: "900p60",
+	quality: "1080p30",
 	audio: { mode: "application", processId: 7 },
+	cursor: true,
 };
 
-function fakeController(state: ScreenShareState) {
-	return {
-		getState: () => state,
-		onStateChange: () => () => {},
-		listSources: async () => [],
-		start: vi.fn(async () => {}),
-		stop: vi.fn(async () => {}),
-		dispose: async () => {},
-	} satisfies ScreenShareController;
-}
-
 describe("restartShare", () => {
-	it("para e começa de novo com o último pedido", async () => {
-		const controller = fakeController({
+	it("religa o mesmo áudio, sem parar o vídeo", async () => {
+		const controller = fakeShareController({
 			status: "active",
 			sessionId: 1,
 			source,
+			quality: "1080p30",
+			startedAt: 0,
+			audioMode: request.audio,
+			cursor: true,
+			leveler: true,
+			paused: false,
 			audio: "lost",
 		});
 		await startShare(controller, request);
-		controller.start.mockClear();
 
 		await restartShare(controller);
 
-		expect(controller.stop).toHaveBeenCalledOnce();
-		expect(controller.start).toHaveBeenCalledWith(request);
+		expect(controller.update).toHaveBeenCalledWith({
+			kind: "audio",
+			audio: request.audio,
+		});
+		expect(controller.stop).not.toHaveBeenCalled();
 	});
 
 	it("não faz nada sem transmissão ativa", async () => {
-		const controller = fakeController({ status: "idle" });
+		const controller = fakeShareController({ status: "idle" });
 		await startShare(controller, request);
 
 		await restartShare(controller);
 
-		expect(controller.stop).not.toHaveBeenCalled();
+		expect(controller.update).not.toHaveBeenCalled();
 	});
 });

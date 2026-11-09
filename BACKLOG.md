@@ -2,8 +2,7 @@
 
 Itens adiados ao fechar a reorganização do compartilhamento de tela (Etapas 1 a 6 de [`docs/plans/v0.1-reorganizacao.md`](docs/plans/v0.1-reorganizacao.md), concluída em
 2026-10-06). Vieram de [`docs/plans/v0.1-notes.md`](docs/plans/v0.1-notes.md), com o texto e as evidências originais, e estão sob a versão que deve
-recebê-los segundo o `docs/roadmap.md`. Os destinos de "Janelas minimizadas", "divisão do `capture_frame`"
-e "linha de base de desempenho" são sugestões desta triagem, não decisões do roadmap.
+recebê-los segundo o `docs/roadmap.md`.
 
 Ao resolver um item, apague-o daqui e registre o resultado no ADR ou no commit.
 
@@ -69,62 +68,12 @@ Bugs que saem assim que ficarem prontos, pelo auto-update, sem esperar a entrega
 - [ ] "Reconectando" no painel "Voz conectada" e o aviso "Conexão perdida" do compartilhamento ficaram
       apagados no canvas na v0.2.2; entram com a reconexão da v0.6.
 
-## v0.2.5 — Publicador nativo e medição
-
-- [ ] Redução da imagem no caminho do IPC. O legado reduzia em BGRA com `fast_image_resize` e
-      `ResizeAlg::Nearest`, depois de copiar o frame inteiro (`frame.data().to_vec()`); isso saiu com o
-      `legacy/`. O caminho novo converte para I420 e reduz com o `scale` do libyuv (mais legível para texto).
-      **Base pronta:** `to_i420` converte em resolução cheia e reduz com o `scale` do I420 só quando o
-      frame passa da caixa do preset (`fit_in_box`).
-      **Medido (2026-10-05/06, release):** a premissa de que isso é "mais rápido" não se confirmou. No 1080p
-      o `scale` custa 5–10 ms, cerca de metade do `capture_frame`, e a conversão de cor só 2–3 ms. A causa não
-      foi isolada (uma hipótese, não verificada, é o filtro do `scale`; o legado usava `Nearest`). Próximo
-      teste: reduzir em BGRA antes de converter, com o `fast_image_resize`, que por isso continua no
-      `Cargo.toml`, sem uso desde a remoção do `legacy/` (ADR 0009).
-      **Adiado para o publicador nativo (v0.2.5):** é um experimento de otimização, não um defeito.
-- [ ] A divisão do `capture_frame` em readback, redução e conversão (ADR 0009) vem de uma instrumentação que
-      não está no repositório: os logs de tempo por etapa foram removidos (estão no commit `d418b00`). Para
-      repetir a medição, recolocar os logs ou deixar um cronômetro permanente no target `perf`.
-      **Adiado para a v0.2.5**, junto das medições do publicador nativo.
-- [ ] Linha de base de desempenho em build de release, separada para os três presets de qualidade
-      (decisão 16 de `docs/plans/v0.1-reorganizacao.md`). **Adiado para a v0.2.5:** só existe o fps por preset em jogo (ADR 0009); faltam
-      CPU, memória e o histograma de intervalos entre frames, que o publicador nativo vai precisar para comparar.
-- [ ] Publicador de vídeo/áudio nativo em Rust (fica para o próximo plano). Ele precisa de duas peças:
-  1. **Redução na GPU antes de copiar para a memória**, para janelas em 4K cheio: readback (~7 ms) mais
-     conversão (~10 ms) somam ~17 ms, mais que os 16,7 ms de um frame a 60 fps. Combina com o encoder
-     por hardware, que também põe a GPU no caminho.
-  2. **O publicador em si.** O teto de ~43 fps do ACK era de dev e do caminho antigo; em release ele não
-     aparece (envio de ~0,1 ms por frame, e `max_in_flight` maior não ganhou nada; ADR 0009). O ganho do
-     publicador não é tirar esse teto, e sim abrir caminho para o encoder por hardware e para a redução
-     na GPU.
-
-  Uma terceira peça, a captura própria de janelas com o `windows-capture`, estava prevista e **deixou de
-  ser necessária**: o atraso das janelas vinha de o libwebrtc cair no GDI por falta de COM na thread, e o
-  passo 9 corrigiu isso (ver o item da queda de fps em janelas, em `docs/plans/v0.1-notes.md`, e o ADR 0008).
-
-  Pontos para observar depois do passo 9: janela parada custa uma conversão por volta, mesmo sem mudança
-  (expor o `updated_region` exigiria mexer no `webrtc-sys`); jogos em tela cheia exclusiva podem não ser
-  capturáveis como janela (o contorno é compartilhar a tela); conteúdo com DRM sai preto também no WGC.
-- [ ] Medição/comparação de desempenho estruturada (fica para o próximo plano; a Etapa 6 só coleta a
-  linha de base).
-
 ## Mais adiante
 
-Miniaturas e o aviso de conteúdo protegido estão na v0.8 do roadmap (`## Screen Share`); Linux, depois da v1.0; sem versão para funcionalidades novas de voz.
+O aviso de conteúdo protegido está na v0.8 do roadmap (`## Screen Share`); as miniaturas foram adiantadas para a v0.2.4; Linux, depois da v1.0; sem versão para funcionalidades novas de voz.
 
-- [ ] Miniaturas no seletor de fontes. Enquanto isso, o seletor mostra só ícones. Pontos do código de preview
-  do protótipo a corrigir quando voltarem ao escopo: previews enviados como `Vec<u8>` em JSON e uma
-  sessão WGC aberta por janela.
 - [ ] Aviso de possível conteúdo protegido (frames totalmente pretos por vários segundos).
 - [ ] Suporte a Linux (risco principal: WebRTC no WebKitGTK) e versão web.
 - [ ] Qualquer funcionalidade nova de voz além do que já existe.
-- [ ] Janelas minimizadas não aparecem no seletor. Não é bug nosso: o libwebrtc as descarta da lista
-      (`IsIconic`) e também não as captura, e o `CaptureSource` só sai dessa lista (medido: o `start` de uma
-      janela minimizada devolve `SourceNotFound`). O seletor recarrega a lista a cada 2 s (ao fim de cada
-      pedido, sem acumular), então uma janela restaurada aparece sem reabrir. Adiado: lista própria com
-      `EnumWindows`, selo "Minimizada" e restauração da janela ao escolher (contraria a decisão 2 do PLAN).
-      A lista leva ~95 ms com 4 janelas (release), por causa dos ícones: remedir com muitas janelas.
-      **Adiado de novo na v0.2.2** (decisão de 17/10): a lista continua sem as minimizadas, e o quadro
-      do seletor no canvas perdeu o selo "Minimizada".
 - [ ] Um segundo tema (claro, por exemplo). A troca por `data-theme` já existe desde a v0.2.2 (ADR 0012);
       a opção aparece nas configurações quando o tema existir, com o contraste conferido.

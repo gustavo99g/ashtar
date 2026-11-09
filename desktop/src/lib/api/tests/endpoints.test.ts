@@ -1,6 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { apiUrl } from "../config";
-import { createInvite, getInvite, listInvites, revokeInvite } from "../endpoints/invites";
+import {
+	createInvite,
+	getInvite,
+	listInvites,
+	revokeInvite,
+} from "../endpoints/invites";
 import { getMe, updateMe } from "../endpoints/me";
 import {
 	createRecoveryInvite,
@@ -10,7 +15,11 @@ import {
 	setMemberBeta,
 	unlinkMember,
 } from "../endpoints/members";
-import { createVoiceToken, listVoiceParticipants } from "../endpoints/voice";
+import {
+	createScreenToken,
+	createVoiceToken,
+	listVoiceParticipants,
+} from "../endpoints/voice";
 
 vi.mock("@/lib/tauri/commands", () => ({ checkForUpdate: vi.fn() }));
 
@@ -108,6 +117,13 @@ describe("funções da API", () => {
 			"/api/voice/token",
 			{ channel_id: "jogatina" },
 			() => createVoiceToken("jogatina"),
+		],
+		[
+			"createScreenToken",
+			"POST",
+			"/api/voice/screen-token",
+			{ channel_id: "jogatina" },
+			() => createScreenToken("jogatina"),
 		],
 	])("%s: %s %s", async (_name, method, path, body, call) => {
 		await call();

@@ -26,3 +26,17 @@ export function createVoiceToken(
 		jsonRequest("POST", request),
 	);
 }
+
+/**
+ * `POST /api/voice/screen-token`: o token da conexão que transmite a tela (`{id}:screen`). Só para
+ * quem já está na sala pela voz (409 para os outros). Vale 5 minutos para entrar.
+ */
+export function createScreenToken(
+	channelId: string,
+): Promise<JoinVoiceResponse> {
+	const request: VoiceTokenRequest = { channel_id: channelId };
+	return apiJson<JoinVoiceResponse>(
+		"/api/voice/screen-token",
+		jsonRequest("POST", request),
+	);
+}

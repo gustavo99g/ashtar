@@ -38,3 +38,5 @@ dist-ssr
 *.db
 *.db-wal
 *.db-shm
+# O livekit-server baixado pelo desktop/scripts/livekit-dev.ps1
+.livekit

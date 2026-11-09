@@ -19,32 +19,37 @@ próprio.
 A divisão de responsabilidades segue uma regra: **cada lado cuida da mídia na direção em que é bom**
 (ver [ADR 0001](docs/adr/0001-voz-no-webview-captura-no-rust.md)).
 
-- **React (webview):** toda a interface, a conexão com a sala do LiveKit, o microfone (com o
+- **React (webview):** toda a interface, a conexão da voz com a sala do LiveKit, o microfone (com o
   cancelamento de eco do navegador), a reprodução das vozes e a exibição das transmissões dos outros.
-- **Rust:** o que o navegador não faz bem ou não faz: capturar janelas e telas, capturar só o áudio
-  de um aplicativo e falar com as APIs do sistema operacional.
+- **Rust:** o que o navegador não faz bem ou não faz: capturar janelas e telas, converter e codificar o
+  vídeo na GPU, capturar só o áudio de um aplicativo, falar com as APIs do sistema operacional e
+  **publicar a transmissão** numa segunda conexão com a sala, `{user_id}:screen`
+  ([ADR 0017](docs/adr/0017-publicador-nativo.md)). O vídeo da transmissão não passa pelo webview.
 
 ```mermaid
 flowchart LR
   subgraph Rust["Rust (src-tauri)"]
     SRC[media/sources] -. lista fontes .-> CMD
-    VC[media/video_capture] --> VS{{VideoSink}}
+    WGC[platform/win32: WGC, GPU e encoder] --> V[media/video]
+    V --> PS{{PacketSink}}
     AC[media/audio] --> AS{{AudioSink}}
-    VS --> IPC[media/ipc_sink]
-    AS --> IPC
-    S[media/session] -. inicia e encerra .-> VC
-    S -. inicia e encerra .-> AC
-    CMD[commands] --> S
+    PS --> PUB[media/publisher]
+    AS --> PUB
+    SH[media/share] -. inicia, ajusta e encerra .-> V
+    SH -. inicia e encerra .-> AC
+    SH --> PUB
+    TH[media/thumbnails] -- "Channel, bytes crus" --> CMD
+    CMD[commands] --> SH
   end
   subgraph React["React (webview)"]
     TS[lib/tauri/commands/] --> CMD
-    IPC -- "Channel, bytes crus" --> SS[features/screen-share]
-    SS --> TS
-    V[features/voice] --> SS
+    SS[features/screen-share] --> TS
+    V2[features/voice] --> SS
   end
-  V <--> LK[(Servidor LiveKit)]
-  SS --> LK
-  API[API: tokens] --> V
+  PUB -- ":screen" --> LK[(Servidor LiveKit)]
+  V2 <-- "voz" --> LK
+  API[API: tokens] --> V2
+  API -- "screen-token" --> SS
 ```
 
 ## Mapa do código
@@ -57,37 +62,46 @@ flowchart LR
   `{ kind, message }`.
 - **`commands/`**: a fronteira com o frontend. Os comandos só recebem argumentos, delegam ao
   `media/` e convertem o resultado. Nenhuma lógica de captura mora aqui.
-- **`media/`**: tudo que envolve captura.
+- **`media/`**: tudo que envolve a transmissão: a captura, o vídeo na GPU e a publicação.
   - **`mod.rs`**: só declarações e reexportações; o resto do código usa `crate::media::X`.
-  - **`sink.rs`**: o frame capturado e os traits `VideoSink` e `AudioSink`, que desacoplam a
-    captura do destino dos dados.
-  - **`gate.rs`**: o `FrameGate`, contador de frames em trânsito usado para backpressure.
+  - **`sink.rs`**: o `SinkStatus` e o `AudioSink`, que desacoplam a captura de áudio do destino.
   - **`capture.rs`**: o `spawn_capture` e o `CaptureHandle`, a forma única de criar e encerrar
     threads de captura ([ADR 0005](docs/adr/0005-threads-de-captura.md)).
-  - **`sources.rs`**: os tipos das fontes (`SourceRef`, `CaptureSource`) e a listagem, que vem do
-    `DesktopCapturer` e é complementada pela plataforma
-    ([ADR 0003](docs/adr/0003-listagem-de-fontes.md)).
+  - **`sources.rs`**: os tipos das fontes (`SourceRef`, `CaptureSource`) e a lista, que o app mesmo
+    monta, com as janelas minimizadas e sem as do próprio Ashtar
+    ([ADR 0019](docs/adr/0019-seletor-de-fontes.md)).
   - **`audio.rs`**: o `AudioMode` e a entrada comum da captura de áudio.
-  - **`diagnostics.rs`**: sinks que só registram no log o que recebem, para testar capturas isoladas.
-  - **`video_capture.rs`**: captura de vídeo com o `DesktopCapturer`, controle de taxa e conversão
-    para I420 ([ADR 0002](docs/adr/0002-captura-com-desktopcapturer.md)).
-  - **`ipc_sink.rs`**: os sinks que enviam frames e áudio ao webview. Temporário
-    ([ADR 0007](docs/adr/0007-envio-ao-livekit-pelo-webview.md)).
-  - **`session.rs`**: o `ScreenShareManager`, que agrupa vídeo e áudio de um compartilhamento
+  - **`video.rs`**: o formato pedido (`VideoFormat`), os comandos do meio da transmissão
+    (`VideoControl`), os números (`VideoStats`) e o `spawn_video`
+    ([ADR 0018](docs/adr/0018-captura-pelo-wgc-e-video-na-gpu.md)).
+  - **`encoded.rs`**: o `PacketSink` e o `Fanout`, para onde vai o H.264 (ou, no plano B, o NV12), com
+    mais de um destino.
+  - **`bitrate.rs`**: o bitrate do encoder corrigido pelo que sai de verdade.
+  - **`publisher.rs`**: a conexão `:screen` na LiveKit, com o vídeo já codificado, o áudio, os pedidos
+    de keyframe e de bitrate e a pausa ([ADR 0017](docs/adr/0017-publicador-nativo.md)).
+  - **`share.rs`**: o `ShareManager`, que agrupa vídeo, áudio e conexão de uma transmissão, com
+    início atômico e o fim avisado uma única vez
     ([ADR 0006](docs/adr/0006-encerramento-da-sessao-por-eventos.md)).
+  - **`quality.rs`**: os presets (Leve, Movimento e Nitidez) como formato de vídeo.
+  - **`thumbnails.rs`**: as miniaturas ao vivo do seletor, em JPEG pelo `Channel` do Tauri.
+  - **`focus.rs`**: a janela escolhida para a frente, e o Ashtar fora de toda captura.
+  - **`diagnostics.rs`**: o destino que só registra no log o que recebe, para testar o áudio isolado.
   - **`platform/`**: tudo que é específico de um sistema operacional
     ([ADR 0004](docs/adr/0004-estrutura-por-plataforma.md)).
-    - **`win32/`**: Windows. Em `sources/`, a extração de ícones, os detalhes de janelas e o
-      mapeamento de monitores, com guards RAII para recursos GDI. A captura de áudio com WASAPI
-      fica em `audio_capture.rs`.
-    - **`unsupported.rs`**: as mesmas funções para qualquer outro sistema, devolvendo valores padrão
+    - **`win32/`**: Windows. `wgc.rs` captura pelo Windows.Graphics.Capture, `gpu.rs` abre o
+      dispositivo D3D11, `convert.rs` reduz e converte para NV12 na GPU, `mf_encoder.rs` é o
+      encoder H.264 de hardware do Media Foundation, `pipeline.rs` é o laço da transmissão,
+      `readback.rs` traz a imagem para a memória (plano B e miniaturas) e `thumbnails.rs` as
+      miniaturas. Em `sources/`, a lista de janelas e telas e a extração de ícones. A captura de
+      áudio com WASAPI fica em `audio_capture.rs`.
+    - **`unsupported.rs`**: as mesmas funções para qualquer outro sistema, devolvendo listas vazias
       ou `AppError::Unsupported`.
 
 ### Frontend do app (`desktop/src/`)
 
 - **`lib/tauri/commands/`**: a única pasta que importa `@tauri-apps/api`, com um arquivo por assunto
-  (`core`, `screen-share`, `updater`, `app`, `identity`). Tem os tipos do contrato (`AppError`,
-  `CaptureSource`, `SourceRef`) e um wrapper tipado por comando e evento.
+  (`core`, `screen-share`, `thumbnails`, `updater`, `app`, `identity`). Tem os tipos do contrato
+  (`AppError`, `CaptureSource`, `SourceRef`) e um wrapper tipado por comando e evento.
 - **`features/voice/`**: a conexão com a sala do LiveKit, em subdomínios: `room` (a conexão, mute e
   deafen), `devices` (microfone e saída), `members` (quem está na sala), `call` (a sala por dentro) e
   `dock` (o pé da coluna). O padrão das pastas de cada feature está na ADR 0014.
@@ -100,8 +114,11 @@ flowchart LR
   crescente e o aviso de cada evento, com `resumed` no `ready` da volta de uma queda. A única pasta
   que abre `WebSocket`. Quem liga a conexão à sessão e passa cada evento ao `realtime.ts` de cada
   feature é o `app/RealtimeBridge.tsx`; com o socket fora, as consultas repetidas voltam a rodar.
-- **`features/screen-share/`**: a interface `ScreenShareController` e suas implementações; hoje, a
-  `IpcScreenShare`, que recebe os dados do Rust e os publica no LiveKit.
+- **`features/screen-share/`**: a interface `ScreenShareController` e a `NativeScreenShare`, que pede o
+  token da `:screen` à API e chama os comandos do Rust; o seletor com miniaturas, os ajustes rápidos
+  no botão Tela (`ShareQuickSettings`), o painel completo da transmissão (a saúde, os números, o
+  envio do último minuto, quem está assistindo e desde quando) e os ajustes que os dois dividem
+  (`ShareControls`).
 
 ### API (`api/`)
 
@@ -120,10 +137,11 @@ A crate é uma biblioteca (`lib.rs`) com dois binários: o servidor (`main.rs`) 
   canais" conferido dentro, como em `identity/`) e `layout` (a árvore e a versão que dá o 409).
 - **`realtime/`**: o `Hub` do tempo real: o `broadcast` dos eventos, os tickets de uso único e
   quem está online.
-- **`voice.rs`**: o que fala com o LiveKit: quem está numa sala e tirar alguém de todas.
+- **`voice.rs`**: o que fala com o LiveKit: quem está numa sala e tirar alguém de todas. A `:screen` de
+  alguém não é participante: só marca o dono como transmitindo, e sai da sala junto com ele.
 - **`routes/`**: as rotas HTTP, finas sobre as regras: a identidade (`/api/auth/*`, `/api/me`), o
-  Painel (`/api/invites`, `/api/members`), a voz (`/api/voice/token` e `/participants`, só para uma
-  sala aberta do banco), o chat (`/api/channels/...`, `/api/categories/...`, `/api/people`), o
+  Painel (`/api/invites`, `/api/members`), a voz (`/api/voice/token`, `/screen-token` e `/participants`, só para uma
+  sala aberta do banco, e o da tela só para quem já está nela), o chat (`/api/channels/...`, `/api/categories/...`, `/api/people`), o
   WebSocket (`/api/realtime/ticket` e `/api/realtime`) e o webhook do LiveKit (`/webhooks/livekit`).
   Autenticação por `Authorization: Bearer <token>`; o WebSocket, que não manda cabeçalho, entra com
   o ticket.
@@ -140,59 +158,74 @@ As decisões estão nas ADRs [0010](docs/adr/0010-banco-sqlite.md),
 
 ## Fluxos
 
-### Iniciar um compartilhamento
+### Iniciar uma transmissão
 
 ```mermaid
 sequenceDiagram
-  participant UI as React (IpcScreenShare)
+  participant UI as React (NativeScreenShare)
+  participant API as API
   participant C as commands/screen_share.rs
-  participant S as media/session.rs
-  participant V as video_capture
+  participant S as media/share.rs
+  participant P as media/publisher.rs
+  participant V as media/video
   participant A as captura de áudio
-  UI->>C: ipc_screen_share_start(opções, canais)
+  UI->>API: voice/screen-token
+  API-->>UI: token da :screen
+  UI->>C: screen_share_start(opções, token)
   C->>S: iniciar (dentro de spawn_blocking)
-  S->>V: spawn_capture
+  S->>P: entrar na sala como :screen
+  S->>V: spawn_video (captura, GPU e encoder)
   V-->>S: pronto
+  S->>P: publicar a trilha do tipo que o vídeo abriu
   S->>A: spawn_capture (se o áudio estiver ligado)
   A-->>S: pronto ou erro
-  Note over S: se o áudio falhar, o vídeo é parado antes de responder
+  Note over S: se algo falhar, o vídeo para e a :screen sai da sala antes de responder
   S-->>C: id da sessão ou erro
   C-->>UI: sessionId
-  loop enquanto compartilha
-    V-->>UI: frame I420 (Channel)
-    UI->>C: ipc_screen_share_ack
+  loop enquanto transmite
+    V-->>P: H.264 pronto (PacketSink)
+    P-->>UI: números a cada segundo (screen-share-stats)
   end
 ```
 
 O início é atômico: o frontend recebe uma sessão completa ou um erro, nunca uma sessão pela metade.
+Durante a transmissão, o painel ajusta o preset, a fonte, o áudio, o cursor e a pausa sem republicar
+a trilha (`screen_share_update`).
 
 ### Encerrar
 
-Uma sessão termina por três caminhos: o usuário para, a janela compartilhada fecha, ou a captura
-falha. Em todos eles, quem remove a sessão do `ScreenShareManager` é quem emite o evento
-`screen-share-ended`, e ele sai exatamente uma vez. Se só o áudio cair, o vídeo continua e o evento
-emitido é o `screen-share-audio-ended`.
+Uma transmissão termina por quatro caminhos: o usuário para, a janela compartilhada fecha, a captura
+ou o encoder falham, ou a conexão `:screen` cai. Em todos eles, quem remove a sessão do `ShareManager`
+é quem emite o evento `screen-share-ended`, e ele sai exatamente uma vez; a `:screen` sai da sala na
+hora, sem deixar uma transmissão fantasma. Se só o áudio cair, o vídeo continua e o evento emitido é o
+`screen-share-audio-ended`.
 
 ## Invariantes e fronteiras
 
 Regras que atravessam módulos. Quebrar uma delas costuma produzir bugs longe da causa.
 
-- **A captura não sabe para onde os dados vão.** Capturas entregam dados a um `VideoSink` ou
-  `AudioSink`; nada em `video_capture` ou `platform/` conhece IPC ou LiveKit.
+- **A captura não sabe para onde os dados vão.** O vídeo sai por um `PacketSink` e o áudio por um
+  `AudioSink`; nada em `platform/` conhece a LiveKit. Quem a conhece é o `publisher.rs`.
+- **O vídeo da transmissão não sai da GPU até virar H.264.** Captura, redução, conversão e encoder
+  dividem o mesmo dispositivo D3D11, um por transmissão
+  ([ADR 0018](docs/adr/0018-captura-pelo-wgc-e-video-na-gpu.md)).
+- **O Media Foundation é iniciado uma vez por processo e nunca desligado.** Um `MFShutdown` ao fim de
+  cada transmissão derrubava a seguinte (`pipeline.rs`).
 - **Toda thread de captura nasce por `spawn_capture`.** É ele que garante o nome da thread, a
   inicialização síncrona e o `on_end` chamado exatamente uma vez, inclusive em panic.
 - **Funções que bloqueiam só rodam em `spawn_blocking`.** Estão marcadas com a seção `# Bloqueia`
   nos comentários `///`. Nunca as chame direto de um comando `async`.
 - **Uma thread de captura nunca faz join em si mesma.** O `on_end` só avisa o manager; quem
   encerra é o manager, de fora da thread.
-- **Só os pontos de entrada comuns chamam `platform::`.** `media/sources.rs` e `media/audio.rs`
-  escolhem a implementação; o resto do código nunca usa `platform::win32` diretamente.
+- **Só os pontos de entrada comuns chamam `platform::`.** `media/sources.rs`, `audio.rs`, `video.rs`,
+  `thumbnails.rs` e `focus.rs` escolhem a implementação; o resto do código nunca usa
+  `platform::win32` diretamente.
 - **Só a pasta `commands/` importa `@tauri-apps/api`.** A regra de lint impede o contrário. Isso mantém
   aberta a possibilidade de uma versão web.
 - **Dados binários atravessam o IPC como bytes crus** (`InvokeResponseBody::Raw`), nunca como
-  `Vec<u8>` serializado em JSON.
-- **O app nunca se lista como fonte de captura.** Compartilhar a própria janela com áudio capturaria
-  as vozes da chamada.
+  `Vec<u8>` serializado em JSON. Hoje é só o das miniaturas: o vídeo da transmissão não passa pelo IPC.
+- **O app nunca se lista como fonte de captura**, e a janela dele fica fora de toda captura
+  (`WDA_EXCLUDEFROMCAPTURE`). Compartilhar a própria janela com áudio capturaria as vozes da chamada.
 - **Todo `unsafe` tem um comentário `// SAFETY:`** explicando por que a chamada é segura.
 
 ## Plataformas

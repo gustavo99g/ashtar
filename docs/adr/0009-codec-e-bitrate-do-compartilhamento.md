@@ -1,6 +1,6 @@
 # 0009 — Codec, bitrate e simulcast do compartilhamento pelo IPC
 
-- **Status:** aceita
+- **Status:** substituída por 0017 e 0018 (v0.2.4); fica como a medição do caminho IPC
 - **Data:** 2026-10
 
 ## Contexto

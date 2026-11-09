@@ -18,6 +18,8 @@ pub enum AppError {
     VideoCapture(String),
     #[error("falha na captura de áudio: {0}")]
     AudioCapture(String),
+    #[error("falha na transmissão: {0}")]
+    Publish(String),
     #[error("erro interno: {0}")]
     Internal(String),
     #[error("falha na atualização: {0}")]
@@ -35,6 +37,7 @@ impl AppError {
             Self::AlreadySharing => "AlreadySharing",
             Self::VideoCapture(_) => "VideoCapture",
             Self::AudioCapture(_) => "AudioCapture",
+            Self::Publish(_) => "Publish",
             Self::Internal(_) => "Internal",
             Self::Unsupported(_) => "Unsupported",
             Self::Update(_) => "Update",

@@ -5,18 +5,26 @@ import { ErrorState } from "@/components/ui/states";
 import { useMe, useSession } from "@/features/identity";
 import { QuickInvite } from "@/features/invites";
 import {
+	openSharePanel,
 	parseShareTrackName,
+	type ScreenShareController,
 	shareSpec,
+	sourceRefKey,
 	useScreenShareState,
 	useScreenShares,
+	useThumbnails,
 } from "@/features/screen-share";
 import { paths } from "@/lib/paths";
-import { SALA } from "../../room/model/channel";
-import { stopWatching, useRoomView, watchShare } from "../stores/roomViewStore";
+import type { CaptureSource } from "@/lib/tauri/commands";
+import {
+	ConnectingTile,
+	ParticipantTile,
+} from "../../members/components/ParticipantTile";
 import { useLiveMembers } from "../../members/hooks/useLiveMembers";
 import { useVoice } from "../../room/hooks/useVoice";
+import { SALA } from "../../room/model/channel";
+import { stopWatching, useRoomView, watchShare } from "../stores/roomViewStore";
 import { CallControls } from "./CallControls";
-import { ConnectingTile, ParticipantTile } from "../../members/components/ParticipantTile";
 import { RoomGrid } from "./RoomGrid";
 import { LayoutToggle, RoomHeader } from "./RoomHeader";
 import { ScreenStage } from "./ScreenStage";
@@ -127,13 +135,12 @@ function ConnectedRoom({ onExit }: { onExit: () => void }) {
 	// Todas as publicações de tela, assinadas ou não.
 	// Uma transmissão por vez: de fora, só a que vale pela regra (as outras param sozinhas).
 	const { winner } = useScreenShares();
-	const remoteShare =
-		winner && !winner.participant.isLocal ? winner : undefined;
+	const remote = winner && !winner.isOwn ? winner : undefined;
+	const remoteShare = remote?.track;
 	const remoteInfo = parseShareTrackName(remoteShare?.publication.trackName);
 
 	const watching = useRoomView((state) => state.watching);
-	const watched =
-		remoteShare?.participant.identity === watching ? remoteShare : undefined;
+	const watched = remote?.ownerId === watching ? remoteShare : undefined;
 
 	// A transmissão assistida acabou: volta para a Grade. Só depois de ela ter aparecido, porque
 	// no primeiro desenho a lista de trilhas ainda vem vazia.
@@ -148,9 +155,8 @@ function ConnectedRoom({ onExit }: { onExit: () => void }) {
 
 	const memberOf = (identity: string) =>
 		members.find((member) => member.id === identity);
-	const remoteSharer = remoteShare
-		? memberOf(remoteShare.participant.identity)
-		: undefined;
+	const remoteSharer = remote ? memberOf(remote.ownerId) : undefined;
+
 	const sharer = watched ? remoteSharer : undefined;
 	const focus = Boolean(watched && sharer);
 	// O Foco inteiro (a transmissão e a faixa de quem está na chamada): é ele que vai para a tela cheia.
@@ -176,7 +182,7 @@ function ConnectedRoom({ onExit }: { onExit: () => void }) {
 								focusAvailable={remoteShare !== undefined}
 								onGrid={stopWatching}
 								onFocus={() => {
-									if (remoteShare) watchShare(remoteShare.participant.identity);
+									if (remote) watchShare(remote.ownerId);
 								}}
 							/>
 						</>
@@ -214,18 +220,10 @@ function ConnectedRoom({ onExit }: { onExit: () => void }) {
 			) : (
 				<RoomGrid>
 					{shareState.status === "active" && screenShare && (
-						<ShareTile
-							title="Você está transmitindo"
-							source={shareState.source.title}
-							action={
-								<Button
-									variant="danger"
-									className="h-[34px]"
-									onClick={() => void screenShare.stop()}
-								>
-									Parar de transmitir
-								</Button>
-							}
+						<OwnShareTile
+							controller={screenShare}
+							source={shareState.source}
+							paused={shareState.paused}
 						/>
 					)}
 					{remoteShare && remoteSharer && (
@@ -252,5 +250,45 @@ function ConnectedRoom({ onExit }: { onExit: () => void }) {
 				</RoomGrid>
 			)}
 		</RoomFrame>
+	);
+}
+
+/** O lugar da própria transmissão: a imagem que está indo, os ajustes e o parar. */
+function OwnShareTile({
+	controller,
+	source,
+	paused,
+}: {
+	controller: ScreenShareController;
+	source: CaptureSource;
+	paused: boolean;
+}) {
+	const preview = useThumbnails([source.source]).get(
+		sourceRefKey(source.source),
+	);
+	return (
+		<ShareTile
+			title={paused ? "Sua transmissão está pausada" : "Você está transmitindo"}
+			source={source.title}
+			preview={preview}
+			action={
+				<div className="flex gap-2">
+					<Button
+						variant="secondary"
+						className="h-[34px]"
+						onClick={openSharePanel}
+					>
+						Ajustes
+					</Button>
+					<Button
+						variant="danger"
+						className="h-[34px]"
+						onClick={() => void controller.stop()}
+					>
+						Parar de transmitir
+					</Button>
+				</div>
+			}
+		/>
 	);
 }

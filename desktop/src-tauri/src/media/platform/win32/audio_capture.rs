@@ -86,7 +86,7 @@ fn open_stream(target: AudioTarget) -> Result<Stream, AppError> {
     let format = WaveFormat::new(
         32,
         32,
-        &wasapi::SampleType::Float,
+        wasapi::SampleType::Float,
         AUDIO_SAMPLE_RATE as usize,
         AUDIO_CHANNELS,
         None,
@@ -97,7 +97,7 @@ fn open_stream(target: AudioTarget) -> Result<Stream, AppError> {
         buffer_duration_hns: BUFFER_DURATION_HNS,
     };
     client
-        .initialize_client(&format, &Direction::Capture, &mode)
+        .initialize_client(&format, Direction::Capture, mode, None)
         .map_err(|e| AppError::AudioCapture(format!("inicializar o cliente: {e}")))?;
 
     let event = client

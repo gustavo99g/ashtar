@@ -1,4 +1,8 @@
-/** Sobre o próprio app: as novidades e a pasta de logs. Espelha `commands/app.rs`. */
+/**
+ * Sobre o próprio app: as novidades, a pasta de logs e o menu da bandeja. Espelha `commands/app.rs`
+ * e `tray.rs`.
+ */
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { call } from "./core";
 
 export interface WhatsNew {
@@ -14,4 +18,21 @@ export function whatsNew() {
 /** Abre a pasta de logs do app no Explorador de Arquivos. Rejeita com um `AppError`. */
 export function openLogDir() {
 	return call<void>("open_log_dir");
+}
+
+/** O que a pessoa pediu pelo menu da bandeja durante uma transmissão (`tray.rs`). */
+export type TrayShareAction = "panel" | "pause" | "resume" | "stop";
+
+/** Mostra (ou tira) as opções da transmissão no menu da bandeja. */
+export function trayShareState(sharing: boolean, paused: boolean) {
+	return call<void>("tray_share_state", { sharing, paused });
+}
+
+/** Escuta os cliques nas opções da transmissão da bandeja. */
+export function onTrayShare(
+	callback: (action: TrayShareAction) => void,
+): Promise<UnlistenFn> {
+	return listen<TrayShareAction>("tray-share", (event) =>
+		callback(event.payload),
+	);
 }
