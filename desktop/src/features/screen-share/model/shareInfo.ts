@@ -1,6 +1,6 @@
 /*
  * Uma transmissão por vez. A trilha de tela publicada leva no nome quando começou, a qualidade e
- * o título da fonte (`screen-share:{"t":...,"q":"720p60","s":"Navegador"}`). O nome vai junto
+ * o título da fonte (`screen-share:{"t":...,"q":"1080p60","s":"Navegador"}`). O nome vai junto
  * com a publicação para todo mundo na sala, assinada ou não, então todos os apps leem a mesma
  * coisa.
  *
@@ -76,6 +76,24 @@ export function shareWinner<T extends ShareCandidate>(
 		if (a !== b) return a < b ? candidate : best;
 		return candidate.identity < best.identity ? candidate : best;
 	}, undefined);
+}
+
+/**
+ * O fim da identidade da conexão que transmite a tela de alguém (`{id}:screen`, ADR 0017). Para o
+ * resto do app, ela é "a tela de fulano", não um participante a mais.
+ */
+export const SCREEN_SUFFIX = ":screen";
+
+/** Se a identidade é a de uma tela. */
+export function isScreenIdentity(identity: string): boolean {
+	return identity.endsWith(SCREEN_SUFFIX);
+}
+
+/** De quem é a identidade: a tela de alguém é desse alguém; o resto é de si mesmo. */
+export function shareOwner(identity: string): string {
+	return isScreenIdentity(identity)
+		? identity.slice(0, -SCREEN_SUFFIX.length)
+		: identity;
 }
 
 /** "1080p · 30 fps": a qualidade escolhida, para quem assiste. */

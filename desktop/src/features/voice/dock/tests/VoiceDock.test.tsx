@@ -5,8 +5,10 @@ import {
 	openSourcePicker,
 	type ScreenShareController,
 } from "@/features/screen-share";
-import { VoiceDock } from "../components/VoiceDock";
+import { fakeShareController } from "@/test/fakeShareController";
 import { useVoice } from "../../room/hooks/useVoice";
+
+import { VoiceDock } from "../components/VoiceDock";
 
 vi.mock("../../room/hooks/useVoice", () => ({ useVoice: vi.fn() }));
 // Só o que o `VoiceDock` monta por conta própria importa aqui: o seletor e os avisos.
@@ -14,17 +16,22 @@ vi.mock("../components/UserPanel", () => ({ UserPanel: () => null }));
 vi.mock("../components/VoiceConnection", () => ({
 	VoiceConnection: () => null,
 }));
-vi.mock("../../room/components/ShareRaceGuard", () => ({ ShareRaceGuard: () => null }));
-vi.mock("../../call/components/ShareNotices", () => ({ ShareNotices: () => null }));
+vi.mock("../../room/components/ShareRaceGuard", () => ({
+	ShareRaceGuard: () => null,
+}));
+vi.mock("../../call/components/ShareNotices", () => ({
+	ShareNotices: () => null,
+}));
+vi.mock("../components/TrayShare", () => ({ TrayShare: () => null }));
+// O seletor pede as miniaturas ao Rust, que não existe aqui.
+vi.mock("@/lib/tauri/commands", async (importOriginal) => ({
+	...(await importOriginal<object>()),
+	thumbnailsStart: vi.fn(async () => 1),
+	thumbnailsUpdate: vi.fn(async () => {}),
+	thumbnailsStop: vi.fn(async () => {}),
+}));
 
-const controller = {
-	getState: () => ({ status: "idle" }),
-	onStateChange: () => () => {},
-	listSources: vi.fn(async () => []),
-	start: vi.fn(async () => {}),
-	stop: async () => {},
-	dispose: async () => {},
-} satisfies ScreenShareController;
+const controller = fakeShareController();
 
 function mockVoice(screenShare: ScreenShareController | null) {
 	vi.mocked(useVoice).mockReturnValue({

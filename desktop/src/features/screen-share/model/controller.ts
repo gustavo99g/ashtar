@@ -1,18 +1,34 @@
 /**
- * Contrato do compartilhamento de tela, independente de como os dados chegam ao LiveKit.
+ * Contrato da transmissão de tela, independente de como os dados chegam ao LiveKit.
  *
- * Hoje a única implementação é a `IpcScreenShare` (o Rust manda os frames pelo IPC e o
- * webview os publica). O publicador nativo e uma eventual versão web serão outras
- * implementações desta mesma interface: o provider e a UI só conhecem o que está aqui.
+ * A implementação é a `NativeScreenShare` (ADR 0017): o Rust captura, codifica e publica numa
+ * conexão própria, `{id}:screen`. O provider e a UI só conhecem o que está aqui.
  */
-import type { AudioMode, CaptureSource, Quality } from "@/lib/tauri/commands";
+import type {
+	AudioMode,
+	CaptureSource,
+	Quality,
+	ShareStats,
+} from "@/lib/tauri/commands";
 
 /** O que o usuário escolheu no seletor. */
 export interface ShareRequest {
 	source: CaptureSource;
 	quality: Quality;
 	audio: AudioMode;
+	cursor: boolean;
+	/** O nivelador do áudio. Sem dizer, começa ligado. */
+	leveler?: boolean;
 }
+
+/** Um ajuste no meio da transmissão, pelo painel ou pela bandeja. */
+export type ShareChange =
+	| { kind: "quality"; quality: Quality }
+	| { kind: "source"; source: CaptureSource }
+	| { kind: "audio"; audio: AudioMode }
+	| { kind: "cursor"; enabled: boolean }
+	| { kind: "paused"; paused: boolean }
+	| { kind: "leveler"; enabled: boolean };
 
 export type ScreenShareState =
 	| {
@@ -24,8 +40,16 @@ export type ScreenShareState =
 	| {
 			status: "active";
 			sessionId: number;
+			/** Quando a transmissão começou (`Date.now()`): o "no ar há" do popover e do painel. */
+			startedAt: number;
 			source: CaptureSource;
-			/** `lost`: o áudio caiu sozinho e o vídeo continua (decisão 7). */
+			quality: Quality;
+			audioMode: AudioMode;
+			cursor: boolean;
+			/** O nivelador do áudio está ligado. */
+			leveler: boolean;
+			paused: boolean;
+			/** `lost`: o áudio caiu sozinho e o vídeo continua. */
 			audio: "off" | "on" | "lost";
 	  }
 	| { status: "error"; kind: string; message: string };
@@ -37,10 +61,22 @@ export interface ScreenShareController {
 	/** Avisa a cada mudança de estado. Devolve a função que cancela o aviso. */
 	onStateChange(listener: (state: ScreenShareState) => void): () => void;
 
+	/** Os números do último segundo, ou `null` fora de uma transmissão. */
+	getStats(): ShareStats | null;
+
+	/** Avisa a cada número novo (um por segundo). Devolve a função que cancela o aviso. */
+	onStats(listener: (stats: ShareStats | null) => void): () => void;
+
 	listSources(): Promise<CaptureSource[]>;
 
 	/** Nunca rejeita: uma falha vira o estado `error`. Ignorado se já houver uma sessão. */
 	start(request: ShareRequest): Promise<void>;
+
+	/**
+	 * Ajusta a transmissão ativa. Rejeita com o erro do Rust (um áudio que não abriu, por exemplo);
+	 * a transmissão continua. Sem transmissão ativa, não faz nada.
+	 */
+	update(change: ShareChange): Promise<void>;
 
 	/** Nunca rejeita. Se houver um início em andamento, espera ele terminar e então para. */
 	stop(): Promise<void>;

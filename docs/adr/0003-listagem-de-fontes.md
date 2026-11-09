@@ -1,6 +1,6 @@
 # 0003 — Listagem de fontes vinda do `DesktopCapturer`
 
-- **Status:** aceita
+- **Status:** substituída por 0019 (v0.2.4)
 - **Data:** 2026-09
 
 ## Contexto

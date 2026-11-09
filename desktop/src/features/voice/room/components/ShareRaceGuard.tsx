@@ -2,15 +2,15 @@ import { ScreenShareOffIcon } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "@/components/ui/toast";
-import { participantPerson } from "@/features/identity";
 import {
 	type ScreenShareController,
+	sharePerson,
 	useScreenShareState,
 	useScreenShares,
 } from "@/features/screen-share";
 import { paths } from "@/lib/paths";
-import { watchShare } from "../../call/stores/roomViewStore";
 import { NoticeIcon } from "../../call/components/NoticeIcon";
+import { watchShare } from "../../call/stores/roomViewStore";
 
 /**
  * Quando duas pessoas começam a transmitir juntas, cada app aplica a mesma regra
@@ -31,11 +31,11 @@ export function ShareRaceGuard({
 	useEffect(() => {
 		if (state.status !== "active" || lost.current === state.sessionId) return;
 		// A própria publicação ainda não chegou à lista: espera, para comparar as duas.
-		if (!shares.some((share) => share.participant.isLocal)) return;
-		if (!winner || winner.participant.isLocal) return;
+		if (!shares.some((share) => share.isOwn)) return;
+		if (!winner || winner.isOwn) return;
 
 		lost.current = state.sessionId;
-		const first = participantPerson(winner.participant);
+		const first = sharePerson(winner);
 		void controller.stop();
 		const id = toast.add({
 			title: `${first.name} começou a transmitir antes`,

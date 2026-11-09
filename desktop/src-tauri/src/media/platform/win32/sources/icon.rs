@@ -36,13 +36,14 @@ pub fn icon_data_url(hwnd: HWND) -> Option<String> {
 ///
 /// Ate 50ms por tentativa de `WM_GETICON` (veja `ask_window_icon`).
 pub fn find_icon(hwnd: HWND) -> Option<HICON> {
-    for kind in [ICON_SMALL2, ICON_SMALL, ICON_BIG] {
+    // O grande primeiro: o seletor desenha o ícone a 24-52 px, e o pequeno (16x16) fica borrado.
+    for kind in [ICON_BIG, ICON_SMALL2, ICON_SMALL] {
         if let Some(icon) = ask_window_icon(hwnd, kind) {
             return Some(icon);
         }
     }
 
-    for index in [GCLP_HICONSM, GCLP_HICON] {
+    for index in [GCLP_HICON, GCLP_HICONSM] {
         // SAFETY: `hwnd` e um HWND recebido do chamador (originado do
         // DesktopCapturer); `GetClassLongPtrW` e uma leitura segura mesmo se
         // a janela ja tiver sido fechada nesse meio-tempo (devolve 0).

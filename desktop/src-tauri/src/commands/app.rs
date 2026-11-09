@@ -1,4 +1,4 @@
-//! Comandos sobre o próprio app (versão, novidades, pasta de logs).
+//! Comandos sobre o próprio app (versão, novidades, pasta de logs, menu da bandeja).
 
 use serde::Serialize;
 use tauri::{AppHandle, Manager};
@@ -6,12 +6,21 @@ use tauri::{AppHandle, Manager};
 use crate::changelog;
 use crate::commands::run_blocking;
 use crate::error::AppError;
+use crate::tray;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct WhatsNew {
     pub version: String,
     /// A seção do `CHANGELOG.md`, em Markdown simples (linhas com `- `).
     pub notes: String,
+}
+
+/// Mostra (ou tira) as opções da transmissão no menu da bandeja. `sharing` falso tira; `paused`
+/// escolhe entre "Pausar" e "Continuar".
+#[tauri::command]
+pub async fn tray_share_state(app: AppHandle, sharing: bool, paused: bool) -> Result<(), AppError> {
+    tray::set_share(&app, sharing.then_some(paused));
+    Ok(())
 }
 
 /// A seção do `CHANGELOG.md` da versão em execução, ou `None` se ela não existe.

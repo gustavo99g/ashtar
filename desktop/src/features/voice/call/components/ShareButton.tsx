@@ -1,4 +1,4 @@
-import { PlayIcon, ScreenShareIcon } from "lucide-react";
+import { PauseIcon, PlayIcon, ScreenShareIcon } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -9,9 +9,10 @@ import {
 	PopoverTitle,
 	PopoverTrigger,
 } from "@/components/ui/popover";
-import { Avatar, AvatarBadge, participantPerson } from "@/features/identity";
+import { Avatar, AvatarBadge } from "@/features/identity";
 import {
 	type ScreenShareController,
+	ShareQuickSettings,
 	useShareButton,
 } from "@/features/screen-share";
 import { paths } from "@/lib/paths";
@@ -19,9 +20,10 @@ import { watchShare } from "../stores/roomViewStore";
 import { BarButton, DockButton } from "./buttons";
 
 /*
- * O botão Tela, na barra da sala (`bar`) e no painel "Voz conectada" (`dock`). Com outra pessoa
- * transmitindo ele fica apagado, mas clicável: o clique explica quem está transmitindo e oferece
- * Assistir.
+ * O botão Tela, na barra da sala (`bar`) e no painel "Voz conectada" (`dock`). Transmitindo, ele
+ * vira Transmitindo (dourado, com a bolinha piscando) ou Pausada (sem piscar), e o clique abre os
+ * ajustes rápidos da transmissão. Com outra pessoa transmitindo ele fica apagado, mas clicável: o
+ * clique explica quem está transmitindo e oferece Assistir.
  */
 export function ShareButton({
 	controller,
@@ -31,18 +33,20 @@ export function ShareButton({
 	variant: "bar" | "dock";
 }) {
 	const navigate = useNavigate();
-	const { active, starting, busyWith, onClick } = useShareButton(controller);
+	const { active, paused, starting, busyWith, onClick } =
+		useShareButton(controller);
 	const [open, setOpen] = useState(false);
-	const sharer = busyWith ? participantPerson(busyWith) : null;
+	const sharer = busyWith;
 
 	const label = active
-		? "Parar de transmitir a tela"
+		? paused
+			? "Transmissão pausada: ajustes"
+			: "Transmitindo: ajustes"
 		: sharer
 			? `Tela: ${sharer.name} já está transmitindo`
 			: "Transmitir a tela";
 	const common = {
 		"aria-label": label,
-		"aria-pressed": active,
 		"aria-disabled": sharer ? true : undefined,
 		disabled: starting,
 		onClick,
@@ -50,34 +54,50 @@ export function ShareButton({
 
 	return (
 		<Popover
-			open={open && sharer !== null}
-			onOpenChange={(next) => setOpen(next && sharer !== null)}
+			open={open && (sharer !== null || active)}
+			onOpenChange={(next) => setOpen(next && (sharer !== null || active))}
 		>
 			<PopoverTrigger
 				render={
 					variant === "bar" ? (
 						<BarButton
-							label="Tela"
-							tone={active ? "on" : "default"}
+							label={active ? (paused ? "Pausada" : "Transmitindo") : "Tela"}
+							tone={active ? (paused ? "paused" : "live") : "default"}
 							{...common}
 						>
-							<ScreenShareIcon />
+							{active && paused ? <PauseIcon /> : <ScreenShareIcon />}
+							{active && !paused && <LiveDot />}
 						</BarButton>
 					) : (
 						<DockButton
 							{...common}
 							className={
 								active
-									? "bg-primary text-primary-foreground hover:bg-primary-hover"
+									? paused
+										? "text-live ring-1 ring-live ring-inset"
+										: "bg-live text-live-foreground hover:bg-live hover:brightness-110"
 									: undefined
 							}
 						>
-							<ScreenShareIcon />
-							Tela
+							{active && paused ? <PauseIcon /> : <ScreenShareIcon />}
+							{active ? (paused ? "Pausada" : "Transmitindo") : "Tela"}
 						</DockButton>
 					)
 				}
 			/>
+			{active && (
+				<PopoverContent
+					side="top"
+					align={variant === "bar" ? "center" : "start"}
+					sideOffset={10}
+					className="w-[340px]"
+				>
+					<ShareQuickSettings
+						controller={controller}
+						onClose={() => setOpen(false)}
+					/>
+				</PopoverContent>
+			)}
 			{sharer && (
 				<PopoverContent
 					side="top"
@@ -123,5 +143,15 @@ export function ShareButton({
 				</PopoverContent>
 			)}
 		</Popover>
+	);
+}
+
+/** A bolinha piscando do botão Transmitindo (parada com "reduzir movimento"). */
+function LiveDot() {
+	return (
+		<span
+			aria-hidden="true"
+			className="absolute top-0.5 right-0.5 size-2 animate-pulse rounded-full bg-live ring-2 ring-background motion-reduce:animate-none"
+		/>
 	);
 }

@@ -1,6 +1,6 @@
 # 0008 — Captura de janelas pelo WGC do libwebrtc
 
-- **Status:** aceita
+- **Status:** substituída por 0018 (v0.2.4: a captura pelo WGC passou a ser própria, e não a do libwebrtc)
 - **Data:** 2026-10
 
 ## Contexto

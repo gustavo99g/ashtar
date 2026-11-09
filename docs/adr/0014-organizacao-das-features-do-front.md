@@ -110,13 +110,15 @@ invites/      components/ (QuickInvite, InviteTicket, InviteStatusPill)  queries
 updater/      components/ (AppSettings, UpdateNotice, WhatsNewDialog)  hooks/ (useUpdateChannelSync)
               stores/ (updaterStore)
 settings/     hooks/ (useApplyTheme)  stores/ (settingsStore)
-screen-share/ components/ (SourcePicker, SourcePickerHost)  hooks/ (useScreenShares, ...)
+screen-share/ components/ (SourcePicker, SourcePickerHost, SharePanel)  hooks/ (useScreenShares, ...)
               stores/ (pickerStore)  model/ (controller, monitorLayout, presets, notices, shareInfo)
-              ipc/ (IpcScreenShare, ScreenShareAudio, o worklet)
+              native/ (NativeScreenShare)
 ```
 
-- A `ipc/` da `screen-share` continua: é uma implementação do `ScreenShareController`, e o publicador
-  nativo (v0.2.5) entra como uma pasta irmã, `native/`.
+- A `ipc/` da `screen-share` (o `IpcScreenShare`, o áudio e o worklet) existia quando esta ADR foi
+  escrita. Na v0.2.4 o publicador nativo entrou como a pasta irmã `native/` (o `NativeScreenShare`, a
+  única implementação do `ScreenShareController`), e a `ipc/` saiu junto com o caminho do IPC
+  ([ADR 0017](0017-publicador-nativo.md)).
 - O `nickRules` passa para `identity/model/`: é regra da identidade, e o nome visível segue as regras do
   nick, menos ser único. O comentário no topo diz que ser único é regra só da API.
 

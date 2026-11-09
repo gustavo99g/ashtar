@@ -1,45 +1,32 @@
-//! Comandos do compartilhamento de tela (Etapa 4 do `docs/plans/v0.1-reorganizacao.md`).
-//!
-//! O prefixo `ipc_` marca o que é específico do caminho atual (frames pelo
-//! IPC do Tauri). `list_capture_sources`, `screen_share_stop` e os eventos de
-//! fim também vão servir ao publicador nativo.
+//! Comandos da transmissão de tela (ADR 0017): a lista de fontes, começar, ajustar e parar; e os
+//! eventos de fim e dos números a cada segundo.
 
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
-use tauri::{
-    ipc::{Channel, InvokeResponseBody},
-    AppHandle, Emitter, State,
-};
+use tauri::{AppHandle, Emitter, Manager, State};
 use tracing::{info, warn};
 
 use crate::{
     error::AppError,
     media::{
         audio::AudioMode,
-        ipc_sink::{IpcAudioSink, IpcVideoSink},
+        focus,
+        publisher::ShareTarget,
         quality::Quality,
-        session::{ScreenShareManager, ShareEvent},
+        share::{ShareChange, ShareEvent, ShareManager, ShareRequest},
         sources::{self, CaptureSource, SourceRef},
-        video_capture::VideoCaptureConfig,
-        EndReason, FrameGate,
+        video::{StatsSnapshot, VideoConfig},
+        EndReason,
     },
 };
 
 use super::run_blocking;
 
-/// O que o frontend escolheu no seletor (argumento de `ipc_screen_share_start`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct StartOptions {
-    pub source: SourceRef,
-    pub quality: Quality,
-    pub audio: AudioMode,
-}
-
-/// Nome do evento de fim da sessão (contrato com o frontend, `docs/plans/v0.1-reorganizacao.md` 4.2).
+/// Nome do evento de fim da sessão (contrato com o frontend).
 pub const SCREEN_SHARE_ENDED: &str = "screen-share-ended";
-/// Nome do evento de fim só do áudio (contrato com o frontend, `docs/plans/v0.1-reorganizacao.md` 4.2).
+/// Nome do evento de fim só do áudio (contrato com o frontend).
 pub const SCREEN_SHARE_AUDIO_ENDED: &str = "screen-share-audio-ended";
 
 /// Motivo do fim, como o frontend recebe.
@@ -102,71 +89,188 @@ fn emit_share_event(app: &AppHandle, event: ShareEvent) {
     }
 }
 
-/// Cria o manager do compartilhamento, ligado aos eventos do Tauri.
-/// Chamado uma vez, no `setup` do app.
-pub fn create_manager(app: &AppHandle) -> Arc<ScreenShareManager> {
+/// Nome do evento com os números da transmissão, a cada segundo.
+pub const SCREEN_SHARE_STATS: &str = "screen-share-stats";
+/// De quanto em quanto tempo os números vão para o frontend.
+const STATS_EVERY: Duration = Duration::from_secs(1);
+/// De quanto em quanto tempo um resumo vai para o arquivo de log.
+const LOG_EVERY: Duration = Duration::from_secs(60);
+
+/// O que o frontend escolheu no seletor, mais onde entrar (argumento de `screen_share_start`).
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ShareOptions {
+    pub source: SourceRef,
+    pub quality: Quality,
+    pub audio: AudioMode,
+    pub cursor: bool,
+    /// O nivelador do áudio (`media/leveler.rs`), ligado por padrão no app.
+    pub leveler: bool,
+    pub target: ShareTarget,
+}
+
+/// Um ajuste no meio (argumento de `screen_share_update`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase",
+    deny_unknown_fields
+)]
+pub enum ShareUpdate {
+    Quality { quality: Quality },
+    Source { source: SourceRef },
+    Audio { audio: AudioMode },
+    Cursor { enabled: bool },
+    Paused { paused: bool },
+    Leveler { enabled: bool },
+}
+
+impl ShareUpdate {
+    fn into_change(self) -> ShareChange {
+        match self {
+            Self::Quality { quality } => ShareChange::Format(quality.format()),
+            Self::Source { source } => ShareChange::Source(source),
+            Self::Audio { audio } => ShareChange::Audio(audio),
+            Self::Cursor { enabled } => ShareChange::Cursor(enabled),
+            Self::Leveler { enabled } => ShareChange::Leveler(enabled),
+            Self::Paused { paused } => ShareChange::Paused(paused),
+        }
+    }
+}
+
+/// Payload de `screen-share-stats`.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StatsPayload {
+    pub session_id: u64,
+    #[serde(flatten)]
+    pub stats: StatsSnapshot,
+}
+
+/// Cria o manager da transmissão nativa, ligado aos eventos do Tauri. Chamado uma vez, no `setup`.
+pub fn create_manager(app: &AppHandle) -> Arc<ShareManager> {
     let app = app.clone();
-    Arc::new(ScreenShareManager::new(move |event| {
-        emit_share_event(&app, event);
+    Arc::new(ShareManager::new(move |event| {
+        emit_share_event(&app, event)
     }))
 }
 
-// ============================================================================
-// Comandos
-// ============================================================================
+/// A fonte escolhida vai para a frente e o Ashtar sai da frente dela.
+fn focus_source(app: &AppHandle, source: SourceRef) {
+    focus::bring_to_front(source);
+    if let Some(window) = app.get_webview_window("main") {
+        if let Err(error) = window.minimize() {
+            warn!(%error, "não deu para minimizar o app");
+        }
+    }
+}
 
-/// Lista as janelas e telas que dá para compartilhar, com título, ícone e geometria.
+/// Manda os números de `session_id` a cada segundo, e um resumo ao log a cada minuto, até a
+/// transmissão acabar.
+fn spawn_stats(app: AppHandle, manager: Arc<ShareManager>, session_id: u64) {
+    tauri::async_runtime::spawn(async move {
+        let mut last_log = Instant::now();
+        loop {
+            tokio::time::sleep(STATS_EVERY).await;
+            let Some(stats) = manager.stats(session_id) else {
+                return;
+            };
+            let snapshot = stats.snapshot(Instant::now());
+            if last_log.elapsed() >= LOG_EVERY {
+                last_log = Instant::now();
+                info!(
+                    target: "media",
+                    session_id,
+                    fps = snapshot.fps,
+                    kbps = snapshot.bitrate_kbps,
+                    alvo_kbps = snapshot.target_kbps,
+                    ms = snapshot.latency_ms,
+                    tamanho = %format!("{}x{}", snapshot.width, snapshot.height),
+                    keyframes = snapshot.keyframes,
+                    descartes = snapshot.dropped,
+                    "resumo da transmissão"
+                );
+            }
+            let payload = StatsPayload {
+                session_id,
+                stats: snapshot,
+            };
+            if let Err(error) = app.emit(SCREEN_SHARE_STATS, payload) {
+                warn!(%error, "falha ao emitir os números da transmissão");
+            }
+        }
+    });
+}
+
+/// Lista as janelas e telas que dá para compartilhar, inclusive as janelas minimizadas.
 ///
 /// A enumeração e a extração de ícones bloqueiam, por isso rodam em [`run_blocking`].
 #[tauri::command]
 pub async fn list_capture_sources() -> Result<Vec<CaptureSource>, AppError> {
-    run_blocking(sources::list_capture_sources).await
+    run_blocking(sources::list_sources).await
 }
 
-/// Inicia um compartilhamento pelo caminho IPC. Só responde depois que o
-/// vídeo e, se pedido, o áudio inicializaram (início atômico, decisão 6).
+/// Começa a transmissão: entra na sala como `:screen`, começa o vídeo e o áudio, traz a fonte para
+/// a frente e minimiza o app. Só responde depois que tudo começou (ou nada ficou rodando).
 #[tauri::command]
-pub async fn ipc_screen_share_start(
-    app: tauri::AppHandle,
-    manager: State<'_, Arc<ScreenShareManager>>,
-    options: StartOptions,
-    video: Channel<InvokeResponseBody>,
-    audio: Channel<InvokeResponseBody>,
+pub async fn screen_share_start(
+    app: AppHandle,
+    manager: State<'_, Arc<ShareManager>>,
+    options: ShareOptions,
 ) -> Result<u64, AppError> {
-    // O navegador do WebView2 pode ter mudado desde a abertura (ele reiniciou, por exemplo): a
-    // captura da tela inteira exclui o que está valendo agora.
+    // O navegador do WebView2 pode ter mudado desde a abertura: a captura da tela inteira exclui
+    // o que está valendo agora.
     crate::webview_process::refresh(&app);
     let manager = Arc::clone(manager.inner());
-    let preset = options.quality.preset();
-
-    let video_config = VideoCaptureConfig {
-        source: options.source,
-        max_width: preset.max_width,
-        max_height: preset.max_height,
-        fps: preset.fps,
+    let request = ShareRequest {
+        video: VideoConfig {
+            source: options.source,
+            format: options.quality.format(),
+            cursor: options.cursor,
+        },
+        audio: options.audio,
+        leveler: options.leveler,
+        target: options.target,
     };
-
-    let video_sink = IpcVideoSink::new(video, FrameGate::new(preset.max_in_flight));
-    let audio_sink = IpcAudioSink::new(audio);
-
-    run_blocking(move || manager.start(video_config, video_sink, options.audio, audio_sink)).await
+    info!(
+        target: "media",
+        quality = ?options.quality,
+        audio = ?options.audio,
+        leveler = options.leveler,
+        "começando a transmissão"
+    );
+    let starting = Arc::clone(&manager);
+    let session_id = run_blocking(move || starting.start(request)).await?;
+    focus_source(&app, options.source);
+    spawn_stats(app, manager, session_id);
+    Ok(session_id)
 }
 
-/// Confirma que o frontend terminou de processar um frame (libera o `FrameGate`).
-/// Ids de sessões encerradas são ignorados: frames em trânsito ainda geram ACKs.
+/// Ajusta a transmissão no meio. Um id que já acabou é ignorado.
 #[tauri::command]
-pub async fn ipc_screen_share_ack(
-    manager: State<'_, Arc<ScreenShareManager>>,
+pub async fn screen_share_update(
+    app: AppHandle,
+    manager: State<'_, Arc<ShareManager>>,
     session_id: u64,
+    update: ShareUpdate,
 ) -> Result<(), AppError> {
-    manager.ack(session_id);
+    // O áudio novo da tela inteira exclui o navegador do WebView2 que está valendo agora.
+    if let ShareUpdate::Audio { .. } = update {
+        crate::webview_process::refresh(&app);
+    }
+    let manager = Arc::clone(manager.inner());
+    run_blocking(move || manager.update(session_id, update.into_change())).await?;
+    if let ShareUpdate::Source { source } = update {
+        focus_source(&app, source);
+    }
     Ok(())
 }
 
-/// Encerra o compartilhamento. Idempotente: um id que já acabou não é erro.
+/// Encerra a transmissão. Idempotente: um id que já acabou não é erro.
 #[tauri::command]
 pub async fn screen_share_stop(
-    manager: State<'_, Arc<ScreenShareManager>>,
+    manager: State<'_, Arc<ShareManager>>,
     session_id: u64,
 ) -> Result<(), AppError> {
     let manager = Arc::clone(manager.inner());
@@ -176,36 +280,105 @@ pub async fn screen_share_stop(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::media::video::EncoderKind;
 
     #[test]
     fn le_as_opcoes_enviadas_pelo_frontend() {
         let json = r#"{
             "source": { "kind": "window", "id": 123 },
-            "quality": "720p60",
-            "audio": { "mode": "application", "processId": 456 }
+            "quality": "1080p30",
+            "audio": { "mode": "system" },
+            "cursor": true,
+            "leveler": true,
+            "target": { "url": "wss://sala", "token": "abc", "trackName": "screen-share:{}" }
         }"#;
-
-        let options: StartOptions = serde_json::from_str(json).unwrap();
-        assert_eq!(
-            options,
-            StartOptions {
-                source: SourceRef::Window(123),
-                quality: Quality::Motion,
-                audio: AudioMode::Application { process_id: 456 },
-            }
-        );
+        let options: ShareOptions = serde_json::from_str(json).unwrap();
+        assert_eq!(options.source, SourceRef::Window(123));
+        assert_eq!(options.quality, Quality::Detail);
+        assert!(options.leveler);
+        assert_eq!(options.target.url, "wss://sala");
     }
 
     #[test]
-    fn recusa_campo_desconhecido() {
-        let json = r#"{
-            "source": { "kind": "monitor", "id": 0 },
-            "quality": "1080p30",
-            "audio": { "mode": "off" },
-            "fps": 60
-        }"#;
+    fn le_cada_ajuste() {
+        let cases = [
+            (
+                r#"{ "kind": "quality", "quality": "1080p60" }"#,
+                ShareUpdate::Quality {
+                    quality: Quality::Motion,
+                },
+            ),
+            (
+                r#"{ "kind": "source", "source": { "kind": "monitor", "id": 9 } }"#,
+                ShareUpdate::Source {
+                    source: SourceRef::Monitor(9),
+                },
+            ),
+            (
+                r#"{ "kind": "audio", "audio": { "mode": "off" } }"#,
+                ShareUpdate::Audio {
+                    audio: AudioMode::Off,
+                },
+            ),
+            (
+                r#"{ "kind": "cursor", "enabled": false }"#,
+                ShareUpdate::Cursor { enabled: false },
+            ),
+            (
+                r#"{ "kind": "paused", "paused": true }"#,
+                ShareUpdate::Paused { paused: true },
+            ),
+            (
+                r#"{ "kind": "leveler", "enabled": false }"#,
+                ShareUpdate::Leveler { enabled: false },
+            ),
+        ];
+        for (json, expected) in cases {
+            assert_eq!(
+                serde_json::from_str::<ShareUpdate>(json).unwrap(),
+                expected,
+                "{json}"
+            );
+        }
+        assert!(serde_json::from_str::<ShareUpdate>(r#"{ "kind": "fps", "fps": 60 }"#).is_err());
+    }
 
-        assert!(serde_json::from_str::<StartOptions>(json).is_err());
+    #[test]
+    fn numeros_no_formato_do_frontend() {
+        let payload = StatsPayload {
+            session_id: 3,
+            stats: StatsSnapshot {
+                encoder: EncoderKind::Hardware("AMDh264Encoder".into()),
+                adapter: "AMD Radeon".into(),
+                width: 1920,
+                height: 1080,
+                fps: 60,
+                bitrate_kbps: 7_900,
+                target_kbps: 8_000,
+                latency_ms: 5.5,
+                keyframes: 2,
+                dropped: 0,
+                paused: false,
+            },
+        };
+        assert_eq!(
+            serde_json::to_value(&payload).unwrap(),
+            serde_json::json!({
+                "sessionId": 3,
+                "encoder": { "kind": "hardware", "name": "AMDh264Encoder" },
+                "adapter": "AMD Radeon",
+                "width": 1920,
+                "height": 1080,
+                "fps": 60,
+                "bitrateKbps": 7900,
+                "targetKbps": 8000,
+                "latencyMs": 5.5,
+                "keyframes": 2,
+                "dropped": 0,
+                "paused": false
+            })
+        );
+        assert_eq!(SCREEN_SHARE_STATS, "screen-share-stats");
     }
 
     #[test]
@@ -225,8 +398,8 @@ mod tests {
 
     #[test]
     fn nomes_dos_eventos_seguem_o_contrato() {
-        // O frontend escuta estes nomes (`docs/plans/v0.1-reorganizacao.md`, 4.2). Mudar um lado sem o outro quebra em
-        // silêncio: o evento sairia, e ninguém o ouviria.
+        // O frontend escuta estes nomes. Mudar um lado sem o outro quebra em silêncio: o evento
+        // sairia, e ninguém o ouviria.
         assert_eq!(SCREEN_SHARE_ENDED, "screen-share-ended");
         assert_eq!(SCREEN_SHARE_AUDIO_ENDED, "screen-share-audio-ended");
     }

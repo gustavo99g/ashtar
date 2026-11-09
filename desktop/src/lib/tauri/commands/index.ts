@@ -7,4 +7,5 @@ export * from "./app";
 export { type AppError, type AppErrorKind, isAppError } from "./core";
 export * from "./identity";
 export * from "./screen-share";
+export * from "./thumbnails";
 export * from "./updater";

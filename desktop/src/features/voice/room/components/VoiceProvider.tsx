@@ -8,7 +8,8 @@
  * saiu do grupo, por exemplo), a chamada cai sozinha. Quando a API tira a pessoa da sala (removida
  * ou com o computador desvinculado no Painel), confere a sessão na hora.
  *
- * Não sabe nada de captura: cria o `ScreenShareController` da sala e o expõe no contexto.
+ * Não sabe nada de captura: cria o `ScreenShareController` da sala e o expõe no contexto. A tela
+ * transmitida sai do Rust, numa segunda conexão (`{id}:screen`, ADR 0017).
  * Os componentes leem participantes e trilhas pelos hooks do LiveKit (`useParticipants`,
  * `useTracks`...), que funcionam porque a árvore está dentro do `RoomContext`.
  *
@@ -40,7 +41,7 @@ import {
 } from "react";
 import { useSession } from "@/features/identity";
 import {
-	IpcScreenShare,
+	NativeScreenShare,
 	type ScreenShareController,
 } from "@/features/screen-share";
 import { useRoomView } from "../../call/stores/roomViewStore";
@@ -185,7 +186,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 		const { channelId } = target;
 		let cancelled = false;
 		const nextRoom = new Room(roomOptions(deviceIds.current));
-		const controller = new IpcScreenShare(nextRoom);
+		const controller = new NativeScreenShare(channelId);
 
 		nextRoom.on(RoomEvent.ConnectionStateChanged, (state) => {
 			setConnectionState(toVoiceState(state));
@@ -231,7 +232,12 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 			}
 		});
 		nextRoom.on(RoomEvent.TrackPublished, (publication, participant) => {
-			syncSubscription(publication, participant, useRoomView.getState().shown);
+			syncSubscription(
+				publication,
+				participant,
+				useRoomView.getState().shown,
+				nextRoom.localParticipant.identity,
+			);
 		});
 
 		// Só dispara quando a sala cai sozinha: no cleanup as escutas saem antes do disconnect.
