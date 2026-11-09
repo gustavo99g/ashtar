@@ -1,13 +1,16 @@
 /**
- * O painel da própria transmissão: a imagem que está indo (a miniatura ao vivo, ADR 0019), os
- * números do último segundo, quem está assistindo e os ajustes no meio (qualidade, fonte, áudio,
- * cursor, pausa e parar). Cada ajuste vai direto para o Rust; quem assiste não sai da tela.
+ * O painel completo da própria transmissão. Abre pelo "Detalhes" do popover do botão Tela, pelo
+ * "Ajustes" do lugar da transmissão na Grade e pela bandeja. O foco são os números: um aviso de
+ * saúde no topo, os números do último segundo em cartões (mais o ping), o envio do último minuto
+ * com o limite tracejado e quem está assistindo, há quanto tempo. Os ajustes ficam embaixo, os
+ * mesmos do popover (`ShareControls`), e cada um vai direto para o Rust: quem assiste não sai da
+ * tela. A imagem que está indo é a miniatura ao vivo da fonte (ADR 0019).
  *
  * Um ajuste que falha (um áudio que não abriu, por exemplo) aparece aqui e a transmissão segue
  * como estava.
  */
 import { PauseIcon, PlayIcon, XIcon } from "lucide-react";
-import { type ReactNode, useState } from "react";
+import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import {
 	Dialog,
@@ -16,41 +19,45 @@ import {
 	DialogDescription,
 	DialogTitle,
 } from "@/components/ui/dialog";
-import { Segmented, SegmentedItem } from "@/components/ui/segmented";
-import { Switch } from "@/components/ui/switch";
-import type { AudioMode, Quality, ShareStats } from "@/lib/tauri/commands";
+import type { Quality, ShareStats } from "@/lib/tauri/commands";
 import { cn } from "@/lib/utils";
+import { useNow } from "../hooks/useNow";
 import { useScreenShareState } from "../hooks/useScreenShareState";
-import { useShareStats } from "../hooks/useShareStats";
+import { useShareControls } from "../hooks/useShareControls";
+import { useShareStatsHistory } from "../hooks/useShareStatsHistory";
 import { sourceRefKey, useThumbnails } from "../hooks/useThumbnails";
 import type {
 	ScreenShareController,
 	ScreenShareState,
-	ShareChange,
 } from "../model/controller";
 import {
-	networkLimited,
-	QUALITY_ORDER,
-	QUALITY_PRESETS,
-} from "../model/presets";
+	formatElapsed,
+	HISTORY_SECONDS,
+	type ShareHealth,
+	shareHealth,
+	watchingFor,
+} from "../model/health";
+import { networkLimited, QUALITY_PRESETS } from "../model/presets";
 import { openSourcePicker } from "../stores/pickerStore";
+import { useShareViewerList } from "../stores/viewersStore";
+import { ControlLabel, ShareControls } from "./ShareControls";
+import { mbps } from "./ShareQuickSettings";
 
 type ActiveState = Extract<ScreenShareState, { status: "active" }>;
-type AudioChoice = AudioMode["mode"];
 
 interface SharePanelProps {
 	controller: ScreenShareController;
 	open: boolean;
 	onClose: () => void;
-	/** Os nomes de quem está assistindo agora. */
-	viewers: readonly string[];
+	/** O ping até o servidor (`usePing` da voz), medido só com o painel aberto. */
+	ping: number | null;
 }
 
 export function SharePanel({
 	controller,
 	open,
 	onClose,
-	viewers,
+	ping,
 }: SharePanelProps) {
 	const state = useScreenShareState(controller);
 	const active = state.status === "active";
@@ -61,12 +68,12 @@ export function SharePanel({
 				if (!next) onClose();
 			}}
 		>
-			<DialogContent className="flex max-h-[calc(100%-2rem)] flex-col gap-5 overflow-y-auto rounded-[14px] border-border p-6 sm:max-w-[640px]">
+			<DialogContent className="flex max-h-[calc(100%-2rem)] flex-col gap-5 overflow-y-auto rounded-[14px] border-border p-6 sm:max-w-[720px]">
 				{active && (
 					<PanelBody
 						controller={controller}
 						state={state}
-						viewers={viewers}
+						ping={ping}
 						onClose={onClose}
 					/>
 				)}
@@ -78,50 +85,23 @@ export function SharePanel({
 function PanelBody({
 	controller,
 	state,
-	viewers,
+	ping,
 	onClose,
 }: {
 	controller: ScreenShareController;
 	state: ActiveState;
-	viewers: readonly string[];
+	ping: number | null;
 	onClose: () => void;
 }) {
-	const stats = useShareStats(controller);
+	const controls = useShareControls(controller, state);
+	const history = useShareStatsHistory(controller);
+	const stats = history[history.length - 1] ?? null;
+	const viewers = useShareViewerList((s) => s.viewers);
+	const now = useNow();
 	const preview = useThumbnails([state.source.source]).get(
 		sourceRefKey(state.source.source),
 	);
-	const [failure, setFailure] = useState<string | null>(null);
-	const [busy, setBusy] = useState(false);
-
-	async function apply(change: ShareChange) {
-		setBusy(true);
-		setFailure(null);
-		try {
-			await controller.update(change);
-		} catch (error) {
-			setFailure(
-				typeof error === "object" && error !== null && "message" in error
-					? String(error.message)
-					: String(error),
-			);
-		} finally {
-			setBusy(false);
-		}
-	}
-
-	const processId = state.source.processId;
-	const audioChoices: AudioChoice[] =
-		state.source.source.kind === "window" && processId != null
-			? ["off", "application", "system"]
-			: ["off", "system"];
-	const audioChoice = state.audioMode.mode;
-
-	function audioMode(choice: AudioChoice): AudioMode {
-		if (choice === "application" && processId != null) {
-			return { mode: "application", processId };
-		}
-		return { mode: choice === "application" ? "off" : choice };
-	}
+	const health = shareHealth(history, state.quality);
 
 	return (
 		<>
@@ -135,23 +115,41 @@ function PanelBody({
 						<span className="font-semibold text-foreground">
 							{state.source.title}
 						</span>
+						{" · no ar há "}
+						<span className="font-mono">
+							{formatElapsed(state.startedAt, now)}
+						</span>
 					</DialogDescription>
 				</div>
-				<DialogClose
-					render={
-						<Button
-							variant="ghost"
-							size="icon"
-							className="text-muted-foreground"
-						/>
-					}
-					aria-label="Fechar"
-				>
-					<XIcon className="size-[18px]" />
-				</DialogClose>
+				<div className="flex items-center gap-1">
+					<Button
+						variant="ghost"
+						className="h-9 text-sm font-medium"
+						onClick={() => {
+							onClose();
+							openSourcePicker("change");
+						}}
+					>
+						Trocar fonte
+					</Button>
+					<DialogClose
+						render={
+							<Button
+								variant="ghost"
+								size="icon"
+								className="text-muted-foreground"
+							/>
+						}
+						aria-label="Fechar"
+					>
+						<XIcon className="size-[18px]" />
+					</DialogClose>
+				</div>
 			</header>
 
-			<div className="grid grid-cols-[1fr_200px] gap-4">
+			<HealthBanner health={stats ? health : null} />
+
+			<div className="grid grid-cols-[1fr_220px] gap-4">
 				<div className="relative flex aspect-video items-center justify-center overflow-hidden rounded-lg border border-border bg-background">
 					{preview ? (
 						<img
@@ -170,102 +168,60 @@ function PanelBody({
 						</span>
 					)}
 				</div>
-				<StatsList stats={stats} quality={state.quality} />
+				<section
+					aria-label="Quem está assistindo"
+					className="flex flex-col gap-2"
+				>
+					<ControlLabel>
+						{viewers.length === 0
+							? "Ninguém assistindo"
+							: `${viewers.length} assistindo`}
+					</ControlLabel>
+					<ul className="flex flex-col gap-1.5">
+						{viewers.map((viewer) => (
+							<li
+								key={viewer.id}
+								className="flex items-baseline justify-between gap-2 text-[13px]"
+							>
+								<span className="truncate text-foreground">{viewer.name}</span>
+								<span className="shrink-0 text-xs text-muted-foreground">
+									{watchingFor(viewer.since, now)}
+								</span>
+							</li>
+						))}
+					</ul>
+				</section>
 			</div>
 
-			<section className="flex flex-col gap-1.5">
-				<Label>
-					{viewers.length === 0
-						? "Ninguém assistindo"
-						: `${viewers.length} assistindo`}
-				</Label>
-				{viewers.length > 0 && (
-					<span className="text-[13px] text-foreground">
-						{viewers.join(", ")}
-					</span>
-				)}
-			</section>
+			{stats ? (
+				<>
+					<StatCards stats={stats} quality={state.quality} ping={ping} />
+					<SendChart history={history} />
+				</>
+			) : (
+				<span className="text-xs text-muted-foreground">
+					Os números chegam em um segundo.
+				</span>
+			)}
 
-			<div className="grid grid-cols-2 gap-6 border-t border-border pt-4">
-				<section className="flex flex-col gap-2.5">
-					<Label>Qualidade</Label>
-					<Segmented
-						aria-label="Qualidade"
-						value={state.quality}
-						onValueChange={(next) =>
-							void apply({ kind: "quality", quality: next as Quality })
-						}
-					>
-						{QUALITY_ORDER.map((value) => (
-							<SegmentedItem key={value} value={value}>
-								{QUALITY_PRESETS[value].label}
-							</SegmentedItem>
-						))}
-					</Segmented>
-					<span className="text-xs leading-normal text-muted-foreground">
-						{QUALITY_PRESETS[state.quality].description}
-					</span>
-					<label className="mt-2 flex cursor-pointer items-center gap-2.5">
-						<Switch
-							variant="blue"
-							checked={state.cursor}
-							disabled={busy}
-							onCheckedChange={(enabled) =>
-								void apply({ kind: "cursor", enabled })
-							}
-						/>
-						<span className="text-sm text-foreground">Mostrar o cursor</span>
-					</label>
-				</section>
-
-				<section className="flex flex-col gap-2.5">
-					<Label>Áudio</Label>
-					<Segmented
-						aria-label="Áudio"
-						value={audioChoice}
-						onValueChange={(next) =>
-							void apply({
-								kind: "audio",
-								audio: audioMode(next as AudioChoice),
-							})
-						}
-					>
-						{audioChoices.map((choice) => (
-							<SegmentedItem key={choice} value={choice}>
-								{AUDIO_LABELS[choice]}
-							</SegmentedItem>
-						))}
-					</Segmented>
-					{state.audio === "lost" && (
-						<span className="text-xs leading-normal text-warning-text">
-							O áudio caiu. Escolha de novo para religar.
-						</span>
-					)}
-				</section>
+			<div className="border-t border-border pt-4">
+				<ShareControls state={state} controls={controls} />
 			</div>
 
 			<footer className="flex items-center gap-3 border-t border-border pt-4">
 				<span
-					role={failure ? "alert" : undefined}
+					role={controls.failure ? "alert" : undefined}
 					className="min-w-0 flex-1 truncate text-[13px] text-destructive"
 				>
-					{failure && `Não deu para ajustar: ${failure}`}
+					{controls.failure && `Não deu para ajustar: ${controls.failure}`}
 				</span>
-				<Button
-					variant="ghost"
-					className="h-10 text-sm font-medium"
-					onClick={() => {
-						onClose();
-						openSourcePicker("change");
-					}}
-				>
-					Trocar fonte
-				</Button>
 				<Button
 					variant="secondary"
 					className="h-10 text-sm"
-					disabled={busy}
-					onClick={() => void apply({ kind: "paused", paused: !state.paused })}
+					disabled={controls.busy}
+					onClick={() =>
+						void controls.apply({ kind: "paused", paused: !state.paused })
+					}
 				>
 					{state.paused ? <PlayIcon /> : <PauseIcon />}
 					{state.paused ? "Continuar" : "Pausar"}
@@ -285,66 +241,145 @@ function PanelBody({
 	);
 }
 
-const AUDIO_LABELS: Record<AudioChoice, string> = {
-	off: "Sem áudio",
-	application: "Do aplicativo",
-	system: "Do sistema",
+const HEALTH_TEXT: Record<ShareHealth, string> = {
+	ok: "Tudo certo: a imagem está indo no máximo do preset.",
+	network:
+		"A sua conexão está segurando a transmissão: a imagem perde nitidez até ela melhorar.",
+	computer:
+		"O computador está no limite: quadros estão ficando para trás. O Leve ou fechar o que estiver pesando ajuda.",
+	paused: "Pausada: nada está indo para quem assiste.",
 };
 
-function StatsList({
+function HealthBanner({ health }: { health: ShareHealth | null }) {
+	if (!health) return null;
+	const warn = health === "network" || health === "computer";
+	return (
+		<p
+			role={warn ? "status" : undefined}
+			className={cn(
+				"rounded-lg border px-3 py-2 text-[13px] leading-normal",
+				warn
+					? "border-warning/40 bg-warning-subtle text-warning-text"
+					: "border-border bg-rail text-muted-foreground",
+			)}
+		>
+			{HEALTH_TEXT[health]}
+		</p>
+	);
+}
+
+function StatCards({
 	stats,
 	quality,
+	ping,
 }: {
-	stats: ShareStats | null;
+	stats: ShareStats;
 	quality: Quality;
+	ping: number | null;
 }) {
-	if (!stats) {
-		return (
-			<span className="text-xs text-muted-foreground">
-				Os números chegam em um segundo.
-			</span>
-		);
-	}
 	const limited = !stats.paused && networkLimited(quality, stats.targetKbps);
 	return (
-		<dl className="grid grid-cols-[auto_1fr] content-start gap-x-3 gap-y-1 text-xs">
-			<Stat label="Imagem">
-				{stats.width} × {stats.height}, {stats.fps} fps
-			</Stat>
-			<Stat label="Envio">{(stats.bitrateKbps / 1000).toFixed(1)} Mbps</Stat>
-			<Stat label="Limite">
-				<span className={cn(limited && "font-semibold text-warning-text")}>
-					{(stats.targetKbps / 1000).toFixed(1)} Mbps
-				</span>
-			</Stat>
-			<Stat label="Encoder">
+		<dl className="grid grid-cols-3 gap-2">
+			<Card
+				label="Imagem"
+				detail={`${stats.fps} de ${QUALITY_PRESETS[quality].fps} fps`}
+			>
+				{stats.width}×{stats.height}
+			</Card>
+			<Card
+				label="Envio"
+				detail={
+					<span className={cn(limited && "font-semibold text-warning-text")}>
+						limite {mbps(stats.targetKbps)}
+					</span>
+				}
+			>
+				{mbps(stats.bitrateKbps)} Mbps
+			</Card>
+			<Card label="Atraso" detail="da captura ao envio">
+				{stats.latencyMs} ms
+			</Card>
+			<Card label="Perdidos" detail="quadros nesta transmissão">
+				{stats.dropped}
+			</Card>
+			<Card
+				label="Encoder"
+				detail={
+					stats.encoder.kind === "hardware"
+						? stats.adapter
+						: "sem encoder de hardware"
+				}
+			>
 				{stats.encoder.kind === "hardware" ? stats.encoder.name : "Software"}
-			</Stat>
-			<Stat label="Atraso">{stats.latencyMs} ms</Stat>
-			<Stat label="Perdidos">{stats.dropped}</Stat>
-			{limited && (
-				<dd className="col-span-2 mt-1 leading-normal text-warning-text">
-					A sua conexão está segurando a transmissão: a imagem perde nitidez até
-					ela melhorar.
-				</dd>
-			)}
+			</Card>
+			<Card label="Ping" detail="até o servidor">
+				{ping == null ? "—" : `${ping} ms`}
+			</Card>
 		</dl>
 	);
 }
 
-function Stat({ label, children }: { label: string; children: ReactNode }) {
+function Card({
+	label,
+	detail,
+	children,
+}: {
+	label: string;
+	detail: ReactNode;
+	children: ReactNode;
+}) {
 	return (
-		<>
-			<dt className="text-muted-foreground">{label}</dt>
-			<dd className="font-mono text-foreground">{children}</dd>
-		</>
+		<div className="flex min-w-0 flex-col gap-0.5 rounded-lg border border-border bg-rail px-3 py-2">
+			<dt className="text-[11px] text-muted-foreground">{label}</dt>
+			<dd className="truncate font-mono text-sm text-foreground">{children}</dd>
+			<dd className="truncate text-[11px] text-muted-foreground">{detail}</dd>
+		</div>
 	);
 }
 
-function Label({ children }: { children: ReactNode }) {
+/** O envio do último minuto (a linha) e o limite que a LiveKit pediu (tracejado). */
+function SendChart({ history }: { history: readonly ShareStats[] }) {
+	const top =
+		Math.max(...history.map((s) => Math.max(s.bitrateKbps, s.targetKbps)), 1) *
+		1.15;
+	const x = (i: number) =>
+		((HISTORY_SECONDS - history.length + i) / (HISTORY_SECONDS - 1)) * 100;
+	const y = (kbps: number) => 100 - (kbps / top) * 100;
+	const line = (pick: (s: ShareStats) => number) =>
+		history
+			.map((s, i) => `${x(i).toFixed(2)},${y(pick(s)).toFixed(2)}`)
+			.join(" ");
 	return (
-		<span className="text-xs font-bold tracking-[0.06em] text-muted-foreground uppercase">
-			{children}
-		</span>
+		<section className="flex flex-col gap-2">
+			<div className="flex items-baseline justify-between">
+				<ControlLabel>Envio no último minuto</ControlLabel>
+				<span className="text-[11px] text-muted-foreground">
+					tracejado = limite
+				</span>
+			</div>
+			<svg
+				role="img"
+				aria-label={`Envio no último minuto: agora ${mbps(history[history.length - 1].bitrateKbps)} Mbps`}
+				viewBox="0 0 100 100"
+				preserveAspectRatio="none"
+				className="h-24 w-full rounded-lg border border-border bg-rail"
+			>
+				<polyline
+					points={line((s) => s.targetKbps)}
+					fill="none"
+					className="stroke-muted-foreground"
+					strokeWidth="1.5"
+					strokeDasharray="4 3"
+					vectorEffect="non-scaling-stroke"
+				/>
+				<polyline
+					points={line((s) => s.bitrateKbps)}
+					fill="none"
+					className="stroke-primary"
+					strokeWidth="2"
+					vectorEffect="non-scaling-stroke"
+				/>
+			</svg>
+		</section>
 	);
 }

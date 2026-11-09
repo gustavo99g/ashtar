@@ -7,17 +7,17 @@ import {
 import { useEffect, useState } from "react";
 import { applyViewer, decodeViewer, VIEWERS_TOPIC } from "../model/viewers";
 
-const NONE: ReadonlySet<string> = new Set();
+const NONE: ReadonlyMap<string, number> = new Map();
 
 /**
- * As identidades de quem está assistindo a própria transmissão (`model/viewers.ts`). Vazio sem
- * transmissão: cada uma começa do zero.
+ * Quem está assistindo a própria transmissão (`model/viewers.ts`): a identidade e desde quando
+ * (`Date.now()` do primeiro aviso). Vazio sem transmissão: cada uma começa do zero.
  */
 export function useShareViewers(
 	room: Room | null,
 	active: boolean,
-): ReadonlySet<string> {
-	const [viewers, setViewers] = useState<ReadonlySet<string>>(NONE);
+): ReadonlyMap<string, number> {
+	const [viewers, setViewers] = useState<ReadonlyMap<string, number>>(NONE);
 
 	useEffect(() => {
 		if (!room || !active) return;
@@ -32,12 +32,18 @@ export function useShareViewers(
 			const message = decodeViewer(payload);
 			if (!message) return;
 			setViewers((current) =>
-				applyViewer(current, participant.identity, message, me),
+				applyViewer(current, participant.identity, message, me, Date.now()),
 			);
 		};
 		const onLeft = (participant: Participant) => {
 			setViewers((current) =>
-				applyViewer(current, participant.identity, { watching: null }, me),
+				applyViewer(
+					current,
+					participant.identity,
+					{ watching: null },
+					me,
+					Date.now(),
+				),
 			);
 		};
 		room.on(RoomEvent.DataReceived, onData);

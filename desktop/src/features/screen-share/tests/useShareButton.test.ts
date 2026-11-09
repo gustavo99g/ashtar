@@ -91,17 +91,20 @@ describe("useShareButton: uma transmissão por vez", () => {
 		expect(usePickerStore.getState().open).toBe(true);
 	});
 
-	it("transmitindo, o clique para a transmissão", () => {
+	it("transmitindo, o clique não para nem abre o seletor: abre os ajustes", () => {
 		vi.mocked(useScreenShareState).mockReturnValue({
 			status: "active",
 			sessionId: 1,
+			startedAt: 0,
+			paused: true,
 		} as never);
 		vi.mocked(useTracks).mockReturnValue([share("u1")] as never);
 
 		const { result } = renderHook(() => useShareButton(controller));
 		result.current.onClick();
 
-		expect(controller.stop).toHaveBeenCalledOnce();
+		expect(result.current.paused).toBe(true);
+		expect(controller.stop).not.toHaveBeenCalled();
 		expect(usePickerStore.getState().open).toBe(false);
 	});
 });

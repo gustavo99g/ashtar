@@ -1,3 +1,4 @@
+export { ShareQuickSettings } from "./components/ShareQuickSettings";
 export { SourcePickerHost } from "./components/SourcePickerHost";
 export { useScreenShareState } from "./hooks/useScreenShareState";
 export { type ScreenShare, useScreenShares } from "./hooks/useScreenShares";
@@ -24,4 +25,10 @@ export {
 	openSharePanel,
 	openSourcePicker,
 	restartShare,
+	useSharePanelOpen,
 } from "./stores/pickerStore";
+export {
+	type ShareViewer,
+	setShareViewers,
+	useShareViewerList,
+} from "./stores/viewersStore";

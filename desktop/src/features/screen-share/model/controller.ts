@@ -37,6 +37,8 @@ export type ScreenShareState =
 	| {
 			status: "active";
 			sessionId: number;
+			/** Quando a transmissão começou (`Date.now()`): o "no ar há" do popover e do painel. */
+			startedAt: number;
 			source: CaptureSource;
 			quality: Quality;
 			audioMode: AudioMode;

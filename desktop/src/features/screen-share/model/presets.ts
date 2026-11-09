@@ -10,6 +10,8 @@ import type { Quality } from "@/lib/tauri/commands";
 export interface QualityPreset {
 	label: string;
 	spec: string;
+	/** O fps do preset, igual ao de `media/quality.rs`: o painel mostra "58 de 60 fps". */
+	fps: number;
 	description: string;
 	/** O teto do preset, igual ao `bitrate_bps` de `media/quality.rs`: o painel compara com ele. */
 	bitrateKbps: number;
@@ -19,6 +21,7 @@ export const QUALITY_PRESETS = {
 	"720p60": {
 		label: "Leve",
 		spec: "720p · 60",
+		fps: 60,
 		description:
 			"Para upload fraco ou placa de vídeo antiga: menos nitidez, a mesma fluidez.",
 		bitrateKbps: 4_000,
@@ -26,12 +29,14 @@ export const QUALITY_PRESETS = {
 	"1080p60": {
 		label: "Movimento",
 		spec: "1080p · 60",
+		fps: 60,
 		description: "Para jogos e vídeos: prioriza a fluidez.",
 		bitrateKbps: 8_000,
 	},
 	"1080p30": {
 		label: "Nitidez",
 		spec: "1080p · 30",
+		fps: 30,
 		description:
 			"Para código e documentos: mais bits por quadro, texto mais limpo.",
 		bitrateKbps: 6_000,

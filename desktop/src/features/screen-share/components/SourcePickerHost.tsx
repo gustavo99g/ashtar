@@ -14,12 +14,12 @@ import { SourcePicker } from "./SourcePicker";
 export function SourcePickerHost({
 	controller,
 	channelName,
-	viewers,
+	ping,
 }: {
 	controller: ScreenShareController;
 	channelName: string;
-	/** Os nomes de quem está assistindo a própria transmissão. */
-	viewers: readonly string[];
+	/** O ping até o servidor, para o painel da transmissão (`null` sem sala). */
+	ping: number | null;
 }) {
 	const open = usePickerStore((state) => state.open);
 	const mode = usePickerStore((state) => state.mode);
@@ -37,7 +37,7 @@ export function SourcePickerHost({
 				controller={controller}
 				open={panelOpen}
 				onClose={closeSharePanel}
-				viewers={viewers}
+				ping={ping}
 			/>
 		</>
 	);

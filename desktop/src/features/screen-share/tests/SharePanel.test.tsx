@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import type { CaptureSource, ShareStats } from "@/lib/tauri/commands";
@@ -6,6 +6,7 @@ import { fakeShareController } from "@/test/fakeShareController";
 import { SharePanel } from "../components/SharePanel";
 import type { ScreenShareState } from "../model/controller";
 import { usePickerStore } from "../stores/pickerStore";
+import { setShareViewers } from "../stores/viewersStore";
 
 vi.mock("@/lib/tauri/commands", () => ({
 	thumbnailsStart: vi.fn(async () => 1),
@@ -24,6 +25,7 @@ const source: CaptureSource = {
 const active: ScreenShareState = {
 	status: "active",
 	sessionId: 7,
+	startedAt: Date.now() - 65_000,
 	source,
 	quality: "1080p60",
 	audioMode: { mode: "application", processId: 9 },
@@ -32,7 +34,7 @@ const active: ScreenShareState = {
 	audio: "on",
 };
 
-function stats(targetKbps: number): ShareStats {
+function stats(targetKbps: number, dropped = 0): ShareStats {
 	return {
 		sessionId: 7,
 		encoder: { kind: "hardware", name: "AMDh264Encoder" },
@@ -44,40 +46,44 @@ function stats(targetKbps: number): ShareStats {
 		targetKbps,
 		latencyMs: 6,
 		keyframes: 1,
-		dropped: 0,
+		dropped,
 		paused: false,
 	};
 }
 
-function renderPanel(
-	controller = fakeShareController(active),
-	viewers = ["Juju"],
-) {
+function renderPanel(controller = fakeShareController(active), ping = 42) {
 	render(
-		<SharePanel
-			controller={controller}
-			open
-			onClose={() => {}}
-			viewers={viewers}
-		/>,
+		<SharePanel controller={controller} open onClose={() => {}} ping={ping} />,
 	);
 	return controller;
 }
 
 describe("SharePanel", () => {
-	it("mostra os números, o encoder e quem está assistindo", () => {
+	it("mostra os números em cartões, o tempo no ar e quem está assistindo, há quanto tempo", () => {
 		const controller = fakeShareController(active);
 		const numbers = stats(8_000);
 		controller.getStats = () => numbers;
-		renderPanel(controller, ["Juju", "Kid"]);
+		const now = Date.now();
+		setShareViewers([
+			{ id: "u1", name: "Juju", since: now - 12 * 60_000 },
+			{ id: "u2", name: "Kid", since: now },
+		]);
+		renderPanel(controller);
 
-		expect(screen.getByText("1920 × 1080, 60 fps")).toBeInTheDocument();
+		expect(screen.getByText("1920×1080")).toBeInTheDocument();
+		expect(screen.getByText("60 de 60 fps")).toBeInTheDocument();
+		expect(screen.getByText("7,5 Mbps")).toBeInTheDocument();
 		expect(screen.getByText("AMDh264Encoder")).toBeInTheDocument();
+		expect(screen.getByText("42 ms")).toBeInTheDocument();
+		expect(screen.getByText("1:05")).toBeInTheDocument();
 		expect(screen.getByText("2 assistindo")).toBeInTheDocument();
-		expect(screen.getByText("Juju, Kid")).toBeInTheDocument();
+		expect(screen.getByText("há 12 min")).toBeInTheDocument();
+		expect(screen.getByText("agora")).toBeInTheDocument();
+		expect(screen.getByText(/^Tudo certo/)).toBeInTheDocument();
 		expect(
-			screen.queryByText(/segurando a transmissão/),
-		).not.toBeInTheDocument();
+			screen.getByRole("img", { name: /Envio no último minuto/ }),
+		).toBeInTheDocument();
+		setShareViewers([]);
 	});
 
 	it("avisa quando a rede pede bem menos que o preset", () => {
@@ -87,6 +93,27 @@ describe("SharePanel", () => {
 		renderPanel(controller);
 
 		expect(screen.getByText(/segurando a transmissão/)).toBeInTheDocument();
+	});
+
+	it("avisa do computador no limite quando quadros ficam para trás, e não pelo fps", () => {
+		const controller = fakeShareController(active);
+		let numbers = { ...stats(8_000), fps: 4 };
+		const listeners = new Set<() => void>();
+		controller.getStats = () => numbers;
+		controller.onStats = ((listener: () => void) => {
+			listeners.add(listener);
+			return () => listeners.delete(listener);
+		}) as never;
+		renderPanel(controller);
+
+		// A tela parada derruba o fps sem nada de errado.
+		expect(screen.getByText(/^Tudo certo/)).toBeInTheDocument();
+
+		numbers = { ...stats(8_000, 3), fps: 60 };
+		act(() => {
+			for (const listener of listeners) listener();
+		});
+		expect(screen.getByText(/computador está no limite/)).toBeInTheDocument();
 	});
 
 	it("os ajustes vão para o controller", async () => {

@@ -54,6 +54,7 @@ beforeEach(() => {
 	vi.mocked(useScreenShareState).mockReturnValue({
 		status: "active",
 		sessionId: 1,
+		startedAt: 0,
 	} as never);
 });
 

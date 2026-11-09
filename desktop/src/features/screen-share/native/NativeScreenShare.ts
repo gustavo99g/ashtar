@@ -164,6 +164,7 @@ export class NativeScreenShare implements ScreenShareController {
 			source: request.source,
 			quality: request.quality,
 			audioMode: request.audio,
+			startedAt: Date.now(),
 			cursor: request.cursor,
 			paused: false,
 			audio: audioOn ? "on" : "off",

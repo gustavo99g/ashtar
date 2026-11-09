@@ -60,7 +60,8 @@ function renderAt(path: string) {
 
 beforeEach(() => {
 	localStorage.clear();
-	useMiniShare.setState({ corner: "bottom-right" });
+	useMiniShare.setState({ corner: "bottom-right", collapsed: false });
+
 	useRoomView.setState({ watching: null, shown: null });
 	vi.mocked(useVoice).mockReturnValue({ room: {} } as never);
 	vi.mocked(useLiveMembers).mockReturnValue([juju] as never);
@@ -165,9 +166,65 @@ describe("a miniatura da transmissão", () => {
 			pointerId: 1,
 		});
 		fireEvent.pointerMove(mini, { clientX: 100, clientY: 60, pointerId: 1 });
+
+		// Arrastando: os seis encaixes, com o mais perto destacado.
+		const targets = document.querySelectorAll("[data-slot-target]");
+		expect(targets).toHaveLength(6);
+		expect(document.querySelector("[data-nearest]")).toHaveAttribute(
+			"data-slot-target",
+			"top-left",
+		);
+		expect(screen.getByText("Solte para encaixar")).toBeInTheDocument();
+
 		fireEvent.pointerUp(mini, { pointerId: 1 });
 
 		expect(useMiniShare.getState().corner).toBe("top-left");
 		expect(mini).toHaveAttribute("data-corner", "top-left");
+		expect(document.querySelectorAll("[data-slot-target]")).toHaveLength(0);
+	});
+
+	it("solta no meio da lateral, encaixa no meio", () => {
+		act(() => watchShare("juju"));
+		renderAt(paths.channel("geral"));
+		const mini = screen.getByRole("region");
+		Object.defineProperty(mini, "offsetParent", {
+			value: { clientWidth: 1000, clientHeight: 600 },
+		});
+		Object.defineProperty(mini, "offsetLeft", { value: 664 });
+		Object.defineProperty(mini, "offsetTop", { value: 404 });
+		mini.setPointerCapture = vi.fn();
+
+		fireEvent.pointerDown(mini, {
+			button: 0,
+			clientX: 700,
+			clientY: 450,
+			pointerId: 1,
+		});
+		fireEvent.pointerMove(mini, { clientX: 100, clientY: 300, pointerId: 1 });
+		fireEvent.pointerUp(mini, { pointerId: 1 });
+
+		expect(useMiniShare.getState().corner).toBe("left");
+	});
+
+	it("recolhida, vira a aba na lateral e o som continua; a aba abre de novo", () => {
+		act(() => watchShare("juju"));
+		renderAt(paths.channel("geral"));
+
+		fireEvent.click(
+			screen.getByRole("button", { name: "Recolher a miniatura" }),
+		);
+
+		expect(screen.queryByRole("region")).toBeNull();
+		expect(useMiniShare.getState().collapsed).toBe(true);
+		// Continua assistindo: a tela segue baixada, e o som com ela.
+		expect(useRoomView.getState().shown).toBe("juju");
+
+		fireEvent.click(
+			screen.getByRole("button", {
+				name: "Abrir a miniatura da transmissão de Juju",
+			}),
+		);
+		expect(screen.getByRole("region")).toBeInTheDocument();
+		expect(useMiniShare.getState().collapsed).toBe(false);
 	});
 });

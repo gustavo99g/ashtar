@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { clampToArea, nearestCorner } from "../model/miniCorner";
+import {
+	clampToArea,
+	miniSide,
+	nearestCorner,
+	slotPosition,
+} from "../model/miniCorner";
 import { setMiniCorner, useMiniShare } from "../stores/miniShareStore";
 
 const area = { width: 1000, height: 600 };
@@ -7,14 +12,24 @@ const area = { width: 1000, height: 600 };
 describe("o canto da miniatura", () => {
 	beforeEach(() => {
 		localStorage.clear();
-		useMiniShare.setState({ corner: "bottom-right" });
+		useMiniShare.setState({ corner: "bottom-right", collapsed: false });
 	});
 
-	it("solta, vai para o canto da metade em que o centro caiu", () => {
+	it("solta, vai para o encaixe da metade e do terço em que o centro caiu", () => {
 		expect(nearestCorner({ x: 100, y: 100 }, area)).toBe("top-left");
 		expect(nearestCorner({ x: 900, y: 100 }, area)).toBe("top-right");
+		expect(nearestCorner({ x: 100, y: 300 }, area)).toBe("left");
+		expect(nearestCorner({ x: 501, y: 301 }, area)).toBe("right");
 		expect(nearestCorner({ x: 100, y: 500 }, area)).toBe("bottom-left");
-		expect(nearestCorner({ x: 501, y: 301 }, area)).toBe("bottom-right");
+		expect(nearestCorner({ x: 900, y: 401 }, area)).toBe("bottom-right");
+	});
+
+	it("cada encaixe tem o seu lugar, a 16 px das bordas", () => {
+		expect(slotPosition("top-left", area)).toEqual({ left: 16, top: 16 });
+		expect(slotPosition("right", area)).toEqual({ left: 664, top: 210 });
+		expect(slotPosition("bottom-left", area)).toEqual({ left: 16, top: 404 });
+		expect(miniSide("left")).toBe("left");
+		expect(miniSide("bottom-right")).toBe("right");
 	});
 
 	it("arrastando, não sai pelas bordas", () => {
@@ -41,13 +56,20 @@ describe("o canto da miniatura", () => {
 			JSON.parse(localStorage.getItem("ashtar-mini-share") ?? "{}").state,
 		).toEqual({
 			corner: "top-left",
+			collapsed: false,
 		});
 
 		localStorage.setItem(
 			"ashtar-mini-share",
-			JSON.stringify({ state: { corner: "meio" }, version: 1 }),
+			JSON.stringify({
+				state: { corner: "meio", collapsed: "sim" },
+				version: 1,
+			}),
 		);
 		await useMiniShare.persist.rehydrate();
-		expect(useMiniShare.getState().corner).toBe("bottom-right");
+		expect(useMiniShare.getState()).toMatchObject({
+			corner: "bottom-right",
+			collapsed: false,
+		});
 	});
 });

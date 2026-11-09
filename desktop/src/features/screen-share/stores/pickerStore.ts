@@ -36,6 +36,11 @@ export function openSharePanel(): void {
 	usePickerStore.setState({ panelOpen: true });
 }
 
+/** Se o painel da transmissão está aberto: quem mede o ping só mede com ele aberto. */
+export function useSharePanelOpen(): boolean {
+	return usePickerStore((state) => state.panelOpen);
+}
+
 export function closeSharePanel(): void {
 	usePickerStore.setState({ panelOpen: false });
 }

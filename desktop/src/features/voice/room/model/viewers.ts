@@ -34,17 +34,21 @@ export function decodeViewer(payload: Uint8Array): ViewerMessage | null {
 	}
 }
 
-/** Os que assistem `me` depois do aviso de `from`. Devolve o mesmo conjunto se nada mudou. */
+/**
+ * Os que assistem `me` depois do aviso de `from`, cada um com a hora em que começou (`now`, no
+ * primeiro aviso). Devolve o mesmo mapa se nada mudou: um aviso repetido não zera a hora.
+ */
 export function applyViewer(
-	viewers: ReadonlySet<string>,
+	viewers: ReadonlyMap<string, number>,
 	from: string,
 	message: ViewerMessage,
 	me: string,
-): ReadonlySet<string> {
+	now: number,
+): ReadonlyMap<string, number> {
 	const watchingMe = message.watching === me;
 	if (watchingMe === viewers.has(from)) return viewers;
-	const next = new Set(viewers);
-	if (watchingMe) next.add(from);
+	const next = new Map(viewers);
+	if (watchingMe) next.set(from, now);
 	else next.delete(from);
 	return next;
 }

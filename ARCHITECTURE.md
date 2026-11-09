@@ -115,8 +115,10 @@ flowchart LR
   que abre `WebSocket`. Quem liga a conexão à sessão e passa cada evento ao `realtime.ts` de cada
   feature é o `app/RealtimeBridge.tsx`; com o socket fora, as consultas repetidas voltam a rodar.
 - **`features/screen-share/`**: a interface `ScreenShareController` e a `NativeScreenShare`, que pede o
-  token da `:screen` à API e chama os comandos do Rust; o seletor com miniaturas, o painel da
-  transmissão (preset, fonte, áudio, cursor, pausa e os números) e quem está assistindo.
+  token da `:screen` à API e chama os comandos do Rust; o seletor com miniaturas, os ajustes rápidos
+  no botão Tela (`ShareQuickSettings`), o painel completo da transmissão (a saúde, os números, o
+  envio do último minuto, quem está assistindo e desde quando) e os ajustes que os dois dividem
+  (`ShareControls`).
 
 ### API (`api/`)
 

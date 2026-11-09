@@ -26,6 +26,7 @@ describe("restartShare", () => {
 			sessionId: 1,
 			source,
 			quality: "1080p30",
+			startedAt: 0,
 			audioMode: request.audio,
 			cursor: true,
 			paused: false,

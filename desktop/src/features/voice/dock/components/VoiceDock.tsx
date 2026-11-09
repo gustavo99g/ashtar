@@ -29,7 +29,7 @@ export function VoiceDock() {
 					<SourcePickerHost
 						controller={screenShare}
 						channelName={SALA.name}
-						viewers={[]}
+						ping={null}
 					/>
 				))}
 			{screenShare && <ShareNotices controller={screenShare} />}
