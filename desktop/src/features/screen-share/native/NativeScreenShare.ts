@@ -139,6 +139,7 @@ export class NativeScreenShare implements ScreenShareController {
 				quality: request.quality,
 				audio: request.audio,
 				cursor: request.cursor,
+				leveler: request.leveler ?? true,
 				target: {
 					url,
 					token,
@@ -166,6 +167,7 @@ export class NativeScreenShare implements ScreenShareController {
 			audioMode: request.audio,
 			startedAt: Date.now(),
 			cursor: request.cursor,
+			leveler: request.leveler ?? true,
 			paused: false,
 			audio: audioOn ? "on" : "off",
 		});
@@ -298,6 +300,8 @@ function applyChange(state: ActiveState, change: ShareChange): ActiveState {
 			return { ...state, cursor: change.enabled };
 		case "paused":
 			return { ...state, paused: change.paused };
+		case "leveler":
+			return { ...state, leveler: change.enabled };
 	}
 }
 

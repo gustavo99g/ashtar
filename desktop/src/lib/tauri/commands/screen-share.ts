@@ -85,6 +85,8 @@ export interface ShareOptions {
 	quality: Quality;
 	audio: AudioMode;
 	cursor: boolean;
+	/** O nivelador do áudio (`media/leveler.rs`): sobe o som baixo do jogo, sem estourar. */
+	leveler: boolean;
 	target: ShareTarget;
 }
 
@@ -94,7 +96,8 @@ export type ShareUpdate =
 	| { kind: "source"; source: SourceRef }
 	| { kind: "audio"; audio: AudioMode }
 	| { kind: "cursor"; enabled: boolean }
-	| { kind: "paused"; paused: boolean };
+	| { kind: "paused"; paused: boolean }
+	| { kind: "leveler"; enabled: boolean };
 
 export type EncoderKind =
 	| { kind: "hardware"; name: string }

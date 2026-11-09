@@ -42,7 +42,11 @@ import {
 	useMiniShare,
 } from "../stores/miniShareStore";
 import { setShown, stopWatching, useRoomView } from "../stores/roomViewStore";
-import { setShareVolume, toggleShareMuted } from "../stores/shareVolumeStore";
+import {
+	MAX_SHARE_VOLUME,
+	setShareVolume,
+	toggleShareMuted,
+} from "../stores/shareVolumeStore";
 import { LiveBadge } from "./LiveBadge";
 import { PausedCover } from "./PausedCover";
 
@@ -308,7 +312,7 @@ function MiniShareFrame({
 									<Slider
 										aria-label="Volume da transmissão"
 										min={0}
-										max={100}
+										max={MAX_SHARE_VOLUME}
 										value={heard}
 										onValueChange={setShareVolume}
 										className="w-20"

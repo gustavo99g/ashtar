@@ -1,6 +1,6 @@
 /**
- * Qualidade, áudio e cursor da transmissão no ar: os mesmos no popover do botão e no painel
- * completo. `compact` encurta os rótulos do áudio e tira a descrição do preset, para caber no
+ * Qualidade, áudio, nivelador e cursor da transmissão no ar: os mesmos no popover do botão e no
+ * painel completo. `compact` encurta os rótulos do áudio e tira a descrição do preset, para caber no
  * popover.
  */
 import { Segmented, SegmentedItem } from "@/components/ui/segmented";
@@ -82,6 +82,13 @@ export function ShareControls({
 						O áudio caiu. Escolha de novo para religar.
 					</span>
 				)}
+				<ShareSwitch
+					label="Nivelar o volume"
+					checked={state.leveler}
+					// Sem áudio não há o que nivelar; a escolha fica guardada para quando ele voltar.
+					disabled={busy || state.audioMode.mode === "off"}
+					onChange={(enabled) => void apply({ kind: "leveler", enabled })}
+				/>
 			</section>
 			{compact && <CursorSwitch state={state} controls={controls} />}
 			{busy && <span className="sr-only">Ajustando…</span>}
@@ -97,16 +104,35 @@ function CursorSwitch({
 	controls: ReturnType<typeof useShareControls>;
 }) {
 	return (
+		<ShareSwitch
+			label="Mostrar o cursor"
+			checked={state.cursor}
+			disabled={controls.busy}
+			onChange={(enabled) => void controls.apply({ kind: "cursor", enabled })}
+		/>
+	);
+}
+
+function ShareSwitch({
+	label,
+	checked,
+	disabled,
+	onChange,
+}: {
+	label: string;
+	checked: boolean;
+	disabled: boolean;
+	onChange: (enabled: boolean) => void;
+}) {
+	return (
 		<label className="flex cursor-pointer items-center gap-2.5">
 			<Switch
 				variant="blue"
-				checked={state.cursor}
-				disabled={controls.busy}
-				onCheckedChange={(enabled) =>
-					void controls.apply({ kind: "cursor", enabled })
-				}
+				checked={checked}
+				disabled={disabled}
+				onCheckedChange={onChange}
 			/>
-			<span className="text-sm text-foreground">Mostrar o cursor</span>
+			<span className="text-sm text-foreground">{label}</span>
 		</label>
 	);
 }

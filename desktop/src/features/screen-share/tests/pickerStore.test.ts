@@ -29,6 +29,7 @@ describe("restartShare", () => {
 			startedAt: 0,
 			audioMode: request.audio,
 			cursor: true,
+			leveler: true,
 			paused: false,
 			audio: "lost",
 		});

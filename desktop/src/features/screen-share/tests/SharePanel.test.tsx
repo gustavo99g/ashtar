@@ -30,6 +30,7 @@ const active: ScreenShareState = {
 	quality: "1080p60",
 	audioMode: { mode: "application", processId: 9 },
 	cursor: true,
+	leveler: true,
 	paused: false,
 	audio: "on",
 };

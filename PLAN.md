@@ -27,6 +27,7 @@ Base: a `dev` no `773d66a` (`0.2.30`), mais o `encoder-probe` da Etapa 0. Em cad
 | 3 | Publicador `:screen` (vídeo e áudio), sessão, comandos, logs e teste de ponta a ponta | Pendente |
 | 4 | API: token da `:screen`, participantes e kick | Pendente |
 | 5 | App: transmissão nativa, seletor com miniaturas, painel e bandeja; sai o IPC | Pendente |
+| 5c | Nivelador no áudio da transmissão e volume de quem assiste até 200% | Concluída |
 | 6 | Medição contra a `0.2.30` e bitrates dos presets | Pendente |
 | 7 | Lançamento: `0.2.40` no beta e no estável | Pendente |
 

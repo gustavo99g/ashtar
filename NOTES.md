@@ -36,6 +36,16 @@ conscientemente adiado (marcar como tal) antes de fechar a fase. A lista da fase
 - [ ] **Outras placas do grupo** pelo `encoder-probe.exe` (Etapa 6), principalmente NVIDIA e Intel.
 - [ ] **A API da Etapa 4 no computador de casa** antes de o app ir para o beta.
 
+## Volume da transmissão (Etapa 5c)
+
+- [x] **O jogo chegava baixo** para quem assiste: o nivelador (`media/leveler.rs`) sobe o som até +12 dB, com alvo de
+      ~-18 dBFS e um limitador a partir de ~-2 dBFS; vem ligado, com a chave "Nivelar o volume". Quem assiste vai até
+      200%, por um `AudioContext` só acima de 100%.
+- [ ] **Medir na Etapa 6:** anotar o ganho do log (`áudio da transmissão encerrado`) em dois ou três jogos do grupo.
+      Se ficar sempre no máximo, o alvo pode subir; se distorcer, o `LIMIT` pode descer.
+- [ ] **Teste à mão com dois computadores** (roteiro da 5c): o jogo perto da voz, a chave no meio da transmissão, o
+      silêncio sem chiado, "Sem áudio", o volume a 180% e a troca da saída de áudio.
+
 ## A decidir durante a fase
 
 - [ ] **Atalho do pausar:** uma tecla global ou só pela bandeja e pelo painel.

@@ -17,6 +17,8 @@ export interface ShareRequest {
 	quality: Quality;
 	audio: AudioMode;
 	cursor: boolean;
+	/** O nivelador do áudio. Sem dizer, começa ligado. */
+	leveler?: boolean;
 }
 
 /** Um ajuste no meio da transmissão, pelo painel ou pela bandeja. */
@@ -25,7 +27,8 @@ export type ShareChange =
 	| { kind: "source"; source: CaptureSource }
 	| { kind: "audio"; audio: AudioMode }
 	| { kind: "cursor"; enabled: boolean }
-	| { kind: "paused"; paused: boolean };
+	| { kind: "paused"; paused: boolean }
+	| { kind: "leveler"; enabled: boolean };
 
 export type ScreenShareState =
 	| {
@@ -43,6 +46,8 @@ export type ScreenShareState =
 			quality: Quality;
 			audioMode: AudioMode;
 			cursor: boolean;
+			/** O nivelador do áudio está ligado. */
+			leveler: boolean;
 			paused: boolean;
 			/** `lost`: o áudio caiu sozinho e o vídeo continua. */
 			audio: "off" | "on" | "lost";

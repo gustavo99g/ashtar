@@ -23,6 +23,7 @@ const active = (
 	startedAt: 0,
 	audioMode: { mode: "application", processId: 7 },
 	cursor: true,
+	leveler: true,
 	paused: false,
 });
 

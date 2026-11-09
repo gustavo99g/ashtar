@@ -27,7 +27,11 @@ import type { ChannelMember } from "../../members/model/members";
 import { encodeViewer, VIEWERS_TOPIC } from "../../room/model/viewers";
 import { useShareAudio } from "../hooks/useShareAudio";
 import { setShown } from "../stores/roomViewStore";
-import { setShareVolume, toggleShareMuted } from "../stores/shareVolumeStore";
+import {
+	MAX_SHARE_VOLUME,
+	setShareVolume,
+	toggleShareMuted,
+} from "../stores/shareVolumeStore";
 import { LiveBadge } from "./LiveBadge";
 import { PausedCover } from "./PausedCover";
 
@@ -140,11 +144,19 @@ export function ScreenStage({
 						<Slider
 							aria-label="Volume da transmissão"
 							min={0}
-							max={100}
+							max={MAX_SHARE_VOLUME}
 							value={heard}
 							onValueChange={setShareVolume}
-							className="w-24"
+							className="w-28"
 						/>
+						<span
+							className={cn(
+								"ml-2 w-10 text-right font-mono text-xs",
+								heard > 100 ? "text-live" : "text-muted-foreground",
+							)}
+						>
+							{heard}%
+						</span>
 					</div>
 				)}
 				<StageButton

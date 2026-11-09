@@ -24,6 +24,7 @@ const active: ScreenShareState = {
 	quality: "720p60",
 	audioMode: { mode: "application", processId: 9 },
 	cursor: true,
+	leveler: true,
 	paused: false,
 	audio: "on",
 };
@@ -71,6 +72,36 @@ describe("ShareQuickSettings", () => {
 			[{ kind: "audio", audio: { mode: "system" } }],
 			[{ kind: "paused", paused: true }],
 		]);
+	});
+
+	it("a chave Nivelar o volume vai para o controller, e fica desligada sem áudio", async () => {
+		const controller = fakeShareController(active);
+		const { unmount } = render(
+			<ShareQuickSettings controller={controller} onClose={() => {}} />,
+		);
+
+		const leveler = screen.getByRole("switch", { name: "Nivelar o volume" });
+		expect(leveler).toBeChecked();
+		await userEvent.click(leveler);
+		expect(controller.update.mock.calls).toEqual([
+			[{ kind: "leveler", enabled: false }],
+		]);
+		unmount();
+
+		render(
+			<ShareQuickSettings
+				controller={fakeShareController({
+					...active,
+					audioMode: { mode: "off" },
+					audio: "off",
+				})}
+				onClose={() => {}}
+			/>,
+		);
+		// O Switch é um `span`: o desligado vem no `aria-disabled`.
+		expect(
+			screen.getByRole("switch", { name: "Nivelar o volume" }),
+		).toHaveAttribute("aria-disabled", "true");
 	});
 
 	it("Detalhes fecha o popover e abre o painel; Trocar abre o seletor no modo de troca", async () => {
