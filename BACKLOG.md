@@ -6,11 +6,6 @@ recebê-los segundo o `docs/roadmap.md`.
 
 Ao resolver um item, apague-o daqui e registre o resultado no ADR ou no commit.
 
-## Resto da v0.1 (fora da reorganização)
-
-- [ ] O `fetch` do token (`requestVoiceToken`) não tem timeout: com a API fora do ar (túnel caído), o app
-      pode ficar em "conectando" por bastante tempo. Sem destino definido.
-
 ## Correções fora de ordem
 
 Bugs que saem assim que ficarem prontos, pelo auto-update, sem esperar a entrega da ordem.
@@ -21,8 +16,6 @@ Bugs que saem assim que ficarem prontos, pelo auto-update, sem esperar a entrega
       não consegue abrir o Painel, e esse comando é o único jeito de criar a recuperação dele. Ficariam
       `dono`, `backup`, `recuperacao` e, de preferência, `membros`, só para conferir o banco. Se for feito,
       atualizar o `README.md`, o `scripts/local/admin-shell.ps1` (a lista de comandos) e os testes.
-- [ ] **Subir o `MIN_CLIENT_VERSION`** no `.env` de produção (`0.2.20`, a primeira versão com conta): um
-      app mais velho passa a receber o pedido de atualização, em vez de erro de rota. É só configuração.
 
 ## v0.2.2 — UI nova
 
@@ -56,6 +49,10 @@ Bugs que saem assim que ficarem prontos, pelo auto-update, sem esperar a entrega
       `model/`; a `voice` em subdomínios e a `server` separada). Feito em 31/10, sem regra de ESLint: é
       convenção. O que difere do plano está na seção "Como ficou" da ADR.
 
+## v0.5 — Salas e presença
+
+- [ ] No cartão do usuário (ADR 0020), "Mover para outra sala": entra com as várias salas de voz.
+
 ## v0.6 — Voz e vídeo
 
 - [ ] A aba "Voz e vídeo" das configurações saiu na v0.2.2 só com os dispositivos, Entrada e Saída (Etapa
@@ -68,6 +65,12 @@ Bugs que saem assim que ficarem prontos, pelo auto-update, sem esperar a entrega
 - [ ] "Reconectando" no painel "Voz conectada" e o aviso "Conexão perdida" do compartilhamento ficaram
       apagados no canvas na v0.2.2; entram com a reconexão da v0.6.
 
+## v0.8 — Moderação
+
+- [ ] A seção Moderação do cartão do usuário (silenciar o microfone de alguém e deixar surdo, para todos),
+      que está no canvas ("Menu do usuário — com ações") e ficou fora da v0.3: pede uma permissão nova e um
+      comando no servidor de voz.
+
 ## Mais adiante
 
 O aviso de conteúdo protegido está na v0.8 do roadmap (`## Screen Share`); as miniaturas foram adiantadas para a v0.2.4; Linux, depois da v1.0; sem versão para funcionalidades novas de voz.
@@ -75,5 +78,7 @@ O aviso de conteúdo protegido está na v0.8 do roadmap (`## Screen Share`); as 
 - [ ] Aviso de possível conteúdo protegido (frames totalmente pretos por vários segundos).
 - [ ] Suporte a Linux (risco principal: WebRTC no WebKitGTK) e versão web.
 - [ ] Qualquer funcionalidade nova de voz além do que já existe.
+- [ ] Câmera (na sala e na ligação privada) e o overlay em jogos, desenhados no canvas e sem versão.
+- [ ] `@todos`, silenciar com prazo e grupos privados com mais de duas pessoas (fora da v0.3).
 - [ ] Um segundo tema (claro, por exemplo). A troca por `data-theme` já existe desde a v0.2.2 (ADR 0012);
       a opção aparece nas configurações quando o tema existir, com o contraste conferido.
