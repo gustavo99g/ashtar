@@ -8,6 +8,8 @@ const ready: ServerEvent = {
 	type: "ready",
 	user_id: "u1",
 	online: [],
+	busy: [],
+	status: "available",
 	channels: [],
 	dms: [],
 };
@@ -28,6 +30,7 @@ describe("handleMembersRealtime", () => {
 			display_name: null,
 			is_owner: false,
 			online: false,
+			status: "available" as const,
 		};
 		expect(invalidatedBy({ type: "member.joined", person })).toBe(true);
 		expect(invalidatedBy({ type: "member.left", user_id: "u2" })).toBe(true);
@@ -40,7 +43,12 @@ describe("handleMembersRealtime", () => {
 
 	it("os outros eventos não mexem na lista", () => {
 		expect(
-			invalidatedBy({ type: "presence.changed", user_id: "u2", online: true }),
+			invalidatedBy({
+				type: "presence.changed",
+				user_id: "u2",
+				online: true,
+				status: "available",
+			}),
 		).toBe(false);
 	});
 });

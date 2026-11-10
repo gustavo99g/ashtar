@@ -11,7 +11,14 @@ vi.mock("@/lib/api", async (importOriginal) => ({
 }));
 
 function person(id: string, online = false): Person {
-	return { id, nick: id, display_name: null, is_owner: false, online };
+	return {
+		id,
+		nick: id,
+		display_name: null,
+		is_owner: false,
+		online,
+		status: "available",
+	};
 }
 
 function message(id: string, authorId = "ana"): Message {
@@ -74,7 +81,12 @@ describe("handleChatRealtime", () => {
 	it("presence.changed troca o online de quem mudou", () => {
 		const client = setup();
 		handleChatRealtime(
-			{ type: "presence.changed", user_id: "bia", online: true },
+			{
+				type: "presence.changed",
+				user_id: "bia",
+				online: true,
+				status: "available",
+			},
 			client,
 			first,
 		);
@@ -99,6 +111,8 @@ describe("handleChatRealtime", () => {
 			type: "ready" as const,
 			user_id: "u1",
 			online: ["bia"],
+			busy: [],
+			status: "available" as const,
 			channels: [
 				{
 					channel_id: "geral",

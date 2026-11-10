@@ -10,6 +10,8 @@ const ready: ServerEvent = {
 	type: "ready",
 	user_id: "u1",
 	online: [],
+	busy: [],
+	status: "available",
 	channels: [],
 	dms: [],
 };

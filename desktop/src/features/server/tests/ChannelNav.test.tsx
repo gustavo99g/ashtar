@@ -63,6 +63,7 @@ function renderNav({ manage = false, at = paths.channel("geral") } = {}) {
 		user: kid,
 		permissions: [],
 		update_channel: "stable",
+		status: "available",
 		can_create_invite: true,
 		can_view_panel: true,
 		can_manage_channels: manage,

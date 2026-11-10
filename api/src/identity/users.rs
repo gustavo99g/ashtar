@@ -8,6 +8,7 @@ use uuid::Uuid;
 use super::User;
 use super::invites::Preset;
 use super::permissions::{Action, Origin, Permission, require};
+use super::status::Shown;
 use crate::error::{ApiError, unique_violation};
 
 const NICK_MIN: usize = 2;
@@ -131,18 +132,25 @@ pub struct Person {
     pub nick: String,
     pub display_name: Option<String>,
     pub is_owner: bool,
-    /// Com pelo menos um WebSocket aberto (ou caído há menos de 10 segundos).
+    /// Com pelo menos um WebSocket aberto (ou caído há menos de 10 segundos),
+    /// e sem estar invisível.
     pub online: bool,
+    /// Só quer dizer alguma coisa com `online`: quem está offline vem como
+    /// `available`.
+    pub status: Shown,
 }
 
 impl Person {
-    pub fn new(user: &User, online: bool) -> Self {
+    /// `shown` é o que o `Hub` diz de quem está online: `None` para quem está
+    /// offline ou invisível, que para os outros são a mesma coisa.
+    pub fn new(user: &User, shown: Option<Shown>) -> Self {
         Self {
             id: user.id.clone(),
             nick: user.nick.clone(),
             display_name: user.display_name.clone(),
             is_owner: user.is_owner,
-            online,
+            online: shown.is_some(),
+            status: shown.unwrap_or(Shown::Available),
         }
     }
 }

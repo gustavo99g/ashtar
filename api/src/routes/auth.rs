@@ -17,6 +17,7 @@ use crate::AppState;
 use crate::db::now;
 use crate::error::ApiError;
 use crate::identity::permissions::{self, Action, Permission};
+use crate::identity::status::{self, Status};
 use crate::identity::users::Person;
 use crate::identity::{User, devices, invites, users};
 use crate::realtime::ServerEvent;
@@ -80,6 +81,8 @@ pub struct MeResponse {
     /// Chaves das permissões que o membro tem.
     pub permissions: Vec<&'static str>,
     pub update_channel: UpdateChannel,
+    /// O status de verdade, que só a própria pessoa vê.
+    pub status: Status,
     /// O que mostrar ou esconder na interface. Quem decide de verdade é a API.
     pub can_create_invite: bool,
     /// Se o menu mostra o Painel de controle.
@@ -120,7 +123,7 @@ pub async fn redeem(
     // A recuperação devolve quem já existia: só o convite novo avisa o grupo.
     if new_member {
         state.hub.publish(&ServerEvent::MemberJoined {
-            person: Person::new(&user, false),
+            person: Person::new(&user, None),
         });
     }
     Ok(Json(SessionResponse {
@@ -165,6 +168,28 @@ pub async fn update_me(
     Ok(Json(me_response(&state, &user).await?))
 }
 
+#[derive(Debug, Deserialize, TS)]
+#[ts(export, export_to = "index.ts")]
+pub struct SetStatusRequest {
+    pub status: Status,
+}
+
+/// `PUT /api/me/status`: troca o status e responde como o `GET /api/me`. Um
+/// valor fora dos três é 422, pelo próprio formato do pedido.
+///
+/// Grava e só depois avisa: os outros recebem o que podem ver
+/// (`presence.changed`), e as conexões da pessoa, o status de verdade
+/// (`status.changed`).
+pub async fn set_status(
+    State(state): State<AppState>,
+    CurrentUser(user): CurrentUser,
+    ApiJson(request): ApiJson<SetStatusRequest>,
+) -> Result<Json<MeResponse>, ApiError> {
+    status::set(&state.db, &user.id, request.status).await?;
+    state.hub.set_status(&user.id, request.status);
+    Ok(Json(me_response(&state, &user).await?))
+}
+
 async fn me_response(state: &AppState, user: &User) -> Result<MeResponse, ApiError> {
     let effective = permissions::effective(&state.db, user).await?;
     let beta = effective.iter().any(|(p, _)| *p == Permission::BetaUpdates);
@@ -177,6 +202,7 @@ async fn me_response(state: &AppState, user: &User) -> Result<MeResponse, ApiErr
         } else {
             UpdateChannel::Stable
         },
+        status: status::get(&state.db, &user.id).await?,
 
         can_create_invite: permissions::can(user, Action::CreateInvite),
         can_view_panel: permissions::can(user, Action::ViewPanel),

@@ -103,6 +103,7 @@ pub fn app(state: AppState, policy: Arc<ClientPolicy>) -> Router {
         .route("/auth/redeem", post(routes::auth::redeem))
         .route("/auth/login", post(routes::auth::login))
         .route("/me", get(routes::auth::me).patch(routes::auth::update_me))
+        .route("/me/status", put(routes::auth::set_status))
         .route(
             "/invites",
             get(routes::invites::list).post(routes::invites::create),

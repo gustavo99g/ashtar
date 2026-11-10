@@ -29,6 +29,7 @@ function meWith(
 		user: { id: "u1", nick: "kid", display_name: null, is_owner: isOwner },
 		permissions: [],
 		update_channel: channel,
+		status: "available",
 		can_create_invite: isOwner,
 		can_view_panel: isOwner,
 		can_manage_channels: isOwner,

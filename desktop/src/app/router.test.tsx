@@ -36,6 +36,7 @@ function me(canViewPanel: boolean): MeResponse {
 		user,
 		permissions: [],
 		update_channel: "stable",
+		status: "available",
 		can_create_invite: canViewPanel,
 		can_view_panel: canViewPanel,
 		can_manage_channels: false,

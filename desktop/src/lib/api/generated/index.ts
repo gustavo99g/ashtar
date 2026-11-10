@@ -225,6 +225,10 @@ export type MeResponse = { user: UserView,
  */
 permissions: Array<string>, update_channel: UpdateChannel, 
 /**
+ * O status de verdade, que só a própria pessoa vê.
+ */
+status: Status, 
+/**
  * O que mostrar ou esconder na interface. Quem decide de verdade é a API.
  */
 can_create_invite: boolean, 
@@ -319,9 +323,15 @@ export type PendingRecovery = { invite_id: string, expires_at: number, };
  */
 export type Person = { id: string, nick: string, display_name: string | null, is_owner: boolean, 
 /**
- * Com pelo menos um WebSocket aberto (ou caído há menos de 10 segundos).
+ * Com pelo menos um WebSocket aberto (ou caído há menos de 10 segundos),
+ * e sem estar invisível.
  */
-online: boolean, };
+online: boolean, 
+/**
+ * Só quer dizer alguma coisa com `online`: quem está offline vem como
+ * `available`.
+ */
+status: Shown, };
 
 /**
  * O modelo de um convite novo, como a tela mostra. A chave em texto vai para o
@@ -362,7 +372,7 @@ client_id: string, body: string, };
 /**
  * Tudo o que a API manda pelo WebSocket. O `type` é o nome do evento.
  */
-export type ServerEvent = { "type": "ready", user_id: string, online: Array<string>, channels: Array<ChannelHead>, dms: Array<ChannelHead>, } | { "type": "pong" } | { "type": "message.created", message: Message, } | { "type": "presence.changed", user_id: string, online: boolean, } | { "type": "voice.participants", channel_id: string, participants: Array<ParticipantView>, } | { "type": "member.joined", person: Person, } | { "type": "member.left", user_id: string, } | { "type": "channels.changed", version: number, } | { "type": "channel.state", channel_id: string, state: ReadState, };
+export type ServerEvent = { "type": "ready", user_id: string, status: Status, online: Array<string>, busy: Array<string>, channels: Array<ChannelHead>, dms: Array<ChannelHead>, } | { "type": "pong" } | { "type": "message.created", message: Message, } | { "type": "presence.changed", user_id: string, online: boolean, status: Shown, } | { "type": "status.changed", status: Status, } | { "type": "voice.participants", channel_id: string, participants: Array<ParticipantView>, } | { "type": "member.joined", person: Person, } | { "type": "member.left", user_id: string, } | { "type": "channels.changed", version: number, } | { "type": "channel.state", channel_id: string, state: ReadState, };
 
 /**
  * A resposta do `redeem` e do `login`. No app, quem recebe é o Rust, que a
@@ -376,6 +386,18 @@ export type SetBetaRequest = { enabled: boolean, };
  * O corpo do `PUT /api/members/{id}/permissions/{key}`.
  */
 export type SetPermissionRequest = { enabled: boolean, };
+
+export type SetStatusRequest = { status: Status, };
+
+/**
+ * O status como os outros veem quem está online.
+ */
+export type Shown = "available" | "busy";
+
+/**
+ * O status que a pessoa escolheu.
+ */
+export type Status = "available" | "busy" | "invisible";
 
 /**
  * De onde o app busca atualizações.

@@ -1,7 +1,8 @@
 //! `GET /api/people`: quem está no grupo, para a coluna de membros do chat.
 //!
 //! Diferente do `GET /api/members` do Painel, que é só de quem administra:
-//! aqui vai só o que todo membro pode ver, mais quem está online.
+//! aqui vai só o que todo membro pode ver, mais quem está online e quem está
+//! ocupado. Quem está invisível vem como offline, até para ele mesmo.
 
 use axum::Json;
 use axum::extract::State;
@@ -20,7 +21,7 @@ pub async fn list(
         .await?
         .into_iter()
         .filter(|user| user.is_active())
-        .map(|user| Person::new(&user, state.hub.is_online(&user.id)))
+        .map(|user| Person::new(&user, state.hub.shown(&user.id)))
         .collect();
     Ok(Json(people))
 }

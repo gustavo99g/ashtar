@@ -17,6 +17,7 @@ function renderMenu({ owner = false, manage = false } = {}) {
 		user: { id: "kid", nick: "kid", display_name: null, is_owner: owner },
 		permissions: [],
 		update_channel: "stable",
+		status: "available",
 		can_create_invite: owner,
 		can_view_panel: owner,
 		can_manage_channels: manage,

@@ -27,6 +27,7 @@ use super::auth::CurrentUser;
 use crate::AppState;
 use crate::chat::read::{self, ChannelHead};
 use crate::error::ApiError;
+use crate::identity::status::{self, Shown};
 use crate::identity::users;
 use crate::realtime::{Hub, ServerEvent, Signal, TICKET_TTL};
 
@@ -94,13 +95,28 @@ async fn run(hub: Arc<Hub>, db: SqlitePool, user_id: String, mut socket: WebSock
     // "online". O `online` e os canais do `ready` são lidos com a assinatura
     // feita: uma mensagem que chegar no meio vem pelo `ready` ou pelo evento
     // (ou pelos dois, e o app ignora o id repetido), nunca por nenhum.
-    hub.connect(&user_id);
+    let status = match status::get(&db, &user_id).await {
+        Ok(status) => status,
+        Err(error) => {
+            eprintln!("realtime: não deu para ler o status: {error}");
+            close(&mut socket, CLOSE_INTERNAL, "Erro no servidor: reconecte.").await;
+            return;
+        }
+    };
+    hub.connect(&user_id, status);
     let mut events = hub.subscribe();
     match heads(&db, &user_id).await {
         Ok((channels, dms)) => {
+            let online = hub.online();
             let ready = ServerEvent::Ready {
                 user_id: user_id.clone(),
-                online: hub.online(),
+                status,
+                busy: online
+                    .iter()
+                    .filter(|(_, shown)| *shown == Shown::Busy)
+                    .map(|(id, _)| id.clone())
+                    .collect(),
+                online: online.into_iter().map(|(id, _)| id).collect(),
                 channels,
                 dms,
             };

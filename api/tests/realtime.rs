@@ -490,7 +490,9 @@ async fn presenca_entra_na_hora_e_sai_depois_do_atraso() {
     let online = next_of(&mut kid_socket, "presence.changed").await;
     assert_eq!(
         online,
-        json!({ "type": "presence.changed", "user_id": ana_id, "online": true })
+        json!({
+            "type": "presence.changed", "user_id": ana_id, "online": true, "status": "available"
+        })
     );
 
     let people = get(&ctx, "/api/people", &ctx.owner_token).await;
@@ -514,6 +516,165 @@ async fn presenca_entra_na_hora_e_sai_depois_do_atraso() {
         .find(|p| p["id"] == ana_id.as_str())
         .unwrap();
     assert_eq!(ana_row["online"], false);
+}
+
+async fn set_status(ctx: &Ctx, token: &str, status: &str) {
+    let response = ctx
+        .http
+        .put(format!("http://{}/api/me/status", ctx.base))
+        .bearer_auth(token)
+        .json(&json!({ "status": status }))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response.status().as_u16(), 200);
+}
+
+/// A linha de `id` no `GET /api/people`, vista por quem tem o `token`.
+async fn person(ctx: &Ctx, token: &str, id: &str) -> Value {
+    get(ctx, "/api/people", token)
+        .await
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|p| p["id"] == id)
+        .unwrap()
+        .clone()
+}
+
+#[tokio::test]
+async fn o_ocupado_chega_a_todos() {
+    let ctx = setup().await;
+    let ana = join(&ctx, "Ana", 2, false).await;
+    let (mut kid_socket, _) = connect(&ctx, &ctx.owner_token).await;
+    let (mut ana_socket, ana_ready) = connect(&ctx, &ana).await;
+    let ana_id = user_id(&ana_ready);
+    assert_eq!(ana_ready["status"], "available");
+    assert_eq!(ana_ready["busy"], json!([]));
+
+    set_status(&ctx, &ana, "busy").await;
+    let expected = json!({
+        "type": "presence.changed", "user_id": ana_id, "online": true, "status": "busy"
+    });
+    assert_eq!(
+        next_of(&mut kid_socket, "presence.changed").await["user_id"],
+        ana_id.as_str()
+    );
+    assert_eq!(next_of(&mut kid_socket, "presence.changed").await, expected);
+    // Para ela, o status de verdade; o Kid não recebe esse evento.
+    assert_eq!(
+        next_of(&mut ana_socket, "status.changed").await,
+        json!({ "type": "status.changed", "status": "busy" })
+    );
+    assert!(
+        until_pong(&mut kid_socket)
+            .await
+            .iter()
+            .all(|event| event["type"] != "status.changed")
+    );
+
+    let row = person(&ctx, &ctx.owner_token, &ana_id).await;
+    assert_eq!(
+        (&row["online"], &row["status"]),
+        (&json!(true), &json!("busy"))
+    );
+    // Quem conecta depois já recebe quem está ocupado.
+    let bia = join(&ctx, "Bia", 3, false).await;
+    let (_, bia_ready) = connect(&ctx, &bia).await;
+    assert_eq!(bia_ready["busy"], json!([ana_id]));
+    assert!(
+        bia_ready["online"]
+            .as_array()
+            .unwrap()
+            .contains(&json!(ana_id))
+    );
+}
+
+#[tokio::test]
+async fn o_invisivel_some_para_os_outros() {
+    let ctx = setup().await;
+    let ana = join(&ctx, "Ana", 2, false).await;
+    let (mut kid_socket, _) = connect(&ctx, &ctx.owner_token).await;
+    let (mut ana_socket, ana_ready) = connect(&ctx, &ana).await;
+    let ana_id = user_id(&ana_ready);
+    until_pong(&mut kid_socket).await;
+
+    // Ficar invisível é, para os outros, ficar offline. A palavra não sai.
+    set_status(&ctx, &ana, "invisible").await;
+    let events = until_pong(&mut kid_socket).await;
+    assert_eq!(
+        events,
+        [json!({
+            "type": "presence.changed", "user_id": ana_id, "online": false, "status": "available"
+        })]
+    );
+    assert_eq!(
+        next_of(&mut ana_socket, "status.changed").await["status"],
+        "invisible"
+    );
+    let row = person(&ctx, &ctx.owner_token, &ana_id).await;
+    assert_eq!(
+        (&row["online"], &row["status"]),
+        (&json!(false), &json!("available"))
+    );
+
+    // Quem conecta agora não vê a Ana no `ready`.
+    let bia = join(&ctx, "Bia", 3, false).await;
+    let (_bia_socket, bia_ready) = connect(&ctx, &bia).await;
+    assert!(
+        !bia_ready["online"]
+            .as_array()
+            .unwrap()
+            .contains(&json!(ana_id))
+    );
+    assert_eq!(bia_ready["busy"], json!([]));
+    assert!(!bia_ready.to_string().contains("invisible"));
+    until_pong(&mut kid_socket).await;
+
+    // Ela continua recebendo tudo.
+    let (status, _) = post(
+        &ctx,
+        "/api/channels/geral/messages",
+        Some(&ctx.owner_token),
+        json!({ "client_id": "c1", "body": "oi" }),
+    )
+    .await;
+    assert_eq!(status, 201);
+    assert_eq!(
+        next_of(&mut ana_socket, "message.created").await["message"]["body"],
+        "oi"
+    );
+
+    // O status sobrevive a reconectar: ela cai e volta sem ninguém ver nada.
+    drop(ana_socket);
+    tokio::time::sleep(Duration::from_millis(250)).await;
+    let (mut ana_socket, ana_ready) = connect(&ctx, &ana).await;
+    assert_eq!(ana_ready["status"], "invisible");
+    assert!(
+        !ana_ready["online"]
+            .as_array()
+            .unwrap()
+            .contains(&json!(ana_id))
+    );
+    let seen: Vec<Value> = until_pong(&mut kid_socket)
+        .await
+        .into_iter()
+        .filter(|event| event["type"] == "presence.changed")
+        .collect();
+    assert_eq!(seen, Vec::<Value>::new());
+
+    // Sair do invisível é ficar online.
+    set_status(&ctx, &ana, "available").await;
+    assert_eq!(
+        next_of(&mut kid_socket, "presence.changed").await,
+        json!({
+            "type": "presence.changed", "user_id": ana_id, "online": true, "status": "available"
+        })
+    );
+    assert_eq!(
+        next_of(&mut ana_socket, "status.changed").await["status"],
+        "available"
+    );
 }
 
 #[tokio::test]

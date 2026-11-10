@@ -78,6 +78,7 @@ function renderChat(channelId = "geral", { manage = false } = {}) {
 		user: kid,
 		permissions: [],
 		update_channel: "stable",
+		status: "available",
 		can_create_invite: true,
 		can_view_panel: true,
 		can_manage_channels: manage,
@@ -107,6 +108,7 @@ beforeEach(() => {
 			display_name: "Kid",
 			is_owner: true,
 			online: true,
+			status: "available",
 		},
 		{
 			id: "u2",
@@ -114,6 +116,7 @@ beforeEach(() => {
 			display_name: null,
 			is_owner: false,
 			online: true,
+			status: "available",
 		},
 		{
 			id: "u3",
@@ -121,6 +124,7 @@ beforeEach(() => {
 			display_name: null,
 			is_owner: false,
 			online: false,
+			status: "available",
 		},
 	]);
 	vi.mocked(listVoiceParticipants).mockResolvedValue([
@@ -308,6 +312,7 @@ describe("ChatView", () => {
 				display_name: "Kid",
 				is_owner: true,
 				online: false,
+				status: "available",
 			},
 			{
 				id: "u2",
@@ -315,6 +320,7 @@ describe("ChatView", () => {
 				display_name: null,
 				is_owner: false,
 				online: true,
+				status: "available",
 			},
 		]);
 		renderChat();
