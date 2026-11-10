@@ -440,7 +440,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 			<RoomContext.Provider value={room ?? undefined}>
 				{/* muted também cancela a assinatura: quem entrar depois do deafen não é ouvido. */}
 				{/* O deafen cala só as vozes: a transmissão segue no volume do Foco. */}
-				{room && <RoomAudio deafened={isDeafened} />}
+				{room && <RoomAudio room={room} deafened={isDeafened} />}
 				{children}
 			</RoomContext.Provider>
 		</VoiceContext.Provider>
