@@ -114,6 +114,7 @@ mod tests {
             [
                 "categories",
                 "channel_layout",
+                "channel_members",
                 "channels",
                 "devices",
                 "invite_uses",
