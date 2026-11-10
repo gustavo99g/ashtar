@@ -104,14 +104,15 @@ pub async fn send(
     )
     .await?;
     let status = if created {
-        // Só a nova vai para o WebSocket: a repetida todo mundo já recebeu.
-        // A de uma conversa privada ainda não vai para ninguém: o `publish`
-        // manda para todas as conexões. Ela passa a ir, só para os dois, quando
-        // o tempo real ganha destinatário (Etapa 8 da v0.3).
-        if matches!(channel, Readable::Text(_)) {
-            state.hub.publish(&ServerEvent::MessageCreated {
-                message: message.clone(),
-            });
+        // Só a nova vai para o WebSocket: a repetida quem devia já recebeu.
+        // A de um canal de texto vai para todos; a de uma conversa privada, só
+        // para os dois.
+        let event = ServerEvent::MessageCreated {
+            message: message.clone(),
+        };
+        match &channel {
+            Readable::Text(_) => state.hub.publish(&event),
+            Readable::Dm(dm) => state.hub.publish_to(&dm.members, &event),
         }
         StatusCode::CREATED
     } else {

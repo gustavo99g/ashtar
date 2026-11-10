@@ -99,6 +99,7 @@ describe("handleChatRealtime", () => {
 			user_id: "u1",
 			online: ["bia"],
 			channels: [{ channel_id: "geral", last_message_id: "m9" }],
+			dms: [],
 		};
 		vi.mocked(listMessages).mockResolvedValue({ messages: [], has_more: false });
 

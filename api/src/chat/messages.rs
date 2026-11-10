@@ -238,6 +238,22 @@ pub async fn heads(db: &SqlitePool) -> Result<Vec<ChannelHead>, ApiError> {
     .await?)
 }
 
+/// O mesmo para as conversas privadas de `user_id` que já têm mensagem. A
+/// vazia não entra: ela só existe para a pessoa depois da primeira mensagem.
+pub async fn dm_heads(db: &SqlitePool, user_id: &str) -> Result<Vec<ChannelHead>, ApiError> {
+    Ok(sqlx::query_as(
+        "SELECT cm.channel_id, MAX(m.id) AS last_message_id
+         FROM channel_members cm
+         JOIN messages m ON m.channel_id = cm.channel_id
+         WHERE cm.user_id = ?
+         GROUP BY cm.channel_id
+         ORDER BY cm.channel_id",
+    )
+    .bind(user_id)
+    .fetch_all(db)
+    .await?)
+}
+
 /// Uma página do histórico.
 #[derive(Debug, Serialize, TS)]
 #[ts(export, export_to = "index.ts")]

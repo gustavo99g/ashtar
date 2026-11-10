@@ -3,8 +3,9 @@
 //! Um [`Hub`] para a API inteira. Cada WebSocket aberto assina o mesmo
 //! `broadcast` do tokio; quem muda alguma coisa (uma mensagem nova, alguém que
 //! entrou na sala) publica um [`ServerEvent`], que vai uma vez para o JSON e
-//! sai igual para todos. O hub também guarda os tickets de entrada e quem está
-//! online.
+//! sai igual para quem deve receber: todos ([`Hub::publish`]) ou só algumas
+//! pessoas ([`Hub::publish_to`], ADR 0021). O hub também guarda os tickets de
+//! entrada e quem está online.
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -37,12 +38,14 @@ const CAPACITY: usize = 256;
 #[ts(export, export_to = "index.ts")]
 pub enum ServerEvent {
     /// O primeiro evento de toda conexão, só para ela: quem é, quem está online
-    /// agora e a mensagem mais nova de cada canal de texto.
+    /// agora, a mensagem mais nova de cada canal de texto e a de cada conversa
+    /// privada dela.
     #[serde(rename = "ready")]
     Ready {
         user_id: String,
         online: Vec<String>,
         channels: Vec<ChannelHead>,
+        dms: Vec<ChannelHead>,
     },
     /// A resposta ao `ping` que o app manda a cada 25 segundos.
     #[serde(rename = "pong")]
@@ -68,11 +71,29 @@ pub enum ServerEvent {
     ChannelsChanged { version: i64 },
 }
 
-/// O que passa pelo `broadcast`: um evento já em JSON, ou a ordem de fechar as
-/// conexões de alguém (removido ou desvinculado).
+/// Quem recebe um evento.
+#[derive(Debug, Clone)]
+pub enum Audience {
+    Everyone,
+    /// Só as conexões destas pessoas (ids de usuário).
+    Only(Arc<[String]>),
+}
+
+impl Audience {
+    pub fn includes(&self, user_id: &str) -> bool {
+        match self {
+            Self::Everyone => true,
+            Self::Only(ids) => ids.iter().any(|id| id == user_id),
+        }
+    }
+}
+
+/// O que passa pelo `broadcast`: um evento já em JSON, com quem deve
+/// recebê-lo, ou a ordem de fechar as conexões de alguém (removido ou
+/// desvinculado).
 #[derive(Debug, Clone)]
 pub enum Signal {
-    Event(Utf8Bytes),
+    Event { json: Utf8Bytes, to: Audience },
     Close { user_id: String },
 }
 
@@ -146,8 +167,23 @@ impl Hub {
     /// Manda o evento para todas as conexões. Sem ninguém conectado, não faz
     /// nada.
     pub fn publish(&self, event: &ServerEvent) {
+        self.send(event, Audience::Everyone);
+    }
+
+    /// Manda o evento só para as conexões de `user_ids`. O evento passa pelo
+    /// mesmo `broadcast` dos outros, e é o laço de cada conexão que descarta o
+    /// que não é da pessoa dela (`routes/realtime.rs`).
+    pub fn publish_to<S: AsRef<str>>(&self, user_ids: &[S], event: &ServerEvent) {
+        let ids = user_ids.iter().map(|id| id.as_ref().to_owned()).collect();
+        self.send(event, Audience::Only(ids));
+    }
+
+    fn send(&self, event: &ServerEvent, to: Audience) {
         let json = serde_json::to_string(event).expect("evento sempre vira JSON");
-        let _ = self.tx.send(Signal::Event(json.into()));
+        let _ = self.tx.send(Signal::Event {
+            json: json.into(),
+            to,
+        });
     }
 
     /// Uma conexão nova de `user_id`. A primeira o deixa online.
@@ -253,9 +289,32 @@ mod tests {
 
     fn next_event(rx: &mut broadcast::Receiver<Signal>) -> serde_json::Value {
         match rx.try_recv().expect("deveria ter um evento") {
-            Signal::Event(json) => serde_json::from_str(json.as_str()).unwrap(),
+            Signal::Event { json, .. } => serde_json::from_str(json.as_str()).unwrap(),
             Signal::Close { .. } => panic!("esperava um evento"),
         }
+    }
+
+    #[test]
+    fn o_evento_com_destinatario_e_so_de_quem_foi_nomeado() {
+        let hub = Hub::default();
+        let mut rx = hub.subscribe();
+
+        hub.publish(&ServerEvent::Pong);
+        hub.publish_to(&["u1", "u2"], &ServerEvent::Pong);
+
+        let Signal::Event { to, .. } = rx.try_recv().unwrap() else {
+            panic!("esperava um evento");
+        };
+        assert!(
+            to.includes("u1") && to.includes("u3"),
+            "o publish é de todos"
+        );
+        let Signal::Event { to, .. } = rx.try_recv().unwrap() else {
+            panic!("esperava um evento");
+        };
+        assert!(to.includes("u1") && to.includes("u2"));
+        assert!(!to.includes("u3"));
+        assert!(!to.includes("u"), "o id é comparado inteiro");
     }
 
     #[test]

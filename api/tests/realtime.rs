@@ -212,6 +212,7 @@ async fn o_ready_traz_a_ultima_mensagem_de_cada_canal() {
         ready["channels"],
         json!([{ "channel_id": "geral", "last_message_id": sent["id"] }])
     );
+    assert_eq!(ready["dms"], json!([]));
 }
 
 #[tokio::test]
@@ -282,6 +283,139 @@ async fn a_mensagem_nova_chega_em_todos() {
     kid_socket.send(Message::text("ping")).await.unwrap();
     let event = next_of(&mut kid_socket, "pong").await;
     assert_eq!(event["type"], "pong");
+}
+
+/// Abre a conversa de quem tem o `token` com `other_id` e devolve o id dela.
+async fn open_dm(ctx: &Ctx, token: &str, other_id: &str) -> String {
+    let (status, body) = post(ctx, "/api/dms", Some(token), json!({ "user_id": other_id })).await;
+    assert!(status == 201 || status == 200, "{body}");
+    body["id"].as_str().unwrap().to_owned()
+}
+
+/// Tudo o que chega em `socket` até o `pong` de um `ping` mandado agora. Como
+/// a conexão escreve na ordem em que o hub publicou, o que foi publicado antes
+/// do `ping` e era dela está aqui. É como os testes provam que um evento **não**
+/// chegou, sem depender de esperar um tempo.
+async fn until_pong(socket: &mut Socket) -> Vec<Value> {
+    socket.send(Message::text("ping")).await.unwrap();
+    let mut events = Vec::new();
+    loop {
+        let event = next(socket).await;
+        if event["type"] == "pong" {
+            return events;
+        }
+        events.push(event);
+    }
+}
+
+#[tokio::test]
+async fn a_mensagem_privada_so_chega_nos_dois() {
+    let ctx = setup().await;
+    let ana = join(&ctx, "Ana", 2, false).await;
+    let bia = join(&ctx, "Bia", 3, false).await;
+    let (mut kid_socket, _) = connect(&ctx, &ctx.owner_token).await;
+    let (mut ana_socket, ana_ready) = connect(&ctx, &ana).await;
+    let (mut bia_socket, _) = connect(&ctx, &bia).await;
+    // Esvazia os avisos de presença das três entradas.
+    for socket in [&mut kid_socket, &mut ana_socket, &mut bia_socket] {
+        until_pong(socket).await;
+    }
+
+    let dm = open_dm(&ctx, &ctx.owner_token, &user_id(&ana_ready)).await;
+    let path = format!("/api/channels/{dm}/messages");
+    let (status, sent) = post(
+        &ctx,
+        &path,
+        Some(&ctx.owner_token),
+        json!({ "client_id": "c1", "body": "segredo" }),
+    )
+    .await;
+    assert_eq!(status, 201, "{sent}");
+
+    for socket in [&mut kid_socket, &mut ana_socket] {
+        let event = next_of(socket, "message.created").await;
+        assert_eq!(event["message"]["id"], sent["id"]);
+        assert_eq!(event["message"]["channel_id"], dm);
+        assert_eq!(event["message"]["body"], "segredo");
+    }
+    // A Bia não recebe nada: nem a mensagem, nem outro evento sobre a conversa.
+    assert_eq!(until_pong(&mut bia_socket).await, Vec::<Value>::new());
+
+    // Uma mensagem num canal de texto continua chegando nos três.
+    let (status, _) = post(
+        &ctx,
+        "/api/channels/geral/messages",
+        Some(&ana),
+        json!({ "client_id": "c2", "body": "oi, todo mundo" }),
+    )
+    .await;
+    assert_eq!(status, 201);
+    for socket in [&mut kid_socket, &mut ana_socket, &mut bia_socket] {
+        let event = next_of(socket, "message.created").await;
+        assert_eq!(event["message"]["body"], "oi, todo mundo");
+    }
+}
+
+#[tokio::test]
+async fn a_mensagem_privada_chega_em_todas_as_conexoes_dos_dois() {
+    let ctx = setup().await;
+    let ana = join(&ctx, "Ana", 2, false).await;
+    let (_kid_socket, kid_ready) = connect(&ctx, &ctx.owner_token).await;
+    // A Ana com o app aberto em dois computadores (duas conexões, mesma pessoa).
+    let (mut first, _) = connect(&ctx, &ana).await;
+    let (mut second, _) = connect(&ctx, &ana).await;
+
+    let dm = open_dm(&ctx, &ana, &user_id(&kid_ready)).await;
+    let (status, _) = post(
+        &ctx,
+        &format!("/api/channels/{dm}/messages"),
+        Some(&ana),
+        json!({ "client_id": "c1", "body": "oi" }),
+    )
+    .await;
+    assert_eq!(status, 201);
+    for socket in [&mut first, &mut second] {
+        let event = next_of(socket, "message.created").await;
+        assert_eq!(event["message"]["body"], "oi");
+    }
+}
+
+#[tokio::test]
+async fn o_ready_so_traz_as_conversas_da_pessoa() {
+    let ctx = setup().await;
+    let ana = join(&ctx, "Ana", 2, false).await;
+    let bia = join(&ctx, "Bia", 3, false).await;
+    let (_, ana_ready) = connect(&ctx, &ana).await;
+    let (_, bia_ready) = connect(&ctx, &bia).await;
+    assert_eq!(ana_ready["dms"], json!([]));
+
+    // Kid e Ana conversam; Kid só abre a conversa com a Bia, sem escrever.
+    let dm = open_dm(&ctx, &ctx.owner_token, &user_id(&ana_ready)).await;
+    open_dm(&ctx, &ctx.owner_token, &user_id(&bia_ready)).await;
+    let (status, sent) = post(
+        &ctx,
+        &format!("/api/channels/{dm}/messages"),
+        Some(&ctx.owner_token),
+        json!({ "client_id": "c1", "body": "oi" }),
+    )
+    .await;
+    assert_eq!(status, 201);
+
+    let head = json!([{ "channel_id": dm, "last_message_id": sent["id"] }]);
+    let (_, kid_ready) = connect(&ctx, &ctx.owner_token).await;
+    let (_, ana_ready) = connect(&ctx, &ana).await;
+    let (_, bia_ready) = connect(&ctx, &bia).await;
+    assert_eq!(
+        kid_ready["dms"], head,
+        "a conversa vazia com a Bia não entra"
+    );
+    assert_eq!(ana_ready["dms"], head);
+    assert_eq!(bia_ready["dms"], json!([]));
+    // A conversa não aparece entre os canais de ninguém.
+    for ready in [&kid_ready, &ana_ready, &bia_ready] {
+        assert_eq!(ready["channels"].as_array().unwrap().len(), 1);
+        assert_eq!(ready["channels"][0]["channel_id"], "geral");
+    }
 }
 
 #[tokio::test]

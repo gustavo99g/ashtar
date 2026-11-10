@@ -327,7 +327,7 @@ client_id: string, body: string, };
 /**
  * Tudo o que a API manda pelo WebSocket. O `type` é o nome do evento.
  */
-export type ServerEvent = { "type": "ready", user_id: string, online: Array<string>, channels: Array<ChannelHead>, } | { "type": "pong" } | { "type": "message.created", message: Message, } | { "type": "presence.changed", user_id: string, online: boolean, } | { "type": "voice.participants", channel_id: string, participants: Array<ParticipantView>, } | { "type": "member.joined", person: Person, } | { "type": "member.left", user_id: string, } | { "type": "channels.changed", version: number, };
+export type ServerEvent = { "type": "ready", user_id: string, online: Array<string>, channels: Array<ChannelHead>, dms: Array<ChannelHead>, } | { "type": "pong" } | { "type": "message.created", message: Message, } | { "type": "presence.changed", user_id: string, online: boolean, } | { "type": "voice.participants", channel_id: string, participants: Array<ParticipantView>, } | { "type": "member.joined", person: Person, } | { "type": "member.left", user_id: string, } | { "type": "channels.changed", version: number, };
 
 /**
  * A resposta do `redeem` e do `login`. No app, quem recebe é o Rust, que a

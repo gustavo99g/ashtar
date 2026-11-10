@@ -29,6 +29,7 @@ describe("handleVoiceRealtime", () => {
 			user_id: "u1",
 			online: [],
 			channels: [],
+			dms: [],
 		};
 		const client = new QueryClient();
 		client.setQueryData(voiceKeys.participants("sala"), [kid]);

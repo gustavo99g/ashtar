@@ -5,6 +5,9 @@
 //! `X-App-Version` não chegam na conexão. O app pede o ticket pela rota comum,
 //! que passa pela `ClientPolicy` e pela sessão, e conecta com ele em até 30
 //! segundos. O ticket vale uma vez.
+//!
+//! Todo evento do hub passa por todas as conexões, e cada uma só escreve no
+//! socket o que é da pessoa dela (o `to` do [`Signal::Event`]).
 
 use std::sync::Arc;
 use std::time::Duration;
@@ -22,7 +25,7 @@ use ts_rs::TS;
 
 use super::auth::CurrentUser;
 use crate::AppState;
-use crate::chat::messages;
+use crate::chat::messages::{self, ChannelHead};
 use crate::error::ApiError;
 use crate::identity::users;
 use crate::realtime::{Hub, ServerEvent, Signal, TICKET_TTL};
@@ -93,12 +96,13 @@ async fn run(hub: Arc<Hub>, db: SqlitePool, user_id: String, mut socket: WebSock
     // (ou pelos dois, e o app ignora o id repetido), nunca por nenhum.
     hub.connect(&user_id);
     let mut events = hub.subscribe();
-    match messages::heads(&db).await {
-        Ok(channels) => {
+    match heads(&db, &user_id).await {
+        Ok((channels, dms)) => {
             let ready = ServerEvent::Ready {
                 user_id: user_id.clone(),
                 online: hub.online(),
                 channels,
+                dms,
             };
             if send(&mut socket, &ready).await {
                 serve(&user_id, &mut socket, &mut events).await;
@@ -110,6 +114,18 @@ async fn run(hub: Arc<Hub>, db: SqlitePool, user_id: String, mut socket: WebSock
         }
     }
     hub.disconnect(&user_id);
+}
+
+/// O que o `ready` leva do chat: os canais de texto, que são de todos, e as
+/// conversas privadas de `user_id`.
+async fn heads(
+    db: &SqlitePool,
+    user_id: &str,
+) -> Result<(Vec<ChannelHead>, Vec<ChannelHead>), ApiError> {
+    Ok((
+        messages::heads(db).await?,
+        messages::dm_heads(db, user_id).await?,
+    ))
 }
 
 async fn serve(
@@ -135,7 +151,10 @@ async fn serve(
                 }
             }
             signal = events.recv() => match signal {
-                Ok(Signal::Event(json)) => {
+                // O evento de outra pessoa morre aqui, antes do socket: é esta
+                // linha que mantém uma conversa privada só entre os dois.
+                Ok(Signal::Event { to, .. }) if !to.includes(user_id) => {}
+                Ok(Signal::Event { json, .. }) => {
                     if socket.send(Message::Text(json)).await.is_err() {
                         return;
                     }

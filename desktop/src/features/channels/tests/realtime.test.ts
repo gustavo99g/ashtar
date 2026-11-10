@@ -11,6 +11,7 @@ const ready: ServerEvent = {
 	user_id: "u1",
 	online: [],
 	channels: [],
+	dms: [],
 };
 
 /** Se a lista em cache ficou velha depois do evento. */

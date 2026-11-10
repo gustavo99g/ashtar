@@ -9,6 +9,7 @@ const ready: ServerEvent = {
 	user_id: "u1",
 	online: [],
 	channels: [],
+	dms: [],
 };
 
 /** Um cache com a lista do Painel e se ela ficou velha depois do evento. */
