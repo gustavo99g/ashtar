@@ -2,7 +2,13 @@ import { act, render, screen } from "@testing-library/react";
 import { DisconnectReason, RoomEvent, Track } from "livekit-client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { useSessionStore } from "@/features/identity";
-import { createVoiceToken, getMe, type UserView } from "@/lib/api";
+import {
+	ApiError,
+	createVoiceToken,
+	getMe,
+	TIMEOUT_MESSAGE,
+	type UserView,
+} from "@/lib/api";
 import { switchNoiseSuppression } from "../../noise/rnnoise";
 import { useNoiseChoice } from "../../noise/stores/noiseStore";
 import { SALA } from "../model/channel";
@@ -183,6 +189,32 @@ describe("VoiceProvider", () => {
 		expect(createVoiceToken).toHaveBeenCalledTimes(2);
 		expect(screen.getByRole("button")).toHaveTextContent(
 			`${SALA.id} connecting`,
+		);
+	});
+
+	it("a API que não responde em 10 s vira erro com a mensagem do tempo limite, e não um conectando sem fim", async () => {
+		useSessionStore.setState({ session: { status: "connected", user } });
+		vi.mocked(createVoiceToken).mockRejectedValueOnce(
+			new ApiError({ status: 0, kind: "timeout", message: TIMEOUT_MESSAGE }),
+		);
+		function ErrorProbe() {
+			const { connectionState, error, join } = useVoice();
+			return (
+				<button type="button" onClick={() => join(SALA.id)}>
+					{connectionState}: {error?.message}
+				</button>
+			);
+		}
+		render(
+			<VoiceProvider>
+				<ErrorProbe />
+			</VoiceProvider>,
+		);
+
+		await act(async () => screen.getByRole("button").click());
+
+		expect(screen.getByRole("button")).toHaveTextContent(
+			`error: ${TIMEOUT_MESSAGE}`,
 		);
 	});
 
