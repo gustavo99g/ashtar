@@ -1,9 +1,14 @@
 import { CrownIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { Popover, PopoverTrigger } from "@/components/ui/popover";
-import { Avatar, PersonName } from "@/features/identity";
+import { Avatar, PersonName, useSession } from "@/features/identity";
 import { UserCardPopup } from "@/features/members";
-import { SALA, useVoiceParticipants } from "@/features/voice";
+import {
+	SALA,
+	UserVolume,
+	useVoiceChannelId,
+	useVoiceParticipants,
+} from "@/features/voice";
 import type { Person } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { authorName } from "../model/messages";
@@ -73,6 +78,9 @@ function Group({
 	people: Person[];
 	room: Map<string, boolean>;
 }) {
+	const session = useSession();
+	const myId = session.status === "connected" ? session.user.id : null;
+	const inSala = useVoiceChannelId() === SALA.id;
 	if (people.length === 0) return null;
 	return (
 		<section aria-label={title} className="flex flex-col gap-0.5">
@@ -129,7 +137,15 @@ function Group({
 												? null
 												: { name: SALA.name, sharing },
 									}}
-								/>
+								>
+									{/* O volume, só de quem está na mesma sala que você. */}
+									{inSala && sharing !== undefined && person.id !== myId && (
+										<UserVolume
+											userId={person.id}
+											name={authorName(person)}
+										/>
+									)}
+								</UserCardPopup>
 							</Popover>
 						</li>
 					);

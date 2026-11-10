@@ -214,7 +214,12 @@ function VoiceChannelRow({
 				</button>
 			</RowFrame>
 			{!collapsed && members.length > 0 && (
-				<RoomMembers members={members} myId={myId} roomName={channel.name} />
+				<RoomMembers
+					members={members}
+					myId={myId}
+					roomName={channel.name}
+					inCall={inCall}
+				/>
 			)}
 		</li>
 	);

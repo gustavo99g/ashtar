@@ -3,7 +3,7 @@ import { Popover, PopoverTrigger } from "@/components/ui/popover";
 import { COLLAPSED_AVATARS } from "@/features/channels";
 import { Avatar } from "@/features/identity";
 import { UserCardPopup } from "@/features/members";
-import { type ChannelMember, LiveBadge } from "@/features/voice";
+import { type ChannelMember, LiveBadge, UserVolume } from "@/features/voice";
 import { cn } from "@/lib/utils";
 
 /*
@@ -16,10 +16,13 @@ export function RoomMembers({
 	members,
 	myId,
 	roomName,
+	inCall,
 }: {
 	members: ChannelMember[];
 	myId: string | null;
 	roomName: string;
+	/** Quem usa está nesta sala: aí o cartão dos outros tem o volume. */
+	inCall: boolean;
 }) {
 	return (
 		<ul aria-label={`Quem está na ${roomName}`} className="flex flex-col gap-0.5">
@@ -29,6 +32,7 @@ export function RoomMembers({
 						member={member}
 						isMe={member.id === myId}
 						roomName={roomName}
+						inCall={inCall}
 					/>
 				</li>
 			))}
@@ -72,10 +76,12 @@ function MemberRow({
 	member,
 	isMe,
 	roomName,
+	inCall,
 }: {
 	member: ChannelMember;
 	isMe: boolean;
 	roomName: string;
+	inCall: boolean;
 }) {
 	return (
 		<Popover>
@@ -123,7 +129,12 @@ function MemberRow({
 					online: true,
 					room: { name: roomName, sharing: member.sharing },
 				}}
-			/>
+			>
+				{/* Só de quem você está ouvindo, e nunca no seu próprio cartão. */}
+				{inCall && !isMe && (
+					<UserVolume userId={member.id} name={member.name} />
+				)}
+			</UserCardPopup>
 		</Popover>
 	);
 }

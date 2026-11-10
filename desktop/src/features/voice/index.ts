@@ -4,6 +4,7 @@ export { VoiceRoom } from "./call/components/VoiceRoom";
 export { watchShare } from "./call/stores/roomViewStore";
 export { VoiceSettings } from "./devices/components/VoiceSettings";
 export { VoiceDock } from "./dock/components/VoiceDock";
+export { UserVolume } from "./members/components/UserVolume";
 export { useLiveMembers } from "./members/hooks/useLiveMembers";
 export {
 	type ChannelMember,
@@ -19,4 +20,5 @@ export {
 } from "./room/components/VoiceProvider";
 export { useInCall } from "./room/hooks/useInCall";
 export { useVoice } from "./room/hooks/useVoice";
+export { useVoiceChannelId } from "./room/hooks/useVoiceChannelId";
 export { SALA } from "./room/model/channel";
