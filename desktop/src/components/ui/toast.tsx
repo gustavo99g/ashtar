@@ -111,13 +111,27 @@ function ToastList() {
 	return toasts.map((item) => <ToastItem key={item.id} item={item} />);
 }
 
-/** Fica uma vez na raiz do app (`app/App.tsx`). */
-function Toaster({ children }: { children?: ReactNode }) {
+/**
+ * Fica uma vez na raiz do app (`app/App.tsx`). `raised`: numa chamada, os avisos sobem para
+ * acima da barra da sala (Microfone, Áudio, Tela), como o aviso de atualização.
+ */
+function Toaster({
+	children,
+	raised = false,
+}: {
+	children?: ReactNode;
+	raised?: boolean;
+}) {
 	return (
 		<ToastPrimitive.Provider toastManager={toast} timeout={0} limit={3}>
 			{children}
 			<ToastPrimitive.Portal>
-				<ToastPrimitive.Viewport className="fixed right-4 bottom-4 z-50 flex w-[380px] max-w-[calc(100%-2rem)] flex-col-reverse gap-2 outline-none">
+				<ToastPrimitive.Viewport
+					className={cn(
+						"fixed right-4 z-50 flex w-[380px] max-w-[calc(100%-2rem)] flex-col-reverse gap-2 outline-none",
+						raised ? "bottom-[94px]" : "bottom-4",
+					)}
+				>
 					<ToastList />
 				</ToastPrimitive.Viewport>
 			</ToastPrimitive.Portal>

@@ -2,15 +2,20 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { whatsNew } from "@/lib/tauri/commands";
-import { WhatsNewDialog } from "../WhatsNewDialog";
+import { WhatsNewDialog } from "../components/WhatsNewDialog";
+import { useUpdaterStore } from "../stores/updaterStore";
 
 vi.mock("@/lib/tauri/commands", () => ({ whatsNew: vi.fn() }));
 
-const LAST_SEEN_KEY = "ashtar.lastSeenVersion";
 const notes = "- Visual novo.\n- Cada um tem a sua conta.\n\n  - Com recuo também.\n";
 
 beforeEach(() => {
 	localStorage.clear();
+	useUpdaterStore.setState({
+		whatsNew: null,
+		whatsNewOpen: false,
+		lastSeenVersion: null,
+	});
 	vi.mocked(whatsNew).mockReset();
 });
 
@@ -38,7 +43,7 @@ describe("WhatsNewDialog", () => {
 		await userEvent.click(await screen.findByRole("button", { name: "Entendi" }));
 
 		expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-		expect(localStorage.getItem(LAST_SEEN_KEY)).toBe("0.2.20");
+		expect(useUpdaterStore.getState().lastSeenVersion).toBe("0.2.20");
 	});
 
 	it("o ESC também conta como visto", async () => {
@@ -51,11 +56,11 @@ describe("WhatsNewDialog", () => {
 		await waitFor(() =>
 			expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
 		);
-		expect(localStorage.getItem(LAST_SEEN_KEY)).toBe("0.2.20");
+		expect(useUpdaterStore.getState().lastSeenVersion).toBe("0.2.20");
 	});
 
 	it("uma versão que já foi vista não abre de novo", async () => {
-		localStorage.setItem(LAST_SEEN_KEY, "0.2.20");
+		useUpdaterStore.setState({ lastSeenVersion: "0.2.20" });
 		vi.mocked(whatsNew).mockResolvedValue({ version: "0.2.20", notes });
 		render(<WhatsNewDialog />);
 

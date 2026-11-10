@@ -1,7 +1,9 @@
+import { ArchivedSettings } from "@/features/channels";
 import { ProfileSettings } from "@/features/identity";
+import { InvitesSettings } from "@/features/invites";
+import { MembersSettings } from "@/features/members";
 import { AppSettings } from "@/features/updater";
 import { useVoice, VoiceSettings } from "@/features/voice";
-import { RoutePlaceholder } from "../placeholder";
 
 /*
  * As páginas das configurações, desenhadas dentro do `SettingsLayout` (menu à esquerda).
@@ -24,9 +26,12 @@ export function AppSettingsRoute() {
 }
 
 export function InvitesSettingsRoute() {
-	return <RoutePlaceholder title="Convites" stage={7} />;
+	return <InvitesSettings />;
 }
 
 export function MembersSettingsRoute() {
-	return <RoutePlaceholder title="Membros" stage={7} />;
+	return <MembersSettings />;
+}
+export function ArchivedSettingsRoute() {
+	return <ArchivedSettings />;
 }

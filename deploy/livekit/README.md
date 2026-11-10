@@ -1,8 +1,8 @@
 # LiveKit na VPS
 
-O LiveKit sai do LiveKit Cloud e passa a rodar numa VPS própria, antes do resto da v0.2.4: a cota de
-tráfego (GB) do plano gratuito está acabando antes do previsto. A API e o banco continuam no computador de casa, pelo
-Tailscale Funnel; só a mídia muda de lugar.
+Primeiro passo da v0.2.5: o LiveKit sai do LiveKit Cloud e passa a rodar numa VPS própria. O que pesa é a
+cota de tráfego (GB) do plano gratuito: uns 30 minutos de teste em 2026-11-09 gastaram ~3 GB. A API e o banco
+continuam no computador de casa, pelo Tailscale Funnel, até o resto da v0.2.5; aqui só a mídia muda de lugar.
 
 O app não precisa de versão nova: ele recebe a URL do LiveKit da API junto com o token. A troca é só no
 `.env` da API.
@@ -78,7 +78,7 @@ Para voltar ao LiveKit Cloud, basta repor as três variáveis antigas no `.env` 
   `setup.sh` de novo, `docker compose up -d` e atualize o `.env` da API.
 * **Consumo:** o tráfego de saída aparece no painel da Hostinger; o plano KVM 2 inclui 8 TB por mês.
 
-## O que fica para a v0.2.4
+## O que falta da v0.2.5
 
 * TURN por TLS na 443, para redes que só deixam passar HTTPS (precisa dividir a 443 com o Caddy);
 * API e banco na mesma VPS, com HTTPS no domínio próprio;

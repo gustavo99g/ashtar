@@ -59,6 +59,7 @@ export function SettingsLayout() {
 	// Escondido até o `/api/me` responder: quem decide de verdade é a API, aqui é só o menu.
 	const showPanel = useMe().data?.can_view_panel === true;
 	const channel = useMe().data?.update_channel;
+	const showServer = useMe().data?.can_manage_channels === true;
 
 	useEffect(() => {
 		const onKeyDown = (event: KeyboardEvent) => {
@@ -85,6 +86,14 @@ export function SettingsLayout() {
 					<MenuItem to={paths.settings.voice}>Voz e vídeo</MenuItem>
 					<MenuItem to={paths.settings.app}>Aplicativo</MenuItem>
 				</MenuGroup>
+				{showServer && (
+					<>
+						<MenuSeparator />
+						<MenuGroup label="Servidor">
+							<MenuItem to={paths.settings.archived}>Arquivados</MenuItem>
+						</MenuGroup>
+					</>
+				)}
 				{showPanel && (
 					<>
 						<MenuSeparator />

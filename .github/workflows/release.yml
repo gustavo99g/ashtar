@@ -100,7 +100,6 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           VITE_API_URL: ${{ vars.VITE_API_URL }}
-          VITE_ACCESS_CODE: ${{ secrets.VITE_ACCESS_CODE }}
         with:
           projectPath: desktop
           owner: gustavo99g

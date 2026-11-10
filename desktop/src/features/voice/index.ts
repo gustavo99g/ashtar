@@ -1,12 +1,23 @@
-export { SALA } from "./channel";
-export { ChannelNav } from "./components/ChannelNav";
-export { ServerView } from "./components/ServerView";
-export { VoiceDock } from "./components/VoiceDock";
-export { VoiceRoom } from "./components/VoiceRoom";
-export { VoiceSettings } from "./components/VoiceSettings";
-export { useVoice } from "./useVoice";
+export { LiveBadge } from "./call/components/LiveBadge";
+export { MiniShare } from "./call/components/MiniShare";
+export { VoiceRoom } from "./call/components/VoiceRoom";
+export { watchShare } from "./call/stores/roomViewStore";
+export { VoiceSettings } from "./devices/components/VoiceSettings";
+export { VoiceDock } from "./dock/components/VoiceDock";
+export { PersonCard } from "./members/components/PersonCard";
+export { useLiveMembers } from "./members/hooks/useLiveMembers";
+export {
+	type ChannelMember,
+	memberFromApi,
+	peopleNowLabel,
+} from "./members/model/members";
+export { useVoiceParticipants } from "./members/queries";
+export { handleVoiceRealtime } from "./members/realtime";
 export {
 	type VoiceConnectionState,
 	type VoiceError,
 	VoiceProvider,
-} from "./VoiceProvider";
+} from "./room/components/VoiceProvider";
+export { useInCall } from "./room/hooks/useInCall";
+export { useVoice } from "./room/hooks/useVoice";
+export { SALA } from "./room/model/channel";

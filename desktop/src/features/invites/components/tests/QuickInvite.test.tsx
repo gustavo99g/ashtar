@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { type CreatedInviteView, createInvite } from "@/lib/api";
-import { forgetQuickInvite } from "../../quickInvite";
+import { forgetQuickInvite } from "../../stores/quickInviteStore";
 import { QuickInvite } from "../QuickInvite";
 
 vi.mock("@/lib/api", async (importOriginal) => ({

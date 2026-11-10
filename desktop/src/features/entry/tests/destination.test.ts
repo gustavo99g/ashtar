@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import type { Session } from "@/features/identity";
 import { ApiError } from "@/lib/api";
 import { paths } from "@/lib/paths";
-import { entryDestination, invitePath } from "../destination";
-import type { InviteLink } from "../inviteLink";
+import { entryDestination, invitePath } from "../model/destination";
+import type { InviteLink } from "../model/inviteLink";
 
 const connected: Session = {
 	status: "connected",

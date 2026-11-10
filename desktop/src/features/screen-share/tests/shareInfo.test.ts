@@ -4,10 +4,10 @@ import {
 	shareSpec,
 	shareTrackName,
 	shareWinner,
-} from "../shareInfo";
+} from "../model/shareInfo";
 
 const name = (startedAt: number) =>
-	shareTrackName({ startedAt, quality: "720p60", title: "Jogo" });
+	shareTrackName({ startedAt, quality: "1080p60", title: "Jogo" });
 
 describe("nome da trilha", () => {
 	it("volta igual do outro lado", () => {
@@ -23,7 +23,7 @@ describe("nome da trilha", () => {
 		const parsed = parseShareTrackName(
 			shareTrackName({
 				startedAt: 1,
-				quality: "720p60",
+				quality: "1080p60",
 				title: "x".repeat(300),
 			}),
 		);
@@ -35,7 +35,7 @@ describe("nome da trilha", () => {
 		["sem nome", undefined],
 		["JSON quebrado", "screen-share:{"],
 		["qualidade desconhecida", 'screen-share:{"t":1,"q":"4k","s":"x"}'],
-		["sem horário", 'screen-share:{"q":"720p60","s":"x"}'],
+		["sem horário", 'screen-share:{"q":"1080p60","s":"x"}'],
 	])("%s não tem informação", (_, trackName) => {
 		expect(parseShareTrackName(trackName)).toBeNull();
 	});

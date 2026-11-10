@@ -105,6 +105,7 @@ cargo run --bin admin -- remover <nick>
 cargo run --bin admin -- desvincular <nick>
 cargo run --bin admin -- beta <nick> ligar|desligar
 cargo run --bin admin -- permissoes <nick>
+cargo run --bin admin -- semear [--mensagens 1200]      # só no desenvolvimento: ana, bia, caio e o #geral cheio
 ```
 
 O código de um convite aparece uma vez só, na criação: copie na hora.
@@ -132,18 +133,18 @@ Números de desempenho só valem em build de release.
 
 O app se divide em duas partes que conversam pelo IPC do Tauri:
 
-* **React (webview):** interface, conexão com a sala do LiveKit, microfone, reprodução das vozes e
-  exibição das transmissões dos outros participantes.
-* **Rust:** captura de janelas, telas e do áudio de aplicativos, e tudo que depende do sistema
-  operacional.
+* **React (webview):** interface, conexão da voz com a sala do LiveKit, microfone, reprodução das
+  vozes e exibição das transmissões dos outros participantes.
+* **Rust:** captura de janelas, telas e do áudio de aplicativos, o vídeo na GPU (WGC, conversão e
+  encoder H.264 de hardware), a publicação da transmissão e tudo que depende do sistema operacional.
 
 ```text
 Desktop
    ├── React ── HTTP ──────────→ API
-   │     │                        └── token LiveKit
-   │     └── LiveKit SDK ──────→ LiveKit Server
-   │           ↑
-   └── Rust (captura de tela e áudio) ── IPC ──┘
+   │     │                        └── tokens LiveKit (voz e :screen)
+   │     └── LiveKit SDK (voz) ─→ LiveKit Server
+   │                                  ↑
+   └── Rust (captura, GPU, encoder) ──┘  (conexão :screen: vídeo e áudio da transmissão)
 ```
 
 A API cuida de usuários, autenticação, sessões, convites, canais, mensagens, permissões e da geração
@@ -218,9 +219,7 @@ Teste com o grupo (v0.1)
   • API pelo Tailscale Funnel
   • mídia pelo LiveKit Cloud (plano gratuito)
         ↓
-LiveKit na VPS, API e banco ainda em casa (antecipado, 2026-10-31)
-        ↓
-VPS com LiveKit, API e banco (v0.2.4)
+VPS com LiveKit, API e banco (v0.2)
 ```
 
 **API pelo Tailscale Funnel.** O Funnel é gratuito no plano pessoal e dá uma URL fixa
@@ -229,45 +228,46 @@ Tailscale (`tailscale funnel --bg 3000`). Na primeira vez, o nome público levou
 no DNS; enquanto isso, o túnel rápido da Cloudflare (`cloudflared tunnel --url http://127.0.0.1:3000`)
 serviu de alternativa, com a ressalva de que a URL muda a cada reinício. Os dois só transportam HTTP e
 WebSocket, por isso servem para a API, mas não para a mídia, que trafega por UDP. Com um domínio próprio
-(necessário de qualquer forma na v0.2.4), o túnel nomeado da Cloudflare também dá uma URL fixa.
+(necessário de qualquer forma na v0.2.5), o túnel nomeado da Cloudflare também dá uma URL fixa.
 
 **Mídia pelo LiveKit Cloud.** O plano gratuito (Build) inclui, por mês, 5.000 minutos de participante,
 50 GB de dados transferidos e até 100 participantes simultâneos. Os limites são um teto rígido: se
 forem atingidos, novas conexões falham até o início do mês seguinte. Acompanhe o consumo no painel do
 LiveKit Cloud.
 
-Estimativa para um grupo de 5 pessoas, com o bitrate máximo de cada preset do app (`maxBitrate` em
-`desktop/src/features/screen-share/presets.ts`; ainda não medido em uso real, e o consumo fica abaixo do
-teto quando a imagem muda pouco):
+Estimativa para um grupo de 5 pessoas, com o bitrate máximo de cada preset do app (`bitrate_bps` em
+`desktop/src-tauri/src/media/quality.rs`; os valores são o ponto de partida da v0.2.4 e ainda não foram
+medidos em uso real, e o consumo fica abaixo do teto quando a imagem muda pouco):
 
 | Preset | Bitrate máximo | Tráfego com 4 pessoas assistindo | Horas no plano gratuito |
 |---|---|---|---|
-| 720p60 | 3,5 Mbps | ~6,3 GB/h | ~8 h |
-| 900p60 | 8 Mbps | ~14,4 GB/h | ~3,5 h |
-| 1080p30 | 8 Mbps | ~14,4 GB/h | ~3,5 h |
+| Leve (720p60) | 4 Mbps | ~7,2 GB/h | ~7 h |
+| Movimento (1080p60) | 8 Mbps | ~14,4 GB/h | ~3,5 h |
+| Nitidez (1080p30) | 6 Mbps | ~10,8 GB/h | ~4,6 h |
 
 Os minutos duram mais que o tráfego: 5 pessoas por 3 horas gastam 900 minutos, cerca de 5 noites por mês,
-mas o tráfego dos presets de 8 Mbps acaba em cerca de 3,5 horas. Com o publicador nativo (v0.2.5, depois da VPS), quem
-transmite abre uma segunda conexão e conta como dois participantes no Cloud, mas isso já não pesa na cota. Ou seja, o plano gratuito comporta uma
-ou duas noites nos presets pesados e algumas no 720p60, não um mês de uso.
+mas o tráfego do Movimento acaba em cerca de 3,5 horas. Desde a v0.2.4, quem transmite abre uma segunda
+conexão (a `:screen`) e conta como mais um participante no Cloud: a mesma noite de 5 pessoas vira 6
+participantes, ~1.080 minutos, e o grupo ainda cabe nos 5.000 minutos do plano. Ou seja, o plano gratuito
+comporta uma ou duas noites no Movimento e algumas no Leve, não um mês de uso.
 
 O plano pago seguinte inclui 150.000 minutos e 250 GB, com excedente de US$ 0,12/GB. Com uso intenso
 (4 noites por semana, 3 horas, um preset de 8 Mbps no teto, 4 pessoas assistindo), seriam uns 750 GB por
 mês, cerca de US$ 60 de excedente além da mensalidade. O limite que aperta é sempre o tráfego, nunca os
 minutos.
 
-Durante o teste da v0.1, o preset mais leve (720p60) estica a cota, e o consumo de uma noite real (GB e
+Durante o teste da v0.1, o preset mais leve (o Leve, 720p60) estica a cota, e o consumo de uma noite real (GB e
 minutos) deve ser anotado: é o número que confirma o dimensionamento da VPS.
 
-**Conexão de quem transmite.** Os presets Equilibrado e Nitidez usam até 8 Mbps de vídeo; com o áudio e a
-sobrecarga, conte ~9 Mbps de upload para quem transmite fora da rede local, e um download parecido para
-cada pessoa que assiste. O Movimento usa até 3,5 Mbps.
+**Conexão de quem transmite.** O Movimento usa até 8 Mbps de vídeo; com o áudio e a sobrecarga, conte
+~9 Mbps de upload para quem transmite fora da rede local, e um download parecido para cada pessoa que
+assiste. A Nitidez usa até 6 Mbps e o Leve até 4. O app segue a estimativa de banda da LiveKit, abaixo do
+teto do preset, e o painel avisa quando a rede está limitando.
 
-**VPS.** Na v0.2.4, o servidor do LiveKit (que é gratuito e de código aberto), a API e o banco passam a
+**VPS.** Na v0.2.5, o servidor do LiveKit (que é gratuito e de código aberto), a API e o banco passam a
 rodar numa VPS própria. O LiveKit próprio é pré-requisito das transmissões múltiplas da v0.4, e a API e
 o banco deixam de depender de um computador pessoal ligado. Se os limites do plano gratuito apertarem
-antes, a migração é antecipada. Foi o que aconteceu com o LiveKit: a cota de tráfego apertou e ele passa
-para a VPS antes do resto (configuração em [`deploy/livekit/`](deploy/livekit/README.md)). Para o código do LiveKit, a troca é só de configuração: a URL, a chave
+antes, a migração é antecipada. Para o código do LiveKit, a troca é só de configuração: a URL, a chave
 e o segredo no `.env`.
 
 A VPS é escolhida pelo **tráfego de saída incluso** e pela **latência** até o grupo, não só pela CPU.

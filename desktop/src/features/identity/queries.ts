@@ -4,8 +4,18 @@
  * array à mão.
  */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useCallback } from "react";
 import { getInvite, getMe, updateMe } from "@/lib/api";
-import { redeemInvite, useSession } from "./session";
+import { redeemInvite, useSession } from "./stores/sessionStore";
+
+/**
+ * Esquece tudo o que a API devolveu (de todos os domínios): quando este computador sai do grupo, o
+ * que estava no cache já não é desta pessoa. Devolve a função, para o `SessionWatcher` chamar.
+ */
+export function useClearCache() {
+	const queryClient = useQueryClient();
+	return useCallback(() => queryClient.clear(), [queryClient]);
+}
 
 export const identityKeys = {
 	all: ["identity"] as const,

@@ -4,8 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError, apiFetch, clearSession, type UserView } from "@/lib/api";
 import { login } from "@/lib/tauri/commands";
 import { identityKeys } from "../queries";
-import { SessionWatcher } from "../SessionWatcher";
-import { startSession, useSessionStore } from "../session";
+import { SessionWatcher } from "../components/SessionWatcher";
+import { startSession, useSessionStore } from "../stores/sessionStore";
 
 vi.mock("@/lib/tauri/commands", () => ({
 	login: vi.fn(),

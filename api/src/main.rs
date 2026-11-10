@@ -8,16 +8,11 @@ async fn main() {
     dotenv().ok();
     let policy = Arc::new(ClientPolicy::from_env());
     println!(
-        "Versão mínima do cliente: {}; código de acesso: {}",
+        "Versão mínima do cliente: {}",
         policy
             .min_version
             .as_ref()
             .map_or("desligada".into(), |v| v.to_string()),
-        if policy.access_code.is_some() {
-            "ligado"
-        } else {
-            "desligado"
-        },
     );
     let database_url = std::env::var("DATABASE_URL").expect("defina DATABASE_URL no .env");
     let public_url = std::env::var("PUBLIC_URL").expect("defina PUBLIC_URL no .env");

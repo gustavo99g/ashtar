@@ -1,6 +1,6 @@
 /**
- * Todas as rotas da 0.2.2, já declaradas. As telas que ainda não existem mostram um lugar
- * provisório (`routes/placeholder.tsx`) e cada etapa troca o seu.
+ * Todas as rotas, cada uma com a sua tela. Desde a 0.2.3, `/server` só redireciona para o último
+ * canal de texto (`/channels/:channelId`).
  *
  * Router de memória: o app não tem barra de endereço, o link do convite chega pelo deep link
  * (Etapa 4) e o token só vive na memória, então toda abertura começa em "Entrando…" (`/`).
@@ -15,6 +15,7 @@ import { RequireNoAccount } from "@/features/entry";
 import { AppShell } from "@/layouts/AppShell";
 import { RootLayout } from "@/layouts/RootLayout";
 import { SettingsLayout } from "@/layouts/SettingsLayout";
+import { ChannelRoute } from "@/routes/channel";
 import {
 	AlreadyInRoute,
 	InviteRoute,
@@ -25,6 +26,7 @@ import {
 import { ServerRoute } from "@/routes/server";
 import {
 	AppSettingsRoute,
+	ArchivedSettingsRoute,
 	InvitesSettingsRoute,
 	MembersSettingsRoute,
 	ProfileSettingsRoute,
@@ -59,6 +61,7 @@ export const routes: RouteObject[] = [
 				children: [
 					{ path: "/server", element: <ServerRoute /> },
 					{ path: "/room", element: <VoiceRoomRoute /> },
+					{ path: "/channels/:channelId", element: <ChannelRoute /> },
 					{
 						path: "/settings",
 						element: <SettingsLayout />,
@@ -69,6 +72,7 @@ export const routes: RouteObject[] = [
 							{ path: "app", element: <AppSettingsRoute /> },
 							{ path: "invites", element: <InvitesSettingsRoute /> },
 							{ path: "members", element: <MembersSettingsRoute /> },
+							{ path: "archived", element: <ArchivedSettingsRoute /> },
 						],
 					},
 				],

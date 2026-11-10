@@ -13,7 +13,12 @@ export const paths = {
 		alreadyIn: "/entry/already-in",
 		leftGroup: "/entry/left",
 	},
+	/** Abre o último canal de texto (o `ServerRoute` redireciona). */
 	server: "/server",
+	/** Um canal de texto. */
+	channel: (id: string) => `/channels/${encodeURIComponent(id)}`,
+	/** O padrão da rota de um canal, para o router e para o `useMatch`. */
+	channelPattern: "/channels/:channelId",
 	voiceRoom: "/room",
 	settings: {
 		root: "/settings",
@@ -22,5 +27,7 @@ export const paths = {
 		app: "/settings/app",
 		invites: "/settings/invites",
 		members: "/settings/members",
+		/** Servidor › Arquivados: só no menu de quem gerencia os canais. */
+		archived: "/settings/archived",
 	},
 } as const;

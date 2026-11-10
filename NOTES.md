@@ -1,70 +1,71 @@
-# NOTES — pendências da v0.2.2 (UI nova)
+# NOTES — pendências da v0.2.4 (publicador nativo)
 
 Lista de verificação da fase descrita no [`PLAN.md`](PLAN.md). Cada item deve ser resolvido ou
 conscientemente adiado (marcar como tal) antes de fechar a fase. A lista da fase anterior está arquivada em
-[`docs/plans/v0.2.1-notes.md`](docs/plans/v0.2.1-notes.md).
+[`docs/plans/v0.2.3-notes.md`](docs/plans/v0.2.3-notes.md).
 
 ## Vindos do BACKLOG
 
-- [ ] **Seletor e trava de uma transmissão por vez** (adiados da v0.1): a trava só considera trilhas já
-      assinadas, não impede duas pessoas de começarem juntas, e o erro de início não pode ser dispensado.
-      Resolve na Etapa 5 (a trava olha as publicações da sala, e quem começou depois vê um aviso
-      dispensável).
-- [ ] **Textos dos presets** prometem mais fluidez do que o medido em jogo (Equilibrado 25 a 34 fps,
-      Nitidez 18 a 25 fps; ADR 0009). Resolve na Etapa 5.
-- [x] **Botão "Abrir pasta de logs"** (adiado da v0.2.0): vira um comando Rust, porque a permissão
-      `opener:default` não abre caminhos locais. Resolvido na Etapa 6 (`open_log_dir`).
-- [ ] **Interruptor do beta e canal por pessoa** (adiados da v0.2.0 e da v0.2.1): o dono liga e desliga no
-      Painel (Etapa 7). O canal por pessoa está feito (Etapa 6): o app passa ao Rust o canal da API depois
-      do `/api/me`, só na memória, e a variável `ASHTAR_UPDATE_CHANNEL` ficou só para o desenvolvimento.
-- [ ] **Administração pela interface** no lugar do `admin` temporário: rotas na Etapa 1, telas na Etapa 7;
-      o `admin` fica só com `dono` e `backup` na Etapa 8.
+- [x] **Publicador de vídeo e áudio nativo em Rust:** as duas peças, a redução na GPU antes de copiar para a
+      memória e o publicador em si, são as Etapas 2 e 3.
+- [x] **Redução da imagem no caminho do IPC** (o `scale` do libyuv, 5–10 ms no 1080p): deixa de existir com o
+      IPC (Etapa 5). O `fast_image_resize` sai do `Cargo.toml`.
+- [x] **Divisão do `capture_frame` em readback, redução e conversão:** sai com o IPC. O caminho novo tem os
+      próprios números e logs (Etapa 3).
+- [ ] **Linha de base de desempenho em release por preset** (CPU, memória e histograma de intervalos entre
+      frames): a medição da Etapa 6, contra a `0.2.30`.
+- [ ] **Medição e comparação estruturada:** a mesma Etapa 6, com o roteiro e os números na ADR 0017.
+- [x] **Janelas minimizadas no seletor:** lista própria por `EnumWindows`, o selo "Minimizada" e a janela
+      restaurada ao escolher (Etapas 1 e 5). Remedir o tempo da lista com muitas janelas: hoje leva ~95 ms com
+      4, por causa dos ícones.
+- [x] **Miniaturas no seletor** (v0.8 do roadmap, adiantadas): pelo WGC, só dos cards visíveis, sem `Vec<u8>` em
+      JSON, pelo `Channel` do Tauri (Etapa 5).
+- [x] **Janela parada custa uma conversão por volta:** o WGC só entrega imagem quando algo muda, e o caminho novo
+      só codifica imagens novas (Etapa 2).
 
-## Vindos da v0.2.1
+## Antes do beta
 
-- [ ] **Identidade falsa nova a cada entrada** (`idiot-<uuid>`, nome `Idiota-<uuid>`): o app passa a entrar
-      pelo `POST /api/voice/token`, com o nome visível e o nick vindos do banco (Etapa 5). A rota antiga sai
-      na Etapa 8.
-- [ ] **Rota antiga aberta:** `/api/voice/join` continua aceitando o código de acesso. Sai na Etapa 8,
-      junto com o `ACCESS_CODE` e a subida do `MIN_CLIENT_VERSION`.
-- [ ] **Vincular o computador do dono:** `admin dono` e uma recuperação para você mesmo, aberta no app
-      beta (Etapa 8).
-- [ ] **Backup fora do computador** e uma restauração testada **antes** de o grupo entrar (Etapa 5 da
-      v0.2.1). Se a v0.2.1 fechar sem isso, fica aqui como condição da troca.
-- [ ] **Comparação do código de acesso** sem tempo constante em `client_policy.rs`: some com o código de
-      acesso na Etapa 8.
+- [ ] **Jogo em tela cheia exclusiva:** confere se o WGC captura como janela; se não, o contorno é compartilhar a
+      tela.
+- [ ] **Monitor HDR:** a cor sai lavada na conversão para BT.709?
+- [ ] **Notebook com duas GPUs:** captura, conversão e encoder no mesmo adaptador (decisão 2).
+- [ ] **Janela redimensionada, minimizada e fechada** no meio da transmissão.
+- [ ] **Máquina sem encoder de hardware:** o plano B entra sozinho e o painel mostra "Software".
+- [ ] **Driver atualizado com a transmissão aberta** (dispositivo perdido): a transmissão acaba com aviso, sem
+      fantasma na sala.
+- [ ] **Outras placas do grupo** pelo `encoder-probe.exe` (Etapa 6), principalmente NVIDIA e Intel.
+- [ ] **A API da Etapa 4 no computador de casa** antes de o app ir para o beta.
 
-## Antes da troca do grupo
+## Volume da transmissão (Etapa 5c)
 
-- [ ] **A API da Etapa 1 no computador de casa**, com `PUBLIC_URL` no `.env`, antes de o app novo ir ao
-      beta. Ela atende o app instalado (rota antiga) e o novo ao mesmo tempo.
-- [ ] **O link depois do auto-update:** confirmar no beta que o instalador passivo registra o esquema
-      `ashtar` (e, se não registrar, que o registro ao abrir cobre).
-- [ ] **A página do convite no WhatsApp:** colar um link de convite num chat e conferir o cartão da prévia
-      (título, texto e ícone).
-- [ ] **Roteiro manual com dois computadores** da Etapa 8, inteiro, no beta.
-- [ ] **Avisar o grupo** do que muda: ao abrir a versão nova, cada um vai precisar do link que você mandar.
+- [x] **O jogo chegava baixo** para quem assiste: o nivelador (`media/leveler.rs`) sobe o som até +12 dB, com alvo de
+      ~-18 dBFS e um limitador a partir de ~-2 dBFS; vem ligado, com a chave "Nivelar o volume". Quem assiste vai até
+      200%, por um `AudioContext` só acima de 100%.
+- [ ] **Medir na Etapa 6:** anotar o ganho do log (`áudio da transmissão encerrado`) em dois ou três jogos do grupo.
+      Se ficar sempre no máximo, o alvo pode subir; se distorcer, o `LIMIT` pode descer.
+- [ ] **Teste à mão com dois computadores** (roteiro da 5c): o jogo perto da voz, a chave no meio da transmissão, o
+      silêncio sem chiado, "Sem áudio", o volume a 180% e a troca da saída de áudio.
+
+## A decidir durante a fase
+
+- [ ] **Atalho do pausar:** uma tecla global ou só pela bandeja e pelo painel.
+- [x] **Miniaturas em JPEG ou em RGBA cru** pelo `Channel`: JPEG (480×270, qualidade 80): leve o
+      bastante para 24 cards a 8 fps.
+- [x] **Codec do plano B:** VP8 ou H.264 em software. Ficou o VP8, pela
+      `NativeVideoSource` da livekit; quem assiste decodifica os dois.
 
 ## Riscos e cuidados
 
-- [ ] **Hardware genérico:** quem cai na chave aleatória perde a conta ao formatar e precisa de uma
-      recuperação. O log da Etapa 3 mostra quantos são no beta (ADR 0013).
-- [ ] **A troca tem de ser junta** (Etapa 8): sem o código de acesso e com a rota antiga no ar, a rota velha
-      daria token a qualquer um que mandasse a versão certa no cabeçalho. A API sobe sem a rota, com o
-      `MIN_CLIENT_VERSION` novo e sem o `ACCESS_CODE`, numa vez só.
-- [ ] **Contrato da API durante o beta:** o app instalado e o novo usam a mesma API. A Etapa 1 só acrescenta;
-      o nome do participante no `voice/token` muda, mas só o app novo usa essa rota.
-- [ ] **A barra própria** perde o menu de encaixe do Windows 11 (ADR 0012).
-- [ ] **A trava de uma transmissão** continua só no app: um app modificado passa por cima. Para o grupo, dá
-      para aceitar, como hoje.
-- [ ] **Consultas repetidas pelo Funnel:** cada tela do servidor aberta faz uma chamada a cada 5 s, e o app
-      do dono uma a cada 30 s. Se a API do computador de casa sentir, aumentar o intervalo (ADR 0012).
-- [ ] **Minutos do GitHub Actions:** o Vitest e a conferência dos tipos gerados entram no job do Windows,
-      que conta em dobro. Acompanhar o consumo do mês da troca.
-- [ ] **Quem sai do beta** fica na versão que já tem até o estável passar dela (o updater não volta
-      versão). Uma versão do beta que já estava baixada, esperando o reiniciar, também é instalada ao
-      fechar o app.
-- [ ] **O "Atualizar agora" da entrada espera sem notícia:** o updater não avisa quando não há versão nova
-      (nem sem rede), então a tela espera até 2 minutos antes de desistir (Etapa 4.5). O
-      `checkForUpdateNow` da Etapa 6.4 devolve o resultado e pode substituir essa espera; a troca fica
-      para depois da 0.2.2.
+- [ ] **Driver da AMD e a ordem da codec API** (decisão 4): uma atualização de driver pode mudar o
+      comportamento. O teste com GPU da Etapa 2 confere o fps gravado no SPS.
+- [ ] **Outras marcas de placa** podem ter as próprias pegadinhas no Media Foundation. O encoder fica atrás de uma
+      interface, para o AMF (SDK da AMD) ou outro entrar se o MF não servir.
+- [ ] **Sem chave para voltar ao IPC:** um problema no beta só se resolve com outra versão. A semana no beta é a
+      rede de segurança.
+- [ ] **Conteúdo com DRM** sai preto também no WGC. O aviso de conteúdo protegido continua na v0.8.
+- [ ] **Cota do LiveKit Cloud:** a `:screen` conta como mais um participante enquanto a VPS não entra (cerca de 1
+      minuto a mais por minuto de transmissão, dos 5.000 do plano gratuito).
+- [ ] **A trava de uma transmissão por vez** continua só no app e agora precisa reconhecer a `:screen` como a
+      transmissão de alguém.
+- [ ] **O `SetForegroundWindow`** só troca o foco se o app estiver em primeiro plano, o que vale no clique de
+      transmitir. Pela bandeja, trocar de fonte pode não trazer a janela para a frente.

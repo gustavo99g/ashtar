@@ -258,6 +258,21 @@ async fn sem_sessao_nao_entra() {
 }
 
 #[tokio::test]
+async fn a_rota_antiga_de_voz_nao_existe_mais() {
+    // O `/api/voice/join` dava token a quem mandasse a identidade no corpo, sem sessão.
+    let ctx = setup().await;
+    let (status, _) = call(
+        &ctx.router,
+        "POST",
+        "/api/voice/join",
+        None,
+        Some(json!({ "channel_id": "sala", "user_id": "x", "display_name": "Fulano" })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
 async fn recuperacao_troca_o_computador() {
     let ctx = setup().await;
     let code = new_invite(&ctx).await;
@@ -626,6 +641,7 @@ async fn corpo_invalido_responde_no_formato_da_api() {
         ("/api/auth/redeem", None, json, r#"{"code": "AAAA"}"#),
         ("/api/voice/token", Some(token.as_str()), json, "{}"),
         ("/api/voice/token", Some(token.as_str()), json, "[1, 2]"),
+        ("/api/voice/screen-token", Some(token.as_str()), json, "{}"),
     ];
     for (uri, token, content_type, body) in cases {
         let (status, response) = call_raw(&ctx.router, uri, token, content_type, body).await;
@@ -696,6 +712,35 @@ async fn canal_de_voz_invalido_e_recusado_antes_de_tudo() {
     assert_eq!(status, StatusCode::UNAUTHORIZED);
 }
 
+#[tokio::test]
+async fn token_da_tela_pede_sessao_e_canal_valido() {
+    let ctx = setup().await;
+    let token = session(&ctx, "Fulano", 1).await;
+
+    for channel in ["", "com espaco", "../outra", &"a".repeat(65)] {
+        let (status, body) = call(
+            &ctx.router,
+            "POST",
+            "/api/voice/screen-token",
+            Some(&token),
+            Some(json!({ "channel_id": channel })),
+        )
+        .await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{channel:?}");
+        assert_eq!(body["kind"], "invalid_request", "{channel:?}");
+    }
+
+    let (status, _) = call(
+        &ctx.router,
+        "POST",
+        "/api/voice/screen-token",
+        None,
+        Some(json!({ "channel_id": "geral" })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+}
+
 /// Regras de identidade direto sobre o banco, sem HTTP (SQLite em memória, ou em
 /// arquivo onde a concorrência importa).
 mod regras {
@@ -751,9 +796,10 @@ mod regras {
         let invite = invites::create(pool, owner, InviteKind::New, None, HOUR, 1, NOW)
             .await
             .unwrap();
-        invites::redeem(pool, &invite.code, &key(n), Some(nick), NOW)
+        let redeemed = invites::redeem(pool, &invite.code, &key(n), Some(nick), NOW)
             .await
-            .unwrap()
+            .unwrap();
+        (redeemed.user, redeemed.token)
     }
 
     async fn new_invite(pool: &SqlitePool, owner: &User, ttl: i64, max_uses: i64) -> String {
@@ -878,9 +924,10 @@ mod regras {
 
         // O nick ficou livre e a mesma chave pode ser vinculada de novo.
         let code = new_invite(&pool, &owner, HOUR, 1).await;
-        let (again, _) = invites::redeem(&pool, &code, &key(1), Some("kid"), NOW + 12)
-            .await
-            .unwrap();
+        let invites::Redeemed { user: again, .. } =
+            invites::redeem(&pool, &code, &key(1), Some("kid"), NOW + 12)
+                .await
+                .unwrap();
         assert_ne!(again.id, kid.id);
 
         // O histórico continua apontando para o membro removido.
@@ -940,9 +987,10 @@ mod regras {
     async fn convite_revogado_corta_os_proximos_mas_nao_quem_ja_entrou() {
         let (pool, owner) = setup().await;
         let code = new_invite(&pool, &owner, HOUR, 5).await;
-        let (kid, _) = invites::redeem(&pool, &code, &key(1), Some("Kid"), NOW)
-            .await
-            .unwrap();
+        let invites::Redeemed { user: kid, .. } =
+            invites::redeem(&pool, &code, &key(1), Some("Kid"), NOW)
+                .await
+                .unwrap();
 
         let id = invites::list(&pool).await.unwrap()[0].id.clone();
         invites::revoke(&pool, &owner, &id[..8], NOW).await.unwrap();
@@ -1098,9 +1146,14 @@ mod regras {
         let code = recovery_invite(&pool, &owner, &kid).await;
 
         // O nick passado é ignorado: o membro é o do convite.
-        let (back, new_token) = invites::redeem(&pool, &code, &key(2), Some("Outro"), NOW)
+        let invites::Redeemed {
+            user: back,
+            token: new_token,
+            new_member,
+        } = invites::redeem(&pool, &code, &key(2), Some("Outro"), NOW)
             .await
             .unwrap();
+        assert!(!new_member, "a recuperação não cria membro");
         assert_eq!(back.id, kid.id);
         assert_eq!(back.nick, "Kid");
 
@@ -1136,9 +1189,10 @@ mod regras {
         ));
 
         let code = recovery_invite(&pool, &owner, &owner).await;
-        let (user, token) = invites::redeem(&pool, &code, &key(1), None, NOW)
-            .await
-            .unwrap();
+        let invites::Redeemed { user, token, .. } =
+            invites::redeem(&pool, &code, &key(1), None, NOW)
+                .await
+                .unwrap();
         assert!(user.is_owner);
         assert!(devices::has_device(&pool, &owner).await.unwrap());
         let current = devices::authenticate(&pool, &token, NOW).await.unwrap();
@@ -1253,9 +1307,12 @@ mod regras {
     async fn nao_guarda_segredo_em_claro() {
         let (pool, owner) = setup().await;
         let code = new_invite(&pool, &owner, HOUR, 1).await;
-        let (_, token) = invites::redeem(&pool, &code, &key(1), Some("Kid"), NOW)
+        let invites::Redeemed {
+            token, new_member, ..
+        } = invites::redeem(&pool, &code, &key(1), Some("Kid"), NOW)
             .await
             .unwrap();
+        assert!(new_member, "o convite novo cria o membro");
 
         let stored: Vec<String> = sqlx::query_scalar(
             "SELECT code_hash FROM invites UNION ALL SELECT token_hash FROM sessions
@@ -1299,7 +1356,13 @@ mod regras {
         let effective = permissions::effective(&pool, &kid).await.unwrap();
         assert_eq!(effective, [(beta, Origin::Direct)]);
         let owners = permissions::effective(&pool, &owner).await.unwrap();
-        assert_eq!(owners, [(beta, Origin::Owner)]);
+        assert_eq!(
+            owners,
+            [
+                (beta, Origin::Owner),
+                (Permission::ManageChannels, Origin::Owner)
+            ]
+        );
 
         permissions::set(&pool, &owner, &kid, beta, false, NOW)
             .await
@@ -1414,7 +1477,7 @@ mod nome_e_modelos {
         invites::redeem(pool, &code, &key, Some(nick), NOW)
             .await
             .unwrap()
-            .0
+            .user
     }
 
     async fn stored_preset(pool: &SqlitePool, id: &str) -> Option<String> {
@@ -2309,6 +2372,7 @@ mod painel {
             keys,
             [
                 "atualizacoes.beta",
+                "canais.gerenciar",
                 "convites.criar",
                 "convites.recuperacao",
                 "convites.revogar",
@@ -2329,7 +2393,10 @@ mod painel {
                 "granted_at": null,
             })
         );
-        for grant in list.as_array().unwrap()[1..].iter() {
+        assert_eq!(list[1]["key"], "canais.gerenciar");
+        assert_eq!(list[1]["kind"], "permission");
+        // As permissões vêm antes das ações.
+        for grant in list.as_array().unwrap()[2..].iter() {
             assert_eq!(grant["kind"], "action");
             assert_eq!(grant["granted"], true);
             assert_eq!(grant["origin"], "owner");
@@ -2555,7 +2622,7 @@ mod painel {
 /// do LiveKit ficam aqui.
 mod sala {
     use super::*;
-    use api::routes::voice::{RoomParticipant, join_participants};
+    use api::voice::{RoomParticipant, join_participants};
 
     fn in_room(identity: &str, screen_sharing: bool) -> RoomParticipant {
         RoomParticipant {
@@ -2812,7 +2879,6 @@ mod pagina {
         let owner = users::create_owner(&db, "Kid", now()).await.unwrap();
         let policy = ClientPolicy {
             min_version: Some("9.9.9".parse().unwrap()),
-            access_code: Some("segredo".into()),
         };
         let router = app(
             AppState::new(db.clone(), "https://ashtar.test"),

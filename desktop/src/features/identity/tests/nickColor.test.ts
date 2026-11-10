@@ -5,7 +5,7 @@ import {
 	nickColor,
 	nickColorIndex,
 	nickHash,
-} from "../nickColor";
+} from "../model/nickColor";
 
 /** Os mesmos casos do teste da API (`api/`): se um mudar, o outro tem de mudar junto. */
 const CASES: [nick: string, index: number][] = [

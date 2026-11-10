@@ -50,7 +50,7 @@ que cada tema define o contrato inteiro. O tema muda só cor, raio e no máximo 
 o tema escuro do canvas.
 
 **Tipos da API.** Gerados do Rust com o `ts-rs` para dentro de `lib/api`; o CI confere se os arquivos
-gerados estão em dia. Os comandos do Tauri continuam escritos à mão em `lib/tauri/commands.ts`.
+gerados estão em dia. Os comandos do Tauri continuam escritos à mão em `lib/tauri/commands/` (era um arquivo só até a ADR 0014).
 
 **Janela.** 1440 × 900, o tamanho dos quadros, com mínimo de 1000 × 640. Numa tela que não comporta (a
 primeira abertura, sem nada gravado), ela fica com 90% da área útil do monitor, centralizada. Sem a barra do
@@ -93,3 +93,5 @@ colar o convite), rodando no CI do desktop.
   tema, com o contraste conferido.
 - Rever quando chegar o chat (`lib/realtime` e o fim da consulta repetida), um segundo tema, uma segunda
   janela (a transmissão destacada, por exemplo) ou se o `tauri-specta` sair estável.
+- Desde a v0.2.3, o tempo real é o WebSocket da ADR 0015 (`lib/realtime` e um `realtime.ts` por feature), e
+  as consultas repetidas só rodam com ele fora.

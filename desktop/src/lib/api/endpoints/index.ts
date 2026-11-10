@@ -1,3 +1,17 @@
+export {
+	archiveCategory,
+	archiveChannel,
+	createCategory,
+	createChannel,
+	getArchivedChannels,
+	getChannelLayout,
+	renameCategory,
+	setChannelLayout,
+	unarchiveCategory,
+	unarchiveChannel,
+	updateChannel,
+} from "./channels";
+export { listMessages, listPeople, type PageCursor, sendMessage } from "./chat";
 export { createInvite, getInvite, listInvites, revokeInvite } from "./invites";
 export { getMe, updateMe } from "./me";
 export {
@@ -6,6 +20,13 @@ export {
 	listMembers,
 	removeMember,
 	setMemberBeta,
+	setMemberPermission,
 	unlinkMember,
 } from "./members";
-export { createVoiceToken, listVoiceParticipants } from "./voice";
+export { createRealtimeTicket } from "./realtime";
+
+export {
+	createScreenToken,
+	createVoiceToken,
+	listVoiceParticipants,
+} from "./voice";

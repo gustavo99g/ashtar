@@ -11,7 +11,7 @@ import {
 	UPDATE_NOT_FOUND,
 	UPDATE_WAIT_MS,
 	useUpdateNow,
-} from "../useUpdateNow";
+} from "../hooks/useUpdateNow";
 
 vi.mock("@/lib/tauri/commands", () => ({
 	checkForUpdate: vi.fn(),

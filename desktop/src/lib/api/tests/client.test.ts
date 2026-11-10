@@ -200,18 +200,12 @@ describe("apiFetch: sessão", () => {
 		expect(reauthenticate).toHaveBeenCalledOnce();
 	});
 
-	it("o 401 do código de acesso e o 401 sem sessão não fazem login", async () => {
+	it("o 401 sem sessão não faz login", async () => {
 		const reauthenticate = vi.fn(async () => setSessionToken("novo"));
 		unregister = setSessionHandlers({ reauthenticate, onLeftGroup: vi.fn() });
 
 		fetchMock.mockResolvedValueOnce(unauthenticated());
 		expect((await rejection(apiFetch("/api/me"))).kind).toBe("unauthenticated");
-
-		setSessionToken("abc");
-		fetchMock.mockResolvedValueOnce(
-			json(401, { kind: "access_denied", message: "Recusado." }),
-		);
-		expect((await rejection(apiFetch("/api/me"))).kind).toBe("access_denied");
 
 		expect(reauthenticate).not.toHaveBeenCalled();
 	});

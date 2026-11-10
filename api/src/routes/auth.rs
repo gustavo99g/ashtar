@@ -12,13 +12,14 @@ use axum::http::request::Parts;
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
+use super::extract::ApiJson;
 use crate::AppState;
 use crate::db::now;
 use crate::error::ApiError;
 use crate::identity::permissions::{self, Action, Permission};
+use crate::identity::users::Person;
 use crate::identity::{User, devices, invites, users};
-
-use super::extract::ApiJson;
+use crate::realtime::ServerEvent;
 
 #[derive(Debug, Deserialize)]
 pub struct RedeemRequest {
@@ -83,6 +84,8 @@ pub struct MeResponse {
     pub can_create_invite: bool,
     /// Se o menu mostra o Painel de controle.
     pub can_view_panel: bool,
+    /// Se a lista de canais mostra criar, editar, arquivar e arrastar.
+    pub can_manage_channels: bool,
 }
 
 #[derive(Debug, Deserialize, TS)]
@@ -109,7 +112,17 @@ pub async fn redeem(
     if matches!(result, Err(ApiError::InvalidInvite)) {
         state.limiter.record_failure();
     }
-    let (user, token) = result?;
+    let invites::Redeemed {
+        user,
+        token,
+        new_member,
+    } = result?;
+    // A recuperação devolve quem já existia: só o convite novo avisa o grupo.
+    if new_member {
+        state.hub.publish(&ServerEvent::MemberJoined {
+            person: Person::new(&user, false),
+        });
+    }
     Ok(Json(SessionResponse {
         token,
         user: UserView::from(&user),
@@ -167,6 +180,9 @@ async fn me_response(state: &AppState, user: &User) -> Result<MeResponse, ApiErr
 
         can_create_invite: permissions::can(user, Action::CreateInvite),
         can_view_panel: permissions::can(user, Action::ViewPanel),
+        can_manage_channels: effective
+            .iter()
+            .any(|(p, _)| *p == Permission::ManageChannels),
     })
 }
 

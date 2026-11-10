@@ -1,18 +1,34 @@
-export type { ScreenShareController, ScreenShareState } from "./controller";
-export { IpcScreenShare } from "./ipc/IpcScreenShare";
-export { type ShareNotice, shareNotice } from "./notices";
+export { ShareQuickSettings } from "./components/ShareQuickSettings";
+export { SourcePickerHost } from "./components/SourcePickerHost";
+export { useScreenShareState } from "./hooks/useScreenShareState";
+export { type ScreenShare, useScreenShares } from "./hooks/useScreenShares";
+export { sharePerson, useShareButton } from "./hooks/useShareButton";
+export { sourceRefKey, useThumbnails } from "./hooks/useThumbnails";
+export type {
+	ScreenShareController,
+	ScreenShareState,
+	ShareChange,
+} from "./model/controller";
+export { type ShareNotice, shareNotice } from "./model/notices";
 export {
-	closeSourcePicker,
-	openSourcePicker,
-	restartShare,
-} from "./pickerStore";
-export { SourcePickerHost } from "./SourcePickerHost";
-export {
+	isScreenIdentity,
 	parseShareTrackName,
 	type ShareInfo,
+	shareOwner,
 	shareSpec,
 	shareWinner,
-} from "./shareInfo";
-export { useScreenShareState } from "./useScreenShareState";
-export { useScreenShares } from "./useScreenShares";
-export { useShareButton } from "./useShareButton";
+} from "./model/shareInfo";
+export { NativeScreenShare } from "./native/NativeScreenShare";
+export {
+	closeSharePanel,
+	closeSourcePicker,
+	openSharePanel,
+	openSourcePicker,
+	restartShare,
+	useSharePanelOpen,
+} from "./stores/pickerStore";
+export {
+	type ShareViewer,
+	setShareViewers,
+	useShareViewerList,
+} from "./stores/viewersStore";

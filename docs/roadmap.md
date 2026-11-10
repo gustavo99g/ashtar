@@ -16,7 +16,7 @@ v0.1  → Teste com o grupo
         ↓
 v0.2  → Comunidade
         Auto-update + convites + UI nova + chat real e supressão de ruído
-        + servidor na VPS + publicador nativo
+        + publicador nativo + servidor na VPS
         ↓
 v0.3  → Conversas privadas
         Mensagens e ligações privadas + não lidas + bandeja
@@ -85,7 +85,9 @@ v0.2.N sai como versão `0.2.N0`, e cada correção dela soma 1 no último dígi
 0.2.1, 0.2.2…    correções da v0.2.0
 0.2.10           entrega v0.2.1 (identidade)
 0.2.11…          correções da v0.2.1
-0.2.40           entrega v0.2.4 (servidor)
+0.2.40           entrega v0.2.4 (publicador nativo)
+0.2.41…          correções da v0.2.4
+0.2.50           entrega v0.2.5 (servidor)
 0.3.0            próxima versão do roadmap
 ```
 
@@ -243,18 +245,21 @@ versões"), e cada uma ganha um plano detalhado próprio antes de começar.
 v0.2.0  Base de entrega       auto-update + pipeline + canal beta + versão mínima + logs
 v0.2.1  Identidade            convites + identidade do dispositivo + permissões + banco (sem mudança visível)
 v0.2.2  UI nova               passa a usar as rotas da identidade
-v0.2.3  Chat real + áudio     chat com histórico + supressão de ruído e cancelamento de eco
-v0.2.4  Servidor              VPS (LiveKit, API e banco) + domínio + backup + alerta
-v0.2.5  Publicador nativo
+v0.2.3  Chat real + áudio     canais de texto com histórico + supressão de ruído + Painel da v0.2.2
+v0.2.4  Publicador nativo     captura pelo WGC + H.264 de hardware + segunda conexão no LiveKit + seletor novo
+v0.2.5  Servidor              VPS (LiveKit, API e banco) + domínio + backup + alerta
 ```
 
 A ordem segue quatro regras: a base de entrega vem primeiro, porque faz todo o resto chegar sozinho; a
 identidade vem antes da UI nova, e a UI nova antes de qualquer tela nova (convite, nick e chat), para que
 nada seja construído duas vezes (a v0.2.1 e a v0.2.2 são uma entrega conjunta: a primeira não muda nada do
 que o grupo vê, e a segunda mostra tudo); o chat e a supressão de ruído saem juntos, numa versão só (a
-supressão é pequena e não depende do chat); e o servidor próprio vem antes do publicador nativo, que é
-desenvolvido e medido já sobre o LiveKit da VPS, sem a cota de minutos do Cloud. Até o servidor, o LiveKit
-Cloud e o computador de casa (com o Tailscale Funnel) bastam, ao custo de uma migração do banco na v0.2.4.
+supressão é pequena e não depende do chat); e o publicador nativo vem antes do servidor próprio. O servidor
+era a v0.2.4 e o publicador a v0.2.5, para que o publicador fosse medido sem a cota do Cloud; a medição da
+Etapa 0 do publicador (`desktop/experiments/encoder-probe`) mostrou o contrário: o caminho novo é bom o
+bastante para não esperar a VPS, e a segunda conexão de quem transmite cabe na cota do LiveKit Cloud enquanto
+o grupo for pequeno. Até o servidor, o LiveKit Cloud e o computador de casa (com o Tailscale Funnel) bastam,
+ao custo de uma migração do banco na v0.2.5.
 
 ---
 
@@ -295,12 +300,12 @@ acesso provisório. As telas de convite e de escolha do nick nascem na UI nova d
 rotas novas e então desliga o código de acesso.
 
 **Banco de dados.** A identidade é o primeiro dado que precisa durar, então o banco entra aqui, rodando
-junto da API no computador que a hospeda (o servidor próprio só vem na v0.2.4):
+junto da API no computador que a hospeda (o servidor próprio só vem na v0.2.5):
 
 * banco escolhido antes da implementação (ADR), com migrações;
 * backup automático, copiado para fora do computador (ex.: Cloudflare R2): a partir daqui há dados reais
   do grupo;
-* a escolha considera a migração para a VPS na v0.2.4: com SQLite, a migração é copiar um arquivo; com
+* a escolha considera a migração para a VPS na v0.2.5: com SQLite, a migração é copiar um arquivo; com
   PostgreSQL, um dump e um restore.
 
 A v0.1 entra com uma identidade aleatória nova a cada entrada (`idiot-<uuid>`, nome `Idiota-<uuid>`); a
@@ -390,6 +395,9 @@ sem identidade válida → nenhum token do LiveKit
 
 ### v0.2.2 — UI nova
 
+> Publicada como `0.2.20` e `0.2.21` (31/10), **menos o Painel de controle**, que sai junto com o chat,
+> na v0.2.3 (`0.2.30`). O plano e o andamento estão no `PLAN.md`.
+
 Refazer a interface a partir do novo protótipo, depois da identidade (v0.2.1) e antes do chat, para que as
 telas de convite, de nick e de conversa sejam construídas uma única vez em cima da interface definitiva. É
 aqui que o grupo passa a ver a identidade: a UI nova usa as rotas de convite e de sessão da v0.2.1 e desliga
@@ -407,58 +415,84 @@ v0.1 deixou (seletor de fontes, trava de uma transmissão por vez, textos dos pr
 
 ### v0.2.3 — Chat real e supressão de ruído
 
-Duas partes, entregues juntas. A segunda é pequena e não depende da primeira.
+Sai numa versão só, a `0.2.30`, junto com o Painel de controle da v0.2.2 (Convites, Membros e o aviso de
+quem entrou), que não é publicado antes. O plano e o andamento estão no `PLAN.md`; as decisões, nas ADRs
+0015 e 0016.
 
 **Chat real**
 
-* enviar, receber e persistir mensagens;
+* enviar, receber e persistir mensagens de texto, com o estado de envio e o "Tentar de novo";
 * histórico ordenado e carregamento incremental;
-* estado de envio e tratamento de erro;
-* WebSocket próprio para eventos do aplicativo (`message.created`, `message.updated`,
-  `message.deleted`, `presence.changed`); a mídia continua no LiveKit;
-* reconexão do canal de eventos.
+* vários canais de texto, em categorias que também guardam as salas de voz, arrumados arrastando, com a
+  permissão "Gerenciar canais" dada por pessoa (adiantado da v0.5, pedido de 31/10);
+* WebSocket próprio para eventos do aplicativo (`message.created`, `presence.changed`, a sala de voz pelo
+  webhook do LiveKit, quem entrou no grupo e as mudanças de canais); a mídia continua no LiveKit;
+* reconexão do canal de eventos;
+* presença online e offline na coluna de membros;
+* miniatura da transmissão para quem sai da sala assistindo alguém.
 
-Até a v0.2.4, o histórico fica no banco do computador que hospeda a API: com ele desligado, não há chat
+Até a v0.2.5, o histórico fica no banco do computador que hospeda a API: com ele desligado, não há chat
 nem histórico.
 
 ```text
 enviar mensagem → o outro receber → fechar e reabrir → ver o histórico
 ```
 
-**Supressão de ruído e cancelamento de eco**
+**Supressão de ruído**
 
-* supressão de ruído, cancelamento de eco e controle automático de ganho do microfone, pelos filtros
-  do próprio WebView (opções de captura do `livekit-client`);
-* ligados por padrão, com opção de desligar (o `livekit-client` 2.22 já pede os filtros por padrão, então
-  falta a opção e conferir no WebView2, com `getSettings()`, se foram aplicados);
-* o eco de quem assiste a uma tela inteira compartilhada **não espera esta entrega**: é um bug que o grupo
-  já sentiu e sai como correção, fora de ordem (ver "Correções fora de ordem"). O modo "Todo o sistema"
-  exclui o PID do app, o que não cobre o WebView2 quando há duas instâncias abertas; a correção é excluir o
-  processo-navegador real do WebView2 (`BrowserProcessId`). Evidências e hipóteses no `BACKLOG.md`;
-* se o filtro do WebView não bastar, avaliar um filtro mais forte (ex.: RNNoise num worklet de áudio).
+* RNNoise como processador da trilha do microfone, ligado por padrão, com um interruptor "Supressão de
+  ruído" em Configurações › Voz e vídeo que volta à supressão do navegador, na hora, também no meio da
+  chamada (as outras opções da aba ficam para a v0.6); com o RNNoise ligado, o filtro de ruído do WebView
+  fica desligado (os dois juntos abafam a voz), e o cancelamento de eco e o ganho automático dele continuam;
+* o filtro do WebView sozinho não bastou na conversa (teclado e voz de fundo passavam), e o Krisp depende
+  do LiveKit Cloud, que sai na v0.2.5.
 
 ```text
-microfone sem ruído de teclado nem eco de quem usa caixa de som
+microfone sem ruído de teclado durante uma conversa
 ```
 
-### v0.2.4 — Servidor
+### v0.2.4 — Publicador nativo
+
+A transmissão de tela sai do WebView. Medido antes de começar (`desktop/experiments/encoder-probe`): 1080p60 de
+uma tela 4K com ~0,7% de CPU, da captura ao H.264 de hardware em 5,8 ms na mediana. Vem antes do servidor
+próprio: a segunda conexão de quem transmite cabe na cota do LiveKit Cloud enquanto o grupo for pequeno.
+
+* publicação do vídeo e do áudio direto do Rust (conexão `{user_id}:screen`), sem passar pelo WebView;
+* captura própria pelo WGC, redução e conversão para NV12 na GPU e encoder H.264 de hardware do Media
+  Foundation, com o codificador de software como plano B;
+* seletor de fontes com todas as janelas (inclusive minimizadas), foco na janela escolhida e miniaturas ao vivo
+  a 5–10 fps; o preview de quem transmite reaproveita a miniatura;
+* presets Movimento (1080p60) e Nitidez (1080p30), e os ajustes no meio da transmissão (preset, fonte, áudio,
+  cursor, pausa), com os números e quem está assistindo;
+* a saída do encoder com mais de um destino (publicador hoje; buffer de clipes e replay na v1.1);
+* medição lado a lado com o caminho IPC (`0.2.30`).
+
+```text
+transmitir 1080p60 de um monitor 4K com a CPU abaixo de ~2% e o fps cravado
+ +
+janela minimizada no seletor, escolhida e trazida para a frente
+ +
+publicador nativo igual ou melhor que o caminho IPC na medição
+```
+
+### v0.2.5 — Servidor
 
 Todo o servidor passa para uma VPS própria. A mídia sai do LiveKit Cloud, pré-requisito das transmissões
 múltiplas da v0.4, e a API e o banco saem do seu computador, para que o aplicativo não caia quando ele
-desligar ou reiniciar. Vem depois do chat e antes do publicador nativo: até aqui, o LiveKit Cloud e o computador de casa bastam
-para o grupo. Pode ser antecipado se a cota do LiveKit Cloud apertar.
+desligar ou reiniciar. Vem depois do publicador nativo: até aqui, o LiveKit Cloud e o computador de casa
+bastam para o grupo. Pode ser antecipado se a cota do LiveKit Cloud apertar.
 
 **Gatilho para antecipar:** se o consumo de minutos de participante de um mês passar de ~60% dos 5.000 do
 plano gratuito, esta entrega passa à frente (ou o plano pago seguinte cobre o mês). O teste de 2026-10-06
 mostrou que o limite que aperta primeiro são os minutos, não o tráfego (~2 GB numa tarde com até 4
-pessoas). O publicador nativo (v0.2.5) vem depois, já sobre o servidor próprio: a segunda conexão de quem transmite
-não consome essa cota.
+pessoas). Com o publicador nativo, a conexão `:screen` de quem transmite conta como mais um participante:
+acompanhar a cota no painel do Cloud.
 
-**Antecipado em 2026-10-31: só o LiveKit.** A cota de tráfego (GB) do plano gratuito chegou perto do fim, ao
-contrário do teste de 2026-10-06, em que os minutos pareciam o limite. O LiveKit passa para a VPS antes do
-resto, com a API e o banco ainda em casa; a troca é só no `.env` da API. Configuração e passo a passo em
-[`deploy/livekit/`](../deploy/livekit/README.md). Desta entrega ficam pendentes o TURN por TLS na 443, a API e
-o banco na VPS, o backup e o alerta.
+**Começa pelo LiveKit.** O que apertou foi o tráfego, não os minutos: uns 30 minutos de teste em 2026-11-09
+gastaram ~3 GB dos 50 GB do mês. O primeiro passo é só o LiveKit na VPS, com a API e o banco ainda em casa; a
+troca é no `.env` da API, sem versão nova do app. Configuração e passo a passo em
+[`deploy/livekit/`](../deploy/livekit/README.md). Depois vêm o TURN por TLS na 443, a API e o banco na VPS, o
+backup e o alerta.
 
 O desktop só conhece a URL da API. A URL, a chave e o segredo do LiveKit ficam no servidor, e a URL do
 LiveKit chega ao desktop pela própria API.
@@ -486,21 +520,6 @@ histórico do chat e usuários migrados, sem perda
 restauração do backup testada uma vez
  +
 servidor desligado → alerta no celular
-```
-
-### v0.2.5 — Publicador nativo
-
-* publicação do vídeo direto do Rust (conexão `{user_id}:screen`), sem passar pelo WebView;
-* medição lado a lado com o caminho IPC, usando como linha de base a Etapa 6 de `docs/plans/v0.1-reorganizacao.md` e o teste da
-  v0.1.
-
-Vem depois do servidor próprio: é desenvolvido e medido já sobre o LiveKit da VPS (v0.2.4), sem a cota de
-minutos do Cloud, onde a segunda conexão de quem transmite contaria como mais um participante. É a parte de
-maior risco técnico que sobrou da mídia, e o motivo do aplicativo existir.
-
-```text
-publicador nativo igual ou melhor que o caminho IPC na medição
-(ou decisão documentada de manter o IPC)
 ```
 
 ---
@@ -623,8 +642,7 @@ Sair da sala e do canal únicos e mostrar quem está fazendo o quê.
 
 ## Canais
 
-* múltiplos canais de texto, com histórico por canal;
-* múltiplas salas de voz;
+* múltiplas salas de voz, criadas como os canais de texto da v0.2.3, nas mesmas categorias;
 * conexão de voz independente do canal de texto selecionado.
 
 ```text
@@ -775,9 +793,9 @@ do grupo, e entra só o que mantiver a base simples.
 
 ## Screen Share
 
-* miniaturas e preview no seletor de fontes;
+* ~~miniaturas e preview no seletor de fontes~~ (adiantado para a v0.2.4, com o publicador nativo);
 * aviso de conteúdo protegido (frames pretos por vários segundos);
-* presets de qualidade expostos na interface.
+* ~~presets de qualidade expostos na interface~~ (v0.2.4: Movimento e Nitidez, no seletor e no painel).
 
 ## Moderação
 
@@ -946,11 +964,55 @@ v0.1    API pelo Tailscale Funnel
 v0.2.1  banco junto da API, no computador de casa
         backup fora do computador (ex.: Cloudflare R2)
         ↓
-v0.2.4  LiveKit, API e banco em VPS própria, com domínio
+v0.2.4  segunda conexão de quem transmite (publicador nativo) no LiveKit Cloud
+        ↓
+v0.2.5  LiveKit, API e banco em VPS própria, com domínio
         alerta de servidor fora do ar
         (antecipado se a cota do LiveKit Cloud apertar)
         ↓
 v0.4    VPS dimensionada para várias transmissões
+```
+
+---
+
+# v1.1 — Clipes e replay (planejada)
+
+## Objetivo
+
+Guardar os melhores momentos do grupo: clipes das transmissões, vistos por todos num canal próprio, e replay
+em segundo plano dos jogos jogados juntos. Nada disso entra antes da v1.0, mas a base é preparada antes (ver
+"Depende de").
+
+## Clipes das transmissões
+
+* qualquer um que esteja assistindo uma transmissão do grupo pode clipar;
+* o clipe é gravado **no PC de quem assiste**: o servidor repassa o H.264 original sem recodificar, então quem
+  assiste tem os mesmos bytes que quem transmite. Quem transmite não gasta upload nem disco;
+* buffer em disco, em pedaços (ex.: os últimos 5 min), para clipes de mais de 1 min; o corte fino fica no canal
+  de clipes;
+* o clipe vai para um **canal de clipes** no chat, com player e miniatura, visível para todos;
+* a decidir: limite de duração ou tamanho por clipe (5 min a 8 Mbps são ~300 MB) e se quem transmite vê quem
+  clipou.
+
+## Replay dos jogos
+
+* com duas ou mais pessoas na sala, o app de cada um reconhece um jogo aberto e grava em segundo plano os
+  últimos minutos, pelo mesmo caminho do publicador nativo (WGC → GPU → encoder de hardware), sem transmitir;
+* cada um salva **o próprio** replay, com uma tecla de atalho, e decide se envia;
+* o envio vai para um armazenamento grande, possivelmente um homelab próprio, por uma API compatível com S3.
+
+## Depende de
+
+* v0.2.4: saída do encoder com mais de um destino (o `Fanout`);
+* v0.7: armazenamento de arquivos e anexos de vídeo no chat;
+* v0.8: reconhecimento de jogos ("Jogando X"), reaproveitado para ligar o replay.
+
+## Critérios de conclusão
+
+```text
+assistir uma transmissão → clipar os últimos 2 min → o clipe aparece no canal de clipes para todos
+ +
+jogar com o grupo → salvar o replay com o atalho → o arquivo fica no PC, pronto para enviar
 ```
 
 ---
@@ -974,7 +1036,6 @@ Funcionalidades que podem ser avaliadas posteriormente:
 - sistema elaborado de cargos e permissões por canal;
 - assinatura de código do instalador (elimina o aviso do SmartScreen);
 - soundboard;
-- clipes (salvar os últimos segundos de uma transmissão);
 ```
 
 Nenhuma delas é necessária para o uso principal do grupo.
@@ -997,9 +1058,9 @@ v0.2
     + logs em arquivo + código de acesso provisório
 08. v0.2.1 Convites + identidade do dispositivo + permissões + segurança mínima + banco
 09. v0.2.2 UI nova
-10. v0.2.3 Chat real + WebSocket + supressão de ruído e cancelamento de eco
-11. v0.2.4 VPS (LiveKit, API e banco) + domínio + migração + alerta
-12. v0.2.5 Publicador nativo + medição
+10. v0.2.3 Chat real + canais de texto + WebSocket + supressão de ruído + Painel
+11. v0.2.4 Publicador nativo (WGC + H.264 de hardware) + seletor de fontes + medição
+12. v0.2.5 VPS (LiveKit, API e banco) + domínio + migração + alerta
 
 v0.3
 13. Mensagens privadas
@@ -1011,7 +1072,7 @@ v0.4
 17. Experiência de quem assiste
 
 v0.5
-18. Canais e salas
+18. Salas de voz
 19. Status + digitando + menções + silenciar canal
 20. Sons, speaking indicator e volume por usuário
 
