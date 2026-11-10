@@ -35,6 +35,8 @@ adiado (marcar como tal) antes de fechar a entrega em que ele está. A lista da 
 - [ ] **O caminho com ganho (acima de 100%) com várias vozes:** hoje serve a uma trilha, a da transmissão.
       Conferir o custo e a troca da saída de áudio com cinco pessoas acima de 100%.
 - [ ] **O volume guardado é por pessoa, no computador:** conferir que sobrevive a reinstalar e ao auto-update.
+- **A troca de saída com reforço** não era seguida nem na transmissão (v0.2.4): o contexto só olhava a saída
+  ao ligar. O `RoomAudio` agora escuta o `ActiveDeviceChanged`.
 
 ## v0.3.1 — todo o chat
 
