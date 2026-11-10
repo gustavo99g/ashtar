@@ -1,100 +1,189 @@
-# Plano — v0.2.4: publicador nativo
+# Plano — v0.3: conversas privadas
 
-A transmissão de tela sai do WebView: a captura, a redução, a conversão e o encoder passam a rodar na GPU, e o
-vídeo e o áudio são publicados direto do Rust numa segunda conexão, `{user_id}:screen`. Junto vêm o seletor de
-fontes refeito e o controle da transmissão em andamento. Sai como `0.2.40` (`docs/roadmap.md`). O plano da fase
-anterior está arquivado em [`docs/plans/v0.2.3-chat.md`](docs/plans/v0.2.3-chat.md).
+A v0.3 traz as conversas privadas entre duas pessoas, com tudo o que elas pedem em volta: não lidas,
+notificações, menções, status e, por último, as ligações. Antes disso, uma parte só de interface refaz a lista
+de canais e o menu do usuário, que as outras duas partes vão usar. O visual segue o canvas
+"Clone do Discord — telas". O plano da fase anterior está arquivado em
+[`docs/plans/v0.2.4-publicador-nativo.md`](docs/plans/v0.2.4-publicador-nativo.md).
 
-**Objetivo desta fase:** transmitir 1080p60 com custo quase zero para a máquina de quem transmite, sem o custo
-crescer com a resolução do monitor; o seletor mostra todas as janelas, com miniaturas ao vivo; e a transmissão
-pode ser ajustada sem parar.
+Sai em três entregas, cada uma pelo beta antes do estável:
 
-**Fora do escopo:** o servidor próprio (v0.2.5; a fase roda sobre o LiveKit Cloud), os clipes das transmissões e
-o replay dos jogos (v1.1; aqui só a base, decisão 5), saída acima de 1080p60, simulcast, HEVC e AV1, câmera,
-Linux e o pressionar para falar (v0.6).
+| Entrega | Versão | O que é | Mexe em |
+|---|---|---|---|
+| v0.3.0 | `0.3.0` | Base visual: lista de canais nova e menu do usuário com volume individual | Só o app |
+| v0.3.1 | `0.3.10` | Todo o chat: conversas privadas, não lidas, notificações, menções, silenciar e status | API, banco e app |
+| v0.3.2 | `0.3.20` | Ligações privadas, com tela compartilhada e registro no histórico | API, banco e app |
 
-Base: a `dev` no `773d66a` (`0.2.30`), mais o `encoder-probe` da Etapa 0. Em cada etapa, `cargo fmt --check`,
-`cargo clippy --all-targets -- -D warnings` e `cargo test` (em `api/` e em `desktop/src-tauri/`) e `pnpm lint`,
-`pnpm build` e `pnpm test` (em `desktop/`) devem passar.
+**Objetivo da fase:** duas pessoas do grupo conversam e se ligam em particular sem sair do Ashtar; ninguém
+perde uma mensagem privada ou uma menção por estar em outro canal, num jogo ou com a janela fechada; e quem
+não quer ser interrompido tem como dizer isso.
+
+**Fora do escopo:** ausente automático por inatividade e "digitando…" (v0.5); criar sala de voz, sons de
+entrada e saída e mover alguém de sala (v0.5); duas transmissões ao mesmo tempo (v0.4); editar, excluir,
+responder, reações, anexos e busca (v0.7); a seção Moderação do cartão do usuário (v0.8); câmera e overlay no
+jogo (sem versão); grupos privados com mais de duas pessoas e criptografia ponta a ponta (depois da v1.0).
+
+Base: a `dev` no `aee73ee` (`0.2.40`). Em cada etapa, `cargo fmt --check`, `cargo clippy --all-targets -- -D
+warnings` e `cargo test` (em `api/` e em `desktop/src-tauri/`) e `pnpm lint`, `pnpm build` e `pnpm test` (em
+`desktop/`) devem passar.
 
 ## Progresso
 
-| Etapa | Descrição | Status |
-|---|---|---|
-| 0 | Decisões: experimento (`6472945`), ADRs 0017 a 0019, roadmap, BACKLOG | Concluída |
-| 1 | Captura própria pelo WGC, lista de janelas, foco e exclusão do app | Concluída |
-| 2 | Vídeo na GPU: conversão, encoder, plano B, bitrate e destinos | Concluída |
-| 3 | Publicador `:screen` (vídeo e áudio), sessão, comandos, logs e teste de ponta a ponta | Concluída |
-| 4 | API: token da `:screen`, participantes e kick | Concluída |
-| 5 | App: transmissão nativa, seletor com miniaturas, painel e bandeja; sai o IPC | Concluída |
-| 5c | Nivelador no áudio da transmissão e volume de quem assiste até 200% | Concluída |
-| 6 | Medição contra a `0.2.30` e bitrates dos presets | Parcial: só na AMD; o resto segue no beta |
-| 7 | Lançamento: `0.2.40` no beta e no estável | Em andamento: `0.2.40` pronta para o beta |
+| Etapa | Entrega | Descrição | Status |
+|---|---|---|---|
+| 0 | todas | Decisões: ADRs 0020 a 0023, roadmap, BACKLOG | Pendente |
+| 1 | v0.3.0 | App: a lista de canais do canvas, o menu do servidor e o menu do canal | Pendente |
+| 2 | v0.3.0 | App: o modo Organizar canais | Pendente |
+| 3 | v0.3.0 | App: o cartão novo do usuário, nas duas listas | Pendente |
+| 4 | v0.3.0 | App: volume individual, o volume pelo bloco e a marca | Pendente |
+| 5 | v0.3.0 | Carona do BACKLOG e lançamento da `0.3.0` | Pendente |
+| 6 | v0.3.1 | Experimento: notificação do Windows, bandeja, barra de tarefas e iniciar com o Windows | Pendente |
+| 7 | v0.3.1 | API: conversas privadas e a permissão por canal | Pendente |
+| 8 | v0.3.1 | API: tempo real com destinatário | Pendente |
+| 9 | v0.3.1 | API: lidas, menções e silenciar | Pendente |
+| 10 | v0.3.1 | API: status | Pendente |
+| 11 | v0.3.1 | App: a lateral direita com abas | Pendente |
+| 12 | v0.3.1 | App: as conversas (lista, janela embaixo, abas) | Pendente |
+| 13 | v0.3.1 | App: não lidas e a linha "novas mensagens" | Pendente |
+| 14 | v0.3.1 | App: menções e silenciar | Pendente |
+| 15 | v0.3.1 | App: notificações, sons e a aba Notificações | Pendente |
+| 16 | v0.3.1 | App: status e iniciar com o Windows | Pendente |
+| 17 | v0.3.1 | Lançamento da `0.3.10` | Pendente |
+| 18 | v0.3.2 | Experimento: a janela de ligação recebida com o app fechado | Pendente |
+| 19 | v0.3.2 | API: ligações (sinalização, token, webhook, registro) | Pendente |
+| 20 | v0.3.2 | App: ligar e receber | Pendente |
+| 21 | v0.3.2 | App: a tela da ligação e a tela compartilhada | Pendente |
+| 22 | v0.3.2 | App: o fim da ligação, a chamada perdida e o Ocupado | Pendente |
+| 23 | v0.3.2 | Lançamento da `0.3.20`, depois da v0.2.5 | Pendente |
 
-A 2 usa a captura da 1, a 3 usa o vídeo da 2, e a 5 usa os comandos da 3 e o token da 4. A 4 pode andar em
-paralelo desde o começo. O caminho de hoje (IPC) continua funcionando até a Etapa 5, que é onde ele sai.
+Dependências: a 2 usa a lista da 1, e a 4 usa o cartão da 3. A 6 é um experimento e anda desde o começo, em
+paralelo com a v0.3.0. Na v0.3.1, a 8 usa a 7, a 9 usa a 8, e o app (11 a 16) pode começar pela 11 enquanto a
+API anda. A v0.3.2 inteira depende da v0.3.1; a 23 depende também da v0.2.5 (decisão 20).
 
-Branches: tudo na `feature/0.2.4`, um pull request por etapa para dentro dela. A Etapa 4 também vai para a `dev`
-logo que fica pronta: só acrescenta uma rota, e o app instalado não percebe. Nada do app é publicado até a
-Etapa 7, que leva a `feature/0.2.4` para a `dev` (beta) e depois para a `main`.
+Branches: uma por entrega (`feature/0.3.0`, `feature/0.3.1`, `feature/0.3.2`), um pull request por etapa
+para dentro dela. As etapas de API que só acrescentam rotas e eventos (7 a 10 e 19) também vão para a `dev`
+logo que ficam prontas: o app instalado ignora eventos que não conhece (`RealtimeBridge.tsx`). O app só é
+publicado nas etapas de lançamento, que levam a branch para a `dev` (beta) e depois para a `main`.
 
 ## Decisões
 
 As decisões de arquitetura estão nas ADRs, que são a fonte:
-[`0017-publicador-nativo.md`](docs/adr/0017-publicador-nativo.md) (a conexão `:screen`, o vídeo já codificado, o
-áudio, o fim do IPC), [`0018-captura-pelo-wgc-e-video-na-gpu.md`](docs/adr/0018-captura-pelo-wgc-e-video-na-gpu.md)
-(a captura, o dispositivo, a conversão, o encoder, o bitrate) e
-[`0019-seletor-de-fontes.md`](docs/adr/0019-seletor-de-fontes.md) (a lista, as miniaturas, o foco, a exclusão do
-app). Abaixo, o que foi combinado para esta fase e o que o plano decidiu além disso.
 
-### Combinado
+- [`0020-lista-de-canais-e-menu-do-usuario.md`](docs/adr/0020-lista-de-canais-e-menu-do-usuario.md): o modo Organizar, os menus e o volume individual (atualiza o
+  "No app" da ADR 0016).
+- [`0021-conversas-privadas-e-permissao-por-canal.md`](docs/adr/0021-conversas-privadas-e-permissao-por-canal.md): o canal `dm`, os membros do canal, a regra de leitura e
+  o tempo real com destinatário (a revisão que a ADR 0015 já previa).
+- [`0022-lidas-mencoes-e-notificacoes.md`](docs/adr/0022-lidas-mencoes-e-notificacoes.md): o que é lido, a menção, o silenciar, o status e quem decide se uma
+  notificação aparece.
+- [`0023-ligacoes-privadas.md`](docs/adr/0023-ligacoes-privadas.md): a sala, a sinalização, o toque e o registro.
 
-- **Solução definitiva, sem passo intermediário:** captura, vídeo e envio no Rust de uma vez, e não um caminho
-  IPC mais leve.
-- **Teto de 1080p60**, mesmo num monitor 4K. Os presets passam a ser **Movimento** (1080p60) e **Nitidez**
-  (1080p30, com mais bits por quadro, para texto); os bitrates saem da Etapa 6.
-- **Encoder de hardware do Media Foundation**, medido na Etapa 0. **Sem encoder de hardware, plano B:** a imagem
-  já reduzida vai para o codificador de software da crate `livekit`, e o painel mostra "Software".
-- **Seletor com todas as janelas, inclusive as minimizadas**, com o selo "Minimizada". **Escolher uma fonte traz
-  a janela para a frente** (restaurando, se estiver minimizada) **e minimiza o app.**
-- **Miniaturas ao vivo pelo WGC, a 5–10 fps**, só dos cards visíveis e só com o seletor aberto. Adianta as
-  miniaturas da v0.8 do roadmap. **O preview de quem transmite reaproveita a miniatura** da fonte em uso.
-- **Ajustar a transmissão em andamento**, sem parar: preset, fonte, áudio, cursor e pausa, num painel da própria
-  transmissão.
-- **Bandeja durante a transmissão** ("Abrir o painel", "Pausar"/"Continuar", "Parar de transmitir"),
-  **estatísticas** no painel (fps, bitrate, encoder, aviso de rede limitando) e **quem está assistindo**.
-- **O IPC sai nesta fase, sem chave para voltar.** Já se mostrou pesado (ADR 0009 e a Etapa 0), e manter os dois
-  caminhos dobraria as Etapas 1 a 6. A rede de segurança é o canal beta.
-- **Logs do pipeline** no arquivo de log e **teste de ponta a ponta** com um LiveKit local.
-- **Clipes e replay ficam para depois** (v1.1). Esta fase só deixa a saída do encoder pronta para isso.
+### Combinado (08/11 e 10/11)
+
+O desenho das conversas e da ligação foi fechado em 08/11, no canvas (linhas "Conversas na lateral direita" e
+"Ligação privada"). Ficaram descartados: a coluna de ícones à esquerda, as abas na barra de título, o verde
+para a ligação e a seção "Em ligação" na lateral esquerda.
+
+- **A v0.3 são as conversas privadas**, e as notificações e menções da v0.5 vêm junto, porque usam a mesma
+  base (até onde cada um leu e o caminho da notificação).
+- **As conversas ficam na lateral direita:** abas Membros e Conversas, e a conversa aberta numa janela
+  embaixo, encostada na lateral.
+- **A lista de canais sai igual à do canvas** ("Canais — categorias e ordem"). A API e o modelo de hoje ficam.
+- **O menu do usuário entra**, com o volume individual. A seção Moderação e "Mover para outra sala" não.
+- **Um "não perturbe" mínimo:** o status Ocupado, que cala avisos, sons e o toque de ligação.
+- **Não lidas visíveis com a janela fechada** (bandeja e barra de tarefas), **sons e a aba Notificações**, e
+  **a linha "novas mensagens"** no histórico.
+- **A VPS (v0.2.5) vem antes de publicar as ligações.**
+- **Testar a notificação do Windows no começo da v0.3.1**, antes de desenhar o resto em cima dela.
+- **Carona do BACKLOG na v0.3.0:** o tempo limite do pedido de token e a versão mínima do app.
 
 ### Decidido neste plano
 
-1. **Captura própria pelo WGC**, para telas e janelas, no lugar do `DesktopCapturer` do libwebrtc: ele não lista
-   nem captura janelas minimizadas e entrega a imagem na memória. Sem a borda amarela e com o cursor.
-2. **Um dispositivo D3D11 por transmissão**, dividido pela captura, pela conversão e pelo encoder, com a proteção
-   multithread ligada. Por transmissão, e não global, para que um dispositivo perdido encerre só aquela.
-3. **Redução e conversão para NV12 na GPU** pelo `ID3D11VideoProcessor`, em BT.709 de faixa limitada. A saída tem
-   sempre o tamanho do preset, com a imagem centralizada: a janela mudando de tamanho não reinicia o encoder.
-4. **A codec API do encoder antes dos tipos de mídia.** No driver da AMD, configurada depois, o encoder volta para
-   30 fps. O encoder é escolhido pela placa do dispositivo (`MFTEnum2` com o LUID).
-5. **A saída do encoder tem mais de um destino** (`PacketSink` e `Fanout`): o publicador agora; o buffer de clipes
-   e replay na v1.1.
-6. **Bitrate corrigido pelo medido**, a cada ~1 s, para seguir o alvo da LiveKit mesmo com o fps variando.
-7. **Só imagens novas são codificadas.** Com a tela parada, a última é reenviada a cada ~1 s.
-8. **Publicação já codificada pela crate `livekit`** (0.9.1): `NativeVideoSource::new_encoded`, H.264, sem
-   simulcast. Os pedidos de keyframe e de bitrate da LiveKit vão para o encoder. No plano B, VP8.
-9. **Áudio da transmissão pelo `NativeAudioSource`**, direto do WASAPI, no mesmo relógio do vídeo.
-10. **Uma conexão só para a tela, `{user_id}:screen`**, com um token que só publica a tela e o áudio dela, não
-    assina nada e vale 5 minutos para entrar. Para o resto do app, ela é "a tela de fulano".
-11. **O Ashtar nunca aparece numa captura** (`WDA_EXCLUDEFROMCAPTURE`).
-12. **Pausar silencia a trilha de vídeo** (`mute`), e quem assiste vê "Transmissão pausada" sobre a última imagem.
-13. **Quem está assistindo vai por mensagem de dados** na conexão da voz (tópico `screen-viewers`).
-14. **Falha sem transmissão fantasma:** se a captura, o encoder ou a conexão falharem, a `:screen` sai da sala na
-    hora e o app avisa uma vez.
+**Lista de canais e menu do usuário (v0.3.0)**
+
+1. **Arrastar só no modo Organizar.** Fora dele, a lista não tem alça nem "…": passando o mouse, a categoria
+   mostra o + e o canal a engrenagem, por cima da linha. No modo, o app arruma uma cópia da árvore e manda um
+   `PUT /api/channels/layout` só, no Concluir. Desfazer joga a cópia fora. Um 409 (alguém mexeu no meio)
+   recarrega a árvore e mantém o modo aberto, com um aviso.
+2. **"Mover para" no lugar de "Mover para cima/baixo".** O menu do canal (engrenagem ou botão direito) tem
+   Editar, Mover para (as categorias e "Sem categoria", a atual marcada) e Arquivar. O Silenciar canal do
+   quadro entra na v0.3.1, na mesma posição.
+3. **O nome do servidor vira o menu de quem gerencia:** Convidar pessoas, Criar canal, Criar categoria,
+   Organizar canais e Canais arquivados. Cada um vê só o que pode: o Convidar continua só do dono, e quem
+   não é dono nem gerencia canais não tem menu.
+4. **O `ChannelNav.tsx` (784 linhas) é dividido** dentro de `features/channels/components/`, pelo padrão da
+   ADR 0014: a lista, a linha de canal, a linha de categoria, os menus e o modo Organizar.
+5. **Um cartão só para o usuário**, na lista de membros e na lista da sala (`PersonCard`), que cresce para
+   baixo. Na v0.3.0 ele mostra o nome, o nick, onde a pessoa está e o volume; os botões Mensagem e Ligar
+   entram na v0.3.1 e na v0.3.2.
+6. **Volume individual de 0 a 200%, só para quem ajusta**, guardado no computador por pessoa. Aparece no
+   cartão de quem está na mesma sala e clicando no bloco da pessoa na grade. Clicar no alto-falante silencia
+   só para você e, de novo, volta ao valor anterior. Acima de 100% usa o mesmo caminho com ganho do som da
+   transmissão (`useShareAudio.ts`), que passa a servir às duas coisas.
+7. **A marca no bloco:** a porcentagem, ou o alto-falante vermelho, quando o volume não está em 100%.
+
+**Conversas privadas (v0.3.1)**
+
+8. **A conversa privada é um canal de tipo `dm`**, com as mesmas mensagens, o mesmo envio e o mesmo
+   histórico dos canais de texto. Ela não tem nome, categoria nem posição, e nunca aparece no
+   `GET /api/channels` nem no layout. A migração `0004` refaz a tabela `channels` para aceitar o tipo novo (o
+   SQLite não altera um `CHECK`) e cria `channel_members`. Um par de pessoas tem uma conversa só, garantida
+   por uma chave única com os dois ids em ordem.
+9. **Uma regra de leitura só.** Toda rota de mensagens passa por uma função que recebe quem pede: canal de
+   texto, qualquer membro ativo; `dm`, só os dois. Para quem não é da conversa a resposta é 404, igual a um
+   id que não existe.
+10. **Rotas novas:** `POST /api/dms` (abre a conversa com alguém, ou devolve a que já existe) e
+    `GET /api/dms` (as suas conversas, com a outra pessoa, a última mensagem e as não lidas). Enviar e ler
+    continuam em `/api/channels/{id}/messages`.
+11. **O tempo real ganha destinatário.** Cada evento do `Hub` sai para todos ou para uma lista de pessoas, e
+    cada conexão descarta o que não é dela. Os eventos de uma conversa privada só saem para os dois. O
+    `ready` de cada conexão só traz os canais que a pessoa lê. Testes de integração abrem três conexões e
+    conferem que a terceira não recebe nada, nem pelo socket nem pelo REST.
+12. **Texto puro, e avisado.** As mensagens privadas ficam no banco como as outras. O começo de toda conversa
+    mostra uma linha fixa dizendo isso.
+13. **Quem saiu do grupo:** a conversa continua na lista de quem ficou, só para leitura, com "(saiu do
+    grupo)".
+
+**Lidas, menções, silenciar e status (v0.3.1)**
+
+14. **"Lido" é um ponteiro por pessoa e por canal**, no servidor (`channel_state`: a última mensagem lida e
+    se está silenciado). O app marca como lido quando o canal está aberto, a janela em foco e o fim do
+    histórico à vista, ou quando a pessoa pede ("Marcar como lido" e "Marcar tudo como lido"). As não lidas são as mensagens dos outros depois do ponteiro. O `ready` traz, para cada
+    canal e conversa, o ponteiro, as não lidas e as menções.
+15. **A menção é `@nick`, resolvida pela API no envio.** O nick é único e não muda; o app mostra o nome
+    visível. A mensagem leva a lista de quem foi mencionado, e a API guarda as menções para contar as não
+    lidas de cada um. Sem `@todos` nesta fase.
+16. **Silenciar** cala o aviso, o som e o número do canal ou da conversa, mas a menção passa. Fica no
+    servidor, junto do ponteiro.
+17. **Três status:** Disponível, Ocupado e Invisível, guardados no servidor. Ocupado aparece para os outros
+    (bolinha vermelha) e, no app de quem escolheu, cala avisos, sons e notificações do Windows; as não lidas
+    continuam contando. Invisível é resolvido na API: os outros recebem a pessoa como offline.
+18. **O app decide se notifica, num lugar só** (`features/notifications`): olha o status, o silenciar, as
+    chaves da aba Notificações, se a janela está em foco e qual canal está aberto. Com a janela à vista, o
+    aviso é o do canto do app; minimizada ou na bandeja, é a notificação do Windows. "Começou a transmitir"
+    sai do `voice.participants` que o app já recebe, sem rota nova.
+19. **A lateral sai do chat e vai para a casca do app**, com 300 de largura: hoje a `PeopleColumn` só existe
+    dentro do `ChatView`, e o canvas a mostra também na sala de voz, minimizada.
+
+**Ligações privadas (v0.3.2)**
+
+20. **Só é publicada com o LiveKit na VPS** (v0.2.5). No LiveKit Cloud, cada ligação com tela compartilhada
+    são até quatro conexões contando minutos.
+21. **A sala da ligação é a própria conversa.** O token da voz e o da `:screen` passam a aceitar uma conversa
+    `dm` de que a pessoa faz parte, além das salas de voz. O webhook do LiveKit de uma sala privada só avisa
+    os dois.
+22. **A sinalização é da API:** chamar, atender, recusar, cancelar e desligar são rotas, e os eventos
+    (`call.ringing`, `call.accepted`, `call.ended`) saem só para os dois. Sem resposta em 30 s vira chamada
+    perdida. Se os dois ligarem um para o outro ao mesmo tempo, a segunda chamada atende a primeira.
+23. **O registro é uma mensagem de sistema na conversa** (tipo `call`), com o resultado e a duração. Ela
+    conta como não lida quando a chamada foi perdida.
+24. **Uma conexão de voz por vez.** Atender ou ligar estando numa sala sai da sala; estando transmitindo,
+    o aviso é obrigatório e diz quantos estão assistindo. O aviso comum tem "Não perguntar de novo".
+25. **Quem liga nunca vê "ocupado"**, e os outros membros não veem que os dois estão em ligação: eles só
+    saem da lista da sala.
+26. **A tela da ligação é a `VoiceRoom`**, com outro cabeçalho e sem Convidar. A tela compartilhada usa o
+    publicador nativo como está, com a trava de uma transmissão por vez valendo por sala.
 
 ---
 
-**Critério de pronto da fase:** transmitir 1080p60 de um monitor 4K com a CPU da máquina abaixo de ~2% e o fps
-cravado; o seletor com as minimizadas e as miniaturas; o IPC removido; a medição contra a `0.2.30` registrada na
-ADR 0017; e todos os itens do `NOTES.md` resolvidos ou conscientemente adiados.
+**Critério de pronto da fase:** o "pronto quando" das três etapas de lançamento (5, 17 e 23), os testes de
+vazamento passando no pipeline, e todos os itens do `NOTES.md` resolvidos ou conscientemente adiados.
