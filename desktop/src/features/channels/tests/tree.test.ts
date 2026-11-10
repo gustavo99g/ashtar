@@ -6,8 +6,7 @@ import {
 	dragCollision,
 	dragId,
 	layoutRequest,
-	moveCategory,
-	moveChannel,
+	moveToCategory,
 	sameOrder,
 } from "../model/tree";
 
@@ -43,38 +42,33 @@ function order(next: Layout | null) {
 	return { top, categories };
 }
 
-describe("mover pelo menu", () => {
-	it("sobe e desce dentro do mesmo lugar", () => {
-		expect(
-			order(moveChannel(layout, "cs", -1))?.categories[0].channels,
-		).toEqual(["cs", "lol"]);
-		expect(order(moveChannel(layout, "geral", 1))?.top).toEqual([
-			"sala",
-			"geral",
+describe("mover para outra categoria, pelo menu", () => {
+	it("vai para o fim da categoria escolhida e troca a categoria do canal", () => {
+		const next = moveToCategory(layout, "lol", "avisos");
+		expect(order(next)?.categories).toEqual([
+			{ id: "jogos", channels: ["cs"] },
+			{ id: "avisos", channels: ["regras", "lol"] },
 		]);
+		expect(next?.categories[1].channels[1].category_id).toBe("avisos");
 	});
 
-	it("na ponta, passa para o lugar vizinho e troca a categoria do canal", () => {
-		const up = moveChannel(layout, "lol", -1);
-		expect(order(up)?.top).toEqual(["geral", "sala", "lol"]);
-		expect(up?.top[2].category_id).toBeNull();
-
-		const down = moveChannel(layout, "cs", 1);
-		expect(order(down)?.categories[1].channels).toEqual(["cs", "regras"]);
-		expect(down?.categories[1].channels[0].category_id).toBe("avisos");
+	it("\"Sem categoria\" leva para o fim do topo", () => {
+		const next = moveToCategory(layout, "cs", null);
+		expect(order(next)?.top).toEqual(["geral", "sala", "cs"]);
+		expect(next?.top[2].category_id).toBeNull();
 	});
 
-	it("o primeiro do topo não sobe e o último da lista não desce", () => {
-		expect(moveChannel(layout, "geral", -1)).toBeNull();
-		expect(moveChannel(layout, "regras", 1)).toBeNull();
-	});
-
-	it("categoria sobe e desce, mas não passa das pontas", () => {
+	it("sai do topo para uma categoria", () => {
 		expect(
-			order(moveCategory(layout, "avisos", -1))?.categories.map((c) => c.id),
-		).toEqual(["avisos", "jogos"]);
-		expect(moveCategory(layout, "jogos", -1)).toBeNull();
-		expect(moveCategory(layout, "avisos", 1)).toBeNull();
+			order(moveToCategory(layout, "geral", "jogos"))?.categories[0].channels,
+		).toEqual(["lol", "cs", "geral"]);
+	});
+
+	it("não há o que gravar se ele já está lá, ou se o canal ou a categoria não existem", () => {
+		expect(moveToCategory(layout, "lol", "jogos")).toBeNull();
+		expect(moveToCategory(layout, "geral", null)).toBeNull();
+		expect(moveToCategory(layout, "lol", "sumiu")).toBeNull();
+		expect(moveToCategory(layout, "sumiu", "jogos")).toBeNull();
 	});
 });
 

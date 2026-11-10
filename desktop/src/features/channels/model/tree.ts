@@ -1,9 +1,8 @@
 /**
- * As mudanças de ordem da lista, sem React: mover um canal ou uma categoria (pelo menu ou
- * arrastando) devolve a lista nova, que vira o `PUT /api/channels/layout`.
+ * As mudanças de ordem da lista, sem React: mover um canal para outra categoria (pelo menu) ou
+ * arrastar um canal ou uma categoria devolve a lista nova, que vira o `PUT /api/channels/layout`.
  *
- * Um "lugar" de canal é o topo (`null`) ou uma categoria (o id). Mover para cima no primeiro canal
- * de um lugar leva para o fim do lugar de cima; para baixo no último, para o começo do de baixo.
+ * Um "lugar" de canal é o topo (`null`) ou uma categoria (o id).
  */
 import { type CollisionDetection, closestCenter } from "@dnd-kit/core";
 import type { ChannelView, Layout, LayoutRequest } from "@/lib/api";
@@ -109,44 +108,21 @@ export function placeChannel(
 	return rebuild(layout, lists);
 }
 
-/** Um passo para cima (`-1`) ou para baixo (`1`), passando de um lugar para o vizinho na ponta. */
-export function moveChannel(
+/**
+ * O "Mover para" do menu do canal: leva o canal para o fim da categoria `categoryId`, ou do topo
+ * (`null`). `null` se ele já está lá, se a categoria não existe ou se o canal não existe: aí não há
+ * o que gravar.
+ */
+export function moveToCategory(
 	layout: Layout,
 	channelId: string,
-	step: -1 | 1,
+	categoryId: string | null,
 ): Layout | null {
 	const lists = places(layout);
-	const placeIndex = lists.findIndex((p) =>
-		p.channels.some((c) => c.id === channelId),
-	);
-	if (placeIndex < 0) return null;
-	const place = lists[placeIndex];
-	const index = place.channels.findIndex((c) => c.id === channelId);
-	const target = index + step;
-	if (target >= 0 && target < place.channels.length) {
-		return placeChannel(layout, channelId, place.id, target);
-	}
-	const neighbour = lists[placeIndex + step];
-	if (!neighbour) return null;
-	return placeChannel(
-		layout,
-		channelId,
-		neighbour.id,
-		step === -1 ? neighbour.channels.length : 0,
-	);
-}
-
-/** Uma categoria um passo para cima ou para baixo. */
-export function moveCategory(
-	layout: Layout,
-	categoryId: string,
-	step: -1 | 1,
-): Layout | null {
-	const index = layout.categories.findIndex((c) => c.id === categoryId);
-	const target = index + step;
-	if (index < 0 || target < 0 || target >= layout.categories.length)
-		return null;
-	return reorderCategory(layout, index, target);
+	const from = lists.find((p) => p.channels.some((c) => c.id === channelId));
+	const to = lists.find((p) => p.id === categoryId);
+	if (!from || !to || from.id === to.id) return null;
+	return placeChannel(layout, channelId, to.id, to.channels.length);
 }
 
 /**

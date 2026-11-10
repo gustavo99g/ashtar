@@ -1,9 +1,11 @@
 import { Menu as MenuPrimitive } from "@base-ui/react/menu";
+import { ChevronRightIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /*
  * O menu dos "..." (o do membro, por exemplo): 268px, itens de 36px e o item perigoso em
- * vermelho. Ficou só o que as telas usam; o shadcn tem também submenu, checkbox e radio.
+ * vermelho. Ficou só o que as telas usam: o shadcn tem também checkbox e radio. O submenu entrou
+ * com o "Mover para" do canal (v0.3.0).
  */
 
 function DropdownMenu(props: MenuPrimitive.Root.Props) {
@@ -19,12 +21,13 @@ function DropdownMenuContent({
 	alignOffset = 0,
 	side = "bottom",
 	sideOffset = 6,
+	anchor,
 	className,
 	...props
 }: MenuPrimitive.Popup.Props &
 	Pick<
 		MenuPrimitive.Positioner.Props,
-		"align" | "alignOffset" | "side" | "sideOffset"
+		"align" | "alignOffset" | "side" | "sideOffset" | "anchor"
 	>) {
 	return (
 		<MenuPrimitive.Portal>
@@ -34,6 +37,7 @@ function DropdownMenuContent({
 				alignOffset={alignOffset}
 				side={side}
 				sideOffset={sideOffset}
+				anchor={anchor}
 			>
 				<MenuPrimitive.Popup
 					data-slot="dropdown-menu-content"
@@ -103,6 +107,53 @@ function DropdownMenuSeparator({
 	);
 }
 
+/** Um submenu: o `DropdownMenuSubTrigger` é o item que abre, e o `DropdownMenuSubContent`, a lista. */
+function DropdownMenuSub(props: MenuPrimitive.SubmenuRoot.Props) {
+	return <MenuPrimitive.SubmenuRoot data-slot="dropdown-menu-sub" {...props} />;
+}
+
+function DropdownMenuSubTrigger({
+	className,
+	children,
+	...props
+}: MenuPrimitive.SubmenuTrigger.Props) {
+	return (
+		<MenuPrimitive.SubmenuTrigger
+			data-slot="dropdown-menu-sub-trigger"
+			className={cn(
+				"relative flex h-9 cursor-default items-center gap-2.5 rounded-md px-2.5 text-[13px] text-foreground outline-hidden select-none",
+				"data-highlighted:bg-accent data-popup-open:bg-accent",
+				"[&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+				className,
+			)}
+			{...props}
+		>
+			{children}
+			<ChevronRightIcon
+				aria-hidden="true"
+				className="ml-auto size-4 text-muted-foreground"
+			/>
+		</MenuPrimitive.SubmenuTrigger>
+	);
+}
+
+function DropdownMenuSubContent({
+	className,
+	...props
+}: React.ComponentProps<typeof DropdownMenuContent>) {
+	return (
+		<DropdownMenuContent
+			data-slot="dropdown-menu-sub-content"
+			side="right"
+			align="start"
+			sideOffset={4}
+			alignOffset={-7}
+			className={cn("w-[200px]", className)}
+			{...props}
+		/>
+	);
+}
+
 export {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -110,5 +161,8 @@ export {
 	DropdownMenuItem,
 	DropdownMenuLabel,
 	DropdownMenuSeparator,
+	DropdownMenuSub,
+	DropdownMenuSubContent,
+	DropdownMenuSubTrigger,
 	DropdownMenuTrigger,
 };

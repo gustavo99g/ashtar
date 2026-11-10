@@ -91,7 +91,7 @@ export function useSetLayout() {
 					? "A lista de canais mudou"
 					: "Não deu para mudar a ordem",
 				description: isApiError(error, "conflict")
-					? "Outra pessoa mexeu ao mesmo tempo. Confira e arraste de novo."
+					? "Outra pessoa mexeu ao mesmo tempo. Confira e tente de novo."
 					: error.message,
 			});
 		},

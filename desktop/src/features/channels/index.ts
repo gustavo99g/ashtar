@@ -11,8 +11,7 @@ export {
 	applyDrop,
 	dragCollision,
 	dragId,
-	moveCategory,
-	moveChannel,
+	moveToCategory,
 	sameOrder,
 } from "./model/tree";
 export {
