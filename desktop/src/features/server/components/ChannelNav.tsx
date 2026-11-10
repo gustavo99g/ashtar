@@ -2,10 +2,12 @@ import {
 	moveToCategory,
 	useCanManageChannels,
 	useChannelLayout,
+	useIsOrganizing,
 	useSetLayout,
 } from "@/features/channels";
 import { CategoryRow } from "./CategoryRow";
 import { type ChannelManage, ChannelRow } from "./ChannelRow";
+import { OrganizeList } from "./OrganizeList";
 
 /*
  * A coluna do servidor (ADRs 0016 e 0020): os canais do topo e as categorias, cada uma com os seus
@@ -19,12 +21,16 @@ import { type ChannelManage, ChannelRow } from "./ChannelRow";
  * mouse na linha, o + da categoria e a engrenagem do canal, e abre os mesmos menus pelo botão
  * direito. Criar canal e categoria, organizar e os arquivados ficam no menu do servidor
  * (`ServerMenu`).
+ *
+ * No modo Organizar, a coluna troca esta lista pela `OrganizeList`: é só lá que se arrasta.
  */
 export function ChannelNav() {
 	const { data: layout } = useChannelLayout();
 	const canManage = useCanManageChannels();
 	const setLayout = useSetLayout();
+	const organizing = useIsOrganizing();
 
+	if (organizing) return <OrganizeList />;
 	if (!layout) return <div className="min-h-0 flex-1" />;
 
 	const manage: ChannelManage | null = canManage

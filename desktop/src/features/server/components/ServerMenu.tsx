@@ -15,7 +15,13 @@ import {
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { openChannelDialog, useCanManageChannels } from "@/features/channels";
+import {
+	openChannelDialog,
+	startOrganizing,
+	useCanManageChannels,
+	useChannelLayout,
+	useIsOrganizing,
+} from "@/features/channels";
 import { useMe } from "@/features/identity";
 import { paths } from "@/lib/paths";
 
@@ -31,13 +37,16 @@ const SERVER_NAME = "Ashtar";
  * - **Criar canal, Criar categoria, Organizar canais e Canais arquivados**, para quem gerencia os
  *   canais.
  *
- * Quem não tem nenhum item não ganha menu: o nome é só texto.
+ * Quem não tem nenhum item não ganha menu: o nome é só texto. No modo Organizar o menu fica
+ * desligado: criar ou arquivar no meio mudaria a árvore que a pessoa está arrumando.
  */
 export function ServerMenu() {
 	const navigate = useNavigate();
 	const { data: me } = useMe();
 	const canManage = useCanManageChannels();
 	const canInvite = me?.can_view_panel ?? false;
+	const { data: layout } = useChannelLayout();
+	const organizing = useIsOrganizing();
 
 	const name = (
 		<>
@@ -54,7 +63,8 @@ export function ServerMenu() {
 		<DropdownMenu>
 			<DropdownMenuTrigger
 				aria-label={`Menu do ${SERVER_NAME}`}
-				className={`${bar} hover:bg-secondary data-popup-open:bg-secondary`}
+				disabled={organizing}
+				className={`${bar} hover:bg-secondary disabled:pointer-events-none data-popup-open:bg-secondary`}
 			>
 				{name}
 				<ChevronDownIcon
@@ -94,8 +104,10 @@ export function ServerMenu() {
 							<FolderPlusIcon className="size-[15px]" />
 							Criar categoria
 						</DropdownMenuItem>
-						{/* Desligado até a Etapa 2, que traz o modo Organizar. */}
-						<DropdownMenuItem disabled>
+						<DropdownMenuItem
+							disabled={!layout}
+							onClick={() => layout && startOrganizing(layout)}
+						>
 							<ArrowUpDownIcon className="size-[15px]" />
 							Organizar canais
 						</DropdownMenuItem>

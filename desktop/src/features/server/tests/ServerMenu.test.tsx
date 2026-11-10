@@ -58,7 +58,7 @@ describe("o menu do servidor", () => {
 		expect(screen.queryByRole("button")).toBeNull();
 	});
 
-	it("o dono que gerencia vê tudo, com o Organizar ainda desligado", async () => {
+	it("o dono que gerencia vê tudo", async () => {
 		renderMenu({ owner: true, manage: true });
 		await openMenu();
 
@@ -69,9 +69,6 @@ describe("o menu do servidor", () => {
 			"Organizar canais",
 			"Canais arquivados",
 		]);
-		expect(
-			screen.getByRole("menuitem", { name: "Organizar canais" }),
-		).toHaveAttribute("aria-disabled", "true");
 	});
 
 	it("quem só gerencia os canais não vê o Convidar", async () => {
