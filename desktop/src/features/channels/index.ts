@@ -8,16 +8,18 @@ export {
 	textChannels,
 } from "./model/layout";
 export {
-	applyDrop,
+	type DropLine,
 	dragCollision,
 	dragId,
+	dropLine,
 	moveToCategory,
-	sameOrder,
+	parseDragId,
 } from "./model/tree";
 export {
 	channelsKeys,
 	useCanManageChannels,
 	useChannelLayout,
+	useFinishOrganizing,
 	useSetLayout,
 } from "./queries";
 export { handleChannelsRealtime } from "./realtime";
@@ -31,6 +33,14 @@ export {
 	openChannelDialog,
 	useChannelDialog,
 } from "./stores/dialogStore";
+export {
+	dropInDraft,
+	organizeChanged,
+	startOrganizing,
+	stopOrganizing,
+	useIsOrganizing,
+	useOrganize,
+} from "./stores/organizeStore";
 export {
 	DEFAULT_CHANNEL_ID,
 	setLastChannel,

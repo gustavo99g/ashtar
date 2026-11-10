@@ -1,6 +1,7 @@
 /**
  * As mudanças de ordem da lista, sem React: mover um canal para outra categoria (pelo menu) ou
- * arrastar um canal ou uma categoria devolve a lista nova, que vira o `PUT /api/channels/layout`.
+ * arrastar um canal ou uma categoria (no modo Organizar) devolve a lista nova, que vira o
+ * `PUT /api/channels/layout`.
  *
  * Um "lugar" de canal é o topo (`null`) ou uma categoria (o id).
  */
@@ -161,6 +162,55 @@ export function applyDrop(
 	if (!place) return null;
 	const index = place.channels.findIndex((c) => c.id === to.id);
 	return placeChannel(layout, from.id, place.id, index);
+}
+
+/** Onde desenhar a linha de "vai cair aqui": numa das bordas da linha de id `id`. */
+export interface DropLine {
+	/** O `dragId` do canal, da categoria ou do topo que serve de referência. */
+	id: string;
+	edge: "before" | "after";
+}
+
+/**
+ * A linha que mostra onde o arrastado vai cair se for solto agora. Sai do próprio `applyDrop`: faz a
+ * soltura numa cópia e olha quem ficou de vizinho, então a linha nunca promete um lugar diferente do
+ * que a soltura dá. `null` se soltar ali não muda nada.
+ *
+ * Canal: antes do canal que ficaria embaixo dele; se ficaria por último, depois do de cima; numa
+ * categoria vazia (ou no topo vazio), depois do nome dela. Categoria: antes da categoria de baixo,
+ * ou depois da de cima.
+ */
+export function dropLine(
+	layout: Layout,
+	active: string,
+	over: string,
+): DropLine | null {
+	const next = applyDrop(layout, active, over);
+	const from = parseDragId(active);
+	if (!next || !from || sameOrder(layout, next)) return null;
+
+	if (from.kind === "category") {
+		const index = next.categories.findIndex((c) => c.id === from.id);
+		const below = next.categories[index + 1];
+		if (below) return { id: dragId.category(below.id), edge: "before" };
+		const above = next.categories[index - 1];
+		return above ? { id: dragId.category(above.id), edge: "after" } : null;
+	}
+	if (from.kind !== "channel") return null;
+
+	const place = places(next).find((p) =>
+		p.channels.some((c) => c.id === from.id),
+	);
+	if (!place) return null;
+	const index = place.channels.findIndex((c) => c.id === from.id);
+	const below = place.channels[index + 1];
+	if (below) return { id: dragId.channel(below.id), edge: "before" };
+	const above = place.channels[index - 1];
+	if (above) return { id: dragId.channel(above.id), edge: "after" };
+	return {
+		id: place.id === null ? dragId.top : dragId.category(place.id),
+		edge: "after",
+	};
 }
 
 function reorderCategory(

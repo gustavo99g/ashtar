@@ -5,6 +5,7 @@ import {
 	applyDrop,
 	dragCollision,
 	dragId,
+	dropLine,
 	layoutRequest,
 	moveToCategory,
 	sameOrder,
@@ -121,6 +122,72 @@ describe("soltar depois de arrastar", () => {
 		);
 		expect(next && layoutRequest(next).version).toBe(7);
 		expect(next && sameOrder(layout, next)).toBe(true);
+	});
+});
+
+describe("a linha de onde vai cair", () => {
+	const ch = dragId.channel;
+	const cat = dragId.category;
+
+	it("um canal em cima de outro: a linha fica onde ele vai entrar", () => {
+		// De outra lista, toma o lugar do alvo: a linha fica antes dele.
+		expect(dropLine(layout, ch("regras"), ch("cs"))).toEqual({
+			id: ch("cs"),
+			edge: "before",
+		});
+		// Para baixo na mesma lista, vai para depois do alvo, que era o último.
+		expect(dropLine(layout, ch("lol"), ch("cs"))).toEqual({
+			id: ch("cs"),
+			edge: "after",
+		});
+		// Para cima na mesma lista, antes do alvo.
+		expect(dropLine(layout, ch("cs"), ch("lol"))).toEqual({
+			id: ch("lol"),
+			edge: "before",
+		});
+	});
+
+	it("no nome da categoria ou no fim do topo: depois do último canal de lá", () => {
+		expect(dropLine(layout, ch("geral"), cat("jogos"))).toEqual({
+			id: ch("cs"),
+			edge: "after",
+		});
+		expect(dropLine(layout, ch("lol"), dragId.top)).toEqual({
+			id: ch("sala"),
+			edge: "after",
+		});
+	});
+
+	it("numa categoria vazia, logo depois do nome dela", () => {
+		const empty: Layout = {
+			...layout,
+			categories: [
+				...layout.categories,
+				{ id: "vazia", name: "Vazia", channels: [] },
+			],
+		};
+		expect(dropLine(empty, ch("lol"), cat("vazia"))).toEqual({
+			id: cat("vazia"),
+			edge: "after",
+		});
+	});
+
+	it("uma categoria: antes da que fica embaixo, ou depois da de cima", () => {
+		expect(dropLine(layout, cat("avisos"), cat("jogos"))).toEqual({
+			id: cat("jogos"),
+			edge: "before",
+		});
+		expect(dropLine(layout, cat("jogos"), cat("avisos"))).toEqual({
+			id: cat("avisos"),
+			edge: "after",
+		});
+	});
+
+	it("sem linha quando soltar não muda nada", () => {
+		expect(dropLine(layout, ch("lol"), ch("lol"))).toBeNull();
+		// O `cs` já é o último de Jogos.
+		expect(dropLine(layout, ch("cs"), cat("jogos"))).toBeNull();
+		expect(dropLine(layout, cat("jogos"), ch("regras"))).toBeNull();
 	});
 });
 
