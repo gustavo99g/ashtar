@@ -16,7 +16,8 @@ use serde::Serialize;
 use tokio::sync::broadcast;
 use ts_rs::TS;
 
-use crate::chat::messages::{ChannelHead, Message};
+use crate::chat::messages::Message;
+use crate::chat::read::{ChannelHead, ReadState};
 use crate::identity::users::Person;
 use crate::secret;
 use crate::voice::ParticipantView;
@@ -38,8 +39,8 @@ const CAPACITY: usize = 256;
 #[ts(export, export_to = "index.ts")]
 pub enum ServerEvent {
     /// O primeiro evento de toda conexão, só para ela: quem é, quem está online
-    /// agora, a mensagem mais nova de cada canal de texto e a de cada conversa
-    /// privada dela.
+    /// agora, e cada canal de texto e conversa privada dela com a mensagem mais
+    /// nova e o estado de leitura.
     #[serde(rename = "ready")]
     Ready {
         user_id: String,
@@ -69,6 +70,14 @@ pub enum ServerEvent {
     /// recarrega o `GET /api/channels`.
     #[serde(rename = "channels.changed")]
     ChannelsChanged { version: i64 },
+    /// O estado de um canal ou conversa mudou para a pessoa (leu, marcou tudo
+    /// como lido, silenciou). Só vai para as conexões dela: é o que zera o
+    /// número no outro computador.
+    #[serde(rename = "channel.state")]
+    ChannelState {
+        channel_id: String,
+        state: ReadState,
+    },
 }
 
 /// Quem recebe um evento.

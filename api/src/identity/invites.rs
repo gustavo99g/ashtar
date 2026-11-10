@@ -547,6 +547,11 @@ pub async fn redeem(
         .execute(&mut *tx)
         .await?;
 
+    if new_member {
+        // Quem entra vê o histórico sem números de não lidas (ADR 0022).
+        crate::chat::read::seed_new_member(&mut tx, &user.id).await?;
+    }
+
     tx.commit().await?;
     Ok(Redeemed {
         user,

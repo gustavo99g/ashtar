@@ -50,6 +50,7 @@ function message(id: string): Message {
 		client_id: id,
 		author: { id: "u2", nick: "ana", display_name: null, removed: false },
 		body: `mensagem ${id}`,
+		mentions: [],
 		created_at: Math.floor(Date.now() / 1000),
 	};
 }

@@ -32,6 +32,7 @@ function message(id: string, authorId = "ana", channelId = "geral"): Message {
 		client_id: `c-${id}`,
 		author: { id: authorId, nick: authorId, display_name: null, removed: false },
 		body: `mensagem ${id}`,
+		mentions: [],
 		created_at: 1,
 	};
 }

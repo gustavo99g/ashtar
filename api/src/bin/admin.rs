@@ -10,6 +10,7 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::time::Duration;
 
+use api::chat::access::Readable;
 use api::db::{self, now};
 use api::error::ApiError;
 use api::identity::permissions::{self, Origin, Permission};
@@ -420,6 +421,7 @@ async fn seed(
              do histórico bater com as datas. Comece de um banco novo."
         )));
     }
+    let channel = Readable::Text(channel);
     // O limite de envio é do app; aqui as mensagens saem todas de uma vez.
     let limiter = SendLimiter::new(usize::MAX, Duration::from_secs(1));
     // Espalhadas pelos últimos três dias, da mais antiga para a mais nova (o id
@@ -432,7 +434,7 @@ async fn seed(
         api::chat::messages::create(
             db,
             &limiter,
-            &channel.id,
+            &channel,
             author,
             &format!("semear-{now}-{i}"),
             &format!("{line} ({})", i + 1),
@@ -452,6 +454,7 @@ async fn seed(
         // Depois do #geral, para os ids (UUID v7) da conversa virem por último.
         let ana = &people[1];
         let (dm, _) = api::chat::dms::open(db, owner, &ana.id, now).await?;
+        let dm = Readable::Dm(dm);
         let total = 20;
         for i in 0..total {
             let author = if i % 3 == 0 { owner } else { ana };
@@ -459,7 +462,7 @@ async fn seed(
             api::chat::messages::create(
                 db,
                 &limiter,
-                &dm.id,
+                &dm,
                 author,
                 &format!("semear-dm-{now}-{i}"),
                 &format!("{line} ({})", i + 1),

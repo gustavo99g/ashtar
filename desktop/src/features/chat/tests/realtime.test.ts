@@ -21,6 +21,7 @@ function message(id: string, authorId = "ana"): Message {
 		client_id: `c-${id}`,
 		author: { id: authorId, nick: authorId, display_name: null, removed: false },
 		body: "oi",
+		mentions: [],
 		created_at: 1,
 	};
 }
@@ -98,7 +99,13 @@ describe("handleChatRealtime", () => {
 			type: "ready" as const,
 			user_id: "u1",
 			online: ["bia"],
-			channels: [{ channel_id: "geral", last_message_id: "m9" }],
+			channels: [
+				{
+					channel_id: "geral",
+					last_message_id: "m9",
+					state: { last_read_id: null, unread: 0, mentions: 0, muted: false },
+				},
+			],
 			dms: [],
 		};
 		vi.mocked(listMessages).mockResolvedValue({ messages: [], has_more: false });

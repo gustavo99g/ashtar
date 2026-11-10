@@ -155,6 +155,11 @@ async fn next_of(socket: &mut Socket, kind: &str) -> Value {
     }
 }
 
+/// O estado de leitura de um canal, sem menções e sem silenciar.
+fn state(last_read_id: Option<&str>, unread: u32) -> Value {
+    json!({ "last_read_id": last_read_id, "unread": unread, "mentions": 0, "muted": false })
+}
+
 fn user_id(ready: &Value) -> String {
     ready["user_id"].as_str().unwrap().to_owned()
 }
@@ -172,7 +177,7 @@ async fn o_ticket_abre_uma_conexao_so() {
     assert_eq!(ready["online"], json!([ctx.owner.id]));
     assert_eq!(
         ready["channels"],
-        json!([{ "channel_id": "geral", "last_message_id": null }])
+        json!([{ "channel_id": "geral", "last_message_id": null, "state": state(None, 0) }])
     );
 
     // O mesmo ticket de novo, um inventado e nenhum: 401 antes do upgrade.
@@ -210,7 +215,12 @@ async fn o_ready_traz_a_ultima_mensagem_de_cada_canal() {
     let (_, ready) = connect(&ctx, &ctx.owner_token).await;
     assert_eq!(
         ready["channels"],
-        json!([{ "channel_id": "geral", "last_message_id": sent["id"] }])
+        // Quem escreveu já leu até a própria mensagem.
+        json!([{
+            "channel_id": "geral",
+            "last_message_id": sent["id"],
+            "state": state(sent["id"].as_str(), 0),
+        }])
     );
     assert_eq!(ready["dms"], json!([]));
 }
@@ -401,21 +411,72 @@ async fn o_ready_so_traz_as_conversas_da_pessoa() {
     .await;
     assert_eq!(status, 201);
 
-    let head = json!([{ "channel_id": dm, "last_message_id": sent["id"] }]);
     let (_, kid_ready) = connect(&ctx, &ctx.owner_token).await;
     let (_, ana_ready) = connect(&ctx, &ana).await;
     let (_, bia_ready) = connect(&ctx, &bia).await;
+    // A mesma conversa, com o estado de cada um: o Kid escreveu, a Ana não leu.
     assert_eq!(
-        kid_ready["dms"], head,
+        kid_ready["dms"],
+        json!([{
+            "channel_id": dm,
+            "last_message_id": sent["id"],
+            "state": state(sent["id"].as_str(), 0),
+        }]),
         "a conversa vazia com a Bia não entra"
     );
-    assert_eq!(ana_ready["dms"], head);
+    assert_eq!(
+        ana_ready["dms"],
+        json!([{ "channel_id": dm, "last_message_id": sent["id"], "state": state(None, 1) }])
+    );
     assert_eq!(bia_ready["dms"], json!([]));
     // A conversa não aparece entre os canais de ninguém.
     for ready in [&kid_ready, &ana_ready, &bia_ready] {
         assert_eq!(ready["channels"].as_array().unwrap().len(), 1);
         assert_eq!(ready["channels"][0]["channel_id"], "geral");
     }
+}
+
+#[tokio::test]
+async fn o_estado_de_leitura_so_vai_para_as_conexoes_da_pessoa() {
+    let ctx = setup().await;
+    let ana = join(&ctx, "Ana", 2, false).await;
+    let (mut kid_socket, _) = connect(&ctx, &ctx.owner_token).await;
+    let (mut first, _) = connect(&ctx, &ana).await;
+    let (mut second, _) = connect(&ctx, &ana).await;
+
+    let (status, sent) = post(
+        &ctx,
+        "/api/channels/geral/messages",
+        Some(&ctx.owner_token),
+        json!({ "client_id": "c1", "body": "oi @ana" }),
+    )
+    .await;
+    assert_eq!(status, 201, "{sent}");
+    let created = next_of(&mut first, "message.created").await;
+    assert_eq!(created["message"]["mentions"].as_array().unwrap().len(), 1);
+    for socket in [&mut kid_socket, &mut first, &mut second] {
+        until_pong(socket).await;
+    }
+
+    // A Ana lê num computador: o outro dela fica sabendo, o Kid não.
+    let response = ctx
+        .http
+        .put(format!("http://{}/api/channels/geral/read", ctx.base))
+        .bearer_auth(&ana)
+        .json(&json!({ "message_id": sent["id"] }))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response.status().as_u16(), 200);
+    let expected = json!({
+        "type": "channel.state",
+        "channel_id": "geral",
+        "state": state(sent["id"].as_str(), 0),
+    });
+    for socket in [&mut first, &mut second] {
+        assert_eq!(next_of(socket, "channel.state").await, expected);
+    }
+    assert_eq!(until_pong(&mut kid_socket).await, Vec::<Value>::new());
 }
 
 #[tokio::test]

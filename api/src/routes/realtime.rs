@@ -25,7 +25,7 @@ use ts_rs::TS;
 
 use super::auth::CurrentUser;
 use crate::AppState;
-use crate::chat::messages::{self, ChannelHead};
+use crate::chat::read::{self, ChannelHead};
 use crate::error::ApiError;
 use crate::identity::users;
 use crate::realtime::{Hub, ServerEvent, Signal, TICKET_TTL};
@@ -117,14 +117,14 @@ async fn run(hub: Arc<Hub>, db: SqlitePool, user_id: String, mut socket: WebSock
 }
 
 /// O que o `ready` leva do chat: os canais de texto, que são de todos, e as
-/// conversas privadas de `user_id`.
+/// conversas privadas de `user_id`, cada um com o estado de leitura dele.
 async fn heads(
     db: &SqlitePool,
     user_id: &str,
 ) -> Result<(Vec<ChannelHead>, Vec<ChannelHead>), ApiError> {
     Ok((
-        messages::heads(db).await?,
-        messages::dm_heads(db, user_id).await?,
+        read::heads(db, user_id).await?,
+        read::dm_heads(db, user_id).await?,
     ))
 }
 

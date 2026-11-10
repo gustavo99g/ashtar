@@ -65,6 +65,7 @@ function message(id: string, body: string, clientId = id): Message {
 		client_id: clientId,
 		author: { id: "u2", nick: "ana", display_name: null, removed: true },
 		body,
+		mentions: [],
 		created_at: Math.floor(Date.now() / 1000),
 	};
 }

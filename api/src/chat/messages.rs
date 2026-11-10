@@ -5,6 +5,8 @@ use sqlx::{FromRow, SqlitePool};
 use ts_rs::TS;
 use uuid::Uuid;
 
+use super::access::Readable;
+use super::{mentions, read};
 use crate::error::{ApiError, unique_violation};
 use crate::identity::User;
 use crate::limiter::SendLimiter;
@@ -39,6 +41,8 @@ pub struct Message {
     pub client_id: String,
     pub author: Author,
     pub body: String,
+    /// Os ids de quem a mensagem menciona (`@nick`), achados pela API no envio.
+    pub mentions: Vec<String>,
     pub created_at: i64,
 }
 
@@ -53,6 +57,8 @@ struct MessageRow {
     nick: String,
     display_name: Option<String>,
     removed_at: Option<i64>,
+    /// Os ids mencionados, separados por vírgula; `NULL` sem menção.
+    mentions: Option<String>,
 }
 
 impl From<MessageRow> for Message {
@@ -68,9 +74,22 @@ impl From<MessageRow> for Message {
                 removed: row.removed_at.is_some(),
             },
             body: row.body,
+            mentions: split_mentions(row.mentions.as_deref()),
             created_at: row.created_at,
         }
     }
+}
+
+/// O `group_concat` não promete ordem: os ids saem ordenados, para a mesma
+/// mensagem vir sempre igual.
+fn split_mentions(joined: Option<&str>) -> Vec<String> {
+    let mut ids: Vec<String> = joined
+        .into_iter()
+        .flat_map(|joined| joined.split(','))
+        .map(str::to_owned)
+        .collect();
+    ids.sort();
+    ids
 }
 
 /// O `SELECT` de [`MessageRow`], com o autor, seguido do resto da consulta.
@@ -78,7 +97,9 @@ macro_rules! select_message {
     ($rest:literal) => {
         concat!(
             "SELECT m.id, m.channel_id, m.client_id, m.body, m.created_at,
-                    u.id AS author_id, u.nick, u.display_name, u.removed_at
+                    u.id AS author_id, u.nick, u.display_name, u.removed_at,
+                    (SELECT group_concat(x.user_id) FROM mentions x
+                      WHERE x.message_id = m.id) AS mentions
              FROM messages m JOIN users u ON u.id = m.author_id ",
             $rest
         )
@@ -119,17 +140,20 @@ pub fn validate_client_id(input: &str) -> Result<(), ApiError> {
     }
 }
 
-/// Grava a mensagem de `author` no canal `channel_id` (de texto ou uma
-/// conversa privada: quem confere se pode é o [`super::access::readable`]). O mesmo `client_id` do mesmo
-/// autor devolve a mensagem que já existe, sem gravar outra: o "Tentar de
-/// novo" do app nunca duplica. O `bool` diz se ela é nova.
+/// Grava a mensagem de `author` em `channel`, que já passou pela regra de
+/// leitura ([`super::access::readable`]). O mesmo `client_id` do mesmo autor
+/// devolve a mensagem que já existe, sem gravar outra: o "Tentar de novo" do app
+/// nunca duplica. O `bool` diz se ela é nova.
 ///
 /// A ordem importa: o texto inválido é recusado antes de contar no `limiter`, e
 /// um reenvio de mensagem já gravada também não conta (nem leva 429).
+///
+/// Na mesma transação da mensagem vão as menções dela e o ponteiro de lido de
+/// quem escreveu: escrever no canal é ter lido até ali.
 pub async fn create(
     db: &SqlitePool,
     limiter: &SendLimiter,
-    channel_id: &str,
+    channel: &Readable,
     author: &User,
     client_id: &str,
     body: &str,
@@ -137,13 +161,16 @@ pub async fn create(
 ) -> Result<(Message, bool), ApiError> {
     validate_client_id(client_id)?;
     let body = validate_body(body)?;
+    let channel_id = channel.id();
 
     if let Some(existing) = find_existing(db, channel_id, author, client_id).await? {
         return Ok((existing, false));
     }
     limiter.try_send(&author.id)?;
+    let mentioned = mentions::resolve(db, channel, author, &body).await?;
 
     let id = Uuid::now_v7().to_string();
+    let mut tx = db.begin_with("BEGIN IMMEDIATE").await?;
     let inserted = sqlx::query(
         "INSERT INTO messages (id, channel_id, author_id, client_id, body, created_at)
          VALUES (?, ?, ?, ?, ?, ?)",
@@ -154,21 +181,33 @@ pub async fn create(
     .bind(client_id)
     .bind(&body)
     .bind(now)
-    .execute(db)
+    .execute(&mut *tx)
     .await;
 
     match inserted {
-        Ok(_) => Ok((get(db, &id).await?, true)),
+        Ok(_) => {}
         // Dois envios iguais ao mesmo tempo: o segundo perde a corrida e
         // devolve o primeiro.
         Err(error) if unique_violation(&error).is_some() => {
+            drop(tx);
             let existing = find_existing(db, channel_id, author, client_id).await?;
-            existing
+            return existing
                 .map(|m| (m, false))
-                .ok_or(ApiError::Internal(error))
+                .ok_or(ApiError::Internal(error));
         }
-        Err(error) => Err(error.into()),
+        Err(error) => return Err(error.into()),
     }
+    for user_id in &mentioned {
+        sqlx::query("INSERT INTO mentions (message_id, user_id, channel_id) VALUES (?, ?, ?)")
+            .bind(&id)
+            .bind(user_id)
+            .bind(channel_id)
+            .execute(&mut *tx)
+            .await?;
+    }
+    read::advance(&mut tx, &author.id, channel_id, &id).await?;
+    tx.commit().await?;
+    Ok((get(db, &id).await?, true))
 }
 
 /// A mensagem que `author` já gravou com esse `client_id`. Se ela está em
@@ -212,46 +251,6 @@ pub async fn last(db: &SqlitePool, channel_id: &str) -> Result<Option<Message>, 
     .fetch_optional(db)
     .await?;
     Ok(row.map(Message::from))
-}
-
-/// A mensagem mais nova de um canal de texto, como o `ready` do tempo real
-/// leva: na volta de uma queda, o app compara com a última que tem e só chama o
-/// `?after=` dos canais que andaram.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS, FromRow)]
-#[ts(export, export_to = "index.ts")]
-pub struct ChannelHead {
-    pub channel_id: String,
-    /// `None` no canal que ainda não tem mensagem.
-    pub last_message_id: Option<String>,
-}
-
-/// O último id de cada canal de texto aberto, em ordem de id do canal.
-pub async fn heads(db: &SqlitePool) -> Result<Vec<ChannelHead>, ApiError> {
-    Ok(sqlx::query_as(
-        "SELECT c.id AS channel_id,
-                (SELECT MAX(m.id) FROM messages m WHERE m.channel_id = c.id) AS last_message_id
-         FROM channels c
-         WHERE c.kind = 'text' AND c.archived_at IS NULL
-         ORDER BY c.id",
-    )
-    .fetch_all(db)
-    .await?)
-}
-
-/// O mesmo para as conversas privadas de `user_id` que já têm mensagem. A
-/// vazia não entra: ela só existe para a pessoa depois da primeira mensagem.
-pub async fn dm_heads(db: &SqlitePool, user_id: &str) -> Result<Vec<ChannelHead>, ApiError> {
-    Ok(sqlx::query_as(
-        "SELECT cm.channel_id, MAX(m.id) AS last_message_id
-         FROM channel_members cm
-         JOIN messages m ON m.channel_id = cm.channel_id
-         WHERE cm.user_id = ?
-         GROUP BY cm.channel_id
-         ORDER BY cm.channel_id",
-    )
-    .bind(user_id)
-    .fetch_all(db)
-    .await?)
 }
 
 /// Uma página do histórico.

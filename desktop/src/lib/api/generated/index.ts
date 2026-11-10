@@ -40,15 +40,16 @@ export type CategoryView = { id: string, name: string,
 channels: Array<ChannelView>, };
 
 /**
- * A mensagem mais nova de um canal de texto, como o `ready` do tempo real
- * leva: na volta de uma queda, o app compara com a última que tem e só chama o
- * `?after=` dos canais que andaram.
+ * Um canal de texto ou conversa como o `ready` do tempo real leva: a mensagem
+ * mais nova e o estado de quem conectou. Na volta de uma queda, o app compara
+ * o `last_message_id` com a última que tem e só chama o `?after=` dos que
+ * andaram.
  */
 export type ChannelHead = { channel_id: string, 
 /**
  * `None` no canal que ainda não tem mensagem.
  */
-last_message_id: string | null, };
+last_message_id: string | null, state: ReadState, };
 
 /**
  * O tipo de um canal da lista. A chave em texto é a do banco.
@@ -89,7 +90,11 @@ person: Author,
 /**
  * `None` na conversa recém-aberta, que ainda não tem mensagem.
  */
-last_message: Message | null, };
+last_message: Message | null, 
+/**
+ * Até onde quem pede leu, as não lidas, as menções e o silenciar.
+ */
+state: ReadState, };
 
 export type CreateChannelRequest = { name: string, 
 /**
@@ -208,6 +213,12 @@ export type LayoutRequest = {
  */
 version: number, top: Array<string>, categories: Array<CategoryOrder>, };
 
+export type MarkReadRequest = { 
+/**
+ * A mensagem mais nova que a pessoa viu.
+ */
+message_id: string, };
+
 export type MeResponse = { user: UserView, 
 /**
  * Chaves das permissões que o membro tem.
@@ -251,7 +262,11 @@ joined_with: JoinedWith | null, pending_recovery: PendingRecovery | null, };
 /**
  * Uma mensagem como a API devolve e o WebSocket leva.
  */
-export type Message = { id: string, channel_id: string, client_id: string, author: Author, body: string, created_at: number, };
+export type Message = { id: string, channel_id: string, client_id: string, author: Author, body: string, 
+/**
+ * Os ids de quem a mensagem menciona (`@nick`), achados pela API no envio.
+ */
+mentions: Array<string>, created_at: number, };
 
 /**
  * Uma página do histórico.
@@ -266,6 +281,8 @@ messages: Array<Message>,
  * `after`).
  */
 has_more: boolean, };
+
+export type MuteRequest = { muted: boolean, };
 
 /**
  * Nick e nome visível, sem o id: o que uma rota sem sessão pode mostrar.
@@ -312,6 +329,24 @@ online: boolean, };
  */
 export type Preset = "person" | "group" | "custom";
 
+/**
+ * O estado de um canal ou conversa para uma pessoa.
+ */
+export type ReadState = { 
+/**
+ * A última mensagem lida. `None`: não leu nada.
+ */
+last_read_id: string | null, 
+/**
+ * Mensagens dos outros depois do ponteiro, até [`UNREAD_CAP`].
+ */
+unread: number, 
+/**
+ * Menções à pessoa depois do ponteiro, até [`UNREAD_CAP`]. Conta mesmo
+ * com o canal silenciado.
+ */
+mentions: number, muted: boolean, };
+
 export type RealtimeTicket = { ticket: string, 
 /**
  * Em segundos.
@@ -327,7 +362,7 @@ client_id: string, body: string, };
 /**
  * Tudo o que a API manda pelo WebSocket. O `type` é o nome do evento.
  */
-export type ServerEvent = { "type": "ready", user_id: string, online: Array<string>, channels: Array<ChannelHead>, dms: Array<ChannelHead>, } | { "type": "pong" } | { "type": "message.created", message: Message, } | { "type": "presence.changed", user_id: string, online: boolean, } | { "type": "voice.participants", channel_id: string, participants: Array<ParticipantView>, } | { "type": "member.joined", person: Person, } | { "type": "member.left", user_id: string, } | { "type": "channels.changed", version: number, };
+export type ServerEvent = { "type": "ready", user_id: string, online: Array<string>, channels: Array<ChannelHead>, dms: Array<ChannelHead>, } | { "type": "pong" } | { "type": "message.created", message: Message, } | { "type": "presence.changed", user_id: string, online: boolean, } | { "type": "voice.participants", channel_id: string, participants: Array<ParticipantView>, } | { "type": "member.joined", person: Person, } | { "type": "member.left", user_id: string, } | { "type": "channels.changed", version: number, } | { "type": "channel.state", channel_id: string, state: ReadState, };
 
 /**
  * A resposta do `redeem` e do `login`. No app, quem recebe é o Rust, que a

@@ -32,6 +32,7 @@ function message(authorId: string, created_at: number): Message {
 			removed: false,
 		},
 		body: "oi",
+		mentions: [],
 		created_at,
 	};
 }

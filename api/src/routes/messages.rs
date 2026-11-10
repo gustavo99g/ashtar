@@ -96,7 +96,7 @@ pub async fn send(
     let (message, created) = messages::create(
         &state.db,
         &state.send_limiter,
-        channel.id(),
+        &channel,
         &user,
         &request.client_id,
         &request.body,

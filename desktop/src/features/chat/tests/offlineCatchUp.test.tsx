@@ -53,6 +53,7 @@ beforeEach(() => {
 						client_id: "c1",
 						author: { id: "u2", nick: "ana", display_name: null, removed: false },
 						body: "oi",
+						mentions: [],
 						created_at: 1,
 					},
 				],

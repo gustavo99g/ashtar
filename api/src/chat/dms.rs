@@ -10,6 +10,7 @@ use ts_rs::TS;
 use uuid::Uuid;
 
 use super::messages::{self, Author, Message};
+use super::read::{self, ReadState};
 use crate::error::ApiError;
 use crate::identity::{User, users};
 
@@ -47,6 +48,8 @@ pub struct Conversation {
     pub person: Author,
     /// `None` na conversa recém-aberta, que ainda não tem mensagem.
     pub last_message: Option<Message>,
+    /// Até onde quem pede leu, as não lidas, as menções e o silenciar.
+    pub state: ReadState,
 }
 
 /// A chave do par: os dois ids em ordem, `menor:maior`. É a mesma de qualquer
@@ -160,6 +163,7 @@ pub async fn view(db: &SqlitePool, dm: &Dm, viewer: &User) -> Result<Conversatio
             removed: !other.is_active(),
         },
         last_message: messages::last(db, &dm.id).await?,
+        state: read::state(db, &viewer.id, &dm.id).await?,
     })
 }
 
