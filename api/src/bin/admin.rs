@@ -60,11 +60,16 @@ enum Command {
     /// Mostra as permissões de um membro e de onde cada uma vem.
     Permissoes { nick: String },
     /// Só no desenvolvimento: cria três membros de teste e enche o #geral de
-    /// mensagens dos últimos dias, para ver o chat com histórico.
+    /// mensagens dos últimos dias, para ver o chat com histórico. Com
+    /// `--conversa`, também uma conversa privada.
     Semear {
         /// Quantas mensagens (de 1 a 2000).
         #[arg(long, default_value_t = 300, value_parser = clap::value_parser!(u16).range(1..=2000))]
         mensagens: u16,
+        /// Também semeia uma conversa privada entre o dono e a "ana", com 20
+        /// mensagens.
+        #[arg(long)]
+        conversa: bool,
     },
     /// Copia o banco para a pasta, com data no nome, e apaga as cópias mais antigas.
     Backup {
@@ -128,7 +133,10 @@ async fn run(db: &SqlitePool, command: Command) -> Result<(), ApiError> {
 
     match command {
         Command::Dono { .. } => unreachable!("tratado acima"),
-        Command::Semear { mensagens } => seed(db, &owner, mensagens.into(), now).await?,
+        Command::Semear {
+            mensagens,
+            conversa,
+        } => seed(db, &owner, mensagens.into(), conversa, now).await?,
         Command::Convite { validade, usos } => {
             let invite = invites::create(
                 db,
@@ -378,7 +386,13 @@ const SEED_LINES: [&str; 8] = [
 
 /// Enche o banco de desenvolvimento. Recusa se a `PUBLIC_URL` não for local:
 /// no computador de casa, isso criaria gente de mentira no grupo de verdade.
-async fn seed(db: &SqlitePool, owner: &User, count: usize, now: i64) -> Result<(), ApiError> {
+async fn seed(
+    db: &SqlitePool,
+    owner: &User,
+    count: usize,
+    with_dm: bool,
+    now: i64,
+) -> Result<(), ApiError> {
     let public_url = std::env::var("PUBLIC_URL").unwrap_or_default();
     if !(public_url.contains("127.0.0.1") || public_url.contains("localhost")) {
         return Err(ApiError::Config(
@@ -418,7 +432,7 @@ async fn seed(db: &SqlitePool, owner: &User, count: usize, now: i64) -> Result<(
         api::chat::messages::create(
             db,
             &limiter,
-            &channel,
+            &channel.id,
             author,
             &format!("semear-{now}-{i}"),
             &format!("{line} ({})", i + 1),
@@ -434,5 +448,29 @@ async fn seed(db: &SqlitePool, owner: &User, count: usize, now: i64) -> Result<(
             .collect::<Vec<_>>()
             .join(", ")
     );
+    if with_dm {
+        // Depois do #geral, para os ids (UUID v7) da conversa virem por último.
+        let ana = &people[1];
+        let (dm, _) = api::chat::dms::open(db, owner, &ana.id, now).await?;
+        let total = 20;
+        for i in 0..total {
+            let author = if i % 3 == 0 { owner } else { ana };
+            let line = SEED_LINES[(i * 3) % SEED_LINES.len()];
+            api::chat::messages::create(
+                db,
+                &limiter,
+                &dm.id,
+                author,
+                &format!("semear-dm-{now}-{i}"),
+                &format!("{line} ({})", i + 1),
+                now - 3600 + (3600 * i as i64) / total as i64,
+            )
+            .await?;
+        }
+        println!(
+            "{total} mensagens na conversa entre {} e {}.",
+            owner.nick, ana.nick
+        );
+    }
     Ok(())
 }
