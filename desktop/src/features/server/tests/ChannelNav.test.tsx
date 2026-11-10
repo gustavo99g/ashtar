@@ -156,6 +156,19 @@ describe("a coluna de canais", () => {
 		expect(useCollapsed.getState().collapsed).toEqual({ jogos: true });
 	});
 
+	it("clicar em alguém da sala abre o cartão da pessoa", async () => {
+		const user = userEvent.setup();
+		renderNav();
+		const squad = await screen.findByRole("list", {
+			name: "Quem está na Squad",
+		});
+
+		await user.click(within(squad).getByRole("button", { name: /ana/ }));
+
+		const card = await screen.findByRole("dialog", { name: "Perfil de ana" });
+		expect(within(card).getByText("Na Squad · transmitindo")).toBeVisible();
+	});
+
 	it("sem Gerenciar canais, a lista não tem ferramenta nenhuma", async () => {
 		const user = userEvent.setup();
 		renderNav();

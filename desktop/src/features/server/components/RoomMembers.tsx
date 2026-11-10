@@ -1,17 +1,15 @@
 import { HeadphoneOffIcon, MicOffIcon } from "lucide-react";
-import {
-	Popover,
-	PopoverContent,
-	PopoverTrigger,
-} from "@/components/ui/popover";
+import { Popover, PopoverTrigger } from "@/components/ui/popover";
 import { COLLAPSED_AVATARS } from "@/features/channels";
 import { Avatar } from "@/features/identity";
-import { type ChannelMember, LiveBadge, PersonCard } from "@/features/voice";
+import { UserCardPopup } from "@/features/members";
+import { type ChannelMember, LiveBadge } from "@/features/voice";
 import { cn } from "@/lib/utils";
 
 /*
  * Quem está numa sala de voz, do jeito que a coluna mostra: a lista de nomes embaixo da sala
  * (`RoomMembers`) e, com a categoria recolhida, só os avatares na própria linha (`AvatarStrip`).
+ * Clicar num nome abre o cartão da pessoa (`UserCardPopup`), o mesmo da lista de membros.
  */
 
 export function RoomMembers({
@@ -116,20 +114,16 @@ function MemberRow({
 					) : null}
 				</span>
 			</PopoverTrigger>
-			<PopoverContent
+			<UserCardPopup
 				side="right"
-				align="start"
-				sideOffset={16}
-				aria-label={`Perfil de ${member.name}`}
-				className="w-[280px] gap-0 overflow-hidden border-border-strong bg-card p-0"
-			>
-				<PersonCard
-					nick={member.nick}
-					name={member.name}
-					sharing={member.sharing}
-					channelName={roomName}
-				/>
-			</PopoverContent>
+				person={{
+					nick: member.nick,
+					name: member.name,
+					// Quem está na sala está online, mesmo Invisível (ADR 0022).
+					online: true,
+					room: { name: roomName, sharing: member.sharing },
+				}}
+			/>
 		</Popover>
 	);
 }

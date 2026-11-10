@@ -1,6 +1,8 @@
 import { CrownIcon } from "lucide-react";
 import type { ReactNode } from "react";
+import { Popover, PopoverTrigger } from "@/components/ui/popover";
 import { Avatar, PersonName } from "@/features/identity";
+import { UserCardPopup } from "@/features/members";
 import { SALA, useVoiceParticipants } from "@/features/voice";
 import type { Person } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -15,6 +17,9 @@ import { usePeople } from "../queries";
  * mas com as mesmas cores, o dono inclusive. Embaixo
  * do nome, "Na Sala" ou "Transmitindo na Sala" para quem está na sala de voz (a mesma lista da
  * Etapa 5, que chega pelo tempo real).
+ *
+ * Cada linha é um botão que abre o cartão da pessoa (`UserCardPopup`, ADR 0020), à esquerda da
+ * coluna. É o mesmo cartão da lista da sala.
  */
 export function PeopleColumn() {
 	const { data: people } = usePeople();
@@ -80,36 +85,52 @@ function Group({
 					const sharing = room.get(person.id);
 					const online = person.online;
 					return (
-						<li
-							key={person.id}
-							className={cn(
-								"flex items-center gap-2.5 rounded-md px-2 py-1.5",
-								!online && OFFLINE_DIM,
-							)}
-						>
-							<Avatar
-								nick={person.nick}
-								displayName={person.display_name}
-								size={32}
-								badge={
-									online && (
-										<span className="absolute -right-0.5 -bottom-0.5 size-2.5 rounded-full border-2 border-card bg-status-online" />
-									)
-								}
-							/>
-							<span className="flex min-w-0 flex-col">
-								<PersonName
-									owner={person.is_owner}
-									className="truncate text-sm font-medium"
+						<li key={person.id}>
+							<Popover>
+								<PopoverTrigger
+									className={cn(
+										"flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left",
+										"hover:bg-secondary data-popup-open:bg-secondary",
+										!online && OFFLINE_DIM,
+									)}
 								>
-									{authorName(person)}
-								</PersonName>
-								{sharing !== undefined && (
-									<span className="truncate text-xs text-muted-foreground">
-										{sharing ? "Transmitindo na Sala" : "Na Sala"}
+									<Avatar
+										nick={person.nick}
+										displayName={person.display_name}
+										size={32}
+										badge={
+											online && (
+												<span className="absolute -right-0.5 -bottom-0.5 size-2.5 rounded-full border-2 border-card bg-status-online" />
+											)
+										}
+									/>
+									<span className="flex min-w-0 flex-col">
+										<PersonName
+											owner={person.is_owner}
+											className="truncate text-sm font-medium"
+										>
+											{authorName(person)}
+										</PersonName>
+										{sharing !== undefined && (
+											<span className="truncate text-xs text-muted-foreground">
+												{sharing ? `Transmitindo na ${SALA.name}` : `Na ${SALA.name}`}
+											</span>
+										)}
 									</span>
-								)}
-							</span>
+								</PopoverTrigger>
+								<UserCardPopup
+									side="left"
+									person={{
+										nick: person.nick,
+										name: authorName(person),
+										online,
+										room:
+											sharing === undefined
+												? null
+												: { name: SALA.name, sharing },
+									}}
+								/>
+							</Popover>
 						</li>
 					);
 				})}

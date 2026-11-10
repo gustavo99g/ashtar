@@ -152,17 +152,38 @@ describe("ChatView", () => {
 		const offline = screen.getByRole("region", { name: "Offline" });
 		expect(within(offline).getByText("bia")).toBeInTheDocument();
 		// Quem está offline fica apagado, com o avatar e o nome juntos; quem está online, não.
-		expect(within(offline).getByText("bia").closest("li")).toHaveClass(
+		expect(within(offline).getByText("bia").closest("button")).toHaveClass(
 			"opacity-50",
 		);
-		expect(within(rest).getByText("ana").closest("li")).not.toHaveClass(
+		expect(within(rest).getByText("ana").closest("button")).not.toHaveClass(
 			"opacity-50",
 		);
-		expect(within(owner).getByText("Kid").closest("li")).not.toHaveClass(
+		expect(within(owner).getByText("Kid").closest("button")).not.toHaveClass(
 			"opacity-50",
 		);
 	});
 
+
+	it("clicar em alguém na lista de membros abre o cartão da pessoa", async () => {
+		const user = userEvent.setup();
+		renderChat();
+		const owner = await screen.findByRole("region", { name: "Dono" });
+		await within(owner).findByText("Na Sala");
+
+		await user.click(within(owner).getByRole("button", { name: /Kid/ }));
+
+		const card = await screen.findByRole("dialog", { name: "Perfil de Kid" });
+		expect(within(card).getByText("kid")).toBeVisible();
+		expect(within(card).getByText("Na Sala")).toBeVisible();
+
+		// Quem está offline também abre, e o cartão diz isso.
+		await user.keyboard("{Escape}");
+		const offline = screen.getByRole("region", { name: /^Offline/ });
+		await user.click(within(offline).getByRole("button", { name: /bia/ }));
+
+		const other = await screen.findByRole("dialog", { name: "Perfil de bia" });
+		expect(within(other).getByText("Offline")).toBeVisible();
+	});
 	it("quem gerencia os canais clica no tópico e abre o Editar já nele", async () => {
 		useChannelDialog.setState({ dialog: null });
 		const user = userEvent.setup();
@@ -299,7 +320,7 @@ describe("ChatView", () => {
 		const owner = await screen.findByRole("region", { name: "Dono" });
 		expect(within(owner).getByText("Kid")).toBeInTheDocument();
 		// O dono offline continua no topo, só que apagado, com as cores de sempre.
-		expect(within(owner).getByText("Kid").closest("li")).toHaveClass(
+		expect(within(owner).getByText("Kid").closest("button")).toHaveClass(
 			"opacity-50",
 		);
 		const rest = screen.getByRole("region", { name: "Resto" });

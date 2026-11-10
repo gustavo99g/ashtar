@@ -4,7 +4,6 @@ export { VoiceRoom } from "./call/components/VoiceRoom";
 export { watchShare } from "./call/stores/roomViewStore";
 export { VoiceSettings } from "./devices/components/VoiceSettings";
 export { VoiceDock } from "./dock/components/VoiceDock";
-export { PersonCard } from "./members/components/PersonCard";
 export { useLiveMembers } from "./members/hooks/useLiveMembers";
 export {
 	type ChannelMember,
