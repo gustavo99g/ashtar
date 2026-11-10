@@ -1,5 +1,14 @@
 # O que há de novo no Ashtar
 
+## 0.3.0
+
+- A lista de canais ficou mais limpa. As ferramentas só aparecem quando você passa o mouse: a engrenagem no canal e o + na categoria. O botão direito abre o mesmo menu.
+- O nome do servidor, no alto da coluna, virou o menu de quem gerencia os canais: criar canal, criar categoria, organizar e ver os arquivados. Para o dono, também Convidar pessoas.
+- Organizar canais: arrastar agora é num modo próprio. Arrume tudo com calma, e só o Concluir grava, de uma vez. Desfazer volta a lista como estava. Fora do modo, nada se arrasta sem querer.
+- "Mover para", no menu do canal, leva o canal para outra categoria sem arrastar.
+- Clique em qualquer pessoa, na lista de membros ou na lista da sala, para abrir o cartão dela.
+- Volume por pessoa: na sala, clique no bloco de alguém (ou abra o cartão) e ajuste a voz dela de 0 a 200%, ou silencie só para você. Só você ouve a diferença, e o ajuste fica guardado neste computador.
+
 ## 0.2.40
 
 - A transmissão de tela ficou muito mais leve: a imagem agora é capturada e codificada pela placa de vídeo, e o app a envia direto, sem passar pela interface. Dá para transmitir 1080p a 60 fps sem pesar no computador, mesmo com um monitor grande. Sem encoder na placa, o processador entra sozinho, e o painel avisa.

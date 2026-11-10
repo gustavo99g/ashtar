@@ -105,11 +105,22 @@ flowchart LR
 - **`features/voice/`**: a conexão com a sala do LiveKit, em subdomínios: `room` (a conexão, mute e
   deafen), `devices` (microfone e saída), `members` (quem está na sala), `call` (a sala por dentro) e
   `dock` (o pé da coluna). O padrão das pastas de cada feature está na ADR 0014.
-- **`features/server/`**: a coluna e a tela do servidor, sobre a `voice`.
+  O volume de cada pessoa fica em `members/stores/userVolumeStore.ts`, no `localStorage`, e chega à
+  trilha por `room/model/boost.ts`, que também serve ao som da transmissão (acima de 100%, por um
+  `AudioContext` com ganho).
+- **`features/server/`**: a coluna e a tela do servidor, sobre a `voice`. A coluna (ADR 0020) é o
+  `ServerMenu` (o nome do grupo, que é o menu de quem gerencia) e o `ChannelNav`, que mostra a lista
+  de sempre (`ChannelRow`, `CategoryRow`, `ChannelMenu`, `RoomMembers`) ou, no modo Organizar, a
+  `OrganizeList`, a única que monta o arrasto.
 - **`features/chat/`**: o histórico de cada canal (uma consulta infinita "para trás", que nunca é
   invalidada, só recomeçada), o envio com a caixa de saída e o `client_id`, o rascunho por canal e
   quem está no grupo com a presença.
 - **`features/channels/`**: a lista de canais e categorias, com a versão, e o último canal aberto.
+  As mudanças de ordem ficam em `model/tree.ts`, sem React, e a cópia que o modo Organizar arruma
+  antes de gravar, em `stores/organizeStore.ts`.
+- **`features/members/`**: os membros no Painel e o `UserCard`, o cartão que abre ao clicar em
+  alguém na lista de membros e na lista da sala. As ações do cartão são seções que quem abre passa
+  como filhos.
 - **`lib/realtime/`**: o WebSocket da API (ADR 0015), sem React: ticket, `ping`, reconexão com espera
   crescente e o aviso de cada evento, com `resumed` no `ready` da volta de uma queda. A única pasta
   que abre `WebSocket`. Quem liga a conexão à sessão e passa cada evento ao `realtime.ts` de cada

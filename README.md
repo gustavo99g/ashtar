@@ -2,7 +2,7 @@
 
 Ashtar é uma aplicação privada de comunicação para uma única comunidade, inspirada no Discord.
 
-> Status atual: **v0.2.1 — Identidade na API** (concluída; a UI nova da v0.2.2 passa a usá-la)
+> Status atual: **v0.3.0 — Base visual das conversas privadas** (a lista de canais nova e o volume por pessoa; a v0.3.1 traz as conversas)
 
 ## Funcionalidades
 
@@ -303,10 +303,12 @@ máquina tiver problema, os dois se perdem juntos.
 
 ## Status
 
-Em desenvolvimento, na **v0.2**, entregue em partes (veja o [`docs/roadmap.md`](docs/roadmap.md)). A v0.2.0
-(auto-update, canal beta e pipeline de release) e a v0.2.1 (identidade, convites e permissões na API) estão
-prontas; a próxima é a v0.2.2, a UI nova, que passa a usar as rotas de identidade. A estrutura do código está
-em [`ARCHITECTURE.md`](ARCHITECTURE.md).
+Em desenvolvimento, na **v0.3**, entregue em três partes (veja o [`docs/roadmap.md`](docs/roadmap.md)). A v0.2
+está pronta até a v0.2.4 (o publicador nativo da transmissão); a v0.2.5, o servidor próprio, anda em paralelo.
+A v0.3.0 é a base visual: a lista de canais sem ferramentas fixas, o modo Organizar, o cartão do usuário e o
+volume por pessoa. A próxima é a v0.3.1, com as conversas privadas, as não lidas, as menções e as
+notificações. O plano da fase está no [`PLAN.md`](PLAN.md), e a estrutura do código em
+[`ARCHITECTURE.md`](ARCHITECTURE.md).
 
 ## Licença
 
