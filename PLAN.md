@@ -31,7 +31,7 @@ warnings` e `cargo test` (em `api/` e em `desktop/src-tauri/`) e `pnpm lint`, `p
 
 | Etapa | Entrega | Descrição | Status |
 |---|---|---|---|
-| 0 | todas | Decisões: ADRs 0020 a 0023, roadmap, BACKLOG | Pendente |
+| 0 | todas | Decisões: ADRs 0020 a 0023, roadmap, BACKLOG | Concluída |
 | 1 | v0.3.0 | App: a lista de canais do canvas, o menu do servidor e o menu do canal | Pendente |
 | 2 | v0.3.0 | App: o modo Organizar canais | Pendente |
 | 3 | v0.3.0 | App: o cartão novo do usuário, nas duas listas | Pendente |
