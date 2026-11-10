@@ -1,8 +1,7 @@
 import { Outlet } from "react-router-dom";
-import logo from "@/assets/ashtar.svg";
 import { ChannelDialogs } from "@/features/channels";
 import { JoinNotices } from "@/features/members";
-import { ChannelNav } from "@/features/server";
+import { ChannelNav, ServerMenu } from "@/features/server";
 import { MiniShare, VoiceDock } from "@/features/voice";
 /*
  * A moldura de quem já entrou: a coluna do servidor à esquerda e a rota no meio. As
@@ -14,7 +13,8 @@ import { MiniShare, VoiceDock } from "@/features/voice";
  * elas cobrirem só a área do meio, com a coluna à mostra. Por isso a miniatura da transmissão tem a
  * própria camada, empilhada sobre o `main` na mesma célula da grade, e não dentro dele.
  *
- * A coluna vem da `features/server` (a sala com quem está nela, `ChannelNav`) e da
+ * A coluna vem da `features/server` (o nome do grupo com o menu de quem gerencia, `ServerMenu`, e
+ * os canais, `ChannelNav`) e da
  * `features/voice` (no pé, o cartão de quem está usando, com o botão de configurações,
  * `VoiceDock`).
  */
@@ -25,10 +25,7 @@ export function AppShell() {
 				aria-label="Servidor"
 				className="flex w-[304px] shrink-0 flex-col bg-card"
 			>
-				<div className="flex h-12 shrink-0 items-center gap-2.5 border-b border-border px-4 text-[15px] font-bold">
-					<img src={logo} alt="" className="size-7 rounded-lg" />
-					Ashtar
-				</div>
+				<ServerMenu />
 				<ChannelNav />
 				<VoiceDock />
 			</aside>
