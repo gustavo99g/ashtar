@@ -1,6 +1,6 @@
 # 0016 — Canais e categorias
 
-- **Status:** aceita
+- **Status:** aceita; o "No app" (o arrasto e os menus) foi revisto pela 0020 (v0.3)
 - **Data:** 2026-10
 
 ## Contexto
