@@ -51,7 +51,12 @@ export type ChannelHead = { channel_id: string,
 last_message_id: string | null, };
 
 /**
- * O tipo do canal. A chave em texto é a do banco.
+ * O tipo de um canal da lista. A chave em texto é a do banco.
+ *
+ * A conversa privada (`dm`, ADR 0021) fica de fora de propósito: ela não é um
+ * [`Channel`] (não tem nome nem posição), e uma consulta da lista que
+ * esquecesse o `kind IN ('text', 'voice')` falha ao ler o tipo, em vez de
+ * mostrar a conversa de alguém.
  */
 export type ChannelKind = "text" | "voice";
 
@@ -67,6 +72,24 @@ category_id: string | null,
  * Só na lista de arquivados.
  */
 archived_at: number | null, };
+
+/**
+ * Uma conversa como a lista do app mostra, do ponto de vista de quem pede.
+ */
+export type Conversation = { 
+/**
+ * O id do canal: é com ele que se lê e se envia, pelas rotas de mensagem.
+ */
+id: string, 
+/**
+ * A outra pessoa. `removed` diz que ela saiu do grupo: a conversa fica só
+ * para leitura.
+ */
+person: Author, 
+/**
+ * `None` na conversa recém-aberta, que ainda não tem mensagem.
+ */
+last_message: Message | null, };
 
 export type CreateChannelRequest = { name: string, 
 /**
@@ -248,6 +271,12 @@ has_more: boolean, };
  * Nick e nome visível, sem o id: o que uma rota sem sessão pode mostrar.
  */
 export type NameView = { nick: string, display_name: string | null, };
+
+export type OpenDmRequest = { 
+/**
+ * O id da outra pessoa.
+ */
+user_id: string, };
 
 /**
  * De onde vem uma permissão (para o `admin permissoes` e o Painel).

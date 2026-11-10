@@ -140,7 +140,7 @@ pub async fn read(db: &SqlitePool) -> Result<Layout, ApiError> {
     .fetch_all(&mut *conn)
     .await?;
     let channels: Vec<Channel> = sqlx::query_as(select_channel!(
-        "WHERE archived_at IS NULL ORDER BY position, created_at"
+        "WHERE archived_at IS NULL AND kind IN ('text', 'voice') ORDER BY position, created_at"
     ))
     .fetch_all(&mut *conn)
     .await?;
@@ -181,7 +181,7 @@ pub async fn read(db: &SqlitePool) -> Result<Layout, ApiError> {
 pub async fn read_archived(db: &SqlitePool, actor: &User) -> Result<Archived, ApiError> {
     require_permission(db, actor, Permission::ManageChannels).await?;
     let channels: Vec<Channel> = sqlx::query_as(select_channel!(
-        "WHERE archived_at IS NOT NULL ORDER BY archived_at DESC"
+        "WHERE archived_at IS NOT NULL AND kind IN ('text', 'voice') ORDER BY archived_at DESC"
     ))
     .fetch_all(db)
     .await?;
@@ -221,12 +221,13 @@ pub async fn apply(
         ));
     }
 
-    let open_channels: HashSet<String> =
-        sqlx::query_scalar("SELECT id FROM channels WHERE archived_at IS NULL")
-            .fetch_all(&mut *tx)
-            .await?
-            .into_iter()
-            .collect();
+    let open_channels: HashSet<String> = sqlx::query_scalar(
+        "SELECT id FROM channels WHERE archived_at IS NULL AND kind IN ('text', 'voice')",
+    )
+    .fetch_all(&mut *tx)
+    .await?
+    .into_iter()
+    .collect();
     let open_categories: HashSet<String> =
         sqlx::query_scalar("SELECT id FROM categories WHERE archived_at IS NULL")
             .fetch_all(&mut *tx)

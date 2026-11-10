@@ -5,7 +5,6 @@ use sqlx::{FromRow, SqlitePool};
 use ts_rs::TS;
 use uuid::Uuid;
 
-use super::channels::Channel;
 use crate::error::{ApiError, unique_violation};
 use crate::identity::User;
 use crate::limiter::SendLimiter;
@@ -120,7 +119,8 @@ pub fn validate_client_id(input: &str) -> Result<(), ApiError> {
     }
 }
 
-/// Grava a mensagem de `author` em `channel`. O mesmo `client_id` do mesmo
+/// Grava a mensagem de `author` no canal `channel_id` (de texto ou uma
+/// conversa privada: quem confere se pode é o [`super::access::readable`]). O mesmo `client_id` do mesmo
 /// autor devolve a mensagem que já existe, sem gravar outra: o "Tentar de
 /// novo" do app nunca duplica. O `bool` diz se ela é nova.
 ///
@@ -129,7 +129,7 @@ pub fn validate_client_id(input: &str) -> Result<(), ApiError> {
 pub async fn create(
     db: &SqlitePool,
     limiter: &SendLimiter,
-    channel: &Channel,
+    channel_id: &str,
     author: &User,
     client_id: &str,
     body: &str,
@@ -138,7 +138,7 @@ pub async fn create(
     validate_client_id(client_id)?;
     let body = validate_body(body)?;
 
-    if let Some(existing) = find_existing(db, channel, author, client_id).await? {
+    if let Some(existing) = find_existing(db, channel_id, author, client_id).await? {
         return Ok((existing, false));
     }
     limiter.try_send(&author.id)?;
@@ -149,7 +149,7 @@ pub async fn create(
          VALUES (?, ?, ?, ?, ?, ?)",
     )
     .bind(&id)
-    .bind(&channel.id)
+    .bind(channel_id)
     .bind(&author.id)
     .bind(client_id)
     .bind(&body)
@@ -162,7 +162,7 @@ pub async fn create(
         // Dois envios iguais ao mesmo tempo: o segundo perde a corrida e
         // devolve o primeiro.
         Err(error) if unique_violation(&error).is_some() => {
-            let existing = find_existing(db, channel, author, client_id).await?;
+            let existing = find_existing(db, channel_id, author, client_id).await?;
             existing
                 .map(|m| (m, false))
                 .ok_or(ApiError::Internal(error))
@@ -176,7 +176,7 @@ pub async fn create(
 /// devolver como se fosse deste canal.
 async fn find_existing(
     db: &SqlitePool,
-    channel: &Channel,
+    channel_id: &str,
     author: &User,
     client_id: &str,
 ) -> Result<Option<Message>, ApiError> {
@@ -187,7 +187,7 @@ async fn find_existing(
             .fetch_optional(db)
             .await?;
     match row.map(Message::from) {
-        Some(message) if message.channel_id != channel.id => Err(ApiError::Conflict(
+        Some(message) if message.channel_id != channel_id => Err(ApiError::Conflict(
             "Esse client_id já foi usado em outro canal.".into(),
         )),
         found => Ok(found),
@@ -200,6 +200,18 @@ async fn get(db: &SqlitePool, id: &str) -> Result<Message, ApiError> {
         .fetch_one(db)
         .await?;
     Ok(row.into())
+}
+
+/// A última mensagem do canal `channel_id`, se ele tem alguma. É o que a lista
+/// de conversas mostra embaixo do nome.
+pub async fn last(db: &SqlitePool, channel_id: &str) -> Result<Option<Message>, ApiError> {
+    let row: Option<MessageRow> = sqlx::query_as(select_message!(
+        "WHERE m.channel_id = ? ORDER BY m.id DESC LIMIT 1"
+    ))
+    .bind(channel_id)
+    .fetch_optional(db)
+    .await?;
+    Ok(row.map(Message::from))
 }
 
 /// A mensagem mais nova de um canal de texto, como o `ready` do tempo real
@@ -248,10 +260,10 @@ pub enum Cursor {
     After(String),
 }
 
-/// Até `limit` mensagens de `channel` no sentido de `cursor`.
+/// Até `limit` mensagens do canal `channel_id` no sentido de `cursor`.
 pub async fn page(
     db: &SqlitePool,
-    channel: &Channel,
+    channel_id: &str,
     cursor: Cursor,
     limit: i64,
 ) -> Result<MessagePage, ApiError> {
@@ -262,7 +274,7 @@ pub async fn page(
             sqlx::query_as(select_message!(
                 "WHERE m.channel_id = ? ORDER BY m.id DESC LIMIT ?"
             ))
-            .bind(&channel.id)
+            .bind(channel_id)
             .bind(fetch)
             .fetch_all(db)
             .await?
@@ -271,7 +283,7 @@ pub async fn page(
             sqlx::query_as(select_message!(
                 "WHERE m.channel_id = ? AND m.id < ? ORDER BY m.id DESC LIMIT ?"
             ))
-            .bind(&channel.id)
+            .bind(channel_id)
             .bind(id)
             .bind(fetch)
             .fetch_all(db)
@@ -281,7 +293,7 @@ pub async fn page(
             sqlx::query_as(select_message!(
                 "WHERE m.channel_id = ? AND m.id > ? ORDER BY m.id ASC LIMIT ?"
             ))
-            .bind(&channel.id)
+            .bind(channel_id)
             .bind(id)
             .bind(fetch)
             .fetch_all(db)

@@ -130,6 +130,7 @@ pub fn app(state: AppState, policy: Arc<ClientPolicy>) -> Router {
             get(routes::messages::list).post(routes::messages::send),
         )
         .route("/people", get(routes::people::list))
+        .route("/dms", get(routes::dms::list).post(routes::dms::open))
         .route(
             "/channels",
             get(routes::channels::list).post(routes::channels::create),

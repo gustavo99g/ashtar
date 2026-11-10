@@ -101,7 +101,8 @@ pub async fn archive(
         return Ok(None);
     }
     let channels: Vec<String> = sqlx::query_scalar(
-        "SELECT id FROM channels WHERE category_id = ? AND archived_at IS NULL
+        "SELECT id FROM channels
+         WHERE category_id = ? AND archived_at IS NULL AND kind IN ('text', 'voice')
          ORDER BY position, created_at",
     )
     .bind(id)

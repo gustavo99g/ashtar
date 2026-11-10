@@ -121,7 +121,7 @@ async fn seed(ctx: &Ctx, n: usize) {
         api::chat::messages::create(
             &ctx.db,
             &limiter,
-            &channel,
+            &channel.id,
             &ctx.owner,
             &format!("seed-{i}"),
             &format!("mensagem {i}"),

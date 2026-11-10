@@ -22,7 +22,12 @@ processo só, com SQLite, e o grupo tem uns dez membros.
 
 **Um par de pessoas tem uma conversa só.** A coluna `dm_key` guarda os dois ids em ordem (`menor:maior`) e é
 única. A tabela `channel_members` diz quem é de cada `dm`. Como o SQLite não altera um `CHECK`, a migração
-refaz a tabela `channels` (com `PRAGMA defer_foreign_keys`, porque as mensagens apontam para ela).
+refaz a tabela `channels` (com `PRAGMA defer_foreign_keys`, porque as mensagens apontam para ela). A tabela
+nova é criada com o mesmo nome, depois de apagar a antiga: criar uma `channels_new` e renomear no fim deixa
+as violações adiadas sem desconto, e o `COMMIT` da migração falha.
+
+**No código, a `dm` não é um `Channel`.** O tipo `ChannelKind` continua com `text` e `voice`, e a conversa tem
+o tipo próprio (`Dm`). A regra de leitura devolve um ou outro.
 
 **Uma regra de leitura só** (`chat/access.rs`): dado quem pede e o id, devolve o canal de texto aberto, ou a
 `dm` de que a pessoa faz parte, ou 404. Toda rota de mensagens passa por ela. Para quem não é da conversa, a
