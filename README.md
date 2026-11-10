@@ -181,13 +181,14 @@ v0.2  → Comunidade
         de ruído → servidor na VPS → publicador nativo
 
 v0.3  → Conversas privadas
-        Mensagens e ligações privadas + não lidas + bandeja
+        Lista de canais nova + mensagens privadas + não lidas, menções e notificações
+        + status + ligações privadas
 
 v0.4  → Transmissões múltiplas
         Várias transmissões simultâneas + experiência de quem assiste
 
-v0.5  → Canais e presença
-        Múltiplos canais e salas + status + menções + sons da voz
+v0.5  → Salas e presença
+        Várias salas de voz + ausente automático + digitando + sons da voz
 
 v0.6  → Confiabilidade e configurações
         Reconexão + estados + tela de configurações + atalhos globais
