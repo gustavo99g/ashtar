@@ -110,8 +110,9 @@ para a ligação e a seção "Em ligação" na lateral esquerda.
 3. **O nome do servidor vira o menu de quem gerencia:** Convidar pessoas, Criar canal, Criar categoria,
    Organizar canais e Canais arquivados. Cada um vê só o que pode: o Convidar continua só do dono, e quem
    não é dono nem gerencia canais não tem menu.
-4. **O `ChannelNav.tsx` (784 linhas) é dividido** dentro de `features/channels/components/`, pelo padrão da
-   ADR 0014: a lista, a linha de canal, a linha de categoria, os menus e o modo Organizar.
+4. **O `ChannelNav.tsx` (784 linhas) é dividido** dentro de `features/server/components/`, onde a ADR 0014 pôs
+   a coluna: a lista, a linha de canal, a linha de categoria, quem está na sala, os menus e o menu do
+   servidor.
 5. **Um cartão só para o usuário**, na lista de membros e na lista da sala (`PersonCard`), que cresce para
    baixo. Na v0.3.0 ele mostra o nome, o nick, onde a pessoa está e o volume; os botões Mensagem e Ligar
    entram na v0.3.1 e na v0.3.2.

@@ -24,8 +24,9 @@ usuário".
 teclado, a categoria mostra o + (criar canal nela) e o canal a engrenagem, por cima da linha. Quem não gerencia
 canais não vê nenhum dos dois.
 
-**O nome do servidor é o menu de quem gerencia:** Convidar pessoas (só o dono), Criar canal, Criar categoria,
-Organizar canais e Canais arquivados. Cada um vê só o que pode; quem não tem nenhum item não ganha menu.
+**O nome do servidor é o menu de quem gerencia:** Convidar pessoas (só o dono; leva a Configurações ›
+Convites, e o convite rápido continua na sala), Criar canal, Criar categoria, Organizar canais e Canais
+arquivados. Cada um vê só o que pode; quem não tem nenhum item não ganha menu.
 
 **O menu do canal** abre pela engrenagem ou pelo botão direito: Editar canal, Mover para (um submenu com "Sem
 categoria" e as categorias, a atual marcada) e Arquivar canal. "Mover para" leva o canal para o fim da categoria
@@ -70,7 +71,8 @@ quem não está em 100% ganha uma marca, que só você vê. O "ficar sem áudio"
   criar e organizar, o menu do canal para o que é de um canal.
 - Reordenar passa a ser um pedido e um `channels.changed`, em vez de um por arrasto.
 - Enquanto alguém organiza, a cópia local não acompanha o que os outros mudam; o 409 do Concluir cobre o caso.
-- O `ChannelNav.tsx` é dividido dentro de `features/channels`, pelo padrão da ADR 0014.
+- O `ChannelNav.tsx` é dividido em arquivos menores dentro de `features/server/components/`, onde a ADR 0014
+  pôs a coluna do servidor.
 - O cartão é a porta das conversas privadas (ADR 0021) e das ligações (ADR 0023), que só acrescentam uma
   seção.
 - Rever o volume no computador se a conta deixar de ser ligada a um computador só.
