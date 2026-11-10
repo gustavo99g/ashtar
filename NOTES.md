@@ -29,6 +29,8 @@ adiado (marcar como tal) antes de fechar a entrega em que ele está. A lista da 
       telas, e o modo dura até o Concluir ou o Desfazer. Fechar o app descarta a cópia. Sem pergunta de
       confirmação.
 - [x] **409 no Concluir:** busca a árvore, recomeça o modo a partir dela e avisa. A arrumação feita se perde.
+- **Cartão do usuário:** sem botão de fechar (como o canvas) e com o nick no cabeçalho (como a ADR 0020). As
+  seções são filhos do `UserCard`; quem abre decide quais passa.
 - [ ] **Volume individual e o "ficar sem áudio":** o deafen cala as vozes sem apagar o volume de cada um.
 - [ ] **O caminho com ganho (acima de 100%) com várias vozes:** hoje serve a uma trilha, a da transmissão.
       Conferir o custo e a troca da saída de áudio com cinco pessoas acima de 100%.
