@@ -24,10 +24,11 @@ adiado (marcar como tal) antes de fechar a entrega em que ele está. A lista da 
       canais e não é dono (sem Convidar) e para quem não é nenhum dos dois (sem menu).
 - **Submenu nos testes:** o base-ui deixa os itens do submenu com `pointer-events: none` no jsdom. Use o
   `userEvent` com `pointerEventsCheck: 0` e `fireEvent.click` no item.
-- **Entre a Etapa 1 e a 2 não há como reordenar dentro de uma categoria.** As duas saem juntas na `0.3.0`.
 - [ ] **"Criar canal de voz"** aparece no quadro e fica de fora: criar sala de voz é da v0.5.
-- [ ] **Sair do modo Organizar com mudanças** (trocar de tela, fechar a janela): confirmar ou descartar.
-- [ ] **409 no Concluir:** recarregar a árvore sem perder o modo, com um aviso do que aconteceu.
+- [x] **Sair do modo Organizar com mudanças:** não há por onde sair sem querer. A coluna fica em todas as
+      telas, e o modo dura até o Concluir ou o Desfazer. Fechar o app descarta a cópia. Sem pergunta de
+      confirmação.
+- [x] **409 no Concluir:** busca a árvore, recomeça o modo a partir dela e avisa. A arrumação feita se perde.
 - [ ] **Volume individual e o "ficar sem áudio":** o deafen cala as vozes sem apagar o volume de cada um.
 - [ ] **O caminho com ganho (acima de 100%) com várias vozes:** hoje serve a uma trilha, a da transmissão.
       Conferir o custo e a troca da saída de áudio com cinco pessoas acima de 100%.

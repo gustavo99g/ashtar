@@ -33,7 +33,7 @@ warnings` e `cargo test` (em `api/` e em `desktop/src-tauri/`) e `pnpm lint`, `p
 |---|---|---|---|
 | 0 | todas | Decisões: ADRs 0020 a 0023, roadmap, BACKLOG | Concluída |
 | 1 | v0.3.0 | App: a lista de canais do canvas, o menu do servidor e o menu do canal | Concluída |
-| 2 | v0.3.0 | App: o modo Organizar canais | Pendente |
+| 2 | v0.3.0 | App: o modo Organizar canais | Concluída |
 | 3 | v0.3.0 | App: o cartão novo do usuário, nas duas listas | Pendente |
 | 4 | v0.3.0 | App: volume individual, o volume pelo bloco e a marca | Pendente |
 | 5 | v0.3.0 | Carona do BACKLOG e lançamento da `0.3.0` | Pendente |
