@@ -34,16 +34,20 @@ function matches(
 
 /**
  * As conversas da lista: só as que têm mensagem (a recém-aberta e vazia não aparece para
- * ninguém), filtradas pela busca, da que andou por último para a mais parada. Os ids das
- * mensagens são UUID v7, então comparar o texto é comparar a ordem de envio.
+ * ninguém), filtradas pela busca; as com não lidas primeiro (`unreadOf`) e, dentro de cada grupo,
+ * da que andou por último para a mais parada. Os ids das mensagens são UUID v7, então comparar o
+ * texto é comparar a ordem de envio.
  */
 export function listedConversations(
 	conversations: Conversation[],
 	query = "",
+	unreadOf: (conversationId: string) => number = () => 0,
 ): Conversation[] {
 	return conversations
 		.filter((c) => c.last_message !== null && matches(c.person, query))
 		.sort((a, b) => {
+			const waiting = Number(unreadOf(b.id) > 0) - Number(unreadOf(a.id) > 0);
+			if (waiting !== 0) return waiting;
 			const left = a.last_message?.id ?? "";
 			const right = b.last_message?.id ?? "";
 			return left < right ? 1 : left > right ? -1 : 0;

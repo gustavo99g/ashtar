@@ -10,6 +10,7 @@ import {
 } from "@tanstack/react-query";
 import { useCallback } from "react";
 import { useSession } from "@/features/identity";
+import { seedMissing, useUnreadTotal } from "@/features/unread";
 import { type Conversation, listDms, type Message, openDm } from "@/lib/api";
 import { useRealtimeOpen } from "@/lib/realtime";
 import { useAppVisible } from "@/lib/visibility";
@@ -37,6 +38,14 @@ export function useDms() {
 		queryKey: dmsKeys.list(),
 		queryFn: async () => {
 			const fresh = await listDms();
+			// As não lidas de uma conversa que o `ready` ainda não trouxe (uma nova).
+			seedMissing(
+				fresh.map((c) => ({
+					channel_id: c.id,
+					last_message_id: c.last_message?.id ?? null,
+					state: c.state,
+				})),
+			);
 			const known = new Set(fresh.map((c) => c.id));
 			const empty = (
 				queryClient.getQueryData<Conversation[]>(dmsKeys.list()) ?? []
@@ -49,6 +58,15 @@ export function useDms() {
 		refetchInterval: visible && !live ? DMS_REFRESH_MS : false,
 	});
 }
+
+/** A soma das não lidas das conversas: o número dourado da aba Conversas e da faixa. */
+export function useDmsUnread(): number {
+	const { data } = useDms();
+	const ids = data?.map((c) => c.id) ?? NO_IDS;
+	return useUnreadTotal(ids);
+}
+
+const NO_IDS: string[] = [];
 
 /** Põe a conversa na lista em cache, no lugar da que tinha o mesmo id. */
 export function upsertConversation(

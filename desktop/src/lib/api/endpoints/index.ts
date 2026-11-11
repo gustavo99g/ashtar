@@ -24,6 +24,7 @@ export {
 	setMemberPermission,
 	unlinkMember,
 } from "./members";
+export { markAllRead, markRead, setMuted } from "./read";
 export { createRealtimeTicket } from "./realtime";
 
 export {

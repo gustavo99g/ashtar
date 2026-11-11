@@ -2,6 +2,7 @@ import { HashIcon, Volume2Icon } from "lucide-react";
 import { type MouseEvent, type ReactNode, useState } from "react";
 import { useMatch, useNavigate } from "react-router-dom";
 import { shownWhenCollapsed } from "@/features/channels";
+import { useReadState } from "@/features/unread";
 import { useSession } from "@/features/identity";
 import {
 	type ChannelMember,
@@ -18,8 +19,11 @@ import { AvatarStrip, RoomMembers } from "./RoomMembers";
 
 /*
  * Uma linha de canal na coluna (ADR 0020). A linha não reserva espaço para ferramenta nenhuma: a
- * engrenagem de quem gerencia aparece por cima dela, à direita, só com o mouse na linha, com o foco
- * ou com o menu aberto. O botão direito na linha abre o mesmo menu.
+ * engrenagem aparece por cima dela, à direita, só com o mouse na linha, com o foco ou com o menu
+ * aberto. O botão direito na linha abre o mesmo menu. No canal de texto ela é de todo mundo (o
+ * "Marcar como lido"); na sala de voz, só de quem gerencia.
+ *
+ * O canal de texto com não lidas fica com o nome em destaque e um ponto na beirada esquerda.
  */
 
 /** O que quem gerencia os canais pode fazer a partir de uma linha. `null` para os outros. */
@@ -67,8 +71,10 @@ function RowFrame({
 }) {
 	const [menuOpen, setMenuOpen] = useState(false);
 
+	const hasMenu = manage !== null || channel.kind === "text";
+
 	function onContextMenu(event: MouseEvent) {
-		if (!manage) return;
+		if (!hasMenu) return;
 		event.preventDefault();
 		setMenuOpen(true);
 	}
@@ -80,7 +86,7 @@ function RowFrame({
 			onContextMenu={onContextMenu}
 		>
 			{children}
-			{manage && (
+			{hasMenu && (
 				<span
 					className={cn(
 						"absolute top-1/2 right-1 flex -translate-y-1/2 rounded bg-secondary opacity-0",
@@ -90,10 +96,14 @@ function RowFrame({
 				>
 					<ChannelMenu
 						channel={channel}
-						categories={manage.categories}
+						manage={
+							manage && {
+								categories: manage.categories,
+								onMoveTo: (categoryId) => manage.moveTo(channel.id, categoryId),
+							}
+						}
 						open={menuOpen}
 						onOpenChange={setMenuOpen}
-						onMoveTo={(categoryId) => manage.moveTo(channel.id, categoryId)}
 					/>
 				</span>
 			)}
@@ -105,6 +115,8 @@ function TextChannel({ channel, collapsed, manage }: RowProps) {
 	const navigate = useNavigate();
 	const match = useMatch(paths.channelPattern);
 	const selected = match?.params.channelId === channel.id;
+	// No canal aberto as novas são lidas na hora: não precisa chamar atenção.
+	const fresh = useReadState(channel.id).unread > 0 && !selected;
 	const shown =
 		!collapsed ||
 		shownWhenCollapsed(channel, {
@@ -120,10 +132,20 @@ function TextChannel({ channel, collapsed, manage }: RowProps) {
 					type="button"
 					aria-current={selected ? "page" : undefined}
 					onClick={() => void navigate(paths.channel(channel.id))}
-					className={rowClass(selected)}
+					className={cn(
+						rowClass(selected),
+						fresh && "font-semibold text-foreground",
+					)}
 				>
+					{fresh && (
+						<span
+							aria-hidden="true"
+							className="absolute top-1/2 -left-2 h-2 w-1 -translate-y-1/2 rounded-r-full bg-foreground"
+						/>
+					)}
 					<HashIcon aria-hidden="true" className="size-[18px] shrink-0" />
 					<span className="truncate">{channel.name}</span>
+					{fresh && <span className="sr-only">, com mensagens novas</span>}
 				</button>
 			</RowFrame>
 		</li>

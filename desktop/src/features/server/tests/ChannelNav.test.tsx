@@ -5,12 +5,14 @@ import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useChannelDialog, useCollapsed } from "@/features/channels";
 import { identityKeys, useSessionStore } from "@/features/identity";
+import { clearUnread, useUnreadStore } from "@/features/unread";
 import { VoiceProvider } from "@/features/voice";
 import {
 	type ChannelView,
 	type Layout,
 	listVoiceParticipants,
 	type MeResponse,
+	markRead,
 	type ParticipantView,
 	setChannelLayout,
 } from "@/lib/api";
@@ -20,6 +22,7 @@ import { ChannelNav } from "../components/ChannelNav";
 vi.mock("@/lib/api", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/lib/api")>()),
 	listVoiceParticipants: vi.fn(),
+	markRead: vi.fn(),
 	setChannelLayout: vi.fn(),
 	getChannelLayout: vi.fn(() => new Promise(() => {})),
 }));
@@ -93,6 +96,7 @@ beforeEach(() => {
 	useSessionStore.setState({ session: { status: "connected", user: kid } });
 	useCollapsed.setState({ collapsed: {} });
 	useChannelDialog.setState({ dialog: null });
+	clearUnread();
 	vi.mocked(listVoiceParticipants).mockImplementation(async (id) =>
 		id === "squad"
 			? ["ana", "bia", "caio", "duda", "edu", "fabi", "gabi"].map((nick, i) =>
@@ -157,6 +161,39 @@ describe("a coluna de canais", () => {
 		expect(useCollapsed.getState().collapsed).toEqual({ jogos: true });
 	});
 
+	it("as não lidas: o canal em destaque, o ponto na categoria recolhida e o Marcar como lido", async () => {
+		const fresh = { last_read_id: "m1", unread: 2, mentions: 0, muted: false };
+		useUnreadStore.setState({
+			me: "kid",
+			byChannel: { geral: fresh, lol: fresh },
+			newest: { geral: "m3", lol: "m3" },
+		});
+		vi.mocked(markRead).mockResolvedValue({ ...fresh, last_read_id: "m3", unread: 0 });
+		const user = userEvent.setup();
+		renderNav();
+
+		// O canal aberto não chama atenção: as novas são lidas ali mesmo.
+		expect(screen.getByRole("button", { name: "geral" })).toBeInTheDocument();
+		const lol = screen.getByRole("button", { name: /^lol,? com mensagens novas$/ });
+
+		// Recolhida, a categoria avisa que esconde um canal com não lidas.
+		await user.click(screen.getByRole("button", { name: "Jogos", expanded: true }));
+		expect(
+			screen.getByRole("button", { name: /^Jogos,? com mensagens novas$/ }),
+		).toBeInTheDocument();
+		expect(lol).not.toBeInTheDocument();
+		await user.click(screen.getByRole("button", { name: /^Jogos/ }));
+
+		await user.pointer({
+			keys: "[MouseRight]",
+			target: screen.getByRole("button", { name: /^lol/ }),
+		});
+		await user.click(await screen.findByRole("menuitem", { name: "Marcar como lido" }));
+		expect(markRead).toHaveBeenCalledWith("lol", { message_id: "m3" });
+		expect(screen.getByRole("button", { name: "lol" })).toBeInTheDocument();
+		expect(screen.getByRole("button", { name: "Jogos", expanded: true })).toBeInTheDocument();
+	});
+
 	it("clicar em alguém da sala abre o cartão da pessoa", async () => {
 		const user = userEvent.setup();
 		renderNav();
@@ -170,18 +207,29 @@ describe("a coluna de canais", () => {
 		expect(within(card).getByText("Na Squad · transmitindo")).toBeVisible();
 	});
 
-	it("sem Gerenciar canais, a lista não tem ferramenta nenhuma", async () => {
+	it("sem Gerenciar canais, o canal de texto só tem o Marcar como lido, e a sala nada", async () => {
 		const user = userEvent.setup();
 		renderNav();
 
-		expect(screen.queryByRole("button", { name: /^Ações para/ })).toBeNull();
 		expect(screen.queryByRole("button", { name: /^Criar canal/ })).toBeNull();
-		// O botão direito também não abre nada.
+		expect(screen.queryByRole("button", { name: "Ações para Squad" })).toBeNull();
+		// O botão direito na sala também não abre nada.
+		await user.pointer({
+			keys: "[MouseRight]",
+			target: screen.getByRole("button", { name: "Entrar na Squad" }),
+		});
+		expect(screen.queryByRole("menu")).toBeNull();
+
 		await user.pointer({
 			keys: "[MouseRight]",
 			target: screen.getByRole("button", { name: "lol" }),
 		});
-		expect(screen.queryByRole("menu")).toBeNull();
+		const menu = await screen.findByRole("menu", { name: "Ações para #lol" });
+		expect(
+			within(menu)
+				.getAllByRole("menuitem")
+				.map((item) => item.textContent),
+		).toEqual(["Marcar como lido"]);
 	});
 
 	it("a lista não tem alça de arrastar nem Mover para cima e para baixo", async () => {

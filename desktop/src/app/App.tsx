@@ -15,6 +15,7 @@ import { Toaster } from "@/components/ui/toast";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { clearOutbox } from "@/features/chat";
 import { clearOpenDms } from "@/features/dms";
+import { clearUnread } from "@/features/unread";
 import { SessionWatcher } from "@/features/identity";
 import { useApplyTheme } from "@/features/settings";
 import { UpdateNotice, WhatsNewDialog } from "@/features/updater";
@@ -27,6 +28,7 @@ import { router } from "./router";
 function goToLeftGroup() {
 	clearOutbox();
 	clearOpenDms();
+	clearUnread();
 	void router.navigate(paths.entry.leftGroup, { replace: true });
 }
 

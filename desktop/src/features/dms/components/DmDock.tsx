@@ -1,6 +1,7 @@
 import { useMatch } from "react-router-dom";
 import { usePeople } from "@/features/chat";
 import type { Conversation } from "@/lib/api";
+import { CountBadge, useUnreadStore } from "@/features/unread";
 import { paths } from "@/lib/paths";
 import { personName } from "../model/conversations";
 import { useDms } from "../queries";
@@ -27,6 +28,7 @@ export function DmDock() {
 	const dms = useDms();
 	const people = usePeople();
 	const inSettings = useMatch(`${paths.settings.root}/*`) !== null;
+	const byChannel = useUnreadStore((store) => store.byChannel);
 	if (inSettings || !dms.data) return null;
 
 	// Só as que a lista conhece: um id guardado de outra conta, ou de uma conversa vazia que não
@@ -49,6 +51,7 @@ export function DmDock() {
 		<div className="absolute inset-y-0 right-4 flex flex-row-reverse items-end gap-3">
 			{expanded && (
 				<DmWindow
+					key={expanded.id}
 					conversation={expanded}
 					online={online.has(expanded.person.id)}
 				/>
@@ -61,11 +64,17 @@ export function DmDock() {
 					onClick={() => showDm(conversation.id)}
 					className="pointer-events-auto flex h-[46px] w-[210px] items-center gap-2 rounded-t-[10px] border border-b-0 border-border-strong bg-card pr-3 pl-2 text-left shadow-[0_-6px_20px_rgba(0,0,0,0.4)] hover:bg-secondary"
 				>
-					<DmAvatar
-						person={conversation.person}
-						online={online.has(conversation.person.id)}
-						size={28}
-					/>
+					<span className="relative shrink-0">
+						<DmAvatar
+							person={conversation.person}
+							online={online.has(conversation.person.id)}
+							size={28}
+						/>
+						<CountBadge
+							count={byChannel[conversation.id]?.unread ?? 0}
+							className="absolute -top-1.5 -right-2 h-4 min-w-4 border-2 border-card px-1 py-0 text-[10px] leading-3"
+						/>
+					</span>
 					<span className="min-w-0 truncate text-[13px] font-semibold text-foreground">
 						{personName(conversation.person)}
 					</span>

@@ -4,13 +4,13 @@ import {
 	UsersIcon,
 } from "lucide-react";
 import type { ReactNode } from "react";
+import { CountBadge } from "@/features/unread";
 import {
 	openSideTab,
 	type SideContext,
 	type SideTab,
 	setSideOpen,
 } from "../stores/sidePanelStore";
-import { CountBadge } from "./CountBadge";
 
 /**
  * A lateral minimizada, como no quadro "Lateral — minimizada na sala": uma faixa de 52 com o

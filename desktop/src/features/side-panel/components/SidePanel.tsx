@@ -2,13 +2,13 @@ import { Tabs } from "@base-ui/react/tabs";
 import { PanelRightCloseIcon } from "lucide-react";
 import { PeopleList, type PersonActions } from "@/features/chat";
 import { DmButton, DmList } from "@/features/dms";
+import { CountBadge } from "@/features/unread";
 import {
 	type SideContext,
 	type SideTab,
 	setSideOpen,
 	setSideTab,
 } from "../stores/sidePanelStore";
-import { CountBadge } from "./CountBadge";
 
 const TAB =
 	"flex h-12 flex-1 items-center justify-center gap-[7px] text-[13px] font-semibold text-muted-foreground outline-none " +
@@ -34,7 +34,7 @@ export function SidePanel({
 }: {
 	context: SideContext;
 	tab: SideTab;
-	/** As não lidas das conversas, ao lado do nome da aba. Chega na Etapa 13. */
+	/** As não lidas das conversas, ao lado do nome da aba. */
 	dmsUnread?: number;
 }) {
 	return (

@@ -1,5 +1,6 @@
 import {
 	ArchiveIcon,
+	CheckCheckIcon,
 	CheckIcon,
 	FolderInputIcon,
 	PencilIcon,
@@ -17,14 +18,16 @@ import {
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { canArchive, openChannelDialog } from "@/features/channels";
+import { markChannelRead, useUnreadStore } from "@/features/unread";
 import type { CategoryView, ChannelView } from "@/lib/api";
 
 /*
- * Os menus de quem gerencia os canais (ADR 0020).
+ * Os menus da coluna (ADR 0020).
  *
  * O do canal abre pela engrenagem, que só aparece com o mouse na linha ou com o foco, e pelo botão
- * direito na linha (quem manda abrir é a linha, pelo `open`). O da categoria não tem botão: só o
- * botão direito no nome dela (ou Shift + F10, com o foco nele).
+ * direito na linha (quem manda abrir é a linha, pelo `open`). Num canal de texto ele é de todo mundo,
+ * com o "Marcar como lido" (Etapa 13); editar, mover e arquivar são só de quem gerencia os canais.
+ * O da categoria não tem botão: só o botão direito no nome dela (ou Shift + F10, com o foco nele).
  */
 
 /** O `#nome` do canal de texto, ou o nome da sala. */
@@ -32,22 +35,31 @@ export function channelLabel(channel: ChannelView): string {
 	return channel.kind === "text" ? `#${channel.name}` : channel.name;
 }
 
-export function ChannelMenu({
-	channel,
-	categories,
-	open,
-	onOpenChange,
-	onMoveTo,
-}: {
-	channel: ChannelView;
+/** O que só quem gerencia os canais tem no menu. */
+export interface ChannelMenuManage {
 	/** As categorias abertas, na ordem da lista: os destinos do "Mover para". */
 	categories: CategoryView[];
-	open: boolean;
-	onOpenChange: (open: boolean) => void;
 	/** `null` é "Sem categoria", o topo da lista. */
 	onMoveTo: (categoryId: string | null) => void;
+}
+
+export function ChannelMenu({
+	channel,
+	manage,
+	open,
+	onOpenChange,
+}: {
+	channel: ChannelView;
+	/** `null` para quem não gerencia os canais. */
+	manage: ChannelMenuManage | null;
+	open: boolean;
+	onOpenChange: (open: boolean) => void;
 }) {
 	const label = channelLabel(channel);
+	const newest = useUnreadStore((store) => store.newest[channel.id]);
+	const unread = useUnreadStore(
+		(store) => (store.byChannel[channel.id]?.unread ?? 0) > 0,
+	);
 	return (
 		<DropdownMenu open={open} onOpenChange={onOpenChange}>
 			<DropdownMenuTrigger
@@ -61,49 +73,73 @@ export function ChannelMenu({
 				aria-label={`Ações para ${label}`}
 				className="w-[210px]"
 			>
-				<DropdownMenuItem
-					onClick={() => openChannelDialog({ kind: "editChannel", channel })}
-				>
-					<PencilIcon className="size-[15px]" />
-					{channel.kind === "text" ? "Editar canal" : "Renomear sala"}
-				</DropdownMenuItem>
-				<DropdownMenuSub>
-					<DropdownMenuSubTrigger>
-						<FolderInputIcon className="size-[15px]" />
-						Mover para
-					</DropdownMenuSubTrigger>
-					<DropdownMenuSubContent aria-label="Mover para">
-						<MoveTarget
-							name="Sem categoria"
-							current={channel.category_id === null}
-							onClick={() => onMoveTo(null)}
-						/>
-						{categories.map((category) => (
-							<MoveTarget
-								key={category.id}
-								name={category.name}
-								current={channel.category_id === category.id}
-								onClick={() => onMoveTo(category.id)}
-							/>
-						))}
-					</DropdownMenuSubContent>
-				</DropdownMenuSub>
-				{canArchive(channel) && (
-					<>
-						<DropdownMenuSeparator />
-						<DropdownMenuItem
-							variant="danger"
-							onClick={() =>
-								openChannelDialog({ kind: "archiveChannel", channel })
-							}
-						>
-							<ArchiveIcon className="size-[15px]" />
-							Arquivar canal
-						</DropdownMenuItem>
-					</>
+				{channel.kind === "text" && (
+					<DropdownMenuItem
+						disabled={!unread || !newest}
+						onClick={() => newest && void markChannelRead(channel.id, newest)}
+					>
+						<CheckCheckIcon className="size-[15px]" />
+						Marcar como lido
+					</DropdownMenuItem>
 				)}
+				{channel.kind === "text" && manage && <DropdownMenuSeparator />}
+				{manage && <ManageItems channel={channel} manage={manage} />}
 			</DropdownMenuContent>
 		</DropdownMenu>
+	);
+}
+
+function ManageItems({
+	channel,
+	manage: { categories, onMoveTo },
+}: {
+	channel: ChannelView;
+	manage: ChannelMenuManage;
+}) {
+	return (
+		<>
+			<DropdownMenuItem
+				onClick={() => openChannelDialog({ kind: "editChannel", channel })}
+			>
+				<PencilIcon className="size-[15px]" />
+				{channel.kind === "text" ? "Editar canal" : "Renomear sala"}
+			</DropdownMenuItem>
+			<DropdownMenuSub>
+				<DropdownMenuSubTrigger>
+					<FolderInputIcon className="size-[15px]" />
+					Mover para
+				</DropdownMenuSubTrigger>
+				<DropdownMenuSubContent aria-label="Mover para">
+					<MoveTarget
+						name="Sem categoria"
+						current={channel.category_id === null}
+						onClick={() => onMoveTo(null)}
+					/>
+					{categories.map((category) => (
+						<MoveTarget
+							key={category.id}
+							name={category.name}
+							current={channel.category_id === category.id}
+							onClick={() => onMoveTo(category.id)}
+						/>
+					))}
+				</DropdownMenuSubContent>
+			</DropdownMenuSub>
+			{canArchive(channel) && (
+				<>
+					<DropdownMenuSeparator />
+					<DropdownMenuItem
+						variant="danger"
+						onClick={() =>
+							openChannelDialog({ kind: "archiveChannel", channel })
+						}
+					>
+						<ArchiveIcon className="size-[15px]" />
+						Arquivar canal
+					</DropdownMenuItem>
+				</>
+			)}
+		</>
 	);
 }
 

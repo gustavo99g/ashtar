@@ -7,6 +7,7 @@ import {
 } from "@/components/ui/states";
 import { usePeople } from "@/features/chat";
 import { useSession } from "@/features/identity";
+import { CountBadge, useUnreadStore } from "@/features/unread";
 import { ApiError, type Conversation, type Person } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import {
@@ -42,6 +43,7 @@ export function DmList() {
 	const [failure, setFailure] = useState<string | null>(null);
 	const searchId = useId();
 	const now = useNow();
+	const byChannel = useUnreadStore((store) => store.byChannel);
 
 	if (!dms.data) {
 		return (
@@ -58,7 +60,8 @@ export function DmList() {
 	const online = new Set(
 		people.data?.filter((p) => p.online).map((p) => p.id),
 	);
-	const conversations = listedConversations(dms.data, query);
+	const unreadOf = (id: string) => byChannel[id]?.unread ?? 0;
+	const conversations = listedConversations(dms.data, query, unreadOf);
 	const none = listedConversations(dms.data).length === 0;
 	const starters =
 		query.trim() || none
@@ -109,6 +112,7 @@ export function DmList() {
 								current={conversation.id === active}
 								myId={myId}
 								now={now}
+								unread={unreadOf(conversation.id)}
 							/>
 						))}
 					</nav>
@@ -160,12 +164,14 @@ function ConversationRow({
 	current,
 	myId,
 	now,
+	unread,
 }: {
 	conversation: Conversation;
 	online: boolean;
 	current: boolean;
 	myId: string | null;
 	now: number;
+	unread: number;
 }) {
 	const last = conversation.last_message;
 	return (
@@ -190,8 +196,18 @@ function ConversationRow({
 						</span>
 					)}
 				</span>
-				<span className="truncate text-[12.5px] text-muted-foreground">
-					{preview(conversation, myId)}
+				<span className="flex items-center justify-between gap-1.5">
+					<span
+						className={cn(
+							"min-w-0 truncate text-[12.5px]",
+							unread > 0
+								? "font-semibold text-foreground"
+								: "text-muted-foreground",
+						)}
+					>
+						{preview(conversation, myId)}
+					</span>
+					<CountBadge count={unread} className="shrink-0" />
 				</span>
 			</span>
 		</button>

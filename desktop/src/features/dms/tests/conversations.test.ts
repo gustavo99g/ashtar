@@ -60,6 +60,13 @@ describe("a lista de conversas", () => {
 		]);
 	});
 
+	it("as com não lidas vêm primeiro, cada grupo da mais recente para a mais parada", () => {
+		const unread: Record<string, number> = { d1: 3, d4: 1 };
+		expect(
+			listedConversations(list, "", (id) => unread[id] ?? 0).map((c) => c.id),
+		).toEqual(["d4", "d1", "d2"]);
+	});
+
 	it("a busca olha o nick e o nome, sem ligar para acento nem maiúscula", () => {
 		expect(listedConversations(list, "  CESAR ").map((c) => c.id)).toEqual([
 			"d4",

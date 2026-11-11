@@ -68,7 +68,12 @@ function pendingMessage(clientId: string): PendingMessage {
 function list(
 	messages: Message[],
 	pending: PendingMessage[] = [],
-	extra: { hasOlder?: boolean; onLoadOlder?: () => void } = {},
+	extra: {
+		hasOlder?: boolean;
+		onLoadOlder?: () => void;
+		unreadAfter?: string | null;
+		onSeeingEndChange?: (seeingEnd: boolean) => void;
+	} = {},
 ) {
 	return (
 		<MessageList
@@ -82,6 +87,8 @@ function list(
 			onLoadOlder={extra.onLoadOlder ?? (() => {})}
 			onRetry={() => {}}
 			onDiscard={() => {}}
+			unreadAfter={extra.unreadAfter}
+			onSeeingEndChange={extra.onSeeingEndChange}
 		/>
 	);
 }
@@ -152,5 +159,64 @@ describe("MessageList: o histórico antigo", () => {
 		const onLoadOlder = vi.fn();
 		render(list([message("m1")], [], { hasOlder: true, onLoadOlder }));
 		expect(onLoadOlder).not.toHaveBeenCalled();
+	});
+});
+
+describe("MessageList: as novas mensagens", () => {
+	const three = [message("m1"), message("m2"), message("m3")];
+
+	function lineBefore(): string | null | undefined {
+		const line = screen.queryByRole("separator", { name: "Novas mensagens" });
+		return line?.nextElementSibling?.textContent;
+	}
+
+	it("a linha fica antes da primeira não lida; null é antes da primeira de todas", () => {
+		const view = render(list(three, [], { unreadAfter: "m1" }));
+		expect(lineBefore()).toContain("mensagem m2");
+		view.unmount();
+
+		render(list(three, [], { unreadAfter: null }));
+		expect(lineBefore()).toContain("mensagem m1");
+	});
+
+	it("sem marca, ou com tudo lido, não há linha", () => {
+		const view = render(list(three));
+		expect(lineBefore()).toBeUndefined();
+		view.rerender(list(three, [], { unreadAfter: "m3" }));
+		expect(lineBefore()).toBeUndefined();
+	});
+
+	it("abre rolada na linha, e não no fim", () => {
+		box.scrollHeight = 1000;
+		box.clientHeight = 100;
+		const offset = vi
+			.spyOn(HTMLElement.prototype, "offsetTop", "get")
+			.mockReturnValue(500);
+		const seeing = vi.fn();
+		render(list(three, [], { unreadAfter: "m1", onSeeingEndChange: seeing }));
+		offset.mockRestore();
+
+		expect(box.scrollTop).toBe(484);
+		expect(seeing).toHaveBeenCalledWith(false);
+		expect(
+			screen.getByRole("button", { name: "Novas mensagens" }),
+		).toBeInTheDocument();
+	});
+
+	it("avisa quando o fim sai e volta à vista", () => {
+		box.scrollHeight = 1000;
+		box.clientHeight = 100;
+		const seeing = vi.fn();
+		render(list(three, [], { onSeeingEndChange: seeing }));
+		const scroller = screen.getByTestId("message-list");
+
+		box.scrollTop = 0;
+		fireEvent.scroll(scroller);
+		expect(seeing).toHaveBeenLastCalledWith(false);
+
+		box.scrollTop = 900;
+		fireEvent.scroll(scroller);
+		expect(seeing).toHaveBeenLastCalledWith(true);
+		expect(seeing).toHaveBeenCalledTimes(2);
 	});
 });

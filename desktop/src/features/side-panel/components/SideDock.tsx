@@ -1,4 +1,5 @@
 import { useMatch } from "react-router-dom";
+import { useDmsUnread } from "@/features/dms";
 import { paths } from "@/lib/paths";
 import { type SideContext, useSidePanel } from "../stores/sidePanelStore";
 import { SidePanel } from "./SidePanel";
@@ -21,9 +22,10 @@ export function SideDock() {
 
 function Side({ context }: { context: SideContext }) {
 	const { open, tab } = useSidePanel(context);
+	const dmsUnread = useDmsUnread();
 	return open ? (
-		<SidePanel context={context} tab={tab} />
+		<SidePanel context={context} tab={tab} dmsUnread={dmsUnread} />
 	) : (
-		<SideStrip context={context} />
+		<SideStrip context={context} dmsUnread={dmsUnread} />
 	);
 }

@@ -21,6 +21,7 @@ import { handleChatRealtime, useOfflineCatchUp } from "@/features/chat";
 import { handleDmsRealtime } from "@/features/dms";
 import { useSession } from "@/features/identity";
 import { handleMembersRealtime } from "@/features/members";
+import { handleUnreadRealtime } from "@/features/unread";
 import { handleVoiceRealtime } from "@/features/voice";
 import { getMe, type ServerEvent } from "@/lib/api";
 import {
@@ -50,6 +51,7 @@ const HANDLERS: Handler[] = [
 	handleMembersRealtime,
 	handleChatRealtime,
 	handleDmsRealtime,
+	handleUnreadRealtime,
 	handleChannelsRealtime,
 ];
 

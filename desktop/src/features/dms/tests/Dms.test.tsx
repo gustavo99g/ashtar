@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useSessionStore } from "@/features/identity";
+import { clearUnread, useUnreadStore } from "@/features/unread";
 import {
 	type Conversation,
 	listDms,
@@ -88,6 +89,7 @@ function renderDms(path: string = paths.channel("geral")) {
 beforeEach(() => {
 	localStorage.clear();
 	clearOpenDms();
+	clearUnread();
 	useSessionStore.setState({ session: { status: "connected", user: kid } });
 	vi.mocked(listPeople).mockResolvedValue([
 		{ ...kid, online: true, status: "available" },
@@ -122,6 +124,40 @@ describe("a aba Conversas", () => {
 		expect(
 			screen.queryByRole("region", { name: "Começar uma conversa" }),
 		).not.toBeInTheDocument();
+	});
+
+	it("as não lidas: a conversa sobe, ganha o número, e o número vai junto para a aba de baixo", async () => {
+		vi.mocked(listDms).mockResolvedValue([
+			conversation("d-ana", "ana", message("m2", "d-ana", "kid", "fechou")),
+			{
+				...conversation("d-bia", "bia", message("m1", "d-bia", "bia", "manda o link")),
+				state: { last_read_id: null, unread: 2, mentions: 0, muted: false },
+			},
+		]);
+		renderDms();
+		const nav = await screen.findByRole("navigation", { name: "Conversas" });
+		const rows = within(nav).getAllByRole("button");
+		expect(rows[0]).toHaveTextContent("bia");
+		expect(within(rows[0]).getByLabelText("2 não lidas")).toBeInTheDocument();
+		expect(within(rows[1]).queryByLabelText(/não lidas/)).not.toBeInTheDocument();
+
+		// Aberta e minimizada, a aba de baixo mostra o mesmo número.
+		showDm("d-ana");
+		showDm("d-bia");
+		useOpenDms.setState({ active: "d-ana" });
+		const tab = await screen.findByRole("button", { name: /Abrir conversa com bia/ });
+		expect(within(tab).getByLabelText("2 não lidas")).toBeInTheDocument();
+
+		// Lido em outro lugar (o channel.state), some dos dois.
+		useUnreadStore.setState((s) => ({
+			byChannel: {
+				...s.byChannel,
+				"d-bia": { last_read_id: "m1", unread: 0, mentions: 0, muted: false },
+			},
+		}));
+		await waitFor(() =>
+			expect(screen.queryByLabelText("2 não lidas")).not.toBeInTheDocument(),
+		);
 	});
 
 	it("a busca filtra as conversas e oferece quem ainda não tem uma", async () => {

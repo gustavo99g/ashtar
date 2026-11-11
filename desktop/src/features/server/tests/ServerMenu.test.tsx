@@ -2,12 +2,18 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useChannelDialog } from "@/features/channels";
 import { identityKeys } from "@/features/identity";
-import type { MeResponse } from "@/lib/api";
+import { useUnreadStore } from "@/features/unread";
+import { markAllRead, type MeResponse } from "@/lib/api";
 import { paths } from "@/lib/paths";
 import { ServerMenu } from "../components/ServerMenu";
+
+vi.mock("@/lib/api", async (importOriginal) => ({
+	...(await importOriginal<typeof import("@/lib/api")>()),
+	markAllRead: vi.fn(),
+}));
 
 function renderMenu({ owner = false, manage = false } = {}) {
 	const client = new QueryClient({
@@ -47,16 +53,44 @@ function items() {
 	return screen.getAllByRole("menuitem").map((item) => item.textContent);
 }
 
+const unread = (count: number) => ({
+	last_read_id: "m1",
+	unread: count,
+	mentions: 0,
+	muted: false,
+});
+
 beforeEach(() => {
 	useChannelDialog.setState({ dialog: null });
+	useUnreadStore.setState({ me: "kid", byChannel: {}, newest: {} });
+	vi.mocked(markAllRead).mockResolvedValue();
 });
 
 describe("o menu do servidor", () => {
-	it("quem não convida nem gerencia vê só o nome, sem menu", () => {
+	it("quem não convida nem gerencia tem só o Marcar tudo como lido, apagado sem não lidas", async () => {
 		renderMenu();
+		await openMenu();
 
-		expect(screen.getByText("Ashtar")).toBeInTheDocument();
-		expect(screen.queryByRole("button")).toBeNull();
+		expect(items()).toEqual(["Marcar tudo como lido"]);
+		expect(
+			screen.getByRole("menuitem", { name: "Marcar tudo como lido" }),
+		).toHaveAttribute("aria-disabled", "true");
+	});
+
+	it("Marcar tudo como lido zera tudo aqui e pede à API", async () => {
+		useUnreadStore.setState({
+			byChannel: { geral: unread(3), "d-ana": unread(1) },
+			newest: { geral: "m9", "d-ana": "m7" },
+		});
+		renderMenu();
+		const user = await openMenu();
+
+		await user.click(screen.getByRole("menuitem", { name: "Marcar tudo como lido" }));
+
+		expect(markAllRead).toHaveBeenCalledTimes(1);
+		const { byChannel } = useUnreadStore.getState();
+		expect(byChannel.geral).toEqual({ ...unread(0), last_read_id: "m9" });
+		expect(byChannel["d-ana"]).toEqual({ ...unread(0), last_read_id: "m7" });
 	});
 
 	it("o dono que gerencia vê tudo", async () => {
@@ -64,6 +98,7 @@ describe("o menu do servidor", () => {
 		await openMenu();
 
 		expect(items()).toEqual([
+			"Marcar tudo como lido",
 			"Convidar pessoas",
 			"Criar canal",
 			"Criar categoria",
@@ -77,6 +112,7 @@ describe("o menu do servidor", () => {
 		await openMenu();
 
 		expect(items()).toEqual([
+			"Marcar tudo como lido",
 			"Criar canal",
 			"Criar categoria",
 			"Organizar canais",
@@ -88,7 +124,7 @@ describe("o menu do servidor", () => {
 		renderMenu({ owner: true });
 		const user = await openMenu();
 
-		expect(items()).toEqual(["Convidar pessoas"]);
+		expect(items()).toEqual(["Marcar tudo como lido", "Convidar pessoas"]);
 		await user.click(screen.getByRole("menuitem", { name: "Convidar pessoas" }));
 		expect(await screen.findByText("Convites")).toBeInTheDocument();
 	});

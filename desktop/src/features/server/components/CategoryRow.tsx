@@ -1,11 +1,14 @@
 import { ChevronDownIcon, PlusIcon } from "lucide-react";
 import { type MouseEvent, useRef, useState } from "react";
+import { useMatch } from "react-router-dom";
 import {
 	openChannelDialog,
 	toggleCategory,
 	useIsCollapsed,
 } from "@/features/channels";
+import { useUnreadStore } from "@/features/unread";
 import type { CategoryView } from "@/lib/api";
+import { paths } from "@/lib/paths";
 import { cn } from "@/lib/utils";
 import { CategoryMenu } from "./ChannelMenu";
 import { type ChannelManage, ChannelRow } from "./ChannelRow";
@@ -14,6 +17,8 @@ import { type ChannelManage, ChannelRow } from "./ChannelRow";
  * Uma categoria da coluna (ADR 0020): o nome, que recolhe e abre os canais dela (a seta fica para
  * o lado quando recolhida), e os canais. Para quem gerencia, o + de criar canal aparece por cima da
  * linha, só com o mouse nela ou com o foco, e o botão direito no nome abre Renomear e Arquivar.
+ *
+ * Recolhida, se esconde um canal de texto com não lidas, ganha um ponto ao lado do nome.
  */
 export function CategoryRow({
 	category,
@@ -26,6 +31,17 @@ export function CategoryRow({
 	const [menuOpen, setMenuOpen] = useState(false);
 	const nameRef = useRef<HTMLButtonElement>(null);
 	const listId = `categoria-${category.id}`;
+	const openChannelId = useMatch(paths.channelPattern)?.params.channelId;
+	const hidesUnread = useUnreadStore(
+		(store) =>
+			collapsed &&
+			category.channels.some(
+				(channel) =>
+					channel.kind === "text" &&
+					channel.id !== openChannelId &&
+					(store.byChannel[channel.id]?.unread ?? 0) > 0,
+			),
+	);
 
 	function onContextMenu(event: MouseEvent) {
 		if (!manage) return;
@@ -53,6 +69,15 @@ export function CategoryRow({
 						)}
 					/>
 					<span className="truncate">{category.name}</span>
+					{hidesUnread && (
+						<>
+							<span
+								aria-hidden="true"
+								className="ml-1 size-1.5 shrink-0 rounded-full bg-foreground"
+							/>
+							<span className="sr-only">, com mensagens novas</span>
+						</>
+					)}
 				</button>
 				{manage && (
 					<>
