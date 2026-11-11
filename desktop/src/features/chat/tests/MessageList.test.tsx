@@ -72,7 +72,8 @@ function list(
 ) {
 	return (
 		<MessageList
-			channelName="geral"
+			label="Mensagens em #geral"
+			start={<p>Bem-vindo a #geral</p>}
 			messages={messages}
 			pending={pending}
 			ownerId={null}

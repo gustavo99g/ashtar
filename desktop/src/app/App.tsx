@@ -14,6 +14,7 @@ import { RouterProvider } from "react-router-dom";
 import { Toaster } from "@/components/ui/toast";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { clearOutbox } from "@/features/chat";
+import { clearOpenDms } from "@/features/dms";
 import { SessionWatcher } from "@/features/identity";
 import { useApplyTheme } from "@/features/settings";
 import { UpdateNotice, WhatsNewDialog } from "@/features/updater";
@@ -25,6 +26,7 @@ import { router } from "./router";
 
 function goToLeftGroup() {
 	clearOutbox();
+	clearOpenDms();
 	void router.navigate(paths.entry.leftGroup, { replace: true });
 }
 

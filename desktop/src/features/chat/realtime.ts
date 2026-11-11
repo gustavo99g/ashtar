@@ -64,7 +64,8 @@ export function handleChatRealtime(
 			if (info.resumed) {
 				// Quem entrou ou saiu do grupo no meio não veio por evento.
 				void queryClient.invalidateQueries({ queryKey: chatKeys.people() });
-				void catchUp(queryClient, event.channels);
+				// As conversas privadas têm histórico em cache como os canais.
+				void catchUp(queryClient, [...event.channels, ...event.dms]);
 			}
 			break;
 		}

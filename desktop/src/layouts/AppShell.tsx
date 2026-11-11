@@ -1,5 +1,6 @@
 import { Outlet } from "react-router-dom";
 import { ChannelDialogs } from "@/features/channels";
+import { DmDock } from "@/features/dms";
 import { JoinNotices } from "@/features/members";
 import { ChannelNav, ServerMenu } from "@/features/server";
 import { SideDock } from "@/features/side-panel";
@@ -43,6 +44,11 @@ export function AppShell() {
 				    tamanho do `main` e deixa o clique passar; só a miniatura o recebe. */}
 				<div className="pointer-events-none relative col-start-1 row-start-1">
 					<MiniShare />
+				</div>
+				{/* As conversas privadas abertas, embaixo e encostadas na lateral: outra camada do
+				    tamanho do `main`, por cima da miniatura. */}
+				<div className="pointer-events-none relative col-start-1 row-start-1">
+					<DmDock />
 				</div>
 			</div>
 			<SideDock />

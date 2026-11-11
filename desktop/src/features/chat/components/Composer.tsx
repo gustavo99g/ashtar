@@ -7,17 +7,22 @@ import { setDraft, useDraft } from "../stores/draftStore";
 const MAX_HEIGHT = 240;
 
 /**
- * O campo de escrever. Enter manda, Shift+Enter quebra a linha. O texto é o rascunho do canal
+ * O campo de escrever, de um canal ou de uma conversa privada (o `channelId` é o de qualquer um
+ * dos dois). Enter manda, Shift+Enter quebra a linha. O texto é o rascunho do canal
  * (`draftStore`): trocar de canal e voltar traz de volta o que estava escrito. Perto do limite
  * aparece a contagem; um texto que a API recusaria nem sai, e o motivo aparece embaixo.
  */
 export function Composer({
 	channelId,
-	channelName,
+	label,
+	compact = false,
 	onSend,
 }: {
 	channelId: string;
-	channelName: string;
+	/** O que o campo diz enquanto vazio: "Mensagem para #geral", "Mensagem para ana". */
+	label: string;
+	/** Com menos margem em volta: é o campo da janela de conversa privada. */
+	compact?: boolean;
 	onSend: (body: string) => void;
 }) {
 	const draft = useDraft(channelId);
@@ -52,14 +57,14 @@ export function Composer({
 	}
 
 	return (
-		<div className="shrink-0 px-4 pb-[30px]">
+		<div className={cn("shrink-0", compact ? "px-2.5 pb-2.5" : "px-4 pb-[30px]")}>
 			<div className="flex items-end rounded-[10px] border border-border bg-secondary px-3.5 focus-within:border-primary">
 				<textarea
 					ref={ref}
 					rows={1}
 					value={draft}
-					aria-label={`Mensagem para #${channelName}`}
-					placeholder={`Mensagem para #${channelName}`}
+					aria-label={label}
+					placeholder={label}
 					onChange={(event) => {
 						setDraft(channelId, event.target.value);
 						if (problem) setProblem(null);

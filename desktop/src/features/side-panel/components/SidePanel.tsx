@@ -1,7 +1,7 @@
 import { Tabs } from "@base-ui/react/tabs";
-import { MessageCircleIcon, PanelRightCloseIcon } from "lucide-react";
-import { EmptyState } from "@/components/ui/states";
-import { PeopleList } from "@/features/chat";
+import { PanelRightCloseIcon } from "lucide-react";
+import { PeopleList, type PersonActions } from "@/features/chat";
+import { DmButton, DmList } from "@/features/dms";
 import {
 	type SideContext,
 	type SideTab,
@@ -14,6 +14,11 @@ const TAB =
 	"flex h-12 flex-1 items-center justify-center gap-[7px] text-[13px] font-semibold text-muted-foreground outline-none " +
 	"hover:bg-secondary focus-visible:bg-secondary " +
 	"data-active:text-foreground data-active:shadow-[inset_0_-2px_0_var(--color-primary)]";
+
+/** O que o cartão de um membro ganha aqui: o botão que abre a conversa privada com ele. */
+const memberActions: PersonActions = (person, close) => (
+	<DmButton userId={person.id} onOpened={close} />
+);
 
 /**
  * A lateral aberta, como no quadro "Lateral — aba Membros": 300 de largura, as abas Membros e
@@ -60,18 +65,10 @@ export function SidePanel({
 				</button>
 			</div>
 			<Tabs.Panel value="members" className="flex min-h-0 flex-1 flex-col">
-				<PeopleList />
+				<PeopleList actions={memberActions} />
 			</Tabs.Panel>
-			<Tabs.Panel
-				value="dms"
-				className="flex min-h-0 flex-1 flex-col items-center justify-center p-6"
-			>
-				{/* A lista de conversas entra na Etapa 12. */}
-				<EmptyState
-					icon={<MessageCircleIcon />}
-					title="Nenhuma conversa ainda"
-					description="As suas conversas privadas aparecem aqui."
-				/>
+			<Tabs.Panel value="dms" className="flex min-h-0 flex-1 flex-col">
+				<DmList />
 			</Tabs.Panel>
 		</Tabs.Root>
 	);

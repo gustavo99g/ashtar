@@ -18,6 +18,7 @@ import { type QueryClient, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
 import { handleChannelsRealtime } from "@/features/channels";
 import { handleChatRealtime, useOfflineCatchUp } from "@/features/chat";
+import { handleDmsRealtime } from "@/features/dms";
 import { useSession } from "@/features/identity";
 import { handleMembersRealtime } from "@/features/members";
 import { handleVoiceRealtime } from "@/features/voice";
@@ -48,6 +49,7 @@ const HANDLERS: Handler[] = [
 	handleVoiceRealtime,
 	handleMembersRealtime,
 	handleChatRealtime,
+	handleDmsRealtime,
 	handleChannelsRealtime,
 ];
 

@@ -16,13 +16,9 @@ import {
 	useCanManageChannels,
 	useChannelLayout,
 } from "@/features/channels";
-import { useSession } from "@/features/identity";
 import { type ChannelView, isApiError } from "@/lib/api";
 import { paths } from "@/lib/paths";
-import { useMessages, usePeople, useSendMessage } from "../queries";
-import { usePending } from "../stores/outboxStore";
-import { Composer } from "./Composer";
-import { MessageList } from "./MessageList";
+import { ChatConversation } from "./ChatConversation";
 
 /**
  * A tela de um canal de texto: o cabeçalho com o nome e o tópico, a conversa e o campo de
@@ -67,7 +63,12 @@ export function ChatView({ channelId }: { channelId: string }) {
 				</h1>
 				<ChannelTopic channel={channel} />
 			</header>
-			<Conversation channelId={channel.id} channelName={channel.name} />
+			<ChatConversation
+				channelId={channel.id}
+				listLabel={`Mensagens em #${channel.name}`}
+				composerLabel={`Mensagem para #${channel.name}`}
+				start={<ChannelStart channelName={channel.name} />}
+			/>
 		</section>
 	);
 }
@@ -113,57 +114,20 @@ function ChannelTopic({ channel }: { channel: ChannelView }) {
 	);
 }
 
-function Conversation({
-	channelId,
-	channelName,
-}: {
-	channelId: string;
-	channelName: string;
-}) {
-	const query = useMessages(channelId);
-	const pending = usePending(channelId);
-	const people = usePeople();
-	const { send, retry, discard } = useSendMessage();
-	const session = useSession();
-	const ownerId =
-		people.data?.find((person) => person.is_owner)?.id ??
-		(session.status === "connected" && session.user.is_owner
-			? session.user.id
-			: null);
-
+/** O começo do canal: aparece quando não há mais histórico para buscar. */
+function ChannelStart({ channelName }: { channelName: string }) {
 	return (
-		<>
-			{query.messages ? (
-				<MessageList
-					channelName={channelName}
-					messages={query.messages}
-					pending={pending}
-					ownerId={ownerId}
-					hasOlder={query.hasPreviousPage}
-					loadingOlder={query.isFetchingPreviousPage}
-					onLoadOlder={() => void query.fetchPreviousPage()}
-					onRetry={retry}
-					onDiscard={discard}
-				/>
-			) : query.isError ? (
-				<Centered>
-					{isApiError(query.error, "network") ? (
-						<OfflineState onRetry={() => void query.refetch()} />
-					) : (
-						<ErrorState onRetry={() => void query.refetch()} />
-					)}
-				</Centered>
-			) : (
-				<Centered>
-					<LoadingState />
-				</Centered>
-			)}
-			<Composer
-				channelId={channelId}
-				channelName={channelName}
-				onSend={(body) => send(channelId, body)}
-			/>
-		</>
+		<div className="flex flex-col gap-2 px-4 pt-8 pb-2">
+			<span className="flex size-[68px] items-center justify-center rounded-full bg-secondary">
+				<HashIcon aria-hidden="true" className="size-10 text-foreground" />
+			</span>
+			<h2 className="text-[28px] font-bold text-foreground">
+				Bem-vindo a #{channelName}
+			</h2>
+			<p className="text-sm text-muted-foreground">
+				Este é o começo do canal #{channelName}.
+			</p>
+		</div>
 	);
 }
 

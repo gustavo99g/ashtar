@@ -1,5 +1,12 @@
-import { ArrowDownIcon, HashIcon } from "lucide-react";
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { ArrowDownIcon } from "lucide-react";
+import {
+	type ReactNode,
+	useCallback,
+	useEffect,
+	useLayoutEffect,
+	useRef,
+	useState,
+} from "react";
 import { Spinner } from "@/components/ui/spinner";
 import type { Message } from "@/lib/api";
 import { conversationRows } from "../model/messages";
@@ -12,7 +19,10 @@ const STICK_PX = 80;
 const LOAD_OLDER_PX = 200;
 
 interface MessageListProps {
-	channelName: string;
+	/** O nome da lista para quem usa leitor de tela: "Mensagens em #geral". */
+	label: string;
+	/** O que aparece antes da primeira mensagem, quando não há mais histórico para buscar. */
+	start: ReactNode;
 	messages: Message[];
 	pending: PendingMessage[];
 	ownerId: string | null;
@@ -31,7 +41,8 @@ interface MessageListProps {
  * anterior sem esperar a rolagem, que nunca viria.
  */
 export function MessageList({
-	channelName,
+	label,
+	start,
 	messages,
 	pending,
 	ownerId,
@@ -120,9 +131,9 @@ export function MessageList({
 						)}
 					</div>
 				) : (
-					<ChannelStart channelName={channelName} />
+					start
 				)}
-				<ol aria-label={`Mensagens em #${channelName}`}>
+				<ol aria-label={label}>
 					{rows.map((row) => (
 						<RowWithDay key={row.message.id} day={row.day}>
 							<MessageItem
@@ -177,22 +188,5 @@ function RowWithDay({
 			</li>
 			{children}
 		</>
-	);
-}
-
-/** O começo do canal: aparece quando não há mais histórico para buscar. */
-function ChannelStart({ channelName }: { channelName: string }) {
-	return (
-		<div className="flex flex-col gap-2 px-4 pt-8 pb-2">
-			<span className="flex size-[68px] items-center justify-center rounded-full bg-secondary">
-				<HashIcon aria-hidden="true" className="size-10 text-foreground" />
-			</span>
-			<h2 className="text-[28px] font-bold text-foreground">
-				Bem-vindo a #{channelName}
-			</h2>
-			<p className="text-sm text-muted-foreground">
-				Este é o começo do canal #{channelName}.
-			</p>
-		</div>
 	);
 }

@@ -4,13 +4,14 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useSessionStore } from "@/features/identity";
-import { listPeople, listVoiceParticipants } from "@/lib/api";
+import { listDms, listPeople, listVoiceParticipants } from "@/lib/api";
 import { paths } from "@/lib/paths";
 import { SideDock } from "../components/SideDock";
 import { useSidePanelStore } from "../stores/sidePanelStore";
 
 vi.mock("@/lib/api", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/lib/api")>()),
+	listDms: vi.fn(),
 	listPeople: vi.fn(),
 	listVoiceParticipants: vi.fn(),
 }));
@@ -42,6 +43,7 @@ beforeEach(() => {
 		{ ...kid, online: true, status: "available" },
 	]);
 	vi.mocked(listVoiceParticipants).mockResolvedValue([]);
+	vi.mocked(listDms).mockResolvedValue([]);
 });
 
 describe("SideDock", () => {
@@ -93,7 +95,7 @@ describe("SideDock", () => {
 		const user = userEvent.setup();
 		const text = renderAt(paths.channel("geral"));
 		await user.click(screen.getByRole("tab", { name: "Conversas" }));
-		expect(screen.getByText("Nenhuma conversa ainda")).toBeInTheDocument();
+		expect(await screen.findByText("Nenhuma conversa ainda")).toBeInTheDocument();
 		expect(screen.queryByText("kid")).not.toBeInTheDocument();
 		text.unmount();
 

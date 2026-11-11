@@ -12,6 +12,7 @@ export {
 	updateChannel,
 } from "./channels";
 export { listMessages, listPeople, type PageCursor, sendMessage } from "./chat";
+export { listDms, openDm } from "./dms";
 export { createInvite, getInvite, listInvites, revokeInvite } from "./invites";
 export { getMe, updateMe } from "./me";
 export {
