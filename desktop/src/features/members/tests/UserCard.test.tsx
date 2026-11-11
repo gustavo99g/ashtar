@@ -17,6 +17,8 @@ describe("o cartão do usuário", () => {
 	it("diz onde a pessoa está: na sala, transmitindo, online ou offline", () => {
 		expect(whereLabel({ online: true, room: null })).toBe("Online");
 		expect(whereLabel({ online: false, room: null })).toBe("Offline");
+		expect(whereLabel({ online: true, busy: true, room: null })).toBe("Ocupado");
+		expect(whereLabel({ online: false, busy: true, room: null })).toBe("Offline");
 		expect(
 			whereLabel({ online: true, room: { name: "Sala", sharing: false } }),
 		).toBe("Na Sala");

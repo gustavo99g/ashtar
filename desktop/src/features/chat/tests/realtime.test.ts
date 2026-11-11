@@ -78,19 +78,20 @@ describe("handleChatRealtime", () => {
 		expect(findPending("c-m2")).toBeUndefined();
 	});
 
-	it("presence.changed troca o online de quem mudou", () => {
+	it("presence.changed troca o online e o status de quem mudou", () => {
 		const client = setup();
 		handleChatRealtime(
 			{
 				type: "presence.changed",
 				user_id: "bia",
 				online: true,
-				status: "available",
+				status: "busy",
 			},
 			client,
 			first,
 		);
 		expect(people(client)?.map((p) => p.online)).toEqual([true, true]);
+		expect(people(client)?.map((p) => p.status)).toEqual(["available", "busy"]);
 	});
 
 	it("member.joined entra uma vez; member.left sai e marca as mensagens", () => {
@@ -110,8 +111,8 @@ describe("handleChatRealtime", () => {
 		const ready = {
 			type: "ready" as const,
 			user_id: "u1",
-			online: ["bia"],
-			busy: [],
+			online: ["ana", "bia"],
+			busy: ["ana"],
 			status: "available" as const,
 			channels: [
 				{
@@ -125,7 +126,8 @@ describe("handleChatRealtime", () => {
 		vi.mocked(listMessages).mockResolvedValue({ messages: [], has_more: false });
 
 		handleChatRealtime(ready, client, first);
-		expect(people(client)?.map((p) => p.online)).toEqual([false, true]);
+		expect(people(client)?.map((p) => p.online)).toEqual([true, true]);
+		expect(people(client)?.map((p) => p.status)).toEqual(["busy", "available"]);
 		expect(client.getQueryState(chatKeys.people())?.isInvalidated).toBe(false);
 		expect(listMessages).not.toHaveBeenCalled();
 

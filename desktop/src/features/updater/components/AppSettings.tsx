@@ -1,6 +1,7 @@
 /**
  * Configurações › Aplicativo (quadros "Aplicativo", "Aplicativo (estável)" e "Aplicativo
- * (atualização pronta)"): a versão, o "O que há de novo", o canal e a pasta de logs.
+ * (atualização pronta)"): a versão, o "O que há de novo", o canal, o iniciar com o Windows e a
+ * pasta de logs.
  *
  * O canal só aparece: quem muda é o dono, em Painel de controle › Membros, e o app recebe pelo
  * `/api/me` (ADR 0013). Com uma versão já baixada, "Procurar atualização" vira Reiniciar, que
@@ -14,14 +15,17 @@ import {
 	RefreshCwIcon,
 	SparklesIcon,
 } from "lucide-react";
-import { type ReactNode, useId, useState } from "react";
+import { type ReactNode, useEffect, useId, useState } from "react";
 import logo from "@/assets/ashtar.svg";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import { useMe } from "@/features/identity";
 import {
+	autostartEnabled,
 	checkForUpdateNow,
 	openLogDir,
+	setAutostart,
 	type UpdateCheck,
 } from "@/lib/tauri/commands";
 import { cn } from "@/lib/utils";
@@ -124,6 +128,66 @@ function CheckStatus({
 		<span role="status" className={cn("text-[13px] leading-tight", color)}>
 			{text}
 		</span>
+	);
+}
+
+/**
+ * A chave do iniciar com o Windows, desligada por padrão. Ela pergunta ao Windows (pelo Rust) se
+ * está ligada, em vez de guardar no app: a pessoa pode ter tirado o Ashtar da inicialização pelo
+ * Gerenciador de Tarefas.
+ */
+function StartWithWindows() {
+	const labelId = useId();
+	const [enabled, setEnabled] = useState<boolean | null>(null);
+	const [failed, setFailed] = useState(false);
+
+	useEffect(() => {
+		let alive = true;
+		autostartEnabled()
+			.then((value) => alive && setEnabled(value))
+			.catch(() => alive && setFailed(true));
+		return () => {
+			alive = false;
+		};
+	}, []);
+
+	function change(next: boolean) {
+		const before = enabled;
+		setEnabled(next);
+		setFailed(false);
+		setAutostart(next).catch(() => {
+			setEnabled(before);
+			setFailed(true);
+		});
+	}
+
+	return (
+		<div className={cn(cardClass, "justify-between gap-6 py-4 pr-[18px] pl-5")}>
+			<span className="flex min-w-0 flex-col gap-1">
+				<span
+					id={labelId}
+					className="text-sm leading-tight font-semibold text-foreground"
+				>
+					Iniciar com o Windows
+				</span>
+				<span className="text-xs leading-normal text-muted-foreground">
+					O Ashtar abre junto com o computador, direto na bandeja, e já recebe as
+					mensagens.
+				</span>
+				{failed && (
+					<span role="alert" className="text-xs text-destructive-text">
+						Não deu para mudar a inicialização do Windows. Tente de novo.
+					</span>
+				)}
+			</span>
+			<Switch
+				variant="blue"
+				aria-labelledby={labelId}
+				checked={enabled ?? false}
+				disabled={enabled === null}
+				onCheckedChange={change}
+			/>
+		</div>
 	);
 }
 
@@ -247,6 +311,10 @@ export function AppSettings() {
 					</div>
 				</Section>
 			)}
+
+			<Section title="Inicialização">
+				<StartWithWindows />
+			</Section>
 
 			<Section title="Problemas">
 				<div

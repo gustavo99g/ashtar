@@ -1,14 +1,19 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AppSettings, useUpdaterStore } from "@/features/updater";
 import type { MeResponse } from "@/lib/api";
 import {
+	autostartEnabled,
 	checkForUpdateNow,
 	installUpdate,
 	openLogDir,
+	setAutostart,
 } from "@/lib/tauri/commands";
 
 vi.mock("@/lib/tauri/commands", () => ({
+	autostartEnabled: vi.fn(),
+	setAutostart: vi.fn(),
 	checkForUpdateNow: vi.fn(),
 	installUpdate: vi.fn(() => new Promise(() => {})),
 	openLogDir: vi.fn(),
@@ -42,6 +47,8 @@ beforeEach(() => {
 	vi.mocked(checkForUpdateNow).mockReset();
 	vi.mocked(installUpdate).mockClear();
 	vi.mocked(openLogDir).mockReset();
+	vi.mocked(autostartEnabled).mockResolvedValue(false);
+	vi.mocked(setAutostart).mockReset();
 });
 
 describe("AppSettings", () => {
@@ -114,5 +121,37 @@ describe("AppSettings", () => {
 		expect(await screen.findByRole("alert")).toHaveTextContent(
 			"Não deu para abrir a pasta.",
 		);
+	});
+});
+
+describe("AppSettings: iniciar com o Windows", () => {
+	it("começa como o Windows diz, e ligar pede ao Rust", async () => {
+		vi.mocked(setAutostart).mockResolvedValue();
+		const user = userEvent.setup();
+		render(<AppSettings />);
+		const toggle = await screen.findByRole("switch", {
+			name: "Iniciar com o Windows",
+		});
+		await vi.waitFor(() => expect(toggle).not.toHaveAttribute("data-disabled"));
+		expect(toggle).not.toBeChecked();
+
+		await user.click(toggle);
+		expect(setAutostart).toHaveBeenCalledWith(true);
+		expect(toggle).toBeChecked();
+	});
+
+	it("se o Windows recusar, a chave volta e diz o porquê", async () => {
+		vi.mocked(autostartEnabled).mockResolvedValue(true);
+		vi.mocked(setAutostart).mockRejectedValue({ kind: "Internal", message: "x" });
+		const user = userEvent.setup();
+		render(<AppSettings />);
+		const toggle = screen.getByRole("switch", { name: "Iniciar com o Windows" });
+		await vi.waitFor(() => expect(toggle).toBeChecked());
+
+		await user.click(toggle);
+		expect(await screen.findByRole("alert")).toHaveTextContent(
+			"Não deu para mudar a inicialização do Windows.",
+		);
+		expect(toggle).toBeChecked();
 	});
 });

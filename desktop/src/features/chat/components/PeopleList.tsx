@@ -1,7 +1,12 @@
 import { CrownIcon } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { Popover, PopoverTrigger } from "@/components/ui/popover";
-import { Avatar, PersonName, useSession } from "@/features/identity";
+import {
+	Avatar,
+	PersonName,
+	StatusDot,
+	useSession,
+} from "@/features/identity";
 import { UserCardPopup } from "@/features/members";
 import {
 	SALA,
@@ -141,7 +146,7 @@ function PersonRow({
 						size={32}
 						badge={
 							online && (
-								<span className="absolute -right-0.5 -bottom-0.5 size-2.5 rounded-full border-2 border-card bg-status-online" />
+								<StatusDot status={person.status} className="size-2.5" />
 							)
 						}
 					/>
@@ -165,6 +170,7 @@ function PersonRow({
 						nick: person.nick,
 						name: authorName(person),
 						online,
+						busy: person.status === "busy",
 						room: sharing === undefined ? null : { name: SALA.name, sharing },
 					}}
 				>

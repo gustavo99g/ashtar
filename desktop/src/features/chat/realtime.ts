@@ -38,7 +38,7 @@ export function handleChatRealtime(
 			updatePeople(queryClient, (people) =>
 				people.map((person) =>
 					person.id === event.user_id
-						? { ...person, online: event.online }
+						? { ...person, online: event.online, status: event.status }
 						: person,
 				),
 			);
@@ -58,8 +58,13 @@ export function handleChatRealtime(
 			break;
 		case "ready": {
 			const online = new Set(event.online);
+			const busy = new Set(event.busy);
 			updatePeople(queryClient, (people) =>
-				people.map((person) => ({ ...person, online: online.has(person.id) })),
+				people.map((person) => ({
+					...person,
+					online: online.has(person.id),
+					status: busy.has(person.id) ? "busy" : "available",
+				})),
 			);
 			if (info.resumed) {
 				// Quem entrou ou saiu do grupo no meio não veio por evento.

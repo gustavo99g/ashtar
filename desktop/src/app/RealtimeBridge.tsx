@@ -19,7 +19,7 @@ import { useEffect, useRef } from "react";
 import { handleChannelsRealtime } from "@/features/channels";
 import { handleChatRealtime, useOfflineCatchUp } from "@/features/chat";
 import { handleDmsRealtime } from "@/features/dms";
-import { useSession } from "@/features/identity";
+import { handleIdentityRealtime, useSession } from "@/features/identity";
 import { handleMembersRealtime } from "@/features/members";
 import { handleUnreadRealtime } from "@/features/unread";
 import { handleVoiceRealtime } from "@/features/voice";
@@ -47,6 +47,7 @@ export const RESTART_GAP_MS = 30_000;
 
 /** O `realtime.ts` de cada feature. */
 const HANDLERS: Handler[] = [
+	handleIdentityRealtime,
 	handleVoiceRealtime,
 	handleMembersRealtime,
 	handleChatRealtime,

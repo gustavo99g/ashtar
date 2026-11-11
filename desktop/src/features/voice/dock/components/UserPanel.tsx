@@ -7,15 +7,26 @@ import {
 } from "lucide-react";
 import type { ComponentProps } from "react";
 import { Link } from "react-router-dom";
-import { Avatar, useMe, useSession } from "@/features/identity";
+import {
+	Avatar,
+	StatusDot,
+	statusLabel,
+	useMe,
+	useMyStatus,
+	useSession,
+} from "@/features/identity";
 import { paths } from "@/lib/paths";
 import { cn } from "@/lib/utils";
 import { useVoice } from "../../room/hooks/useVoice";
+import { StatusMenu } from "./StatusMenu";
 
 /*
  * O cartão de quem está usando, no pé da coluna: avatar, nome, microfone, áudio e o botão das
  * configurações. Microfone e áudio valem também fora da chamada (a próxima entrada já começa
  * assim).
+ *
+ * O avatar e o nome abrem o menu de status (`StatusMenu`). A bolinha e o texto embaixo do nome
+ * seguem o status; em Ocupado o texto fica vermelho, o lembrete de que nada vai tocar.
  */
 export function UserPanel() {
 	const session = useSession();
@@ -24,23 +35,41 @@ export function UserPanel() {
 	const user =
 		me?.user ?? (session.status === "connected" ? session.user : null);
 	const name = user ? user.display_name?.trim() || user.nick : "";
+	const status = useMyStatus();
+	const who = user && (
+		<>
+			<Avatar
+				nick={user.nick}
+				displayName={user.display_name}
+				size={36}
+				badge={
+					<StatusDot status={status} className="size-3.5 border-secondary" />
+				}
+			/>
+			<span className="flex min-w-0 flex-1 flex-col gap-px whitespace-nowrap">
+				<span className="truncate text-sm font-semibold text-gold">{name}</span>
+				<span
+					title={
+						status === "busy" ? "Notificações e toque de ligação desligados" : undefined
+					}
+					className={cn(
+						"text-xs",
+						status === "busy" ? "text-destructive-text" : "text-muted-foreground",
+					)}
+				>
+					{statusLabel(status)}
+				</span>
+			</span>
+		</>
+	);
 
 	return (
-		<div className="flex h-[69px] items-center gap-2 pr-1.5 pl-2.5">
-			{user && (
-				<Avatar
-					nick={user.nick}
-					displayName={user.display_name}
-					size={36}
-					badge={
-						<span className="absolute -right-0.5 -bottom-0.5 size-3 rounded-full border-2 border-secondary bg-status-online" />
-					}
-				/>
+		<div className="flex h-[69px] items-center gap-1 pr-1.5 pl-1.5">
+			{user ? (
+				<StatusMenu user={user} trigger={who} />
+			) : (
+				<div className="min-w-0 flex-1" />
 			)}
-			<div className="flex min-w-0 flex-1 flex-col gap-px whitespace-nowrap">
-				<span className="truncate text-sm font-semibold text-gold">{name}</span>
-				<span className="text-xs text-muted-foreground">Disponível</span>
-			</div>
 			<div className="flex shrink-0">
 				<PanelButton
 					aria-label={isMuted ? "Ativar microfone" : "Desativar microfone"}

@@ -1,6 +1,6 @@
 /**
- * Sobre o próprio app: as novidades, a pasta de logs e o menu da bandeja. Espelha `commands/app.rs`
- * e `tray.rs`.
+ * Sobre o próprio app: as novidades, a pasta de logs, o menu da bandeja e o iniciar com o Windows.
+ * Espelha `commands/app.rs` e `tray.rs`.
  */
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { call } from "./core";
@@ -35,4 +35,14 @@ export function onTrayShare(
 	return listen<TrayShareAction>("tray-share", (event) =>
 		callback(event.payload),
 	);
+}
+
+/** Se o app inicia com o Windows. Rejeita com um `AppError`. */
+export function autostartEnabled() {
+	return call<boolean>("autostart_enabled");
+}
+
+/** Liga ou desliga o iniciar com o Windows (ligado, o app sobe direto na bandeja). */
+export function setAutostart(enabled: boolean) {
+	return call<void>("set_autostart", { enabled });
 }

@@ -8,7 +8,7 @@ import {
 	useUnreadStore,
 } from "@/features/unread";
 import { paths } from "@/lib/paths";
-import { personName } from "../model/conversations";
+import { personName, presenceById } from "../model/conversations";
 import { useDms } from "../queries";
 import { showDm, useOpenDms } from "../stores/openDmsStore";
 import { DmAvatar } from "./DmAvatar";
@@ -44,9 +44,7 @@ export function DmDock() {
 		.filter((c): c is Conversation => c !== undefined);
 	if (known.length === 0) return null;
 
-	const online = new Set(
-		people.data?.filter((p) => p.online).map((p) => p.id),
-	);
+	const presence = presenceById(people.data);
 	const expanded = known.find((c) => c.id === active);
 	const others = known.filter((c) => c.id !== active);
 	const tabs = others.slice(0, DOCK_SLOTS - (expanded ? 1 : 0));
@@ -58,7 +56,7 @@ export function DmDock() {
 				<DmWindow
 					key={expanded.id}
 					conversation={expanded}
-					online={online.has(expanded.person.id)}
+					presence={presence.get(expanded.person.id) ?? null}
 				/>
 			)}
 			{tabs.map((conversation) => (
@@ -72,7 +70,7 @@ export function DmDock() {
 					<span className="relative shrink-0">
 						<DmAvatar
 							person={conversation.person}
-							online={online.has(conversation.person.id)}
+							presence={presence.get(conversation.person.id) ?? null}
 							size={28}
 						/>
 						<CountBadge

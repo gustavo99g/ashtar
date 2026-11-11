@@ -93,6 +93,7 @@
 	--color-status-online: var(--status-online);
 	--color-status-connecting: var(--status-connecting);
 	--color-status-offline: var(--status-offline);
+	--color-status-busy: var(--status-busy);
 	--color-speaking: var(--speaking);
 	--color-live: var(--live);
 	--color-live-foreground: var(--live-foreground);

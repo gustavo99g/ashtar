@@ -2,7 +2,7 @@ import { BellIcon, BellOffIcon, MinusIcon, XIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { ChatConversation } from "@/features/chat";
 import { setChannelMuted, useReadState } from "@/features/unread";
-import type { Conversation } from "@/lib/api";
+import type { Conversation, Shown } from "@/lib/api";
 import { personName } from "../model/conversations";
 import { closeDm, minimizeDm } from "../stores/openDmsStore";
 import { DmAvatar } from "./DmAvatar";
@@ -10,7 +10,7 @@ import { DmAvatar } from "./DmAvatar";
 /**
  * A janela de uma conversa privada, como no quadro "Lateral — conversa embaixo": 380 de largura
  * e até 540 de altura, presa embaixo, com os cantos de cima arredondados. No cabeçalho, quem é, se
- * está online, minimizar e fechar. O corpo é a mesma conversa de um canal de texto
+ * está online (ou Ocupado), minimizar e fechar. O corpo é a mesma conversa de um canal de texto
  * (`ChatConversation`): o histórico em páginas, o rascunho, o "Tentar de novo", os links e o
  * agrupamento vêm juntos.
  *
@@ -22,10 +22,11 @@ import { DmAvatar } from "./DmAvatar";
  */
 export function DmWindow({
 	conversation,
-	online,
+	presence,
 }: {
 	conversation: Conversation;
-	online: boolean;
+	/** O status de quem está do outro lado; `null` offline. */
+	presence: Shown | null;
 }) {
 	const { person } = conversation;
 	const name = personName(person);
@@ -42,13 +43,19 @@ export function DmWindow({
 			className="pointer-events-auto flex h-[min(540px,calc(100%-16px))] w-[380px] flex-col rounded-t-xl border border-b-0 border-border-strong bg-card shadow-[0_-8px_30px_rgba(0,0,0,0.45)]"
 		>
 			<header className="flex h-[52px] shrink-0 items-center gap-2.5 border-b border-border pr-1.5 pl-3">
-				<DmAvatar person={person} online={online} size={32} />
+				<DmAvatar person={person} presence={presence} size={32} />
 				<span className="flex min-w-0 flex-1 flex-col">
 					<span className="truncate text-sm font-semibold text-foreground">
 						{name}
 					</span>
 					<span className="truncate text-[11.5px] text-muted-foreground">
-						{person.removed ? "Saiu do grupo" : online ? "Online" : "Offline"}
+						{person.removed
+							? "Saiu do grupo"
+							: presence === "busy"
+								? "Ocupado"
+								: presence
+									? "Online"
+									: "Offline"}
 					</span>
 				</span>
 				<HeaderButton

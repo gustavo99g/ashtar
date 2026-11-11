@@ -1,13 +1,17 @@
-import { Avatar } from "@/features/identity";
+import { Avatar, StatusDot } from "@/features/identity";
+import type { Shown } from "@/lib/api";
 
-/** O avatar de alguém numa conversa, com a bolinha verde se está online. */
+/**
+ * O avatar de alguém numa conversa, com a bolinha do status de quem está online (verde ou a
+ * vermelha de Ocupado). `presence` nulo é offline: sem bolinha.
+ */
 export function DmAvatar({
 	person,
-	online,
+	presence,
 	size,
 }: {
 	person: { nick: string; display_name: string | null };
-	online: boolean;
+	presence: Shown | null;
 	size: number;
 }) {
 	return (
@@ -15,11 +19,7 @@ export function DmAvatar({
 			nick={person.nick}
 			displayName={person.display_name}
 			size={size}
-			badge={
-				online && (
-					<span className="absolute -right-0.5 -bottom-0.5 box-border size-[11px] rounded-full border-2 border-card bg-status-online" />
-				)
-			}
+			badge={presence && <StatusDot status={presence} className="size-[11px]" />}
 		/>
 	);
 }

@@ -1,7 +1,9 @@
-//! Comandos sobre o próprio app (versão, novidades, pasta de logs, menu da bandeja).
+//! Comandos sobre o próprio app (versão, novidades, pasta de logs, menu da bandeja, iniciar com o
+//! Windows).
 
 use serde::Serialize;
 use tauri::{AppHandle, Manager};
+use tauri_plugin_autostart::ManagerExt;
 
 use crate::changelog;
 use crate::commands::run_blocking;
@@ -20,6 +22,29 @@ pub struct WhatsNew {
 #[tauri::command]
 pub async fn tray_share_state(app: AppHandle, sharing: bool, paused: bool) -> Result<(), AppError> {
     tray::set_share(&app, sharing.then_some(paused));
+    Ok(())
+}
+
+/// Se o app inicia com o Windows (a chave de Configurações › Aplicativo).
+#[tauri::command]
+pub async fn autostart_enabled(app: AppHandle) -> Result<bool, AppError> {
+    app.autolaunch()
+        .is_enabled()
+        .map_err(|error| AppError::Internal(format!("iniciar com o Windows: {error}")))
+}
+
+/// Liga ou desliga o iniciar com o Windows. Ligado, o Windows abre o app com `--tray`, e ele sobe
+/// direto na bandeja (`lib.rs`).
+#[tauri::command]
+pub async fn set_autostart(app: AppHandle, enabled: bool) -> Result<(), AppError> {
+    let autostart = app.autolaunch();
+    let result = if enabled {
+        autostart.enable()
+    } else {
+        autostart.disable()
+    };
+    result.map_err(|error| AppError::Internal(format!("iniciar com o Windows: {error}")))?;
+    tracing::info!(enabled, "iniciar com o Windows");
     Ok(())
 }
 

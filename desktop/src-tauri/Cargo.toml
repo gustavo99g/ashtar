@@ -75,6 +75,8 @@ windows = { version = "0.62", features = [
 tauri-plugin-updater = "2.13"
 tokio = { version = "1", features = ["time"] }
 tauri-plugin-window-state = "2.5.0"
+# Iniciar com o Windows (Configurações › Aplicativo, v0.3.1): a chave fica no registro do usuário.
+tauri-plugin-autostart = "2.7"
 reqwest = { version = "0.13.4", default-features = false, features = ["json", "rustls-no-provider"] }
 rustls = { version = "0.23.45", default-features = false, features = ["ring", "std"] }
 tauri-plugin-deep-link = "2.6.2"

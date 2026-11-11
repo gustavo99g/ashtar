@@ -13,13 +13,14 @@ import {
 	shownCount,
 	useUnreadStore,
 } from "@/features/unread";
-import { ApiError, type Conversation, type Person } from "@/lib/api";
+import { ApiError, type Conversation, type Person, type Shown } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import {
 	agoLabel,
 	listedConversations,
 	peopleToStart,
 	personName,
+	presenceById,
 	preview,
 } from "../model/conversations";
 import { useDms, useOpenDm } from "../queries";
@@ -62,9 +63,7 @@ export function DmList() {
 		);
 	}
 
-	const online = new Set(
-		people.data?.filter((p) => p.online).map((p) => p.id),
-	);
+	const presence = presenceById(people.data);
 	const unreadOf = (id: string) => shownCount(byChannel[id] ?? EMPTY_STATE);
 	const conversations = listedConversations(dms.data, query, unreadOf);
 	const none = listedConversations(dms.data).length === 0;
@@ -113,7 +112,7 @@ export function DmList() {
 							<ConversationRow
 								key={conversation.id}
 								conversation={conversation}
-								online={online.has(conversation.person.id)}
+								presence={presence.get(conversation.person.id) ?? null}
 								current={conversation.id === active}
 								myId={myId}
 								now={now}
@@ -137,7 +136,11 @@ export function DmList() {
 								onClick={() => start(person)}
 								className="flex items-center gap-2.5 rounded-lg p-2 text-left hover:bg-secondary"
 							>
-								<DmAvatar person={person} online={person.online} size={34} />
+								<DmAvatar
+									person={person}
+									presence={person.online ? person.status : null}
+									size={34}
+								/>
 								<span className="min-w-0 truncate text-sm font-semibold text-foreground">
 									{personName(person)}
 								</span>
@@ -165,14 +168,14 @@ export function DmList() {
 
 function ConversationRow({
 	conversation,
-	online,
+	presence,
 	current,
 	myId,
 	now,
 	unread,
 }: {
 	conversation: Conversation;
-	online: boolean;
+	presence: Shown | null;
 	current: boolean;
 	myId: string | null;
 	now: number;
@@ -189,7 +192,7 @@ function ConversationRow({
 				current && "bg-secondary",
 			)}
 		>
-			<DmAvatar person={conversation.person} online={online} size={34} />
+			<DmAvatar person={conversation.person} presence={presence} size={34} />
 			<span className="flex min-w-0 flex-1 flex-col gap-0.5">
 				<span className="flex justify-between gap-1.5">
 					<span className="min-w-0 truncate text-sm font-semibold text-foreground">

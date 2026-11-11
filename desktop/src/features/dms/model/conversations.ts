@@ -2,7 +2,7 @@
  * O que a aba Conversas mostra de cada conversa privada: a ordem, a busca, o começo da última
  * mensagem e há quanto tempo foi. Tudo função pura, com os testes ao lado.
  */
-import type { Conversation, Person } from "@/lib/api";
+import type { Conversation, Person, Shown } from "@/lib/api";
 
 /** O nome que aparece: o nome visível ou, sem ele, o nick. */
 export function personName(person: {
@@ -103,4 +103,11 @@ export function agoLabel(at: number, now: number): string {
 	}
 	if (then.getTime() >= startOfToday - 24 * 60 * 60 * 1000) return "ontem";
 	return then.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+}
+
+/** O status de quem está online, por id. Quem não está aqui está offline (ou invisível). */
+export function presenceById(people: readonly Person[] | undefined): Map<string, Shown> {
+	return new Map(
+		(people ?? []).filter((p) => p.online).map((p) => [p.id, p.status]),
+	);
 }

@@ -25,6 +25,10 @@ mod window;
 use tauri::{Manager, RunEvent};
 use tauri_plugin_window_state::{AppHandleExt, StateFlags};
 
+/// O argumento com que o Windows abre o app quando ele inicia junto (Configurações › Aplicativo):
+/// o app sobe direto na bandeja, sem mostrar a janela.
+const TRAY_ARG: &str = "--tray";
+
 /// O que a janela lembra entre aberturas: tamanho, posição e se estava maximizada.
 const WINDOW_STATE: StateFlags = StateFlags::SIZE
     .union(StateFlags::POSITION)
@@ -44,6 +48,10 @@ pub fn run(log_file: logging::LateFile) {
             window::bring_to_front(app);
         }))
         .plugin(tauri_plugin_deep_link::init())
+        .plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            Some(vec![TRAY_ARG]),
+        ))
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(
             tauri_plugin_window_state::Builder::new()
@@ -66,6 +74,14 @@ pub fn run(log_file: logging::LateFile) {
             permissions::allow_microphone(app);
             webview_process::refresh(app.handle());
             tray::create(app);
+            // A janela nasce invisível (`tauri.conf.json`) e só aparece aqui, a não ser que o app
+            // tenha subido com o Windows: aí fica na bandeja, sem piscar na tela. O
+            // `single-instance` traz a janela se a pessoa abrir o app de novo.
+            if std::env::args().any(|arg| arg == TRAY_ARG) {
+                tracing::info!("iniciado com o Windows: fica na bandeja");
+            } else {
+                window::bring_to_front(app.handle());
+            }
             // O Ashtar nunca aparece numa captura, nem na da própria transmissão (ADR 0019).
             if let Some(window) = app.get_webview_window("main") {
                 media::focus::exclude_from_capture(&window);
@@ -89,6 +105,8 @@ pub fn run(log_file: logging::LateFile) {
             commands::app::whats_new,
             commands::app::open_log_dir,
             commands::app::tray_share_state,
+            commands::app::autostart_enabled,
+            commands::app::set_autostart,
             commands::identity::login,
             commands::identity::redeem,
             commands::identity::account_marker
