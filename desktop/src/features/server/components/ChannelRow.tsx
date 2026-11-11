@@ -2,7 +2,7 @@ import { HashIcon, Volume2Icon } from "lucide-react";
 import { type MouseEvent, type ReactNode, useState } from "react";
 import { useMatch, useNavigate } from "react-router-dom";
 import { shownWhenCollapsed } from "@/features/channels";
-import { useReadState } from "@/features/unread";
+import { CountBadge, useReadState } from "@/features/unread";
 import { useSession } from "@/features/identity";
 import {
 	type ChannelMember,
@@ -23,7 +23,9 @@ import { AvatarStrip, RoomMembers } from "./RoomMembers";
  * aberto. O botão direito na linha abre o mesmo menu. No canal de texto ela é de todo mundo (o
  * "Marcar como lido"); na sala de voz, só de quem gerencia.
  *
- * O canal de texto com não lidas fica com o nome em destaque e um ponto na beirada esquerda.
+ * O canal de texto com não lidas fica com o nome em destaque e um ponto na beirada esquerda; com
+ * menções a você, o número delas à direita. Silenciado, o nome fica apagado e sem ponto, mas o
+ * número das menções aparece do mesmo jeito.
  */
 
 /** O que quem gerencia os canais pode fazer a partir de uma linha. `null` para os outros. */
@@ -115,8 +117,10 @@ function TextChannel({ channel, collapsed, manage }: RowProps) {
 	const navigate = useNavigate();
 	const match = useMatch(paths.channelPattern);
 	const selected = match?.params.channelId === channel.id;
+	const { unread, mentions, muted } = useReadState(channel.id);
 	// No canal aberto as novas são lidas na hora: não precisa chamar atenção.
-	const fresh = useReadState(channel.id).unread > 0 && !selected;
+	const fresh = unread > 0 && !muted && !selected;
+	const mentioned = selected ? 0 : mentions;
 	const shown =
 		!collapsed ||
 		shownWhenCollapsed(channel, {
@@ -135,6 +139,7 @@ function TextChannel({ channel, collapsed, manage }: RowProps) {
 					className={cn(
 						rowClass(selected),
 						fresh && "font-semibold text-foreground",
+						muted && !selected && "opacity-50",
 					)}
 				>
 					{fresh && (
@@ -146,6 +151,12 @@ function TextChannel({ channel, collapsed, manage }: RowProps) {
 					<HashIcon aria-hidden="true" className="size-[18px] shrink-0" />
 					<span className="truncate">{channel.name}</span>
 					{fresh && <span className="sr-only">, com mensagens novas</span>}
+					{muted && <span className="sr-only">, silenciado</span>}
+					<CountBadge
+						count={mentioned}
+						label={mentioned === 1 ? "1 menção" : `${mentioned} menções`}
+						className="ml-auto shrink-0 bg-destructive text-white"
+					/>
 				</button>
 			</RowFrame>
 		</li>

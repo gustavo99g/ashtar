@@ -8,6 +8,8 @@ export {
 	markChannelRead,
 	markEverythingRead,
 	seedMissing,
+	setChannelMuted,
+	shownCount,
 	UNREAD_CAP,
 	useReadState,
 	useUnreadStore,

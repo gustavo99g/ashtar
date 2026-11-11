@@ -1,6 +1,7 @@
-import { MinusIcon, XIcon } from "lucide-react";
+import { BellIcon, BellOffIcon, MinusIcon, XIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { ChatConversation } from "@/features/chat";
+import { setChannelMuted, useReadState } from "@/features/unread";
 import type { Conversation } from "@/lib/api";
 import { personName } from "../model/conversations";
 import { closeDm, minimizeDm } from "../stores/openDmsStore";
@@ -12,6 +13,9 @@ import { DmAvatar } from "./DmAvatar";
  * está online, minimizar e fechar. O corpo é a mesma conversa de um canal de texto
  * (`ChatConversation`): o histórico em páginas, o rascunho, o "Tentar de novo", os links e o
  * agrupamento vêm juntos.
+ *
+ * O sino do cabeçalho silencia a conversa (Etapa 14): ela para de somar no número dourado, a não
+ * ser pelas menções.
  *
  * O campo ganha o foco ao abrir (é o `Composer` que faz isso, a cada `channelId` novo), e o Esc,
  * com o foco em qualquer ponto da janela, fecha.
@@ -25,6 +29,7 @@ export function DmWindow({
 }) {
 	const { person } = conversation;
 	const name = personName(person);
+	const { muted } = useReadState(conversation.id);
 	return (
 		<section
 			aria-label={`Conversa com ${name}`}
@@ -46,6 +51,19 @@ export function DmWindow({
 						{person.removed ? "Saiu do grupo" : online ? "Online" : "Offline"}
 					</span>
 				</span>
+				<HeaderButton
+					label="Silenciar conversa"
+					pressed={muted}
+					onClick={() =>
+						void setChannelMuted(conversation.id, !muted).catch(() => {})
+					}
+				>
+					{muted ? (
+						<BellOffIcon aria-hidden="true" className="size-4" />
+					) : (
+						<BellIcon aria-hidden="true" className="size-4" />
+					)}
+				</HeaderButton>
 				<HeaderButton label="Minimizar conversa" onClick={minimizeDm}>
 					<MinusIcon aria-hidden="true" className="size-4" />
 				</HeaderButton>
@@ -61,6 +79,7 @@ export function DmWindow({
 				listLabel={`Mensagens com ${name}`}
 				composerLabel={`Mensagem para ${name}`}
 				compact
+				mentionable={person.removed ? [] : [person]}
 				start={
 					<p className="px-4 pt-6 pb-2 text-xs leading-relaxed text-muted-foreground">
 						Este é o começo da sua conversa com {name}. As mensagens privadas
@@ -82,10 +101,12 @@ export function DmWindow({
 
 function HeaderButton({
 	label,
+	pressed,
 	onClick,
 	children,
 }: {
 	label: string;
+	pressed?: boolean;
 	onClick: () => void;
 	children: ReactNode;
 }) {
@@ -93,6 +114,7 @@ function HeaderButton({
 		<button
 			type="button"
 			aria-label={label}
+			aria-pressed={pressed}
 			title={label}
 			onClick={onClick}
 			className="flex size-[30px] shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-secondary hover:text-foreground"

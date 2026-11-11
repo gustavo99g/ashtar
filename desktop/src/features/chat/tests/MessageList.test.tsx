@@ -220,3 +220,40 @@ describe("MessageList: as novas mensagens", () => {
 		expect(seeing).toHaveBeenCalledTimes(2);
 	});
 });
+
+describe("MessageList: as menções", () => {
+	it("a menção vira selo, e a mensagem que menciona quem lê ganha destaque", () => {
+		const people = new Map([
+			["kid", { id: "kid", nick: "kid", display_name: "Kid" }],
+			["bia", { id: "bia", nick: "bia", display_name: null }],
+		]);
+		render(
+			<MessageList
+				label="Mensagens em #geral"
+				start={null}
+				messages={[
+					{ ...message("m1"), body: "fala @kid", mentions: ["kid"] },
+					{ ...message("m2"), body: "e a @bia", mentions: ["bia"] },
+					{ ...message("m3"), body: "@ninguem aqui" },
+				]}
+				pending={[]}
+				ownerId={null}
+				people={people}
+				myId="kid"
+				hasOlder={false}
+				loadingOlder={false}
+				onLoadOlder={() => {}}
+				onRetry={() => {}}
+				onDiscard={() => {}}
+			/>,
+		);
+		expect(screen.getByText("@Kid").closest("li")).toHaveAttribute(
+			"data-mentions-me",
+			"true",
+		);
+		expect(screen.getByText("@bia").closest("li")).not.toHaveAttribute(
+			"data-mentions-me",
+		);
+		expect(screen.getByText("@ninguem aqui")).toBeInTheDocument();
+	});
+});

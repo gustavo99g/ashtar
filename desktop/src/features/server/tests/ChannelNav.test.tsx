@@ -1,5 +1,12 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import {
+	act,
+	fireEvent,
+	render,
+	screen,
+	waitFor,
+	within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -15,6 +22,7 @@ import {
 	markRead,
 	type ParticipantView,
 	setChannelLayout,
+	setMuted,
 } from "@/lib/api";
 import { paths } from "@/lib/paths";
 import { ChannelNav } from "../components/ChannelNav";
@@ -24,6 +32,7 @@ vi.mock("@/lib/api", async (importOriginal) => ({
 	listVoiceParticipants: vi.fn(),
 	markRead: vi.fn(),
 	setChannelLayout: vi.fn(),
+	setMuted: vi.fn(),
 	getChannelLayout: vi.fn(() => new Promise(() => {})),
 }));
 
@@ -194,6 +203,50 @@ describe("a coluna de canais", () => {
 		expect(screen.getByRole("button", { name: "Jogos", expanded: true })).toBeInTheDocument();
 	});
 
+	it("silenciado: apagado e sem destaque, mas o número das menções aparece", async () => {
+		const state = { last_read_id: "m1", unread: 4, mentions: 0, muted: false };
+		useUnreadStore.setState({
+			me: "kid",
+			byChannel: { lol: state, cs: { ...state, mentions: 2 } },
+			newest: { lol: "m5", cs: "m5" },
+		});
+		vi.mocked(setMuted).mockResolvedValue({ ...state, muted: true });
+		const user = userEvent.setup();
+		renderNav();
+
+		expect(
+			within(screen.getByRole("button", { name: /^cs/ })).getByLabelText("2 menções"),
+		).toBeInTheDocument();
+
+		await user.pointer({
+			keys: "[MouseRight]",
+			target: screen.getByRole("button", { name: /^lol/ }),
+		});
+		await user.click(await screen.findByRole("menuitem", { name: "Silenciar canal" }));
+		expect(setMuted).toHaveBeenCalledWith("lol", { muted: true });
+		expect(
+			screen.getByRole("button", { name: /^lol,? silenciado$/ }),
+		).toBeInTheDocument();
+
+		// Silenciado com menção: o número aparece mesmo assim.
+		act(() =>
+			useUnreadStore.setState((s) => ({
+				byChannel: { ...s.byChannel, lol: { ...state, muted: true, mentions: 1 } },
+			})),
+		);
+		expect(
+			within(screen.getByRole("button", { name: /^lol/ })).getByLabelText("1 menção"),
+		).toBeInTheDocument();
+
+		await user.pointer({
+			keys: "[MouseRight]",
+			target: screen.getByRole("button", { name: /^lol/ }),
+		});
+		expect(
+			await screen.findByRole("menuitem", { name: "Voltar a ouvir" }),
+		).toBeInTheDocument();
+	});
+
 	it("clicar em alguém da sala abre o cartão da pessoa", async () => {
 		const user = userEvent.setup();
 		renderNav();
@@ -207,7 +260,7 @@ describe("a coluna de canais", () => {
 		expect(within(card).getByText("Na Squad · transmitindo")).toBeVisible();
 	});
 
-	it("sem Gerenciar canais, o canal de texto só tem o Marcar como lido, e a sala nada", async () => {
+	it("sem Gerenciar canais, o canal de texto só tem o Marcar como lido e o Silenciar, e a sala nada", async () => {
 		const user = userEvent.setup();
 		renderNav();
 
@@ -229,7 +282,7 @@ describe("a coluna de canais", () => {
 			within(menu)
 				.getAllByRole("menuitem")
 				.map((item) => item.textContent),
-		).toEqual(["Marcar como lido"]);
+		).toEqual(["Marcar como lido", "Silenciar canal"]);
 	});
 
 	it("a lista não tem alça de arrastar nem Mover para cima e para baixo", async () => {

@@ -1,4 +1,4 @@
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useMemo, useState } from "react";
 import {
 	ErrorState,
 	LoadingState,
@@ -6,8 +6,9 @@ import {
 } from "@/components/ui/states";
 import { useSession } from "@/features/identity";
 import { useMarkRead, useUnreadMarker } from "@/features/unread";
-import { isApiError } from "@/lib/api";
+import { isApiError, type Person } from "@/lib/api";
 import { useAppFocused } from "@/lib/visibility";
+import type { Mentionable } from "../model/mentions";
 import { useMessages, usePeople, useSendMessage } from "../queries";
 import { usePending } from "../stores/outboxStore";
 import { Composer } from "./Composer";
@@ -32,6 +33,7 @@ export function ChatConversation({
 	start,
 	compact = false,
 	readOnly,
+	mentionable,
 }: {
 	channelId: string;
 	listLabel: string;
@@ -40,6 +42,8 @@ export function ChatConversation({
 	compact?: boolean;
 	/** Só para leitura: isto aparece no lugar do campo de escrever. */
 	readOnly?: ReactNode;
+	/** Quem dá para mencionar no campo. Sem isto, todo o grupo (o canal de texto). */
+	mentionable?: readonly Mentionable[];
 }) {
 	const query = useMessages(channelId);
 	const pending = usePending(channelId);
@@ -51,6 +55,11 @@ export function ChatConversation({
 		(session.status === "connected" && session.user.is_owner
 			? session.user.id
 			: null);
+	const myId = session.status === "connected" ? session.user.id : null;
+	const byId = useMemo(
+		() => new Map((people.data ?? NO_PEOPLE).map((p) => [p.id, p])),
+		[people.data],
+	);
 	const [seeingEnd, setSeeingEnd] = useState(true);
 	const focused = useAppFocused();
 	const lastMessageId = query.messages?.[query.messages.length - 1]?.id;
@@ -66,6 +75,8 @@ export function ChatConversation({
 					messages={query.messages}
 					pending={pending}
 					ownerId={ownerId}
+					people={byId}
+					myId={myId}
 					hasOlder={query.hasPreviousPage}
 					loadingOlder={query.isFetchingPreviousPage}
 					onLoadOlder={() => void query.fetchPreviousPage()}
@@ -92,12 +103,16 @@ export function ChatConversation({
 					channelId={channelId}
 					label={composerLabel}
 					compact={compact}
+					mentionable={mentionable ?? people.data ?? NO_PEOPLE}
+					myId={myId}
 					onSend={(body) => send(channelId, body)}
 				/>
 			)}
 		</>
 	);
 }
+
+const NO_PEOPLE: Person[] = [];
 
 function Centered({ children }: { children: ReactNode }) {
 	return (

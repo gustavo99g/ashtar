@@ -16,6 +16,7 @@ import {
 	markRead as apiMarkRead,
 	type Message,
 	type ReadState,
+	setMuted as apiSetMuted,
 } from "@/lib/api";
 
 /** O teto das contagens, o mesmo da API: acima disso aparece "99+". */
@@ -136,6 +137,33 @@ export async function markChannelRead(
 	}
 }
 
+/**
+ * Silencia ou volta a ouvir (Etapa 14): muda aqui na hora e avisa a API. Se a API recusar, volta
+ * como estava e rejeita, para quem chamou mostrar.
+ */
+export async function setChannelMuted(
+	channelId: string,
+	muted: boolean,
+): Promise<void> {
+	const before = useUnreadStore.getState().byChannel[channelId] ?? EMPTY_STATE;
+	applyState(channelId, { ...before, muted });
+	try {
+		applyState(channelId, await apiSetMuted(channelId, { muted }));
+	} catch (error) {
+		const now = useUnreadStore.getState().byChannel[channelId] ?? EMPTY_STATE;
+		applyState(channelId, { ...now, muted: before.muted });
+		throw error;
+	}
+}
+
+/**
+ * O número que aparece para um canal ou conversa: as não lidas, ou, silenciado, só as menções (a
+ * menção passa por cima do silenciar).
+ */
+export function shownCount(state: ReadState): number {
+	return state.muted ? state.mentions : state.unread;
+}
+
 /** O "Marcar tudo como lido": zera tudo aqui e pede à API. */
 export async function markEverythingRead(): Promise<void> {
 	useUnreadStore.setState((store) => ({
@@ -164,9 +192,15 @@ export function useReadState(channelId: string): ReadState {
 	return useUnreadStore((store) => store.byChannel[channelId] ?? EMPTY_STATE);
 }
 
-/** A soma das não lidas destes canais (o número da aba Conversas). */
+/**
+ * A soma do que aparece destes canais (o número da aba Conversas): as não lidas, e só as menções
+ * dos silenciados.
+ */
 export function useUnreadTotal(channelIds: readonly string[]): number {
 	return useUnreadStore((store) =>
-		channelIds.reduce((sum, id) => sum + (store.byChannel[id]?.unread ?? 0), 0),
+		channelIds.reduce(
+			(sum, id) => sum + shownCount(store.byChannel[id] ?? EMPTY_STATE),
+			0,
+		),
 	);
 }

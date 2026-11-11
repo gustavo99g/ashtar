@@ -14,6 +14,7 @@ import {
 	openDm,
 	type Person,
 	sendMessage,
+	setMuted,
 } from "@/lib/api";
 import { paths } from "@/lib/paths";
 import { DmDock } from "../components/DmDock";
@@ -27,6 +28,7 @@ vi.mock("@/lib/api", async (importOriginal) => ({
 	listPeople: vi.fn(),
 	openDm: vi.fn(),
 	sendMessage: vi.fn(),
+	setMuted: vi.fn(),
 }));
 vi.mock("@/lib/tauri/opener", () => ({ openLink: vi.fn() }));
 
@@ -259,6 +261,33 @@ describe("a janela da conversa", () => {
 		// O +N traz a próxima da fila.
 		await user.click(screen.getByRole("button", { name: "Mais 2 conversas abertas" }));
 		expect(await screen.findByRole("region", { name: "Conversa com b" })).toBeInTheDocument();
+	});
+
+	it("o sino silencia a conversa: o número some, a não ser pelas menções", async () => {
+		const user = userEvent.setup();
+		const unread = { last_read_id: null, unread: 3, mentions: 0, muted: false };
+		vi.mocked(listDms).mockResolvedValue([
+			{ ...conversation("d-bia", "bia", message("m1", "d-bia", "bia", "oi")), state: unread },
+		]);
+		vi.mocked(setMuted).mockResolvedValue({ ...unread, muted: true });
+		renderDms();
+		const nav = await screen.findByRole("navigation", { name: "Conversas" });
+		expect(within(nav).getByLabelText("3 não lidas")).toBeInTheDocument();
+		showDm("d-bia");
+		useOpenDms.setState({ active: "d-bia" });
+
+		const bell = await screen.findByRole("button", { name: "Silenciar conversa" });
+		expect(bell).toHaveAttribute("aria-pressed", "false");
+		await user.click(bell);
+		expect(setMuted).toHaveBeenCalledWith("d-bia", { muted: true });
+		expect(bell).toHaveAttribute("aria-pressed", "true");
+		expect(within(nav).queryByLabelText(/não lidas/)).not.toBeInTheDocument();
+
+		// Uma menção passa por cima.
+		useUnreadStore.setState((s) => ({
+			byChannel: { ...s.byChannel, "d-bia": { ...unread, muted: true, mentions: 1 } },
+		}));
+		expect(await within(nav).findByLabelText("1 não lida")).toBeInTheDocument();
 	});
 
 	it("com quem saiu do grupo, é só para leitura", async () => {

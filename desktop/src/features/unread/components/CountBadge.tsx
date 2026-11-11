@@ -6,15 +6,20 @@ import { cn } from "@/lib/utils";
  */
 export function CountBadge({
 	count,
+	label,
 	className,
 }: {
 	count: number;
+	/** O que o leitor de tela diz. Sem isto, "N não lidas". */
+	label?: string;
 	className?: string;
 }) {
 	if (count <= 0) return null;
 	return (
 		<span
-			aria-label={`${count > 99 ? "99+" : count} não lidas`}
+			aria-label={
+				label ?? (count === 1 ? "1 não lida" : `${count > 99 ? "99+" : count} não lidas`)
+			}
 			className={cn(
 				"min-w-[18px] rounded-[9px] bg-gold px-[5px] py-px text-center text-[11px] font-bold text-gold-foreground",
 				className,

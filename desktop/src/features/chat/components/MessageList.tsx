@@ -9,9 +9,12 @@ import {
 } from "react";
 import { Spinner } from "@/components/ui/spinner";
 import type { Message } from "@/lib/api";
+import type { Mentionable } from "../model/mentions";
 import { conversationRows } from "../model/messages";
 import type { PendingMessage } from "../stores/outboxStore";
 import { MessageItem, PendingItem } from "./MessageItem";
+
+const NO_PEOPLE: ReadonlyMap<string, Mentionable> = new Map();
 
 /** Até esta distância do fim, a conversa conta como "no fim" e acompanha as novas. */
 const STICK_PX = 80;
@@ -26,6 +29,10 @@ interface MessageListProps {
 	messages: Message[];
 	pending: PendingMessage[];
 	ownerId: string | null;
+	/** Quem está no grupo, por id: o nome das menções. */
+	people?: ReadonlyMap<string, Mentionable>;
+	/** Quem lê: a mensagem que o menciona ganha destaque. */
+	myId?: string | null;
 	hasOlder: boolean;
 	loadingOlder: boolean;
 	onLoadOlder: () => void;
@@ -56,6 +63,8 @@ export function MessageList({
 	messages,
 	pending,
 	ownerId,
+	people = NO_PEOPLE,
+	myId = null,
 	hasOlder,
 	loadingOlder,
 	onLoadOlder,
@@ -197,6 +206,8 @@ export function MessageList({
 								message={row.message}
 								startsGroup={row.startsGroup}
 								ownerId={ownerId}
+								people={people}
+								myId={myId}
 							/>
 						</RowWithDay>
 					))}

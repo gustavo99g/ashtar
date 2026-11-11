@@ -2,6 +2,8 @@ import {
 	ArchiveIcon,
 	CheckCheckIcon,
 	CheckIcon,
+	BellIcon,
+	BellOffIcon,
 	FolderInputIcon,
 	PencilIcon,
 	SettingsIcon,
@@ -18,7 +20,11 @@ import {
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { canArchive, openChannelDialog } from "@/features/channels";
-import { markChannelRead, useUnreadStore } from "@/features/unread";
+import {
+	markChannelRead,
+	setChannelMuted,
+	useUnreadStore,
+} from "@/features/unread";
 import type { CategoryView, ChannelView } from "@/lib/api";
 
 /*
@@ -26,7 +32,8 @@ import type { CategoryView, ChannelView } from "@/lib/api";
  *
  * O do canal abre pela engrenagem, que só aparece com o mouse na linha ou com o foco, e pelo botão
  * direito na linha (quem manda abrir é a linha, pelo `open`). Num canal de texto ele é de todo mundo,
- * com o "Marcar como lido" (Etapa 13); editar, mover e arquivar são só de quem gerencia os canais.
+ * com o "Marcar como lido" (Etapa 13) e o "Silenciar canal" (Etapa 14); editar, mover e arquivar
+ * são só de quem gerencia os canais.
  * O da categoria não tem botão: só o botão direito no nome dela (ou Shift + F10, com o foco nele).
  */
 
@@ -60,6 +67,9 @@ export function ChannelMenu({
 	const unread = useUnreadStore(
 		(store) => (store.byChannel[channel.id]?.unread ?? 0) > 0,
 	);
+	const muted = useUnreadStore(
+		(store) => store.byChannel[channel.id]?.muted ?? false,
+	);
 	return (
 		<DropdownMenu open={open} onOpenChange={onOpenChange}>
 			<DropdownMenuTrigger
@@ -80,6 +90,20 @@ export function ChannelMenu({
 					>
 						<CheckCheckIcon className="size-[15px]" />
 						Marcar como lido
+					</DropdownMenuItem>
+				)}
+				{channel.kind === "text" && (
+					<DropdownMenuItem
+						onClick={() =>
+							void setChannelMuted(channel.id, !muted).catch(() => {})
+						}
+					>
+						{muted ? (
+							<BellIcon className="size-[15px]" />
+						) : (
+							<BellOffIcon className="size-[15px]" />
+						)}
+						{muted ? "Voltar a ouvir" : "Silenciar canal"}
 					</DropdownMenuItem>
 				)}
 				{channel.kind === "text" && manage && <DropdownMenuSeparator />}

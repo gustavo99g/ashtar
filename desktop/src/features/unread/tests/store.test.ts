@@ -1,18 +1,28 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { type Message, markRead, type ReadState } from "@/lib/api";
+import { act, renderHook } from "@testing-library/react";
+import {
+	type Message,
+	markRead,
+	type ReadState,
+	setMuted,
+} from "@/lib/api";
 import { handleUnreadRealtime } from "../realtime";
 import {
 	applyState,
 	EMPTY_STATE,
 	markChannelRead,
 	seedMissing,
+	setChannelMuted,
+	shownCount,
 	UNREAD_CAP,
 	useUnreadStore,
+	useUnreadTotal,
 } from "../store";
 
 vi.mock("@/lib/api", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/lib/api")>()),
 	markRead: vi.fn(),
+	setMuted: vi.fn(),
 }));
 
 function state(overrides: Partial<ReadState> = {}): ReadState {
@@ -166,5 +176,31 @@ describe("marcar como lido", () => {
 		vi.mocked(markRead).mockRejectedValue(new Error("rede"));
 		await markChannelRead("geral", "m3");
 		expect(of("geral").unread).toBe(0);
+	});
+});
+
+describe("silenciar", () => {
+	it("silenciado, aparece só o número das menções, também na soma", () => {
+		expect(shownCount(state({ unread: 4, mentions: 1 }))).toBe(4);
+		expect(shownCount(state({ unread: 4, mentions: 1, muted: true }))).toBe(1);
+		applyState("geral", state({ unread: 4, mentions: 1, muted: true }));
+		applyState("d-ana", state({ unread: 2 }));
+		const total = renderHook(() => useUnreadTotal(["geral", "d-ana"]));
+		expect(total.result.current).toBe(3);
+		act(() => applyState("d-ana", state({ unread: 2, muted: true })));
+		expect(total.result.current).toBe(1);
+	});
+
+	it("muda na hora; se a API recusar, volta", async () => {
+		vi.mocked(setMuted).mockResolvedValue(state({ muted: true, unread: 2 }));
+		await setChannelMuted("geral", true);
+		expect(setMuted).toHaveBeenCalledWith("geral", { muted: true });
+		expect(of("geral").muted).toBe(true);
+
+		vi.mocked(setMuted).mockRejectedValue(new Error("rede"));
+		const failing = setChannelMuted("geral", false);
+		expect(of("geral").muted).toBe(false);
+		await expect(failing).rejects.toThrow("rede");
+		expect(of("geral").muted).toBe(true);
 	});
 });

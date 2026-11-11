@@ -7,7 +7,12 @@ import {
 } from "@/components/ui/states";
 import { usePeople } from "@/features/chat";
 import { useSession } from "@/features/identity";
-import { CountBadge, useUnreadStore } from "@/features/unread";
+import {
+	CountBadge,
+	EMPTY_STATE,
+	shownCount,
+	useUnreadStore,
+} from "@/features/unread";
 import { ApiError, type Conversation, type Person } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import {
@@ -60,7 +65,7 @@ export function DmList() {
 	const online = new Set(
 		people.data?.filter((p) => p.online).map((p) => p.id),
 	);
-	const unreadOf = (id: string) => byChannel[id]?.unread ?? 0;
+	const unreadOf = (id: string) => shownCount(byChannel[id] ?? EMPTY_STATE);
 	const conversations = listedConversations(dms.data, query, unreadOf);
 	const none = listedConversations(dms.data).length === 0;
 	const starters =

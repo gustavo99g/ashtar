@@ -1,7 +1,12 @@
 import { useMatch } from "react-router-dom";
 import { usePeople } from "@/features/chat";
 import type { Conversation } from "@/lib/api";
-import { CountBadge, useUnreadStore } from "@/features/unread";
+import {
+	CountBadge,
+	EMPTY_STATE,
+	shownCount,
+	useUnreadStore,
+} from "@/features/unread";
 import { paths } from "@/lib/paths";
 import { personName } from "../model/conversations";
 import { useDms } from "../queries";
@@ -71,7 +76,7 @@ export function DmDock() {
 							size={28}
 						/>
 						<CountBadge
-							count={byChannel[conversation.id]?.unread ?? 0}
+							count={shownCount(byChannel[conversation.id] ?? EMPTY_STATE)}
 							className="absolute -top-1.5 -right-2 h-4 min-w-4 border-2 border-card px-1 py-0 text-[10px] leading-3"
 						/>
 					</span>

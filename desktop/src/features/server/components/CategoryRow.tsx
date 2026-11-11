@@ -7,7 +7,7 @@ import {
 	useIsCollapsed,
 } from "@/features/channels";
 import { useUnreadStore } from "@/features/unread";
-import type { CategoryView } from "@/lib/api";
+import type { CategoryView, ReadState } from "@/lib/api";
 import { paths } from "@/lib/paths";
 import { cn } from "@/lib/utils";
 import { CategoryMenu } from "./ChannelMenu";
@@ -18,8 +18,14 @@ import { type ChannelManage, ChannelRow } from "./ChannelRow";
  * o lado quando recolhida), e os canais. Para quem gerencia, o + de criar canal aparece por cima da
  * linha, só com o mouse nela ou com o foco, e o botão direito no nome abre Renomear e Arquivar.
  *
- * Recolhida, se esconde um canal de texto com não lidas, ganha um ponto ao lado do nome.
+ * Recolhida, se esconde um canal de texto com não lidas (fora os silenciados) ou com menções a
+ * você, ganha um ponto ao lado do nome.
  */
+function hasNews(state: ReadState | undefined): boolean {
+	if (!state) return false;
+	return state.mentions > 0 || (state.unread > 0 && !state.muted);
+}
+
 export function CategoryRow({
 	category,
 	manage,
@@ -39,7 +45,7 @@ export function CategoryRow({
 				(channel) =>
 					channel.kind === "text" &&
 					channel.id !== openChannelId &&
-					(store.byChannel[channel.id]?.unread ?? 0) > 0,
+					hasNews(store.byChannel[channel.id]),
 			),
 	);
 
