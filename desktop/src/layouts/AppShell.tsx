@@ -2,9 +2,11 @@ import { Outlet } from "react-router-dom";
 import { ChannelDialogs } from "@/features/channels";
 import { JoinNotices } from "@/features/members";
 import { ChannelNav, ServerMenu } from "@/features/server";
+import { SideDock } from "@/features/side-panel";
 import { MiniShare, VoiceDock } from "@/features/voice";
 /*
- * A moldura de quem já entrou: a coluna do servidor à esquerda e a rota no meio. As
+ * A moldura de quem já entrou: a coluna do servidor à esquerda, a rota no meio e a lateral
+ * (membros e conversas) à direita. As
  * configurações também são filhas daqui e se desenham por cima de tudo (o `SettingsLayout` ocupa
  * a moldura inteira, com `absolute inset-0`), então a coluna continua montada embaixo delas.
  *
@@ -16,7 +18,9 @@ import { MiniShare, VoiceDock } from "@/features/voice";
  * A coluna vem da `features/server` (o nome do grupo com o menu de quem gerencia, `ServerMenu`, e
  * os canais, `ChannelNav`) e da
  * `features/voice` (no pé, o cartão de quem está usando, com o botão de configurações,
- * `VoiceDock`).
+ * `VoiceDock`). A lateral vem da `features/side-panel` (`SideDock`): fica fora da célula do
+ * `main`, então a área do canal, e com ela a camada da miniatura, encolhe quando a lateral abre. É
+ * assim que os encaixes da miniatura contam com a lateral sem saber dela.
  */
 export function AppShell() {
 	return (
@@ -41,6 +45,7 @@ export function AppShell() {
 					<MiniShare />
 				</div>
 			</div>
+			<SideDock />
 			{/* Os diálogos de criar, editar e arquivar canais: abrem pela lista ou pelo cabeçalho do chat. */}
 			<ChannelDialogs />
 		</div>

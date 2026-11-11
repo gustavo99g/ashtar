@@ -156,7 +156,7 @@ describe("router", () => {
 
 	it("o AppShell não deixa texto solto ao lado das colunas", () => {
 		renderAt([paths.server]);
-		const shell = screen.getByRole("complementary").parentElement;
+		const shell = screen.getByRole("complementary", { name: "Servidor" }).parentElement;
 		const loose = Array.from(shell?.childNodes ?? []).filter(
 			(node) => node.nodeType === Node.TEXT_NODE && node.textContent?.trim(),
 		);
@@ -165,7 +165,7 @@ describe("router", () => {
 
 	it("o botão de configurações da coluna abre o Perfil", () => {
 		const router = renderAt([paths.server]);
-		const column = screen.getByRole("complementary");
+		const column = screen.getByRole("complementary", { name: "Servidor" });
 		fireEvent.click(
 			within(column).getByRole("link", { name: "Configurações" }),
 		);
@@ -212,7 +212,7 @@ describe("a abertura", () => {
 
 		const router = renderAt([paths.start]);
 
-		await screen.findByRole("complementary");
+		await screen.findByRole("complementary", { name: "Servidor" });
 		await vi.waitFor(() =>
 			expect(router.state.location.pathname).toBe(HOME),
 		);
@@ -245,7 +245,7 @@ describe("a abertura", () => {
 		const retry = await screen.findByRole("button", { name: "Tentar de novo" });
 		vi.mocked(login).mockResolvedValue({ token: "tok", user });
 		fireEvent.click(retry);
-		await screen.findByRole("complementary");
+		await screen.findByRole("complementary", { name: "Servidor" });
 		await vi.waitFor(() =>
 			expect(router.state.location.pathname).toBe(HOME),
 		);

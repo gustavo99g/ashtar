@@ -23,11 +23,11 @@ import { useMessages, usePeople, useSendMessage } from "../queries";
 import { usePending } from "../stores/outboxStore";
 import { Composer } from "./Composer";
 import { MessageList } from "./MessageList";
-import { PeopleColumn } from "./PeopleColumn";
 
 /**
- * A tela de um canal de texto: o cabeçalho com o nome e o tópico, a conversa, o campo de escrever
- * e a coluna de membros. É a tela do servidor desde a 0.2.3: abrir o app cai no último canal.
+ * A tela de um canal de texto: o cabeçalho com o nome e o tópico, a conversa e o campo de
+ * escrever. É a tela do servidor desde a 0.2.3: abrir o app cai no último canal. Os membros ficam
+ * na lateral (`features/side-panel`), que mora no `AppShell`.
  */
 export function ChatView({ channelId }: { channelId: string }) {
 	const layout = useChannelLayout();
@@ -55,23 +55,20 @@ export function ChatView({ channelId }: { channelId: string }) {
 	if (!channel || channel.kind !== "text") return <MissingChannel />;
 
 	return (
-		<div className="flex h-full min-h-0">
-			<section className="flex min-w-0 flex-1 flex-col">
-				<header className="flex h-12 shrink-0 items-center gap-2 border-b border-border px-4">
-					<HashIcon
-						aria-hidden="true"
-						className="size-5 shrink-0 text-muted-foreground"
-					/>
+		<section className="flex h-full min-h-0 min-w-0 flex-col">
+			<header className="flex h-12 shrink-0 items-center gap-2 border-b border-border px-4">
+				<HashIcon
+					aria-hidden="true"
+					className="size-5 shrink-0 text-muted-foreground"
+				/>
 
-					<h1 className="shrink-0 text-[15px] font-bold text-foreground">
-						{channel.name}
-					</h1>
-					<ChannelTopic channel={channel} />
-				</header>
-				<Conversation channelId={channel.id} channelName={channel.name} />
-			</section>
-			<PeopleColumn />
-		</div>
+				<h1 className="shrink-0 text-[15px] font-bold text-foreground">
+					{channel.name}
+				</h1>
+				<ChannelTopic channel={channel} />
+			</header>
+			<Conversation channelId={channel.id} channelName={channel.name} />
+		</section>
 	);
 }
 

@@ -198,7 +198,7 @@ describe("quem já tem conta não vê as telas de convite", () => {
 	])("%s leva para o servidor", async (_name, path) => {
 		const router = renderAt(path, { status: "connected", user: kid });
 
-		await screen.findByRole("complementary");
+		await screen.findByRole("complementary", { name: "Servidor" });
 		await vi.waitFor(() =>
 			expect(router.state.location.pathname).toBe(HOME),
 		);

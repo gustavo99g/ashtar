@@ -15,21 +15,23 @@ import { authorName } from "../model/messages";
 import { usePeople } from "../queries";
 
 /**
- * A coluna de membros do chat, como no quadro "Canal de texto": "Membros — N" no alto, depois
- * três grupos, cada um em ordem de nome: o Dono (com a coroa), sempre no topo, esteja online ou
- * não; o Resto, que é quem mais está online; e o Offline, com quem está fora. Quem está online tem
- * a bolinha verde no avatar; quem está offline fica com o avatar e o nome apagados (`OFFLINE_DIM`),
- * mas com as mesmas cores, o dono inclusive. Embaixo
- * do nome, "Na Sala" ou "Transmitindo na Sala" para quem está na sala de voz (a mesma lista da
- * Etapa 5, que chega pelo tempo real).
+ * A lista de membros, que é a aba Membros da lateral (`features/side-panel`): três grupos, cada um
+ * em ordem de nome. O Dono (com a coroa), sempre no topo, esteja online ou não; o Resto, que é quem
+ * mais está online; e o Offline, com quem está fora. Quem está online tem a bolinha verde no
+ * avatar; quem está offline fica com o avatar e o nome apagados (`OFFLINE_DIM`), mas com as mesmas
+ * cores, o dono inclusive. Embaixo do nome, "Na Sala" ou "Transmitindo na Sala" para quem está na
+ * sala de voz (a mesma lista da Etapa 5 da v0.2.3, que chega pelo tempo real).
  *
  * Cada linha é um botão que abre o cartão da pessoa (`UserCardPopup`, ADR 0020), à esquerda da
- * coluna. É o mesmo cartão da lista da sala.
+ * lateral. É o mesmo cartão da lista da sala.
+ *
+ * Até a v0.3.0 isto era a `PeopleColumn`, uma coluna dentro do `ChatView`. A lista não sabe mais
+ * de largura, borda nem cabeçalho: quem a põe na tela é a lateral.
  */
-export function PeopleColumn() {
+export function PeopleList() {
 	const { data: people } = usePeople();
 	const { data: inRoom } = useVoiceParticipants(SALA.id);
-	if (!people) return <aside className={COLUMN} />;
+	if (!people) return null;
 
 	const room = new Map(inRoom?.map((p) => [p.user_id, p.screen_sharing]));
 	const byName = (a: Person, b: Person) =>
@@ -39,29 +41,22 @@ export function PeopleColumn() {
 	const offline = people.filter((p) => !p.is_owner && !p.online).sort(byName);
 
 	return (
-		<aside aria-label="Membros" className={COLUMN}>
-			<div className="flex h-12 shrink-0 items-center border-b border-border px-4 text-[11px] font-bold tracking-[0.06em] text-muted-foreground uppercase">
-				Membros — {people.length}
-			</div>
-			<div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-2">
-				<Group
-					title="Dono"
-					icon={<CrownIcon aria-hidden="true" className="size-3 text-gold" />}
-					countless
-					people={owner}
-					room={room}
-				/>
-				<Group title="Resto" people={rest} room={room} />
-				<Group title="Offline" people={offline} room={room} />
-			</div>
-		</aside>
+		<div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-2">
+			<Group
+				title="Dono"
+				icon={<CrownIcon aria-hidden="true" className="size-3 text-gold" />}
+				countless
+				people={owner}
+				room={room}
+			/>
+			<Group title="Resto" people={rest} room={room} />
+			<Group title="Offline" people={offline} room={room} />
+		</div>
 	);
 }
 
 /** Quanto o offline apaga a linha (o avatar e o nome juntos): as cores de cada um continuam. */
 const OFFLINE_DIM = "opacity-50";
-
-const COLUMN = "flex w-60 shrink-0 flex-col border-l border-border bg-card";
 
 function Group({
 	title,
