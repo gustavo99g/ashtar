@@ -21,6 +21,7 @@ import {
 	ParticipantTile,
 } from "../../members/components/ParticipantTile";
 import { useLiveMembers } from "../../members/hooks/useLiveMembers";
+import { useShareQuality } from "../../room/hooks/useShareQuality";
 import { useVoice } from "../../room/hooks/useVoice";
 import { SALA } from "../../room/model/channel";
 import { stopWatching, useRoomView, watchShare } from "../stores/roomViewStore";
@@ -127,7 +128,7 @@ function MeConnecting() {
 }
 
 function ConnectedRoom({ onExit }: { onExit: () => void }) {
-	const { screenShare } = useVoice();
+	const { screenShare, room } = useVoice();
 	const { data: me } = useMe();
 
 	const members = useLiveMembers();
@@ -137,7 +138,15 @@ function ConnectedRoom({ onExit }: { onExit: () => void }) {
 	const { winner } = useScreenShares();
 	const remote = winner && !winner.isOwn ? winner : undefined;
 	const remoteShare = remote?.track;
-	const remoteInfo = parseShareTrackName(remoteShare?.publication.trackName);
+	const trackInfo = parseShareTrackName(remoteShare?.publication.trackName);
+	// A qualidade pode ter mudado depois de publicar: vale o aviso de quem transmite.
+	const announced = useShareQuality(
+		room,
+		remote?.ownerId,
+		remoteShare?.publication.trackName,
+	);
+	const remoteInfo =
+		trackInfo && announced ? { ...trackInfo, quality: announced } : trackInfo;
 
 	const watching = useRoomView((state) => state.watching);
 	const watched = remote?.ownerId === watching ? remoteShare : undefined;

@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+	decodeShareQuality,
+	encodeShareQuality,
 	parseShareTrackName,
 	shareSpec,
 	shareTrackName,
@@ -72,5 +74,15 @@ describe("shareWinner", () => {
 		const kid = { identity: "u-kid", trackName: name(5) };
 		expect(shareWinner([kid])).toBe(kid);
 		expect(shareWinner([])).toBeUndefined();
+	});
+});
+
+describe("aviso da qualidade", () => {
+	it("vai e volta pelo tópico, e só aceita um preset conhecido", () => {
+		expect(decodeShareQuality(encodeShareQuality("720p60"))).toBe("720p60");
+		const raw = (text: string) => new TextEncoder().encode(text);
+		expect(decodeShareQuality(raw('{"quality":"4k"}'))).toBeNull();
+		expect(decodeShareQuality(raw('{"quality":3}'))).toBeNull();
+		expect(decodeShareQuality(raw("lixo"))).toBeNull();
 	});
 });
