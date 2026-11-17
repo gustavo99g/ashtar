@@ -19,6 +19,9 @@ import { routes } from "./router";
 const HOME = paths.channel(DEFAULT_CHANNEL_ID);
 
 vi.mock("@/lib/tauri/commands", () => ({
+	// A ponta dos avisos, na moldura (`NotificationsBridge`).
+	setUnreadBadge: vi.fn(() => Promise.resolve()),
+	onNotificationOpen: vi.fn(() => Promise.resolve(() => {})),
 	login: vi.fn(),
 	accountMarker: vi.fn(),
 	checkForUpdate: vi.fn(() => Promise.resolve()),

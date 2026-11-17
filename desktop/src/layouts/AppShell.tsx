@@ -2,6 +2,7 @@ import { Outlet } from "react-router-dom";
 import { ChannelDialogs } from "@/features/channels";
 import { DmDock } from "@/features/dms";
 import { JoinNotices } from "@/features/members";
+import { NotificationsBridge } from "@/features/notifications";
 import { ChannelNav, ServerMenu } from "@/features/server";
 import { SideDock } from "@/features/side-panel";
 import { MiniShare, VoiceDock } from "@/features/voice";
@@ -54,6 +55,8 @@ export function AppShell() {
 			<SideDock />
 			{/* Os diálogos de criar, editar e arquivar canais: abrem pela lista ou pelo cabeçalho do chat. */}
 			<ChannelDialogs />
+			{/* Os avisos: a regra, o ponto de não lido e o clique num cartão. Não desenha nada. */}
+			<NotificationsBridge />
 		</div>
 	);
 }

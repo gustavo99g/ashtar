@@ -16,6 +16,7 @@ mod error;
 mod identity;
 pub mod logging;
 mod media;
+mod notifications;
 mod permissions;
 mod tray;
 mod updater;
@@ -74,6 +75,8 @@ pub fn run(log_file: logging::LateFile) {
             permissions::allow_microphone(app);
             webview_process::refresh(app.handle());
             tray::create(app);
+            // A janela dos avisos nasce escondida e já carregada (`notifications.rs`).
+            notifications::create(app);
             // A janela nasce invisível (`tauri.conf.json`) e só aparece aqui, a não ser que o app
             // tenha subido com o Windows: aí fica na bandeja, sem piscar na tela. O
             // `single-instance` traz a janela se a pessoa abrir o app de novo.
@@ -107,6 +110,10 @@ pub fn run(log_file: logging::LateFile) {
             commands::app::tray_share_state,
             commands::app::autostart_enabled,
             commands::app::set_autostart,
+            commands::notifications::notification_show,
+            commands::notifications::notification_layout,
+            commands::notifications::notification_open,
+            commands::notifications::set_unread_badge,
             commands::identity::login,
             commands::identity::redeem,
             commands::identity::account_marker

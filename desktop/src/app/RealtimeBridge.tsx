@@ -21,6 +21,7 @@ import { handleChatRealtime, useOfflineCatchUp } from "@/features/chat";
 import { handleDmsRealtime } from "@/features/dms";
 import { handleIdentityRealtime, useSession } from "@/features/identity";
 import { handleMembersRealtime } from "@/features/members";
+import { handleNotificationsRealtime } from "@/features/notifications";
 import { handleUnreadRealtime } from "@/features/unread";
 import { handleVoiceRealtime } from "@/features/voice";
 import { getMe, type ServerEvent } from "@/lib/api";
@@ -54,6 +55,8 @@ const HANDLERS: Handler[] = [
 	handleDmsRealtime,
 	handleUnreadRealtime,
 	handleChannelsRealtime,
+	// Por último: a regra dos avisos lê o silenciar e a lista de canais já em dia.
+	handleNotificationsRealtime,
 ];
 
 export function RealtimeBridge() {

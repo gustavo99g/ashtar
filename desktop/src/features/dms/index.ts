@@ -3,4 +3,4 @@ export { DmDock } from "./components/DmDock";
 export { DmList } from "./components/DmList";
 export { dmsKeys, useDmsUnread } from "./queries";
 export { handleDmsRealtime } from "./realtime";
-export { clearOpenDms } from "./stores/openDmsStore";
+export { clearOpenDms, showDm, useOpenDms } from "./stores/openDmsStore";

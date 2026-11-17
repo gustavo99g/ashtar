@@ -17,6 +17,7 @@ import { clearOutbox } from "@/features/chat";
 import { clearOpenDms } from "@/features/dms";
 import { clearUnread } from "@/features/unread";
 import { SessionWatcher } from "@/features/identity";
+import { resetStreamWatch } from "@/features/notifications";
 import { useApplyTheme } from "@/features/settings";
 import { UpdateNotice, WhatsNewDialog } from "@/features/updater";
 import { useVoice, VoiceProvider } from "@/features/voice";
@@ -29,6 +30,7 @@ function goToLeftGroup() {
 	clearOutbox();
 	clearOpenDms();
 	clearUnread();
+	resetStreamWatch();
 	void router.navigate(paths.entry.leftGroup, { replace: true });
 }
 
