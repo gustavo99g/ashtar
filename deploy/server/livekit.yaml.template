@@ -9,6 +9,10 @@ rtc:
   # Toda a mídia UDP numa porta só (mux), em vez da faixa 50000-60000.
   udp_port: 7882
   use_external_ip: true
+  # A rede interna do Docker (172.17.0.1) não serve para ninguém de fora: fica fora dos candidatos.
+  interfaces:
+    excludes:
+      - docker0
 
 # TURN embutido só por UDP: ajuda quem está atrás de NAT restritivo.
 # O TURN/TLS na 443 (para redes que só deixam HTTPS) fica para a v0.2.4.
