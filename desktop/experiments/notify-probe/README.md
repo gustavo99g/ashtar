@@ -83,23 +83,31 @@ Preencha e copie a conclusão para a ADR 0022.
 
 | Pergunta | Windows 11 | Windows 10 |
 |---|---|---|
-| 1. O aviso do plugin aparece com a janela na bandeja | | |
-| 1. Sai com o nome e o ícone do app | | |
-| 1. O clique no aviso do plugin chega ao app | | |
-| 2. O clique no aviso WinRT chega, dizendo a conversa | | |
-| 2. O clique pela central de notificações chega | | |
-| 3. Os botões chegam, dizendo qual | | |
-| 4. Bolinha na bandeja | | |
-| 4. Selo na barra de tarefas | | |
-| 5. Sobe com o Windows, na bandeja, sem piscar | | |
-| 5. Continua depois de reinstalar por cima | | |
-| 6. Som aos 12 minutos com a janela escondida | | |
-| 7. Com "Não incomodar" | | |
-| 7. Com jogo em tela cheia | | |
-| B. Aviso próprio aparece sem roubar o foco | | |
-| B. Aviso próprio por cima de jogo em tela cheia | | |
+| 1. O aviso do plugin aparece com a janela na bandeja | Sim (`show()` devolveu Ok) | não rodado |
+| 1. Sai com o nome e o ícone do app | não conferido | não rodado |
+| 1. O clique no aviso do plugin chega ao app | Parece que só traz a janela (o registro mostra o foco voltando), sem dizer qual; não confirmado | não rodado |
+| 2. O clique no aviso WinRT chega, dizendo a conversa | Sim: `conversa A, botão None` | não rodado |
+| 2. O clique pela central de notificações chega | não testado | não rodado |
+| 3. Os botões chegam, dizendo qual | Sim: `botão Some("reply")` | não rodado |
+| 4. Bolinha na bandeja | Sim | não rodado |
+| 4. Selo na barra de tarefas | Sim | não rodado |
+| 5. Sobe com o Windows, na bandeja, sem piscar | não testado (falta reiniciar) | não rodado |
+| 5. Continua depois de reinstalar por cima | não testado | não rodado |
+| 6. Som aos 12 minutos com a janela escondida | não testado ("Tocar agora" funciona) | não rodado |
+| 7. Com "Não incomodar" | Os avisos do Windows não aparecem e não ficaram na central | não rodado |
+| 7. Com jogo em tela cheia | não testado | não rodado |
+| B. Aviso próprio aparece sem roubar o foco | Sim | não rodado |
+| B. Aviso próprio com "Não incomodar" | Continua aparecendo (o Windows não sabe que é um aviso) | não rodado |
+| B. Aviso próprio por cima de jogo em tela cheia | não testado | não rodado |
 
-**Conclusão (qual caminho a Etapa 15 usa):**
+**Conclusão (qual caminho a Etapa 15 usa):** o aviso próprio. As duas formas funcionaram, e o grupo preferiu
+a janela do Ashtar: tem a cara do app, empilha até três cartões (o mais novo tira o mais antigo) e não rouba
+o foco. Como ela não respeita o "Não incomodar" sozinha, o app pergunta ao Windows antes de mostrar
+(`SHQueryUserNotificationState`) e segura o aviso em tela cheia, apresentação e tela bloqueada; para o resto,
+existe o status Ocupado. O som toca na própria janela dos avisos, que está à vista nessa hora, o que contorna
+a dúvida do som com a janela principal escondida. A bandeja e o selo funcionaram como esperado. Ficam para
+conferir no roteiro da `0.3.10` (Etapa 17): o reinício com o iniciar com o Windows e o aviso com um jogo em
+tela cheia. Detalhes na ADR 0022.
 
 ## O que eu espero, antes de rodar
 

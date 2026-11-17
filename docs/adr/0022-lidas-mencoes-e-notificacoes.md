@@ -1,6 +1,7 @@
 # 0022 — Lidas, menções, silenciar, status e notificações
 
-- **Status:** proposta (falta o resultado do experimento de notificações, Etapa 6 da v0.3)
+- **Status:** proposta (o experimento de notificações, Etapa 6 da v0.3, já decidiu o caminho; vira aceita no
+  lançamento da `0.3.10`)
 - **Data:** 2026-11
 
 ## Contexto
@@ -46,7 +47,7 @@ status, do silenciar, das chaves da aba Notificações, do foco da janela e do q
 - canal ou conversa aberto e em foco: nada;
 - Ocupado: nada;
 - silenciado: só a menção;
-- janela à vista: o aviso no canto do app; minimizada ou na bandeja: a notificação do Windows.
+- o resto vira um cartão na janela dos avisos, com a janela principal à vista ou na bandeja.
 
 **"Fulano começou a transmitir"** sai do `voice.participants` que o app já recebe, sem rota nova.
 
@@ -55,8 +56,22 @@ privada ou menção não lida.
 
 **As chaves de notificação e os sons ficam no computador;** o lido, o silenciar e o status, no servidor.
 
-**A notificação do Windows:** a decidir pelo experimento da Etapa 6 (o plugin do Tauri, ou um aviso próprio
-numa janela pequena sempre no topo). O resultado entra aqui.
+**O aviso é uma janela própria do Ashtar, e não a notificação do Windows** (resultado do experimento da Etapa
+6, `desktop/experiments/notify-probe`). As duas funcionaram: a do Windows (pelo plugin ou direto pela API
+WinRT, com o clique chegando ao app e dizendo a conversa) e a janela própria, pequena, sem borda, sempre no
+topo, no canto de baixo à direita, que não rouba o foco. A escolha foi pela própria, porque ela tem a cara do
+app e empilha do jeito que o grupo quer:
+
+- no máximo três cartões; um cartão de outra conversa, com a pilha cheia, tira o mais antigo;
+- mensagens da mesma conversa atualizam o cartão dela (com "N novas"), em vez de empilhar;
+- cada cartão some em 6 segundos, e o mouse em cima da pilha pausa;
+- o som toca na própria janela dos avisos (que está à vista nessa hora), no máximo um a cada 3 segundos.
+
+O preço: o Windows não sabe que ela é uma notificação. Ela não fica na central de notificações (as não lidas
+cobrem isso dentro do app) e não respeita sozinha o "Não incomodar" (o experimento confirmou). Antes de
+mostrar, o app pergunta ao Windows (`SHQueryUserNotificationState`) e segura o aviso com jogo ou app em tela
+cheia, apresentação ou tela bloqueada. O "Não incomodar" do Windows não tem consulta pública; quem quer
+silêncio no Ashtar usa o Ocupado.
 
 ## Alternativas consideradas
 
@@ -80,7 +95,7 @@ numa janela pequena sempre no topo). O resultado entra aqui.
 - O `ready` passa a trazer, para cada canal e conversa, o ponteiro, as não lidas, as menções e o silenciar.
 - Toda mensagem enviada passa a procurar menções: uma busca nos membros ativos, barata para dez pessoas.
 - O Invisível pede cuidado em toda rota e evento que diz quem está online, com teste.
-- As não lidas e o aviso do canto não dependem do Windows; a notificação do Windows, sim (modo de foco,
-  notificações desligadas para o app).
+- As não lidas e o aviso não dependem das configurações de notificação do Windows. O "Não incomodar" do
+  Windows não cala o Ashtar; a tela cheia, sim.
 - A ligação privada (ADR 0023) usa o mesmo `decide.ts` e o mesmo status.
 - Rever a regra das mensagens de canal se o grupo pedir notificação por canal, e o `@todos` depois do uso.

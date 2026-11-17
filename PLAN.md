@@ -156,11 +156,12 @@ para a ligação e a seção "Em ligação" na lateral esquerda.
 16. **Silenciar** cala o aviso, o som e o número do canal ou da conversa, mas a menção passa. Fica no
     servidor, junto do ponteiro.
 17. **Três status:** Disponível, Ocupado e Invisível, guardados no servidor. Ocupado aparece para os outros
-    (bolinha vermelha) e, no app de quem escolheu, cala avisos, sons e notificações do Windows; as não lidas
+    (bolinha vermelha) e, no app de quem escolheu, cala avisos e sons; as não lidas
     continuam contando. Invisível é resolvido na API: os outros recebem a pessoa como offline.
 18. **O app decide se notifica, num lugar só** (`features/notifications`): olha o status, o silenciar, as
-    chaves da aba Notificações, se a janela está em foco e qual canal está aberto. Com a janela à vista, o
-    aviso é o do canto do app; minimizada ou na bandeja, é a notificação do Windows. "Começou a transmitir"
+    chaves da aba Notificações, se a janela está em foco e qual canal está aberto. O aviso é uma janela
+    própria do Ashtar no canto da tela, com até três cartões (o experimento da Etapa 6 decidiu, ADR 0022).
+    "Começou a transmitir"
     sai do `voice.participants` que o app já recebe, sem rota nova.
 19. **A lateral sai do chat e vai para a casca do app**, com 300 de largura: hoje a `PeopleColumn` só existe
     dentro do `ChatView`, e o canvas a mostra também na sala de voz, minimizada.
