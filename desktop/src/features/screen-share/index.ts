@@ -11,8 +11,11 @@ export type {
 } from "./model/controller";
 export { type ShareNotice, shareNotice } from "./model/notices";
 export {
+	decodeShareQuality,
+	encodeShareQuality,
 	isScreenIdentity,
 	parseShareTrackName,
+	QUALITY_TOPIC,
 	type ShareInfo,
 	shareOwner,
 	shareSpec,
