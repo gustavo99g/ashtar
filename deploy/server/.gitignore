@@ -1,0 +1,7 @@
+# Gerados pelo setup.sh na VPS; têm segredos.
+.env
+api.env
+livekit.yaml
+Caddyfile
+# Banco e backups da API.
+data/
