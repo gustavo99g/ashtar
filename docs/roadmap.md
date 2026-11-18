@@ -491,6 +491,13 @@ mostrou que o limite que aperta primeiro são os minutos, não o tráfego (~2 GB
 pessoas). Com o publicador nativo, a conexão `:screen` de quem transmite conta como mais um participante:
 acompanhar a cota no painel do Cloud.
 
+**Começa pelo LiveKit.** O que apertou foi o tráfego, não os minutos: uns 30 minutos de teste em 2026-11-09
+gastaram ~3 GB dos 50 GB do mês. O LiveKit foi para a VPS primeiro (2026-11-16, Hostinger KVM 2), com a API e o
+banco ainda em casa; a troca foi só no `.env` da API. Depois vem a API, em duas fases: o domínio
+`api.ashtar.app.br` primeiro repassa para a API de casa enquanto sai a versão do app com a URL nova, e só então o
+banco vai para a VPS. A imagem da API sai do GitHub Actions (botão manual) e a VPS só baixa. Configuração e passo
+a passo em [`deploy/server/`](../deploy/server/README.md).
+
 O desktop só conhece a URL da API. A URL, a chave e o segredo do LiveKit ficam no servidor, e a URL do
 LiveKit chega ao desktop pela própria API.
 

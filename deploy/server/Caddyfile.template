@@ -1,0 +1,12 @@
+# Gerado pelo setup.sh a partir de Caddyfile.template (o Caddyfile não vai para o git).
+# Certificado automático (Let's Encrypt) para cada domínio.
+
+# Sinal do LiveKit (HTTP + WebSocket). A mídia não passa por aqui.
+__LIVEKIT_DOMAIN__ {
+	reverse_proxy 127.0.0.1:7880
+}
+#API
+# API: a da VPS (127.0.0.1:3000) ou, durante a migração, a de casa pelo Funnel.
+#API __API_DOMAIN__ {
+#API 	reverse_proxy __API_UPSTREAM__
+#API }

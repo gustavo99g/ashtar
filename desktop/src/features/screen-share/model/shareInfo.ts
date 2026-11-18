@@ -9,11 +9,18 @@
  * conversa entre eles. Continua a que começou antes; o horário é o relógio de quem publicou, e uma
  * diferença entre os relógios só muda quem ganha, nunca faz os dois discordarem. Empate (ou sem
  * horário) fica com a menor identidade, que é única na sala: a ordem é total.
+ *
+ * O nome não muda depois de publicado. A qualidade pode mudar no meio (o popover e o painel), então
+ * quem transmite avisa a nova pela conexão da voz, no tópico `screen-quality` (`{"quality": ...}`),
+ * e quem assiste prefere o aviso ao nome (`useShareQuality`).
  */
 import type { Quality } from "@/lib/tauri/commands";
 import { QUALITY_PRESETS } from "./presets";
 
 const NAME_PREFIX = "screen-share:";
+
+/** O tópico em que quem transmite avisa a qualidade nova. */
+export const QUALITY_TOPIC = "screen-quality";
 
 /** Até onde o título da fonte vai no nome da trilha. */
 const TITLE_MAX = 80;
@@ -99,4 +106,26 @@ export function shareOwner(identity: string): string {
 /** "1080p · 30 fps": a qualidade escolhida, para quem assiste. */
 export function shareSpec(info: ShareInfo): string {
 	return `${QUALITY_PRESETS[info.quality].spec} fps`;
+}
+
+const encoder = new TextEncoder();
+const decoder = new TextDecoder();
+
+/** O aviso da qualidade nova, para o tópico `screen-quality`. */
+export function encodeShareQuality(quality: Quality): Uint8Array {
+	return encoder.encode(JSON.stringify({ quality }));
+}
+
+/** Um aviso que não é uma qualidade conhecida dá `null`. */
+export function decodeShareQuality(payload: Uint8Array): Quality | null {
+	try {
+		const parsed: unknown = JSON.parse(decoder.decode(payload));
+		if (typeof parsed !== "object" || parsed === null) return null;
+		const { quality } = parsed as Record<string, unknown>;
+		return typeof quality === "string" && quality in QUALITY_PRESETS
+			? (quality as Quality)
+			: null;
+	} catch {
+		return null;
+	}
 }
