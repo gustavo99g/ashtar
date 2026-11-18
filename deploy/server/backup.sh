@@ -28,6 +28,8 @@ if [[ -z "$file" || ! -f "data/$file" ]]; then
   exit 1
 fi
 
+# Aceita o ID puro ou o endpoint inteiro (https://<ID>.r2.cloudflarestorage.com).
+account="$(get R2_ACCOUNT_ID | sed -e 's|^https\?://||' -e 's|\.r2\.cloudflarestorage\.com.*$||' -e 's|/.*$||')"
 prefix="$(get R2_PREFIX)"
 dest="r2:$(get R2_BUCKET)${prefix:+/$prefix}"
 
@@ -37,7 +39,7 @@ docker run --rm \
   -e RCLONE_CONFIG_R2_PROVIDER=Cloudflare \
   -e RCLONE_CONFIG_R2_ACCESS_KEY_ID="$(get R2_ACCESS_KEY_ID)" \
   -e RCLONE_CONFIG_R2_SECRET_ACCESS_KEY="$(get R2_SECRET_ACCESS_KEY)" \
-  -e RCLONE_CONFIG_R2_ENDPOINT="https://$(get R2_ACCOUNT_ID).r2.cloudflarestorage.com" \
+  -e RCLONE_CONFIG_R2_ENDPOINT="https://$account.r2.cloudflarestorage.com" \
   -e RCLONE_CONFIG_R2_NO_CHECK_BUCKET=true \
   rclone/rclone:1.75.2 sync /backups "$dest"
 
