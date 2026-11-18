@@ -139,6 +139,15 @@ else
   backup_status="desligado (falta R2_BUCKET no .env ou a API não roda aqui)"
 fi
 
+# --- Caddy já rodando: recarrega o Caddyfile novo -----------------------------
+# O `docker compose up -d` não recria um contêiner que já está de pé, então sem isto um
+# domínio novo ficaria sem certificado até o próximo restart.
+if docker compose ps --status running --services 2>/dev/null | grep -qx caddy; then
+  docker compose exec -T caddy caddy reload --config /etc/caddy/Caddyfile >/dev/null \
+    && echo "Caddy recarregado com o Caddyfile novo." \
+    || docker compose restart caddy
+fi
+
 echo
 echo "Pronto."
 echo "  LiveKit: wss://$livekit_domain"
