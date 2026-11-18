@@ -3,7 +3,7 @@
 #
 # 1. `admin backup` faz a cópia com VACUUM INTO (seguro com a API no ar) em data/backups,
 #    mantendo as 14 mais recentes.
-# 2. O rclone manda a cópia nova para o R2.
+# 2. O rclone espelha data/backups no R2 (sync): o bucket fica com as mesmas 14 cópias.
 #
 # Variáveis no .env desta pasta:
 #   R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET e, opcional, R2_PREFIX (pasta no bucket).
@@ -29,7 +29,7 @@ if [[ -z "$file" || ! -f "data/$file" ]]; then
 fi
 
 prefix="$(get R2_PREFIX)"
-dest="r2:$(get R2_BUCKET)${prefix:+/$prefix}/$(basename "$file")"
+dest="r2:$(get R2_BUCKET)${prefix:+/$prefix}"
 
 docker run --rm \
   -v "$PWD/data/backups:/backups:ro" \
@@ -39,6 +39,6 @@ docker run --rm \
   -e RCLONE_CONFIG_R2_SECRET_ACCESS_KEY="$(get R2_SECRET_ACCESS_KEY)" \
   -e RCLONE_CONFIG_R2_ENDPOINT="https://$(get R2_ACCOUNT_ID).r2.cloudflarestorage.com" \
   -e RCLONE_CONFIG_R2_NO_CHECK_BUCKET=true \
-  rclone/rclone:1.75.2 copyto "/backups/$(basename "$file")" "$dest"
+  rclone/rclone:1.75.2 sync /backups "$dest"
 
-echo "$(date -Is) enviado para $dest"
+echo "$(date -Is) $(basename "$file") enviado; $dest espelha data/backups"
