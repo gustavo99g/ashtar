@@ -1,5 +1,10 @@
 # O que há de novo no Ashtar
 
+## 0.2.41
+
+- O Ashtar ganhou servidor próprio: a voz e as transmissões passam por ele, e o app fala com o novo endereço. Nada muda no uso, e acaba o limite mensal que fazia a chamada parar de conectar.
+- Quem assiste uma transmissão passa a ver a qualidade nova assim que quem transmite troca.
+
 ## 0.2.40
 
 - A transmissão de tela ficou muito mais leve: a imagem agora é capturada e codificada pela placa de vídeo, e o app a envia direto, sem passar pela interface. Dá para transmitir 1080p a 60 fps sem pesar no computador, mesmo com um monitor grande. Sem encoder na placa, o processador entra sozinho, e o painel avisa.
