@@ -1,0 +1,3 @@
+# O sqlx guarda no banco o checksum de cada migração. Sempre LF, para o build do Windows e o
+# da imagem (Linux) gerarem o mesmo checksum.
+*.sql text eol=lf
