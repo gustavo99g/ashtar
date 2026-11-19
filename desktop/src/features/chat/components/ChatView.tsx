@@ -16,18 +16,14 @@ import {
 	useCanManageChannels,
 	useChannelLayout,
 } from "@/features/channels";
-import { useSession } from "@/features/identity";
 import { type ChannelView, isApiError } from "@/lib/api";
 import { paths } from "@/lib/paths";
-import { useMessages, usePeople, useSendMessage } from "../queries";
-import { usePending } from "../stores/outboxStore";
-import { Composer } from "./Composer";
-import { MessageList } from "./MessageList";
-import { PeopleColumn } from "./PeopleColumn";
+import { ChatConversation } from "./ChatConversation";
 
 /**
- * A tela de um canal de texto: o cabeçalho com o nome e o tópico, a conversa, o campo de escrever
- * e a coluna de membros. É a tela do servidor desde a 0.2.3: abrir o app cai no último canal.
+ * A tela de um canal de texto: o cabeçalho com o nome e o tópico, a conversa e o campo de
+ * escrever. É a tela do servidor desde a 0.2.3: abrir o app cai no último canal. Os membros ficam
+ * na lateral (`features/side-panel`), que mora no `AppShell`.
  */
 export function ChatView({ channelId }: { channelId: string }) {
 	const layout = useChannelLayout();
@@ -55,23 +51,25 @@ export function ChatView({ channelId }: { channelId: string }) {
 	if (!channel || channel.kind !== "text") return <MissingChannel />;
 
 	return (
-		<div className="flex h-full min-h-0">
-			<section className="flex min-w-0 flex-1 flex-col">
-				<header className="flex h-12 shrink-0 items-center gap-2 border-b border-border px-4">
-					<HashIcon
-						aria-hidden="true"
-						className="size-5 shrink-0 text-muted-foreground"
-					/>
+		<section className="flex h-full min-h-0 min-w-0 flex-col">
+			<header className="flex h-12 shrink-0 items-center gap-2 border-b border-border px-4">
+				<HashIcon
+					aria-hidden="true"
+					className="size-5 shrink-0 text-muted-foreground"
+				/>
 
-					<h1 className="shrink-0 text-[15px] font-bold text-foreground">
-						{channel.name}
-					</h1>
-					<ChannelTopic channel={channel} />
-				</header>
-				<Conversation channelId={channel.id} channelName={channel.name} />
-			</section>
-			<PeopleColumn />
-		</div>
+				<h1 className="shrink-0 text-[15px] font-bold text-foreground">
+					{channel.name}
+				</h1>
+				<ChannelTopic channel={channel} />
+			</header>
+			<ChatConversation
+				channelId={channel.id}
+				listLabel={`Mensagens em #${channel.name}`}
+				composerLabel={`Mensagem para #${channel.name}`}
+				start={<ChannelStart channelName={channel.name} />}
+			/>
+		</section>
 	);
 }
 
@@ -116,57 +114,20 @@ function ChannelTopic({ channel }: { channel: ChannelView }) {
 	);
 }
 
-function Conversation({
-	channelId,
-	channelName,
-}: {
-	channelId: string;
-	channelName: string;
-}) {
-	const query = useMessages(channelId);
-	const pending = usePending(channelId);
-	const people = usePeople();
-	const { send, retry, discard } = useSendMessage();
-	const session = useSession();
-	const ownerId =
-		people.data?.find((person) => person.is_owner)?.id ??
-		(session.status === "connected" && session.user.is_owner
-			? session.user.id
-			: null);
-
+/** O começo do canal: aparece quando não há mais histórico para buscar. */
+function ChannelStart({ channelName }: { channelName: string }) {
 	return (
-		<>
-			{query.messages ? (
-				<MessageList
-					channelName={channelName}
-					messages={query.messages}
-					pending={pending}
-					ownerId={ownerId}
-					hasOlder={query.hasPreviousPage}
-					loadingOlder={query.isFetchingPreviousPage}
-					onLoadOlder={() => void query.fetchPreviousPage()}
-					onRetry={retry}
-					onDiscard={discard}
-				/>
-			) : query.isError ? (
-				<Centered>
-					{isApiError(query.error, "network") ? (
-						<OfflineState onRetry={() => void query.refetch()} />
-					) : (
-						<ErrorState onRetry={() => void query.refetch()} />
-					)}
-				</Centered>
-			) : (
-				<Centered>
-					<LoadingState />
-				</Centered>
-			)}
-			<Composer
-				channelId={channelId}
-				channelName={channelName}
-				onSend={(body) => send(channelId, body)}
-			/>
-		</>
+		<div className="flex flex-col gap-2 px-4 pt-8 pb-2">
+			<span className="flex size-[68px] items-center justify-center rounded-full bg-secondary">
+				<HashIcon aria-hidden="true" className="size-10 text-foreground" />
+			</span>
+			<h2 className="text-[28px] font-bold text-foreground">
+				Bem-vindo a #{channelName}
+			</h2>
+			<p className="text-sm text-muted-foreground">
+				Este é o começo do canal #{channelName}.
+			</p>
+		</div>
 	);
 }
 

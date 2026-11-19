@@ -27,6 +27,12 @@ import {
 	updateChannel,
 } from "@/lib/api";
 import { layoutRequest } from "./model/tree";
+import {
+	organizeChanged,
+	startOrganizing,
+	stopOrganizing,
+	useOrganize,
+} from "./stores/organizeStore";
 
 export const channelsKeys = {
 	all: ["channels"] as const,
@@ -91,11 +97,67 @@ export function useSetLayout() {
 					? "A lista de canais mudou"
 					: "Não deu para mudar a ordem",
 				description: isApiError(error, "conflict")
-					? "Outra pessoa mexeu ao mesmo tempo. Confira e arraste de novo."
+					? "Outra pessoa mexeu ao mesmo tempo. Confira e tente de novo."
 					: error.message,
 			});
 		},
 	});
+}
+
+/**
+ * O Concluir do modo Organizar: manda a cópia num pedido só, com a versão que o modo tinha ao abrir,
+ * e sai do modo. Sem mudança, só sai. Num 409 (alguém mexeu enquanto a pessoa organizava), busca a
+ * árvore nova, recomeça o modo a partir dela e avisa; em outro erro, o modo fica como está.
+ */
+export function useFinishOrganizing() {
+	const queryClient = useQueryClient();
+	const mutation = useMutation({
+		mutationFn: (draft: Layout) => setChannelLayout(layoutRequest(draft)),
+		onSuccess: (saved) => {
+			queryClient.setQueryData(channelsKeys.layout(), saved);
+			stopOrganizing();
+		},
+		onError: async (error) => {
+			if (!isApiError(error, "conflict")) {
+				toast.add({
+					title: "Não deu para gravar a ordem",
+					description: error.message,
+				});
+				return;
+			}
+			try {
+				const fresh = await queryClient.fetchQuery({
+					queryKey: channelsKeys.layout(),
+					queryFn: getChannelLayout,
+					staleTime: 0,
+				});
+				// Só se a pessoa ainda está no modo: ela pode ter desfeito enquanto a árvore vinha.
+				if (useOrganize.getState().draft) startOrganizing(fresh);
+				toast.add({
+					title: "Outra pessoa mudou os canais",
+					description: "Confira a ordem e conclua de novo.",
+				});
+			} catch {
+				stopOrganizing();
+				toast.add({
+					title: "Não deu para gravar a ordem",
+					description: "A lista de canais mudou e não deu para buscar a nova.",
+				});
+			}
+		},
+	});
+	return {
+		isPending: mutation.isPending,
+		finish() {
+			const state = useOrganize.getState();
+			if (!state.draft || mutation.isPending) return;
+			if (!organizeChanged(state)) {
+				stopOrganizing();
+				return;
+			}
+			mutation.mutate(state.draft);
+		},
+	};
 }
 
 export function useCreateChannel() {

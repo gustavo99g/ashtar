@@ -19,13 +19,14 @@ v0.2  → Comunidade
         + publicador nativo + servidor na VPS
         ↓
 v0.3  → Conversas privadas
-        Mensagens e ligações privadas + não lidas + bandeja
+        Lista de canais nova + mensagens privadas + não lidas, menções e notificações
+        + status + ligações privadas
         ↓
 v0.4  → Transmissões múltiplas
         Várias transmissões simultâneas + experiência de quem assiste
         ↓
-v0.5  → Canais e presença
-        Múltiplos canais e salas + status + menções + sons da voz
+v0.5  → Salas e presença
+        Várias salas de voz + ausente automático + digitando + sons da voz
         ↓
 v0.6  → Confiabilidade e configurações
         Reconexão + estados + tela de configurações + atalhos globais
@@ -88,7 +89,9 @@ v0.2.N sai como versão `0.2.N0`, e cada correção dela soma 1 no último dígi
 0.2.40           entrega v0.2.4 (publicador nativo)
 0.2.41…          correções da v0.2.4
 0.2.50           entrega v0.2.5 (servidor)
-0.3.0            próxima versão do roadmap
+0.3.0            entrega v0.3.0 (base visual)
+0.3.10           entrega v0.3.1 (todo o chat)
+0.3.20           entrega v0.3.2 (ligações privadas)
 ```
 
 O formato segue o semver, que o Tauri e o updater exigem (sem zero à esquerda: `0.2.01` não é válido). O
@@ -529,72 +532,162 @@ servidor desligado → alerta no celular
 
 ## Objetivo
 
-Mensagens e ligações privadas entre duas pessoas, com o mínimo de notificações e de aplicativo em
-segundo plano que elas exigem.
+Mensagens e ligações privadas entre duas pessoas, com as não lidas, as notificações, as menções e o status
+que elas pedem. Antes, uma entrega só de interface refaz a lista de canais e o cartão do usuário, que as
+outras duas usam. O desenho é o do canvas "Clone do Discord — telas" (fechado em 08/11), e o escopo foi
+combinado em 10/11: as menções, o silenciar, o "começou a transmitir", o "não perturbe" e o volume por pessoa,
+que estavam na v0.5, vêm para cá, porque usam a mesma base.
 
-## Mensagens privadas
+## Entregas
 
-* conversa entre duas pessoas, tratada como um canal com dois membros, reaproveitando o chat da v0.2;
-* primeira permissão por canal do projeto: a API garante que só os dois leiam o histórico, e o
-  WebSocket só envia os eventos para eles, com testes de integração no pipeline;
-* as mensagens ficam em texto puro no banco, legíveis por quem administra o servidor. Isso é comunicado
-  ao grupo; criptografia ponta a ponta fica fora do escopo.
+As três entregas da v0.3 saem juntas, na versão `0.3.20`: a `0.3.0` e a `0.3.10` não chegaram a ser publicadas.
 
-## Não lidas e notificações
+```text
+v0.3.0  Base visual
+        lista de canais nova + modo Organizar + cartão do usuário + volume individual
+        ↓
+v0.3.1  Todo o chat
+        conversas privadas + não lidas + menções + silenciar + notificações + status
+        ↓
+v0.3.2  Ligações privadas
+        tocar, atender, recusar, perdida + tela compartilhada + registro (depois da v0.2.5)
+```
 
-O mínimo para uma mensagem privada não passar despercebida, valendo também para o canal da v0.2:
+### v0.3.0 — Base visual
 
-* indicador de mensagens não lidas;
-* notificação de mensagem nova.
+Só o app. Decisões na ADR 0020.
 
-## Aplicativo em segundo plano
+* lista de canais sem ferramentas fixas: o + da categoria e a engrenagem do canal só no hover;
+* o nome do servidor vira o menu de quem gerencia: Convidar, Criar canal, Criar categoria, Organizar canais e
+  Canais arquivados;
+* menu do canal (engrenagem ou botão direito) com Editar, Mover para e Arquivar;
+* **modo Organizar:** arrastar só nele, com Concluir (grava tudo de uma vez) e Desfazer;
+* um cartão só para o usuário, na lista de membros e na lista da sala;
+* **volume individual**, de 0 a 200%, só para quem ajusta, no cartão e no clique do bloco da grade, com a
+  marca no bloco (adiantado da v0.5);
+* tempo limite no pedido do token de voz e `MIN_CLIENT_VERSION` em `0.2.20` (do `BACKLOG.md`).
 
-* ícone na bandeja: fechar a janela não sai da sala de voz e continua recebendo mensagens e ligações;
-* iniciar com o Windows (opcional).
+```text
+quem gerencia arruma os canais pelo modo Organizar, com um pedido só
+ +
+quem não gerencia vê a lista sem nenhuma ferramenta
+ +
+cada um ajusta o volume de cada pessoa da sala
+```
 
-## Ligações privadas
+### v0.3.1 — Todo o chat
 
-* uma sala do LiveKit por conversa privada, com token só para os dois;
+API, banco e app. Decisões nas ADRs 0021 e 0022.
+
+**Mensagens privadas**
+
+* conversa entre duas pessoas, tratada como um canal de tipo `dm`, reaproveitando o chat da v0.2;
+* primeira permissão por canal do projeto: a API garante que só os dois leiam o histórico, e o WebSocket só
+  envia os eventos para eles, com testes de integração no pipeline;
+* a lateral direita ganha as abas Membros e Conversas e o botão de minimizar; a conversa abre numa janela
+  embaixo, com até três abertas em abas;
+* as mensagens ficam em texto puro no banco, legíveis por quem administra o servidor. Isso é comunicado ao
+  grupo e escrito no começo de cada conversa; criptografia ponta a ponta fica fora do escopo.
+
+**Não lidas**
+
+* até onde cada pessoa leu cada canal e cada conversa, guardado no servidor;
+* número de não lidas nas conversas, marca nos canais e a linha "novas mensagens" no histórico;
+* "Marcar como lido" e "Marcar tudo como lido";
+* ninguém começa com o histórico inteiro como não lido.
+
+**Menções e silenciar** (adiantados da v0.5)
+
+* menções (`@nick`), com sugestão ao digitar, destaque e contador próprio;
+* silenciar canal e silenciar conversa; a menção notifica mesmo assim.
+
+**Notificações**
+
+* aviso para mensagem privada e menção numa janela própria do Ashtar, no canto da tela, com até três cartões
+  (o experimento da Etapa 6 escolheu ela no lugar da notificação do Windows, ADR 0022); a tela cheia segura o
+  aviso;
+* ponto de não lido no ícone da bandeja e na barra de tarefas;
+* sons de mensagem privada e de menção;
+* notificação "fulano começou a transmitir", para quem não está na sala (adiantada da v0.5);
+* aba Notificações nas configurações, com uma chave por tipo;
+* mensagem comum de canal não notifica: só conta como não lida.
+
+**Status**
+
+* Disponível, Ocupado e Invisível, no menu do seu painel;
+* **Ocupado** é o "não perturbe" (adiantado da v0.5): sem avisos, sons, notificações nem toque de ligação;
+* **Invisível:** os outros veem a pessoa offline.
+
+**Aplicativo em segundo plano**
+
+* a bandeja existe desde a v0.2.4: fechar a janela não sai da sala e continua recebendo mensagens;
+* iniciar com o Windows (opcional), direto na bandeja.
+
+```text
+mensagem privada → só os dois leem, com teste automático provando
+ +
+janela fechada → notificação e ponto na bandeja
+ +
+menção num canal silenciado → notifica
+ +
+Ocupado → nada toca, e as não lidas continuam contando
+ +
+reabrir o app → não lidas certas, com a linha "novas mensagens" no lugar
+```
+
+### v0.3.2 — Ligações privadas
+
+API, banco e app. Decisões na ADR 0023. **Só é publicada com o LiveKit na VPS (v0.2.5).**
+
+* a sala da ligação é a própria conversa, com token só para os dois;
 * screen share na ligação, igual ao da sala de voz;
-* tocar, aceitar, recusar, tempo limite e chamada perdida;
-* toca com a janela fechada, pelo aplicativo na bandeja; a notificação tem os botões Aceitar e
-  Recusar (verificar se o plugin de notificação do Tauri dá suporte a botões no Windows; se não der,
-  uma janela própria pequena e sempre no topo);
+* tocar, atender, recusar, tempo limite de 30 s e chamada perdida;
+* toca com a janela fechada, pelo aplicativo na bandeja, num cartão com Recusar, Atender e Responder com
+  mensagem na janela dos avisos (o experimento da Etapa 18 escolheu ela no lugar da notificação do Windows,
+  que some com o "Não incomodar", ADR 0023);
 * quem liga nunca vê "ocupado": a ligação toca normalmente, mesmo que a outra pessoa esteja numa sala;
-* **histórico de chamadas na conversa**: "ligação de 42 min", "chamada perdida", com um botão para ligar
-  de volta.
+* para quem está offline (ou Invisível), o botão Ligar fica apagado;
+* os outros membros não ficam sabendo da ligação: os dois só saem da lista da sala;
+* **registro de chamadas na conversa**: "ligação de 42 min", "chamada perdida", com um botão para ligar de
+  volta.
 
 **Ligação recebida estando numa sala**, como no Discord:
 
 ```text
-toque + notificação com nome e foto de quem liga, com Aceitar e Recusar
+toque + cartão com nome e avatar de quem liga, com Recusar e Sair e atender
  ↓
-a conversa privada aparece no topo da lista, já aberta no canto
+o avatar de quem liga aparece no topo da lateral, com o anel dourado
  ↓
-Aceitar      → sai da sala → entra na ligação
-Recusar      → continua na sala; quem ligou vê "recusada"
-sem resposta → chamada perdida registrada na conversa
+Sair e atender → sai da sala → entra na ligação
+Recusar        → continua na sala; quem ligou vê "recusada"
+sem resposta   → chamada perdida registrada na conversa
 ```
 
 * a pessoa fica conectada a uma única sala de voz por vez, nunca à sala e à ligação ao mesmo tempo;
-* se ela estiver transmitindo a tela na sala, o botão Aceitar avisa que a transmissão será encerrada;
+* quem liga só sai da sala em que está quando a outra pessoa atende;
+* se ela estiver transmitindo a tela na sala, o botão avisa que a transmissão será encerrada;
 * o toque é mais baixo enquanto a pessoa está numa sala, para não atrapalhar a conversa;
-* ao desligar, a pessoa não volta sozinha para a sala: a tela da ligação encerrada oferece um botão
-  "voltar para a sala";
-* a partir da v0.5, com o status "não perturbe", a ligação mostra só a notificação visual, sem som.
+* ao desligar, a pessoa não volta sozinha para a sala: a conversa oferece "voltar para a sala";
+* em Ocupado, a ligação não toca: aparece só o avatar na lateral, com Recusar e Atender na conversa.
+
+```text
+ligação privada com a janela fechada → tocar, atender, recusar e chamada perdida
+ +
+screen share dentro da ligação privada
+ +
+ligação recebida estando numa sala → sair e atender → voltar para a sala com um clique
+ +
+ninguém fora da conversa fica sabendo da ligação
+```
 
 ## Critérios de conclusão
 
 ```text
-mensagem privada → só os dois leem
+v0.3.0 → canais organizados pelo modo Organizar + volume individual
  +
-janela fechada → notificação de mensagem nova pela bandeja
+v0.3.1 → mensagem privada que só os dois leem + não lidas + notificação com a janela fechada
  +
-ligação privada com a janela fechada → tocar, aceitar, recusar e chamada perdida
- +
-screen share dentro da ligação privada
- +
-ligação recebida estando numa sala → aceitar → sair da sala e entrar na ligação
+v0.3.2 → ligação privada com a janela fechada + screen share dentro dela
 ```
 
 ---
@@ -635,16 +728,18 @@ tráfego e CPU da VPS medidos e dentro do plano contratado
 
 ---
 
-# v0.5 — Canais e presença
+# v0.5 — Salas e presença
 
 ## Objetivo
 
-Sair da sala e do canal únicos e mostrar quem está fazendo o quê.
+Sair da sala única e mostrar quem está fazendo o quê. Os canais de texto, as menções, o silenciar, o "não
+perturbe" e o volume por pessoa já saíram antes (v0.2.3 e v0.3).
 
 ## Canais
 
 * múltiplas salas de voz, criadas como os canais de texto da v0.2.3, nas mesmas categorias;
-* conexão de voz independente do canal de texto selecionado.
+* conexão de voz independente do canal de texto selecionado (já vale desde a v0.2.3);
+* mover alguém para outra sala, pelo cartão do usuário.
 
 ```text
 Canal de texto:          # development
@@ -653,31 +748,23 @@ Canal de voz conectado:  🔊 General
 
 ## Presença
 
-* status online, ausente, não perturbe e invisível, com ausente automático por inatividade;
-* "não perturbe" silencia as notificações; ligações privadas aparecem só como notificação visual, sem
-  som;
+* status ausente, com ausente automático por inatividade (Disponível, Ocupado e Invisível são da v0.3);
 * quem está em cada sala de voz;
-* indicador "digitando...";
-* menções (`@nick`), que notificam mesmo em canal silenciado;
-* silenciar canal;
-* notificação "fulano começou a transmitir", para quem não está na sala.
+* indicador "digitando...".
 
 ## Voz
 
 * sons de entrada e saída de pessoas na sala;
-* speaking indicator;
-* volume por usuário.
+* speaking indicator.
 
 ## Critérios de conclusão
 
 ```text
-trocar de canal de texto
+criar uma segunda sala de voz
  ↓
 entrar em voz e continuar navegando pelo chat
  ↓
 trocar de sala de voz
- ↓
-ser mencionado num canal silenciado → receber a notificação
  ↓
 ficar inativo → status muda para ausente
 ```
@@ -1064,9 +1151,9 @@ v0.2
 12. v0.2.5 VPS (LiveKit, API e banco) + domínio + migração + alerta
 
 v0.3
-13. Mensagens privadas
-14. Não lidas + notificações + bandeja
-15. Ligações privadas + histórico de chamadas
+13. v0.3.0 Lista de canais + modo Organizar + cartão do usuário + volume individual
+14. v0.3.1 Mensagens privadas + não lidas + menções + silenciar + notificações + status
+15. v0.3.2 Ligações privadas + registro de chamadas (depois da v0.2.5)
 
 v0.4
 16. Transmissões múltiplas + assinatura seletiva
@@ -1074,8 +1161,8 @@ v0.4
 
 v0.5
 18. Salas de voz
-19. Status + digitando + menções + silenciar canal
-20. Sons, speaking indicator e volume por usuário
+19. Ausente automático + digitando
+20. Sons e speaking indicator
 
 v0.6
 21. Tela de configurações + atalhos globais

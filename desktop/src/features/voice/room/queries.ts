@@ -5,7 +5,13 @@
  */
 import { createVoiceToken, getMe } from "@/lib/api";
 
-/** Pede o token para entrar na sala (`POST /api/voice/token`). Sem cache, de propósito. */
+/**
+ * Pede o token para entrar na sala (`POST /api/voice/token`). Sem cache, de propósito.
+ *
+ * Com a API fora do ar, o pedido não fica esperando: o `lib/api` corta toda chamada em 10 s
+ * (`TIMEOUT_MS`, em `client.ts`) e devolve um `ApiError` do tipo `timeout`, que a sala mostra com o
+ * "Tentar de novo". O token da tela (`createScreenToken`) passa pelo mesmo caminho.
+ */
 export function requestVoiceToken(channelId: string) {
 	return createVoiceToken(channelId);
 }

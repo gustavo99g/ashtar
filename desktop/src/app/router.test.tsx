@@ -19,6 +19,11 @@ import { routes } from "./router";
 const HOME = paths.channel(DEFAULT_CHANNEL_ID);
 
 vi.mock("@/lib/tauri/commands", () => ({
+	// A ponta dos avisos, na moldura (`NotificationsBridge`).
+	setUnreadBadge: vi.fn(() => Promise.resolve()),
+	onNotificationOpen: vi.fn(() => Promise.resolve(() => {})),
+	onNotificationAnswer: vi.fn(() => Promise.resolve(() => {})),
+	notificationRing: vi.fn(() => Promise.resolve()),
 	login: vi.fn(),
 	accountMarker: vi.fn(),
 	checkForUpdate: vi.fn(() => Promise.resolve()),
@@ -36,6 +41,7 @@ function me(canViewPanel: boolean): MeResponse {
 		user,
 		permissions: [],
 		update_channel: "stable",
+		status: "available",
 		can_create_invite: canViewPanel,
 		can_view_panel: canViewPanel,
 		can_manage_channels: false,
@@ -155,7 +161,7 @@ describe("router", () => {
 
 	it("o AppShell não deixa texto solto ao lado das colunas", () => {
 		renderAt([paths.server]);
-		const shell = screen.getByRole("complementary").parentElement;
+		const shell = screen.getByRole("complementary", { name: "Servidor" }).parentElement;
 		const loose = Array.from(shell?.childNodes ?? []).filter(
 			(node) => node.nodeType === Node.TEXT_NODE && node.textContent?.trim(),
 		);
@@ -164,7 +170,7 @@ describe("router", () => {
 
 	it("o botão de configurações da coluna abre o Perfil", () => {
 		const router = renderAt([paths.server]);
-		const column = screen.getByRole("complementary");
+		const column = screen.getByRole("complementary", { name: "Servidor" });
 		fireEvent.click(
 			within(column).getByRole("link", { name: "Configurações" }),
 		);
@@ -211,7 +217,7 @@ describe("a abertura", () => {
 
 		const router = renderAt([paths.start]);
 
-		await screen.findByRole("complementary");
+		await screen.findByRole("complementary", { name: "Servidor" });
 		await vi.waitFor(() =>
 			expect(router.state.location.pathname).toBe(HOME),
 		);
@@ -244,7 +250,7 @@ describe("a abertura", () => {
 		const retry = await screen.findByRole("button", { name: "Tentar de novo" });
 		vi.mocked(login).mockResolvedValue({ token: "tok", user });
 		fireEvent.click(retry);
-		await screen.findByRole("complementary");
+		await screen.findByRole("complementary", { name: "Servidor" });
 		await vi.waitFor(() =>
 			expect(router.state.location.pathname).toBe(HOME),
 		);

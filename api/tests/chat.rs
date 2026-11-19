@@ -4,6 +4,7 @@
 use std::sync::Arc;
 use std::time::Duration;
 
+use api::chat::access::Readable;
 use api::client_policy::ClientPolicy;
 use api::db::{self, now};
 use api::identity::invites::{self, InviteKind};
@@ -116,6 +117,7 @@ async fn seed(ctx: &Ctx, n: usize) {
     let channel = api::chat::channels::get_open_text(&ctx.db, "geral")
         .await
         .unwrap();
+    let channel = Readable::Text(channel);
     let limiter = SendLimiter::new(usize::MAX, Duration::from_secs(1));
     for i in 0..n {
         api::chat::messages::create(

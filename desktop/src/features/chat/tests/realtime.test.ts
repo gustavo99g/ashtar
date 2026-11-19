@@ -11,7 +11,14 @@ vi.mock("@/lib/api", async (importOriginal) => ({
 }));
 
 function person(id: string, online = false): Person {
-	return { id, nick: id, display_name: null, is_owner: false, online };
+	return {
+		id,
+		nick: id,
+		display_name: null,
+		is_owner: false,
+		online,
+		status: "available",
+	};
 }
 
 function message(id: string, authorId = "ana"): Message {
@@ -21,7 +28,10 @@ function message(id: string, authorId = "ana"): Message {
 		client_id: `c-${id}`,
 		author: { id: authorId, nick: authorId, display_name: null, removed: false },
 		body: "oi",
+		mentions: [],
 		created_at: 1,
+		kind: "text",
+		call: null,
 	};
 }
 
@@ -70,14 +80,20 @@ describe("handleChatRealtime", () => {
 		expect(findPending("c-m2")).toBeUndefined();
 	});
 
-	it("presence.changed troca o online de quem mudou", () => {
+	it("presence.changed troca o online e o status de quem mudou", () => {
 		const client = setup();
 		handleChatRealtime(
-			{ type: "presence.changed", user_id: "bia", online: true },
+			{
+				type: "presence.changed",
+				user_id: "bia",
+				online: true,
+				status: "busy",
+			},
 			client,
 			first,
 		);
 		expect(people(client)?.map((p) => p.online)).toEqual([true, true]);
+		expect(people(client)?.map((p) => p.status)).toEqual(["available", "busy"]);
 	});
 
 	it("member.joined entra uma vez; member.left sai e marca as mensagens", () => {
@@ -96,14 +112,25 @@ describe("handleChatRealtime", () => {
 		const client = setup();
 		const ready = {
 			type: "ready" as const,
+			call: null,
 			user_id: "u1",
-			online: ["bia"],
-			channels: [{ channel_id: "geral", last_message_id: "m9" }],
+			online: ["ana", "bia"],
+			busy: ["ana"],
+			status: "available" as const,
+			channels: [
+				{
+					channel_id: "geral",
+					last_message_id: "m9",
+					state: { last_read_id: null, unread: 0, mentions: 0, muted: false },
+				},
+			],
+			dms: [],
 		};
 		vi.mocked(listMessages).mockResolvedValue({ messages: [], has_more: false });
 
 		handleChatRealtime(ready, client, first);
-		expect(people(client)?.map((p) => p.online)).toEqual([false, true]);
+		expect(people(client)?.map((p) => p.online)).toEqual([true, true]);
+		expect(people(client)?.map((p) => p.status)).toEqual(["busy", "available"]);
 		expect(client.getQueryState(chatKeys.people())?.isInvalidated).toBe(false);
 		expect(listMessages).not.toHaveBeenCalled();
 

@@ -112,12 +112,16 @@ mod tests {
         assert_eq!(
             tables,
             [
+                "calls",
                 "categories",
                 "channel_layout",
+                "channel_members",
+                "channel_state",
                 "channels",
                 "devices",
                 "invite_uses",
                 "invites",
+                "mentions",
                 "messages",
                 "sessions",
                 "user_permissions",

@@ -3,8 +3,9 @@
 //! Um [`Hub`] para a API inteira. Cada WebSocket aberto assina o mesmo
 //! `broadcast` do tokio; quem muda alguma coisa (uma mensagem nova, alguém que
 //! entrou na sala) publica um [`ServerEvent`], que vai uma vez para o JSON e
-//! sai igual para todos. O hub também guarda os tickets de entrada e quem está
-//! online.
+//! sai igual para quem deve receber: todos ([`Hub::publish`]) ou só algumas
+//! pessoas ([`Hub::publish_to`], ADR 0021). O hub também guarda os tickets de
+//! entrada e quem está online.
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -15,7 +16,10 @@ use serde::Serialize;
 use tokio::sync::broadcast;
 use ts_rs::TS;
 
-use crate::chat::messages::{ChannelHead, Message};
+use crate::calls::{CallOutcome, CallView};
+use crate::chat::messages::Message;
+use crate::chat::read::{ChannelHead, ReadState};
+use crate::identity::status::{Shown, Status};
 use crate::identity::users::Person;
 use crate::secret;
 use crate::voice::ParticipantView;
@@ -36,21 +40,39 @@ const CAPACITY: usize = 256;
 #[serde(tag = "type")]
 #[ts(export, export_to = "index.ts")]
 pub enum ServerEvent {
-    /// O primeiro evento de toda conexão, só para ela: quem é, quem está online
-    /// agora e a mensagem mais nova de cada canal de texto.
+    /// O primeiro evento de toda conexão, só para ela: quem é, o status dela,
+    /// quem está online agora (sem os invisíveis) e quem desses está ocupado, e
+    /// cada canal de texto e conversa privada dela com a mensagem mais
+    /// nova e o estado de leitura. Se a pessoa está numa ligação (tocando ou
+    /// atendida), ela vem no `call`: é o que acerta quem reconecta no meio.
     #[serde(rename = "ready")]
     Ready {
         user_id: String,
+        status: Status,
         online: Vec<String>,
+        busy: Vec<String>,
         channels: Vec<ChannelHead>,
+        dms: Vec<ChannelHead>,
+        call: Option<CallView>,
     },
     /// A resposta ao `ping` que o app manda a cada 25 segundos.
     #[serde(rename = "pong")]
     Pong,
     #[serde(rename = "message.created")]
     MessageCreated { message: Message },
+    /// Alguém ficou online ou offline, ou trocou entre disponível e ocupado.
+    /// Ficar invisível sai daqui como ficar offline. O `status` só quer dizer
+    /// alguma coisa com `online`.
     #[serde(rename = "presence.changed")]
-    PresenceChanged { user_id: String, online: bool },
+    PresenceChanged {
+        user_id: String,
+        online: bool,
+        status: Shown,
+    },
+    /// A pessoa trocou o próprio status. Só vai para as conexões dela, com o
+    /// status de verdade: é o que acerta o outro computador.
+    #[serde(rename = "status.changed")]
+    StatusChanged { status: Status },
     /// A lista inteira de quem está numa sala de voz, sempre que ela muda.
     #[serde(rename = "voice.participants")]
     VoiceParticipants {
@@ -66,13 +88,56 @@ pub enum ServerEvent {
     /// recarrega o `GET /api/channels`.
     #[serde(rename = "channels.changed")]
     ChannelsChanged { version: i64 },
+    /// O estado de um canal ou conversa mudou para a pessoa (leu, marcou tudo
+    /// como lido, silenciou). Só vai para as conexões dela: é o que zera o
+    /// número no outro computador.
+    #[serde(rename = "channel.state")]
+    ChannelState {
+        channel_id: String,
+        state: ReadState,
+    },
+    /// Uma ligação começou a tocar (ADR 0023). Como os outros `call.*`, só vai
+    /// para as duas pessoas da conversa.
+    #[serde(rename = "call.ringing")]
+    CallRinging { call: CallView },
+    /// A ligação foi atendida: os dois pedem o token da sala da conversa.
+    #[serde(rename = "call.accepted")]
+    CallAccepted { call: CallView },
+    /// A ligação acabou, de qualquer jeito. A `duration`, em segundos, só vem
+    /// na atendida. O registro no histórico chega logo depois, pelo
+    /// `message.created`.
+    #[serde(rename = "call.ended")]
+    CallEnded {
+        call_id: String,
+        channel_id: String,
+        outcome: CallOutcome,
+        duration: Option<i64>,
+    },
 }
 
-/// O que passa pelo `broadcast`: um evento já em JSON, ou a ordem de fechar as
-/// conexões de alguém (removido ou desvinculado).
+/// Quem recebe um evento.
+#[derive(Debug, Clone)]
+pub enum Audience {
+    Everyone,
+    /// Só as conexões destas pessoas (ids de usuário).
+    Only(Arc<[String]>),
+}
+
+impl Audience {
+    pub fn includes(&self, user_id: &str) -> bool {
+        match self {
+            Self::Everyone => true,
+            Self::Only(ids) => ids.iter().any(|id| id == user_id),
+        }
+    }
+}
+
+/// O que passa pelo `broadcast`: um evento já em JSON, com quem deve
+/// recebê-lo, ou a ordem de fechar as conexões de alguém (removido ou
+/// desvinculado).
 #[derive(Debug, Clone)]
 pub enum Signal {
-    Event(Utf8Bytes),
+    Event { json: Utf8Bytes, to: Audience },
     Close { user_id: String },
 }
 
@@ -81,11 +146,15 @@ struct Ticket {
     expires_at: Instant,
 }
 
-/// Quantas conexões a pessoa tem. Estar no mapa é estar online; o `epoch`
-/// muda a cada conexão nova e cancela o "offline" que estava esperando.
+/// Quantas conexões a pessoa tem. Estar no mapa é estar conectado; o `epoch`
+/// muda a cada conexão nova e cancela o "offline" que estava esperando. O
+/// `status` fica aqui para o `ready` e o `presence.changed` não irem ao banco:
+/// quem está no mapa com `Invisible` está conectado, mas não online para os
+/// outros.
 struct Presence {
     connections: usize,
     epoch: u64,
+    status: Status,
 }
 
 #[derive(Default)]
@@ -146,12 +215,36 @@ impl Hub {
     /// Manda o evento para todas as conexões. Sem ninguém conectado, não faz
     /// nada.
     pub fn publish(&self, event: &ServerEvent) {
-        let json = serde_json::to_string(event).expect("evento sempre vira JSON");
-        let _ = self.tx.send(Signal::Event(json.into()));
+        self.send(event, Audience::Everyone);
     }
 
-    /// Uma conexão nova de `user_id`. A primeira o deixa online.
-    pub fn connect(&self, user_id: &str) {
+    /// Manda o evento só para as conexões de `user_ids`. O evento passa pelo
+    /// mesmo `broadcast` dos outros, e é o laço de cada conexão que descarta o
+    /// que não é da pessoa dela (`routes/realtime.rs`).
+    pub fn publish_to<S: AsRef<str>>(&self, user_ids: &[S], event: &ServerEvent) {
+        let ids = user_ids.iter().map(|id| id.as_ref().to_owned()).collect();
+        self.send(event, Audience::Only(ids));
+    }
+
+    fn send(&self, event: &ServerEvent, to: Audience) {
+        let json = serde_json::to_string(event).expect("evento sempre vira JSON");
+        let _ = self.tx.send(Signal::Event {
+            json: json.into(),
+            to,
+        });
+    }
+
+    fn presence_changed(&self, user_id: &str, shown: Option<Shown>) {
+        self.publish(&ServerEvent::PresenceChanged {
+            user_id: user_id.to_owned(),
+            online: shown.is_some(),
+            status: shown.unwrap_or(Shown::Available),
+        });
+    }
+
+    /// Uma conexão nova de `user_id`, que está com `status`. A primeira o
+    /// deixa online para os outros, a não ser que esteja invisível.
+    pub fn connect(&self, user_id: &str, status: Status) {
         let mut inner = self.lock();
         let presence = inner
             .presence
@@ -159,21 +252,20 @@ impl Hub {
             .or_insert(Presence {
                 connections: 0,
                 epoch: 0,
+                status,
             });
         let came_online = presence.connections == 0 && presence.epoch == 0;
         presence.connections += 1;
         presence.epoch += 1;
         drop(inner);
-        if came_online {
-            self.publish(&ServerEvent::PresenceChanged {
-                user_id: user_id.to_owned(),
-                online: true,
-            });
+        if came_online && status.shown().is_some() {
+            self.presence_changed(user_id, status.shown());
         }
     }
 
     /// Uma conexão de `user_id` caiu. Se era a última, ele fica offline depois
-    /// de [`OFFLINE_DELAY`], a não ser que volte antes.
+    /// de [`OFFLINE_DELAY`], a não ser que volte antes. O invisível sai sem
+    /// aviso: para os outros, ele já estava offline.
     pub fn disconnect(self: &Arc<Self>, user_id: &str) {
         let mut inner = self.lock();
         let Some(presence) = inner.presence.get_mut(user_id) else {
@@ -198,23 +290,58 @@ impl Hub {
             if !still_gone {
                 return;
             }
-            inner.presence.remove(&user_id);
+            let was_shown = inner
+                .presence
+                .remove(&user_id)
+                .is_some_and(|p| p.status.shown().is_some());
             drop(inner);
-            hub.publish(&ServerEvent::PresenceChanged {
-                user_id,
-                online: false,
-            });
+            if was_shown {
+                hub.presence_changed(&user_id, None);
+            }
         });
     }
 
-    /// Quem está online agora, em ordem de id.
-    pub fn online(&self) -> Vec<String> {
-        let mut online: Vec<String> = self.lock().presence.keys().cloned().collect();
-        online.sort();
+    /// `user_id` trocou de status. Para os outros sai só o que eles podem ver,
+    /// e só se a pessoa está conectada: entrar em invisível é ficar offline,
+    /// sair dele é ficar online, e entre disponível e ocupado muda o `status`.
+    /// Para as conexões dela vai o status de verdade.
+    pub fn set_status(&self, user_id: &str, status: Status) {
+        let mut inner = self.lock();
+        let before = inner.presence.get_mut(user_id).map(|presence| {
+            let before = presence.status;
+            presence.status = status;
+            before
+        });
+        drop(inner);
+        if let Some(before) = before
+            && before.shown() != status.shown()
+        {
+            self.presence_changed(user_id, status.shown());
+        }
+        self.publish_to(&[user_id], &ServerEvent::StatusChanged { status });
+    }
+
+    /// Quem está online para os outros agora, em ordem de id, com o que eles
+    /// veem. Os invisíveis não entram.
+    pub fn online(&self) -> Vec<(String, Shown)> {
+        let mut online: Vec<(String, Shown)> = self
+            .lock()
+            .presence
+            .iter()
+            .filter_map(|(id, presence)| Some((id.clone(), presence.status.shown()?)))
+            .collect();
+        online.sort_by(|a, b| a.0.cmp(&b.0));
         online
     }
 
-    pub fn is_online(&self, user_id: &str) -> bool {
+    /// O que os outros veem de `user_id`: `None` se está offline ou invisível.
+    pub fn shown(&self, user_id: &str) -> Option<Shown> {
+        self.lock().presence.get(user_id)?.status.shown()
+    }
+
+    /// Se `user_id` tem conexão (ou caiu há menos que o atraso), em qualquer
+    /// status.
+    pub fn is_connected(&self, user_id: &str) -> bool {
         self.lock().presence.contains_key(user_id)
     }
 
@@ -253,9 +380,32 @@ mod tests {
 
     fn next_event(rx: &mut broadcast::Receiver<Signal>) -> serde_json::Value {
         match rx.try_recv().expect("deveria ter um evento") {
-            Signal::Event(json) => serde_json::from_str(json.as_str()).unwrap(),
+            Signal::Event { json, .. } => serde_json::from_str(json.as_str()).unwrap(),
             Signal::Close { .. } => panic!("esperava um evento"),
         }
+    }
+
+    #[test]
+    fn o_evento_com_destinatario_e_so_de_quem_foi_nomeado() {
+        let hub = Hub::default();
+        let mut rx = hub.subscribe();
+
+        hub.publish(&ServerEvent::Pong);
+        hub.publish_to(&["u1", "u2"], &ServerEvent::Pong);
+
+        let Signal::Event { to, .. } = rx.try_recv().unwrap() else {
+            panic!("esperava um evento");
+        };
+        assert!(
+            to.includes("u1") && to.includes("u3"),
+            "o publish é de todos"
+        );
+        let Signal::Event { to, .. } = rx.try_recv().unwrap() else {
+            panic!("esperava um evento");
+        };
+        assert!(to.includes("u1") && to.includes("u2"));
+        assert!(!to.includes("u3"));
+        assert!(!to.includes("u"), "o id é comparado inteiro");
     }
 
     #[test]
@@ -282,11 +432,14 @@ mod tests {
         let json = serde_json::to_value(ServerEvent::PresenceChanged {
             user_id: "u1".into(),
             online: true,
+            status: Shown::Busy,
         })
         .unwrap();
         assert_eq!(
             json,
-            serde_json::json!({ "type": "presence.changed", "user_id": "u1", "online": true })
+            serde_json::json!({
+                "type": "presence.changed", "user_id": "u1", "online": true, "status": "busy"
+            })
         );
         let pong = serde_json::to_value(ServerEvent::Pong).unwrap();
         assert_eq!(pong, serde_json::json!({ "type": "pong" }));
@@ -297,31 +450,111 @@ mod tests {
         let hub = Arc::new(Hub::new(Duration::from_millis(50)));
         let mut rx = hub.subscribe();
 
-        hub.connect("u1");
+        hub.connect("u1", Status::Available);
         assert_eq!(next_event(&mut rx)["online"], true);
         // A segunda conexão não repete o aviso.
-        hub.connect("u1");
+        hub.connect("u1", Status::Available);
         assert!(rx.try_recv().is_err());
 
         hub.disconnect("u1");
         hub.disconnect("u1");
-        assert!(hub.is_online("u1"), "ainda dentro do atraso");
+        assert!(hub.is_connected("u1"), "ainda dentro do atraso");
         tokio::time::sleep(Duration::from_millis(100)).await;
-        assert!(!hub.is_online("u1"));
+        assert!(!hub.is_connected("u1"));
         assert_eq!(next_event(&mut rx)["online"], false);
     }
 
     #[tokio::test]
     async fn voltar_dentro_do_atraso_nao_pisca() {
         let hub = Arc::new(Hub::new(Duration::from_millis(50)));
-        hub.connect("u1");
+        hub.connect("u1", Status::Available);
         let mut rx = hub.subscribe();
 
         hub.disconnect("u1");
-        hub.connect("u1");
+        hub.connect("u1", Status::Available);
         tokio::time::sleep(Duration::from_millis(100)).await;
-        assert!(hub.is_online("u1"));
+        assert!(hub.is_connected("u1"));
         assert!(rx.try_recv().is_err(), "nem offline nem online de novo");
+    }
+
+    /// O próximo sinal, com quem o recebe.
+    fn next_signal(rx: &mut broadcast::Receiver<Signal>) -> (serde_json::Value, Audience) {
+        match rx.try_recv().expect("deveria ter um evento") {
+            Signal::Event { json, to } => (serde_json::from_str(json.as_str()).unwrap(), to),
+            Signal::Close { .. } => panic!("esperava um evento"),
+        }
+    }
+
+    #[tokio::test]
+    async fn o_invisivel_conecta_e_sai_sem_ninguem_ver() {
+        let hub = Arc::new(Hub::new(Duration::from_millis(20)));
+        let mut rx = hub.subscribe();
+
+        hub.connect("u1", Status::Invisible);
+        assert!(hub.is_connected("u1"));
+        assert_eq!(hub.shown("u1"), None);
+        assert_eq!(hub.online(), []);
+        hub.disconnect("u1");
+        tokio::time::sleep(Duration::from_millis(60)).await;
+        assert!(!hub.is_connected("u1"));
+        assert!(rx.try_recv().is_err(), "nenhum aviso de presença");
+    }
+
+    #[test]
+    fn trocar_de_status_mostra_aos_outros_so_o_que_eles_podem_ver() {
+        let hub = Hub::default();
+        hub.connect("u1", Status::Available);
+        let mut rx = hub.subscribe();
+
+        // Ocupado: todos veem a troca, e a pessoa recebe o status de verdade.
+        hub.set_status("u1", Status::Busy);
+        let (event, to) = next_signal(&mut rx);
+        assert_eq!(event["type"], "presence.changed");
+        assert_eq!(
+            (&event["online"], &event["status"]),
+            (&true.into(), &"busy".into())
+        );
+        assert!(to.includes("u2"));
+        let (event, to) = next_signal(&mut rx);
+        assert_eq!(
+            event,
+            serde_json::json!({ "type": "status.changed", "status": "busy" })
+        );
+        assert!(to.includes("u1") && !to.includes("u2"));
+        assert_eq!(hub.online(), [("u1".to_owned(), Shown::Busy)]);
+
+        // Invisível: para os outros, ficou offline. A palavra não sai para eles.
+        hub.set_status("u1", Status::Invisible);
+        let (event, _) = next_signal(&mut rx);
+        assert_eq!(
+            event,
+            serde_json::json!({
+                "type": "presence.changed", "user_id": "u1", "online": false, "status": "available"
+            })
+        );
+        let (event, to) = next_signal(&mut rx);
+        assert_eq!(event["status"], "invisible");
+        assert!(!to.includes("u2"));
+        assert_eq!(hub.online(), []);
+
+        // De volta: online de novo.
+        hub.set_status("u1", Status::Available);
+        let (event, _) = next_signal(&mut rx);
+        assert_eq!(
+            (&event["online"], &event["status"]),
+            (&true.into(), &"available".into())
+        );
+    }
+
+    #[test]
+    fn quem_nao_esta_conectado_troca_de_status_sem_aviso_aos_outros() {
+        let hub = Hub::default();
+        let mut rx = hub.subscribe();
+        hub.set_status("u1", Status::Busy);
+        let (event, to) = next_signal(&mut rx);
+        assert_eq!(event["type"], "status.changed");
+        assert!(!to.includes("u2"));
+        assert!(rx.try_recv().is_err());
     }
 
     #[test]

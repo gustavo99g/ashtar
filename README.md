@@ -2,7 +2,7 @@
 
 Ashtar é uma aplicação privada de comunicação para uma única comunidade, inspirada no Discord.
 
-> Status atual: **v0.2.1 — Identidade na API** (concluída; a UI nova da v0.2.2 passa a usá-la)
+> Status atual: **v0.3.2 — Ligações privadas** (tocar, atender, recusar, chamada perdida, tela compartilhada e registro; sai junto com a v0.3.0 e a v0.3.1, na `0.3.20`)
 
 ## Funcionalidades
 
@@ -181,13 +181,14 @@ v0.2  → Comunidade
         de ruído → servidor na VPS → publicador nativo
 
 v0.3  → Conversas privadas
-        Mensagens e ligações privadas + não lidas + bandeja
+        Lista de canais nova + mensagens privadas + não lidas, menções e notificações
+        + status + ligações privadas
 
 v0.4  → Transmissões múltiplas
         Várias transmissões simultâneas + experiência de quem assiste
 
-v0.5  → Canais e presença
-        Múltiplos canais e salas + status + menções + sons da voz
+v0.5  → Salas e presença
+        Várias salas de voz + ausente automático + digitando + sons da voz
 
 v0.6  → Confiabilidade e configurações
         Reconexão + estados + tela de configurações + atalhos globais
@@ -302,10 +303,12 @@ máquina tiver problema, os dois se perdem juntos.
 
 ## Status
 
-Em desenvolvimento, na **v0.2**, entregue em partes (veja o [`docs/roadmap.md`](docs/roadmap.md)). A v0.2.0
-(auto-update, canal beta e pipeline de release) e a v0.2.1 (identidade, convites e permissões na API) estão
-prontas; a próxima é a v0.2.2, a UI nova, que passa a usar as rotas de identidade. A estrutura do código está
-em [`ARCHITECTURE.md`](ARCHITECTURE.md).
+Em desenvolvimento, na **v0.3**, entregue em três partes (veja o [`docs/roadmap.md`](docs/roadmap.md)). A v0.2
+está pronta, com o servidor próprio na VPS (a voz, as transmissões e a API). A v0.3.0 (a base visual: a lista
+de canais sem ferramentas fixas, o modo Organizar, o cartão do usuário e o volume por pessoa), a v0.3.1 (as
+conversas privadas, as não lidas, as menções, o silenciar, as notificações e o status) e a v0.3.2 (as ligações
+privadas) saem juntas, na versão `0.3.20`. O plano da fase está no [`PLAN.md`](PLAN.md), e a
+estrutura do código em [`ARCHITECTURE.md`](ARCHITECTURE.md).
 
 ## Licença
 

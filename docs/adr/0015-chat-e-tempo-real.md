@@ -1,6 +1,6 @@
 # 0015 — O chat e o tempo real
 
-- **Status:** aceita
+- **Status:** aceita; o tempo real ganhou destinatário na 0021 (v0.3)
 - **Data:** 2026-10
 
 ## Contexto

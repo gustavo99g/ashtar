@@ -1,29 +1,50 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
+import type { Mentionable } from "../model/mentions";
 import { BODY_MAX, COUNTER_FROM, draftProblem } from "../model/messages";
 import { setDraft, useDraft } from "../stores/draftStore";
+import { MentionPicker, useMentionPicker } from "./MentionPicker";
 
 /** Altura máxima do campo antes de rolar por dentro (umas 10 linhas). */
 const MAX_HEIGHT = 240;
 
 /**
- * O campo de escrever. Enter manda, Shift+Enter quebra a linha. O texto é o rascunho do canal
+ * O campo de escrever, de um canal ou de uma conversa privada (o `channelId` é o de qualquer um
+ * dos dois). Enter manda, Shift+Enter quebra a linha. O texto é o rascunho do canal
  * (`draftStore`): trocar de canal e voltar traz de volta o que estava escrito. Perto do limite
  * aparece a contagem; um texto que a API recusaria nem sai, e o motivo aparece embaixo.
+ *
+ * Digitar `@` abre a sugestão de nicks (`MentionPicker`) com quem está em `mentionable`.
  */
 export function Composer({
 	channelId,
-	channelName,
+	label,
+	compact = false,
+	mentionable = [],
+	myId = null,
 	onSend,
 }: {
 	channelId: string;
-	channelName: string;
+	/** O que o campo diz enquanto vazio: "Mensagem para #geral", "Mensagem para ana". */
+	label: string;
+	/** Com menos margem em volta: é o campo da janela de conversa privada. */
+	compact?: boolean;
+	/** Quem dá para mencionar aqui: no canal, o grupo; na conversa, a outra pessoa. */
+	mentionable?: readonly Mentionable[];
+	myId?: string | null;
 	onSend: (body: string) => void;
 }) {
 	const draft = useDraft(channelId);
 	const [problem, setProblem] = useState<string | null>(null);
 	const ref = useRef<HTMLTextAreaElement>(null);
 	const length = [...draft].length;
+	const picker = useMentionPicker({
+		field: ref,
+		text: draft,
+		mentionable,
+		myId,
+		onChange: (text) => setDraft(channelId, text),
+	});
 
 	// O campo cresce com o texto, até o máximo.
 	useLayoutEffect(() => {
@@ -52,19 +73,28 @@ export function Composer({
 	}
 
 	return (
-		<div className="shrink-0 px-4 pb-[30px]">
-			<div className="flex items-end rounded-[10px] border border-border bg-secondary px-3.5 focus-within:border-primary">
+		<div className={cn("shrink-0", compact ? "px-2.5 pb-2.5" : "px-4 pb-[30px]")}>
+			<div className="relative flex items-end rounded-[10px] border border-border bg-secondary px-3.5 focus-within:border-primary">
+				<MentionPicker picker={picker} />
 				<textarea
 					ref={ref}
 					rows={1}
 					value={draft}
-					aria-label={`Mensagem para #${channelName}`}
-					placeholder={`Mensagem para #${channelName}`}
+					aria-label={label}
+					placeholder={label}
+					aria-autocomplete="list"
+					aria-controls={picker.open ? picker.listId : undefined}
+					aria-activedescendant={
+						picker.open ? picker.optionId(picker.active) : undefined
+					}
 					onChange={(event) => {
 						setDraft(channelId, event.target.value);
+						picker.track(event.target);
 						if (problem) setProblem(null);
 					}}
+					onSelect={(event) => picker.track(event.currentTarget)}
 					onKeyDown={(event) => {
+						if (picker.onKeyDown(event)) return;
 						if (
 							event.key === "Enter" &&
 							!event.shiftKey &&

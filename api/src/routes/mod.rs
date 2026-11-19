@@ -1,11 +1,14 @@
 pub mod auth;
+pub mod calls;
 pub mod channels;
+pub mod dms;
 pub mod extract;
 pub mod invites;
 pub mod members;
 pub mod messages;
 pub mod pages;
 pub mod people;
+pub mod read;
 pub mod realtime;
 pub mod voice;
 pub mod webhooks;

@@ -22,6 +22,14 @@ async fn main() {
         .expect("não foi possivel abrir o banco");
     println!("Banco: {database_url}");
 
+    // Uma ligação que estava tocando ou em andamento quando a API caiu não
+    // tem mais quem a encerre: acaba agora, com o registro.
+    match api::calls::close_stale(&pool, api::db::now()).await {
+        Ok(0) => {}
+        Ok(n) => println!("Ligações fechadas ao subir: {n}"),
+        Err(error) => eprintln!("não deu para fechar as ligações abertas: {error}"),
+    }
+
     println!("Endereço público: {public_url}");
 
     let app = api::app(AppState::new(pool, &public_url), policy);

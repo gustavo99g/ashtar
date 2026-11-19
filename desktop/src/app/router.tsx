@@ -29,6 +29,7 @@ import {
 	ArchivedSettingsRoute,
 	InvitesSettingsRoute,
 	MembersSettingsRoute,
+	NotificationsSettingsRoute,
 	ProfileSettingsRoute,
 	VoiceSettingsRoute,
 } from "@/routes/settings";
@@ -69,6 +70,10 @@ export const routes: RouteObject[] = [
 							{ index: true, element: <Navigate to="profile" replace /> },
 							{ path: "profile", element: <ProfileSettingsRoute /> },
 							{ path: "voice", element: <VoiceSettingsRoute /> },
+							{
+								path: "notifications",
+								element: <NotificationsSettingsRoute />,
+							},
 							{ path: "app", element: <AppSettingsRoute /> },
 							{ path: "invites", element: <InvitesSettingsRoute /> },
 							{ path: "members", element: <MembersSettingsRoute /> },

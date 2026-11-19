@@ -1,0 +1,131 @@
+import { type ReactNode, useMemo, useState } from "react";
+import {
+	ErrorState,
+	LoadingState,
+	OfflineState,
+} from "@/components/ui/states";
+import { useSession } from "@/features/identity";
+import { useMarkRead, useUnreadMarker } from "@/features/unread";
+import { isApiError, type Message, type Person } from "@/lib/api";
+import { useAppFocused } from "@/lib/visibility";
+import type { Mentionable } from "../model/mentions";
+import { useMessages, usePeople, useSendMessage } from "../queries";
+import { usePending } from "../stores/outboxStore";
+import { Composer } from "./Composer";
+import { MessageList } from "./MessageList";
+
+/**
+ * A conversa de um canal de texto ou de uma conversa privada: o histórico e o campo de escrever.
+ * Para a API as duas coisas são um canal com mensagens (ADR 0021), então aqui também: o
+ * `channelId` é o id de qualquer uma, e o cache, a caixa de saída e o rascunho já são por id.
+ *
+ * Quem usa diz o que muda de um lugar para o outro: os dois rótulos, o que aparece no começo da
+ * conversa, se o campo é o compacto e, se não dá para escrever, o que fica no lugar do campo.
+ *
+ * Aqui também se dá a conversa como lida (`useMarkRead`) e se decide onde fica a linha "Novas
+ * mensagens" (`useUnreadMarker`). Quem usa monta uma por conversa (`key`), para a linha não passar
+ * de uma para a outra.
+ */
+export function ChatConversation({
+	channelId,
+	listLabel,
+	composerLabel,
+	start,
+	compact = false,
+	readOnly,
+	mentionable,
+	aboveComposer,
+	renderCall,
+}: {
+	channelId: string;
+	listLabel: string;
+	composerLabel: string;
+	start: ReactNode;
+	compact?: boolean;
+	/** Só para leitura: isto aparece no lugar do campo de escrever. */
+	readOnly?: ReactNode;
+	/** Quem dá para mencionar no campo. Sem isto, todo o grupo (o canal de texto). */
+	mentionable?: readonly Mentionable[];
+	/** Uma faixa em cima do campo de escrever (o "Voltar para a sala" do fim de uma ligação). */
+	aboveComposer?: ReactNode;
+	/** O registro de uma ligação no histórico (ver `MessageList`). */
+	renderCall?: (message: Message) => ReactNode;
+}) {
+	const query = useMessages(channelId);
+	const pending = usePending(channelId);
+	const people = usePeople();
+	const { send, retry, discard } = useSendMessage();
+	const session = useSession();
+	const ownerId =
+		people.data?.find((person) => person.is_owner)?.id ??
+		(session.status === "connected" && session.user.is_owner
+			? session.user.id
+			: null);
+	const myId = session.status === "connected" ? session.user.id : null;
+	const byId = useMemo(
+		() => new Map((people.data ?? NO_PEOPLE).map((p) => [p.id, p])),
+		[people.data],
+	);
+	const [seeingEnd, setSeeingEnd] = useState(true);
+	const focused = useAppFocused();
+	const lastMessageId = query.messages?.[query.messages.length - 1]?.id;
+	useMarkRead(channelId, lastMessageId, seeingEnd);
+	const unreadAfter = useUnreadMarker(channelId, focused && seeingEnd);
+
+	return (
+		<>
+			{query.messages ? (
+				<MessageList
+					label={listLabel}
+					start={start}
+					messages={query.messages}
+					pending={pending}
+					ownerId={ownerId}
+					people={byId}
+					myId={myId}
+					hasOlder={query.hasPreviousPage}
+					loadingOlder={query.isFetchingPreviousPage}
+					onLoadOlder={() => void query.fetchPreviousPage()}
+					onRetry={retry}
+					onDiscard={discard}
+					unreadAfter={unreadAfter}
+					onSeeingEndChange={setSeeingEnd}
+					renderCall={renderCall}
+				/>
+			) : query.isError ? (
+				<Centered>
+					{isApiError(query.error, "network") ? (
+						<OfflineState onRetry={() => void query.refetch()} />
+					) : (
+						<ErrorState onRetry={() => void query.refetch()} />
+					)}
+				</Centered>
+			) : (
+				<Centered>
+					<LoadingState />
+				</Centered>
+			)}
+			{aboveComposer}
+			{readOnly ?? (
+				<Composer
+					channelId={channelId}
+					label={composerLabel}
+					compact={compact}
+					mentionable={mentionable ?? people.data ?? NO_PEOPLE}
+					myId={myId}
+					onSend={(body) => send(channelId, body)}
+				/>
+			)}
+		</>
+	);
+}
+
+const NO_PEOPLE: Person[] = [];
+
+function Centered({ children }: { children: ReactNode }) {
+	return (
+		<div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4 p-6">
+			{children}
+		</div>
+	);
+}

@@ -13,14 +13,17 @@ import { ShareButton } from "./ShareButton";
 
 /*
  * A barra de baixo da sala: Microfone, Áudio (o deafen), Tela e Sair. Sem o controller (ainda
- * conectando), o Tela fica desativado.
+ * conectando), o Tela fica desativado. Na ligação privada, o Sair é o Desligar.
  */
 export function CallControls({
 	controller,
 	onExit,
+	call = false,
 }: {
 	controller: ScreenShareController | null;
 	onExit: () => void;
+	/** Na ligação privada: o Sair vira Desligar. */
+	call?: boolean;
 }) {
 	const { isMuted, isDeafened, mute, unmute, deafen, undeafen } = useVoice();
 
@@ -53,8 +56,8 @@ export function CallControls({
 			)}
 			<span aria-hidden="true" className="mx-2 h-10 w-px bg-border" />
 			<BarButton
-				label="Sair"
-				aria-label="Sair da sala"
+				label={call ? "Desligar" : "Sair"}
+				aria-label={call ? "Desligar a ligação" : "Sair da sala"}
 				tone="exit"
 				onClick={onExit}
 			>

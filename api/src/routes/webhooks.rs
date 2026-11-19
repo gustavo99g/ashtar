@@ -5,13 +5,21 @@
 //! Fora do `/api` e da `ClientPolicy`: quem chama é o LiveKit, não o app. A
 //! assinatura (um JWT com o SHA-256 do corpo, feito com a chave da API do
 //! LiveKit) é conferida antes de tudo.
+//!
+//! A sala de uma ligação privada (o nome é o id de uma conversa, ADR 0023)
+//! nunca vira `voice.participants`: contaria a todos quem está falando com
+//! quem. Nela, a saída de um dos dois (ou o fim da sala) encerra a ligação.
 
 use axum::extract::State;
 use axum::http::header::AUTHORIZATION;
 use axum::http::{HeaderMap, StatusCode};
 use livekit_protocol::WebhookEvent;
 
+use super::calls::announce_ended;
 use crate::AppState;
+use crate::calls;
+use crate::chat::dms;
+use crate::db::now;
 use crate::realtime::ServerEvent;
 use crate::voice;
 
@@ -44,6 +52,35 @@ pub fn room_update(event: &WebhookEvent) -> Option<RoomUpdate> {
     }
 }
 
+/// Os eventos que, numa sala de ligação, querem dizer que um dos dois saiu.
+const LEAVES: [&str; 2] = ["participant_left", "participant_connection_aborted"];
+
+/// Se o evento, numa sala de ligação privada, encerra a ligação: a sala fechou,
+/// ou saiu a voz de alguém. A saída da tela (`:screen`) é só o fim da
+/// transmissão.
+pub fn ends_call(event: &WebhookEvent) -> bool {
+    if event.event == "room_finished" {
+        return true;
+    }
+    LEAVES.contains(&event.event.as_str())
+        && event
+            .participant
+            .as_ref()
+            .is_some_and(|p| !p.identity.ends_with(voice::SCREEN_SUFFIX))
+}
+
+/// Encerra a ligação da conversa `dm`, se o evento pede e ela está atendida.
+async fn end_call(state: AppState, dm: dms::Dm) {
+    match calls::end_by_room(&state.db, &dm, now()).await {
+        Ok(Some(ended)) => announce_ended(&state, &ended),
+        Ok(None) => {}
+        Err(error) => eprintln!(
+            "webhook: não deu para encerrar a ligação {}: {error}",
+            dm.id
+        ),
+    }
+}
+
 pub async fn livekit(
     State(state): State<AppState>,
     headers: HeaderMap,
@@ -64,6 +101,23 @@ pub async fn livekit(
             return StatusCode::UNAUTHORIZED;
         }
     };
+    // A sala de uma ligação privada: nada sai para todos.
+    if let Some(room) = event.room.as_ref() {
+        match dms::get(&state.db, &room.name).await {
+            Ok(Some(dm)) => {
+                if ends_call(&event) {
+                    end_call(state.clone(), dm).await;
+                }
+                return StatusCode::OK;
+            }
+            Ok(None) => {}
+            Err(error) => {
+                // Sem saber se é privada, não publica nada: o LiveKit tenta de novo.
+                eprintln!("webhook: não deu para ler a sala {}: {error}", room.name);
+                return StatusCode::INTERNAL_SERVER_ERROR;
+            }
+        }
+    }
     match room_update(&event) {
         Some(RoomUpdate::Empty(room)) => {
             state.hub.start_voice_read(&room);
@@ -104,7 +158,7 @@ async fn reread(state: AppState, room: String) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use livekit_protocol::Room;
+    use livekit_protocol::{ParticipantInfo, Room};
 
     fn event(name: &str, room: Option<&str>) -> WebhookEvent {
         WebhookEvent {
@@ -134,5 +188,32 @@ mod tests {
         assert_eq!(room_update(&event("room_started", Some("sala"))), None);
         assert_eq!(room_update(&event("egress_ended", Some("sala"))), None);
         assert_eq!(room_update(&event("participant_joined", None)), None);
+    }
+
+    fn with_participant(name: &str, identity: &str) -> WebhookEvent {
+        WebhookEvent {
+            participant: Some(ParticipantInfo {
+                identity: identity.into(),
+                ..Default::default()
+            }),
+            ..event(name, Some("conversa"))
+        }
+    }
+
+    #[test]
+    fn a_ligacao_acaba_quando_sai_a_voz_de_um_dos_dois() {
+        assert!(ends_call(&with_participant("participant_left", "kid")));
+        assert!(ends_call(&with_participant(
+            "participant_connection_aborted",
+            "kid"
+        )));
+        assert!(ends_call(&event("room_finished", Some("conversa"))));
+        // A tela que para não derruba a ligação.
+        assert!(!ends_call(&with_participant(
+            "participant_left",
+            "kid:screen"
+        )));
+        assert!(!ends_call(&with_participant("participant_joined", "kid")));
+        assert!(!ends_call(&with_participant("track_unpublished", "kid")));
     }
 }

@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useRef } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/components/ui/states";
@@ -26,7 +26,7 @@ import { useVoice } from "../../room/hooks/useVoice";
 import { SALA } from "../../room/model/channel";
 import { stopWatching, useRoomView, watchShare } from "../stores/roomViewStore";
 import { CallControls } from "./CallControls";
-import { RoomGrid } from "./RoomGrid";
+import { CALL_TILE_MAX, RoomGrid } from "./RoomGrid";
 import { LayoutToggle, RoomHeader } from "./RoomHeader";
 import { ScreenStage } from "./ScreenStage";
 import { ShareTile } from "./ShareTile";
@@ -36,10 +36,16 @@ import { ShareTile } from "./ShareTile";
  * de cada transmissão; o Foco, a transmissão que a pessoa escolheu assistir, com os outros numa
  * faixa embaixo (a tela cheia leva os dois juntos). A chamada mora no `VoiceProvider`, acima do
  * router: sair desta tela não sai da sala.
+ *
+ * A ligação privada (ADR 0023, Etapa 21 da v0.3) usa esta mesma tela: o cabeçalho vira "Ligação
+ * com fulano · Privada" e o tempo, os dois lugares ficam maiores, o Convidar some e o Sair é o
+ * Desligar. Quem encerra a ligação na API é a `features/calls`, ao ver a voz sair da sala dela.
  */
 export function VoiceRoom() {
 	const {
 		voiceChannelId,
+		voiceKind,
+		voiceTitle,
 		room,
 		connectionState,
 		error,
@@ -48,8 +54,9 @@ export function VoiceRoom() {
 		screenShare,
 	} = useVoice();
 	const navigate = useNavigate();
+	const call = voiceKind === "call" ? { title: voiceTitle ?? "" } : undefined;
 
-	if (voiceChannelId !== SALA.id) {
+	if (!voiceChannelId || (voiceChannelId !== SALA.id && !call)) {
 		return <Navigate to={paths.server} replace />;
 	}
 
@@ -60,27 +67,39 @@ export function VoiceRoom() {
 	}
 
 	if (room) {
-		return <ConnectedRoom onExit={exit} />;
+		return <ConnectedRoom onExit={exit} call={call} />;
 	}
 
 	const failed =
 		connectionState === "error" || connectionState === "disconnected";
 	return (
 		<RoomFrame
-			header={<RoomHeader />}
-			controls={<CallControls controller={screenShare} onExit={exit} />}
+			header={<RoomHeader call={call} />}
+			controls={
+				<CallControls
+					controller={screenShare}
+					onExit={exit}
+					call={call !== undefined}
+				/>
+			}
 		>
 			{failed ? (
 				<ErrorState
 					title={
 						connectionState === "error"
-							? "Não foi possível entrar na sala"
-							: "A conexão com a sala caiu"
+							? call
+								? "Não foi possível entrar na ligação"
+								: "Não foi possível entrar na sala"
+							: call
+								? "A conexão com a ligação caiu"
+								: "A conexão com a sala caiu"
 					}
 					description={
 						error?.message ?? "Tente de novo. Se continuar, avise o dono."
 					}
-					onRetry={() => join(SALA.id)}
+					onRetry={() =>
+						join(voiceChannelId, call ? { kind: "call", ...call } : undefined)
+					}
 				/>
 			) : (
 				<MeConnecting />
@@ -127,8 +146,15 @@ function MeConnecting() {
 	);
 }
 
-function ConnectedRoom({ onExit }: { onExit: () => void }) {
-	const { screenShare, room } = useVoice();
+function ConnectedRoom({
+	onExit,
+	call,
+}: {
+	onExit: () => void;
+	call?: { title: string };
+}) {
+	const { screenShare, room, connectedAt } = useVoice();
+	const connectedFor = useConnectedClock(connectedAt);
 	const { data: me } = useMe();
 
 	const members = useLiveMembers();
@@ -174,16 +200,19 @@ function ConnectedRoom({ onExit }: { onExit: () => void }) {
 	const subtitle =
 		focus && sharer
 			? `Assistindo ${sharer.name}`
-			: `${members.length} ${members.length === 1 ? "participante" : "participantes"}`;
+			: call
+				? clockLabel(connectedFor)
+				: `${members.length} ${members.length === 1 ? "participante" : "participantes"}`;
 
 	return (
 		<RoomFrame
 			header={
 				<RoomHeader
 					subtitle={subtitle}
+					call={call}
 					actions={
 						<>
-							{me?.can_create_invite && (
+							{!call && me?.can_create_invite && (
 								<QuickInvite canViewPanel={me.can_view_panel} />
 							)}
 							<LayoutToggle
@@ -198,7 +227,13 @@ function ConnectedRoom({ onExit }: { onExit: () => void }) {
 					}
 				/>
 			}
-			controls={<CallControls controller={screenShare} onExit={onExit} />}
+			controls={
+				<CallControls
+					controller={screenShare}
+					onExit={onExit}
+					call={call !== undefined}
+				/>
+			}
 		>
 			{focus && watched && sharer ? (
 				<div
@@ -227,7 +262,7 @@ function ConnectedRoom({ onExit }: { onExit: () => void }) {
 					</div>
 				</div>
 			) : (
-				<RoomGrid>
+				<RoomGrid tileMax={call ? CALL_TILE_MAX : undefined}>
 					{shareState.status === "active" && screenShare && (
 						<OwnShareTile
 							controller={screenShare}
@@ -300,4 +335,25 @@ function OwnShareTile({
 			}
 		/>
 	);
+}
+
+/** Os segundos desde que a conexão entrou (o tempo da ligação no cabeçalho). */
+function useConnectedClock(since: number | null): number {
+	const [now, setNow] = useState(() => Date.now());
+	useEffect(() => {
+		if (since === null) return;
+		const timer = setInterval(() => setNow(Date.now()), 1000);
+		return () => clearInterval(timer);
+	}, [since]);
+	return since === null ? 0 : Math.max(0, Math.floor((now - since) / 1000));
+}
+
+/** "0:42", "12:04", "1:02:03". */
+function clockLabel(seconds: number): string {
+	const hours = Math.floor(seconds / 3600);
+	const minutes = Math.floor((seconds % 3600) / 60);
+	const rest = String(seconds % 60).padStart(2, "0");
+	return hours > 0
+		? `${hours}:${String(minutes).padStart(2, "0")}:${rest}`
+		: `${minutes}:${rest}`;
 }

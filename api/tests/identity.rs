@@ -114,6 +114,53 @@ async fn convite_cria_o_membro_e_a_sessao_vale() {
 }
 
 #[tokio::test]
+async fn o_status_e_guardado_e_so_aceita_os_tres() {
+    let ctx = setup().await;
+    let code = new_invite(&ctx).await;
+    let (_, session) = redeem(&ctx, &code, 1, "ana").await;
+    let token = session["token"].as_str().unwrap();
+
+    let (_, me) = call(&ctx.router, "GET", "/api/me", Some(token), None).await;
+    assert_eq!(me["status"], "available", "o padrão de quem entra");
+
+    for status in ["busy", "invisible", "available"] {
+        let (code, me) = call(
+            &ctx.router,
+            "PUT",
+            "/api/me/status",
+            Some(token),
+            Some(json!({ "status": status })),
+        )
+        .await;
+        assert_eq!(code, StatusCode::OK, "{me}");
+        assert_eq!(me["status"], status);
+        let (_, me) = call(&ctx.router, "GET", "/api/me", Some(token), None).await;
+        assert_eq!(me["status"], status);
+    }
+
+    for body in [json!({ "status": "ausente" }), json!({})] {
+        let (code, _) = call(
+            &ctx.router,
+            "PUT",
+            "/api/me/status",
+            Some(token),
+            Some(body),
+        )
+        .await;
+        assert_eq!(code, StatusCode::UNPROCESSABLE_ENTITY);
+    }
+    let (code, _) = call(
+        &ctx.router,
+        "PUT",
+        "/api/me/status",
+        None,
+        Some(json!({ "status": "busy" })),
+    )
+    .await;
+    assert_eq!(code, StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
 async fn convite_vale_uma_vez_so() {
     let ctx = setup().await;
     let code = new_invite(&ctx).await;

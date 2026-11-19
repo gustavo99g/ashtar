@@ -114,7 +114,7 @@ function cachedHistories(queryClient: QueryClient) {
  */
 export async function catchUp(
 	queryClient: QueryClient,
-	heads?: ChannelHead[],
+	heads?: Pick<ChannelHead, "channel_id" | "last_message_id">[],
 ): Promise<void> {
 	const latest =
 		heads &&

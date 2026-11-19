@@ -1,2 +1,6 @@
 export { useApplyTheme } from "./hooks/useApplyTheme";
-export { useSettingsStore } from "./stores/settingsStore";
+export {
+	DEFAULT_NOTIFICATIONS,
+	type NotificationPrefs,
+	useSettingsStore,
+} from "./stores/settingsStore";

@@ -12,9 +12,13 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { RouterProvider } from "react-router-dom";
 import { Toaster } from "@/components/ui/toast";
+import { resetCalls } from "@/features/calls";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { clearOutbox } from "@/features/chat";
+import { clearOpenDms } from "@/features/dms";
+import { clearUnread } from "@/features/unread";
 import { SessionWatcher } from "@/features/identity";
+import { resetStreamWatch } from "@/features/notifications";
 import { useApplyTheme } from "@/features/settings";
 import { UpdateNotice, WhatsNewDialog } from "@/features/updater";
 import { useVoice, VoiceProvider } from "@/features/voice";
@@ -25,6 +29,10 @@ import { router } from "./router";
 
 function goToLeftGroup() {
 	clearOutbox();
+	clearOpenDms();
+	clearUnread();
+	resetStreamWatch();
+	resetCalls();
 	void router.navigate(paths.entry.leftGroup, { replace: true });
 }
 

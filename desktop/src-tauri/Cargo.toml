@@ -36,6 +36,7 @@ livekit = { version = "0.10.1", features = ["native-tls"] }
 windows-sys = { version = "0.61.2", features = [
     "Win32_Foundation",
     "Win32_UI_WindowsAndMessaging",
+    "Win32_UI_Shell",
     "Win32_Graphics_Gdi",
     "Win32_Graphics_Dwm",
     "Win32_Storage_Xps",
@@ -75,6 +76,8 @@ windows = { version = "0.62", features = [
 tauri-plugin-updater = "2.13"
 tokio = { version = "1", features = ["time"] }
 tauri-plugin-window-state = "2.5.0"
+# Iniciar com o Windows (Configurações › Aplicativo, v0.3.1): a chave fica no registro do usuário.
+tauri-plugin-autostart = "2.7"
 reqwest = { version = "0.13.4", default-features = false, features = ["json", "rustls-no-provider"] }
 rustls = { version = "0.23.45", default-features = false, features = ["ring", "std"] }
 tauri-plugin-deep-link = "2.6.2"

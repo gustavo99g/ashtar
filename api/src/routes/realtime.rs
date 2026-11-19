@@ -5,6 +5,9 @@
 //! `X-App-Version` não chegam na conexão. O app pede o ticket pela rota comum,
 //! que passa pela `ClientPolicy` e pela sessão, e conecta com ele em até 30
 //! segundos. O ticket vale uma vez.
+//!
+//! Todo evento do hub passa por todas as conexões, e cada uma só escreve no
+//! socket o que é da pessoa dela (o `to` do [`Signal::Event`]).
 
 use std::sync::Arc;
 use std::time::Duration;
@@ -22,8 +25,11 @@ use ts_rs::TS;
 
 use super::auth::CurrentUser;
 use crate::AppState;
-use crate::chat::messages;
+use crate::calls::{self, CallView};
+use crate::chat::dms;
+use crate::chat::read::{self, ChannelHead};
 use crate::error::ApiError;
+use crate::identity::status::{self, Shown};
 use crate::identity::users;
 use crate::realtime::{Hub, ServerEvent, Signal, TICKET_TTL};
 
@@ -91,14 +97,31 @@ async fn run(hub: Arc<Hub>, db: SqlitePool, user_id: String, mut socket: WebSock
     // "online". O `online` e os canais do `ready` são lidos com a assinatura
     // feita: uma mensagem que chegar no meio vem pelo `ready` ou pelo evento
     // (ou pelos dois, e o app ignora o id repetido), nunca por nenhum.
-    hub.connect(&user_id);
+    let status = match status::get(&db, &user_id).await {
+        Ok(status) => status,
+        Err(error) => {
+            eprintln!("realtime: não deu para ler o status: {error}");
+            close(&mut socket, CLOSE_INTERNAL, "Erro no servidor: reconecte.").await;
+            return;
+        }
+    };
+    hub.connect(&user_id, status);
     let mut events = hub.subscribe();
-    match messages::heads(&db).await {
-        Ok(channels) => {
+    match heads(&db, &user_id).await {
+        Ok((channels, dms, call)) => {
+            let online = hub.online();
             let ready = ServerEvent::Ready {
                 user_id: user_id.clone(),
-                online: hub.online(),
+                status,
+                busy: online
+                    .iter()
+                    .filter(|(_, shown)| *shown == Shown::Busy)
+                    .map(|(id, _)| id.clone())
+                    .collect(),
+                online: online.into_iter().map(|(id, _)| id).collect(),
                 channels,
+                dms,
+                call,
             };
             if send(&mut socket, &ready).await {
                 serve(&user_id, &mut socket, &mut events).await;
@@ -110,6 +133,27 @@ async fn run(hub: Arc<Hub>, db: SqlitePool, user_id: String, mut socket: WebSock
         }
     }
     hub.disconnect(&user_id);
+}
+
+/// O que o `ready` leva do chat: os canais de texto, que são de todos, e as
+/// conversas privadas de `user_id`, cada um com o estado de leitura dele, e a
+/// ligação em que a pessoa está, se está numa.
+async fn heads(
+    db: &SqlitePool,
+    user_id: &str,
+) -> Result<(Vec<ChannelHead>, Vec<ChannelHead>, Option<CallView>), ApiError> {
+    let call = match calls::current_for(db, user_id).await? {
+        Some(call) => match dms::get(db, &call.channel_id).await? {
+            Some(dm) => Some(calls::view(db, &dm, &call).await?),
+            None => None,
+        },
+        None => None,
+    };
+    Ok((
+        read::heads(db, user_id).await?,
+        read::dm_heads(db, user_id).await?,
+        call,
+    ))
 }
 
 async fn serve(
@@ -135,7 +179,10 @@ async fn serve(
                 }
             }
             signal = events.recv() => match signal {
-                Ok(Signal::Event(json)) => {
+                // O evento de outra pessoa morre aqui, antes do socket: é esta
+                // linha que mantém uma conversa privada só entre os dois.
+                Ok(Signal::Event { to, .. }) if !to.includes(user_id) => {}
+                Ok(Signal::Event { json, .. }) => {
                     if socket.send(Message::Text(json)).await.is_err() {
                         return;
                     }

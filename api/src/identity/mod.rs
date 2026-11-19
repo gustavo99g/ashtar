@@ -7,6 +7,7 @@
 pub mod devices;
 pub mod invites;
 pub mod permissions;
+pub mod status;
 pub mod users;
 
 use sqlx::FromRow;

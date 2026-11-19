@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="pt-BR">
+	<head>
+		<meta charset="utf-8" />
+		<title>Ashtar</title>
+		<style>
+			html, body { margin: 0; height: 100%; background: #111214; color: #f2f3f5; font: 14px "Segoe UI", sans-serif; }
+			body { display: flex; align-items: center; gap: 12px; padding: 0 16px; box-sizing: border-box; cursor: pointer; border: 1px solid #5865f2; }
+			.avatar { width: 40px; height: 40px; border-radius: 50%; background: #5865f2; display: grid; place-items: center; font-weight: 600; }
+			.name { font-weight: 600; }
+			.text { color: #b5bac1; }
+		</style>
+	</head>
+	<body>
+		<div class="avatar">A</div>
+		<div>
+			<div class="name">Ana</div>
+			<div class="text">oi, vai entrar na sala hoje? (aviso próprio)</div>
+		</div>
+		<script>
+			document.body.addEventListener("click", () => {
+				window.__TAURI__.core.invoke("toast_clicked");
+			});
+		</script>
+	</body>
+</html>

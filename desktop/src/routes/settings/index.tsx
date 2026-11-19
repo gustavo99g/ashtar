@@ -2,6 +2,7 @@ import { ArchivedSettings } from "@/features/channels";
 import { ProfileSettings } from "@/features/identity";
 import { InvitesSettings } from "@/features/invites";
 import { MembersSettings } from "@/features/members";
+import { NotificationsSettings } from "@/features/notifications";
 import { AppSettings } from "@/features/updater";
 import { useVoice, VoiceSettings } from "@/features/voice";
 
@@ -19,6 +20,10 @@ export function ProfileSettingsRoute() {
 
 export function VoiceSettingsRoute() {
 	return <VoiceSettings />;
+}
+
+export function NotificationsSettingsRoute() {
+	return <NotificationsSettings />;
 }
 
 export function AppSettingsRoute() {

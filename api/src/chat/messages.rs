@@ -5,7 +5,9 @@ use sqlx::{FromRow, SqlitePool};
 use ts_rs::TS;
 use uuid::Uuid;
 
-use super::channels::Channel;
+use super::access::Readable;
+use super::{mentions, read};
+use crate::calls::{CallOutcome, CallRecord};
 use crate::error::{ApiError, unique_violation};
 use crate::identity::User;
 use crate::limiter::SendLimiter;
@@ -31,6 +33,20 @@ pub struct Author {
     pub removed: bool,
 }
 
+/// O tipo da mensagem: o texto de alguém, ou o registro de uma ligação.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export, export_to = "index.ts")]
+pub enum MessageKind {
+    Text,
+    /// O registro de uma ligação (ADR 0023), de quem ligou. O `body` é
+    /// "Ligação", para o app antigo; o que vale é o `call`.
+    Call,
+}
+
+/// O texto do registro de ligação, que é o que um app antigo mostra.
+pub const CALL_BODY: &str = "Ligação";
+
 /// Uma mensagem como a API devolve e o WebSocket leva.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
 #[ts(export, export_to = "index.ts")]
@@ -40,7 +56,12 @@ pub struct Message {
     pub client_id: String,
     pub author: Author,
     pub body: String,
+    /// Os ids de quem a mensagem menciona (`@nick`), achados pela API no envio.
+    pub mentions: Vec<String>,
     pub created_at: i64,
+    pub kind: MessageKind,
+    /// Só no `kind = "call"`: como a ligação acabou e quanto durou.
+    pub call: Option<CallRecord>,
 }
 
 #[derive(FromRow)]
@@ -54,6 +75,13 @@ struct MessageRow {
     nick: String,
     display_name: Option<String>,
     removed_at: Option<i64>,
+    /// Os ids mencionados, separados por vírgula; `NULL` sem menção.
+    mentions: Option<String>,
+    kind: String,
+    call_id: Option<String>,
+    call_outcome: Option<String>,
+    call_answered_at: Option<i64>,
+    call_ended_at: Option<i64>,
 }
 
 impl From<MessageRow> for Message {
@@ -69,9 +97,39 @@ impl From<MessageRow> for Message {
                 removed: row.removed_at.is_some(),
             },
             body: row.body,
+            mentions: split_mentions(row.mentions.as_deref()),
             created_at: row.created_at,
+            kind: if row.kind == "call" {
+                MessageKind::Call
+            } else {
+                MessageKind::Text
+            },
+            call: row.call_id.map(|id| CallRecord {
+                id,
+                outcome: row
+                    .call_outcome
+                    .as_deref()
+                    .and_then(CallOutcome::parse)
+                    .unwrap_or(CallOutcome::Missed),
+                duration: match (row.call_answered_at, row.call_ended_at) {
+                    (Some(start), Some(end)) => Some((end - start).max(0)),
+                    _ => None,
+                },
+            }),
         }
     }
+}
+
+/// O `group_concat` não promete ordem: os ids saem ordenados, para a mesma
+/// mensagem vir sempre igual.
+fn split_mentions(joined: Option<&str>) -> Vec<String> {
+    let mut ids: Vec<String> = joined
+        .into_iter()
+        .flat_map(|joined| joined.split(','))
+        .map(str::to_owned)
+        .collect();
+    ids.sort();
+    ids
 }
 
 /// O `SELECT` de [`MessageRow`], com o autor, seguido do resto da consulta.
@@ -79,8 +137,13 @@ macro_rules! select_message {
     ($rest:literal) => {
         concat!(
             "SELECT m.id, m.channel_id, m.client_id, m.body, m.created_at,
-                    u.id AS author_id, u.nick, u.display_name, u.removed_at
-             FROM messages m JOIN users u ON u.id = m.author_id ",
+                    u.id AS author_id, u.nick, u.display_name, u.removed_at,
+                    (SELECT group_concat(x.user_id) FROM mentions x
+                      WHERE x.message_id = m.id) AS mentions,
+                    m.kind, m.call_id, k.outcome AS call_outcome,
+                    k.answered_at AS call_answered_at, k.ended_at AS call_ended_at
+             FROM messages m JOIN users u ON u.id = m.author_id
+             LEFT JOIN calls k ON k.id = m.call_id ",
             $rest
         )
     };
@@ -120,16 +183,20 @@ pub fn validate_client_id(input: &str) -> Result<(), ApiError> {
     }
 }
 
-/// Grava a mensagem de `author` em `channel`. O mesmo `client_id` do mesmo
-/// autor devolve a mensagem que já existe, sem gravar outra: o "Tentar de
-/// novo" do app nunca duplica. O `bool` diz se ela é nova.
+/// Grava a mensagem de `author` em `channel`, que já passou pela regra de
+/// leitura ([`super::access::readable`]). O mesmo `client_id` do mesmo autor
+/// devolve a mensagem que já existe, sem gravar outra: o "Tentar de novo" do app
+/// nunca duplica. O `bool` diz se ela é nova.
 ///
 /// A ordem importa: o texto inválido é recusado antes de contar no `limiter`, e
 /// um reenvio de mensagem já gravada também não conta (nem leva 429).
+///
+/// Na mesma transação da mensagem vão as menções dela e o ponteiro de lido de
+/// quem escreveu: escrever no canal é ter lido até ali.
 pub async fn create(
     db: &SqlitePool,
     limiter: &SendLimiter,
-    channel: &Channel,
+    channel: &Readable,
     author: &User,
     client_id: &str,
     body: &str,
@@ -137,38 +204,53 @@ pub async fn create(
 ) -> Result<(Message, bool), ApiError> {
     validate_client_id(client_id)?;
     let body = validate_body(body)?;
+    let channel_id = channel.id();
 
-    if let Some(existing) = find_existing(db, channel, author, client_id).await? {
+    if let Some(existing) = find_existing(db, channel_id, author, client_id).await? {
         return Ok((existing, false));
     }
     limiter.try_send(&author.id)?;
+    let mentioned = mentions::resolve(db, channel, author, &body).await?;
 
     let id = Uuid::now_v7().to_string();
+    let mut tx = db.begin_with("BEGIN IMMEDIATE").await?;
     let inserted = sqlx::query(
         "INSERT INTO messages (id, channel_id, author_id, client_id, body, created_at)
          VALUES (?, ?, ?, ?, ?, ?)",
     )
     .bind(&id)
-    .bind(&channel.id)
+    .bind(channel_id)
     .bind(&author.id)
     .bind(client_id)
     .bind(&body)
     .bind(now)
-    .execute(db)
+    .execute(&mut *tx)
     .await;
 
     match inserted {
-        Ok(_) => Ok((get(db, &id).await?, true)),
+        Ok(_) => {}
         // Dois envios iguais ao mesmo tempo: o segundo perde a corrida e
         // devolve o primeiro.
         Err(error) if unique_violation(&error).is_some() => {
-            let existing = find_existing(db, channel, author, client_id).await?;
-            existing
+            drop(tx);
+            let existing = find_existing(db, channel_id, author, client_id).await?;
+            return existing
                 .map(|m| (m, false))
-                .ok_or(ApiError::Internal(error))
+                .ok_or(ApiError::Internal(error));
         }
-        Err(error) => Err(error.into()),
+        Err(error) => return Err(error.into()),
     }
+    for user_id in &mentioned {
+        sqlx::query("INSERT INTO mentions (message_id, user_id, channel_id) VALUES (?, ?, ?)")
+            .bind(&id)
+            .bind(user_id)
+            .bind(channel_id)
+            .execute(&mut *tx)
+            .await?;
+    }
+    read::advance(&mut tx, &author.id, channel_id, &id).await?;
+    tx.commit().await?;
+    Ok((get(db, &id).await?, true))
 }
 
 /// A mensagem que `author` já gravou com esse `client_id`. Se ela está em
@@ -176,7 +258,7 @@ pub async fn create(
 /// devolver como se fosse deste canal.
 async fn find_existing(
     db: &SqlitePool,
-    channel: &Channel,
+    channel_id: &str,
     author: &User,
     client_id: &str,
 ) -> Result<Option<Message>, ApiError> {
@@ -187,14 +269,14 @@ async fn find_existing(
             .fetch_optional(db)
             .await?;
     match row.map(Message::from) {
-        Some(message) if message.channel_id != channel.id => Err(ApiError::Conflict(
+        Some(message) if message.channel_id != channel_id => Err(ApiError::Conflict(
             "Esse client_id já foi usado em outro canal.".into(),
         )),
         found => Ok(found),
     }
 }
 
-async fn get(db: &SqlitePool, id: &str) -> Result<Message, ApiError> {
+pub(crate) async fn get(db: &SqlitePool, id: &str) -> Result<Message, ApiError> {
     let row: MessageRow = sqlx::query_as(select_message!("WHERE m.id = ?"))
         .bind(id)
         .fetch_one(db)
@@ -202,28 +284,48 @@ async fn get(db: &SqlitePool, id: &str) -> Result<Message, ApiError> {
     Ok(row.into())
 }
 
-/// A mensagem mais nova de um canal de texto, como o `ready` do tempo real
-/// leva: na volta de uma queda, o app compara com a última que tem e só chama o
-/// `?after=` dos canais que andaram.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS, FromRow)]
-#[ts(export, export_to = "index.ts")]
-pub struct ChannelHead {
-    pub channel_id: String,
-    /// `None` no canal que ainda não tem mensagem.
-    pub last_message_id: Option<String>,
+/// Grava, dentro da transação `tx`, o registro da ligação `call_id` na conversa
+/// `channel_id`, como mensagem de `caller_id` (quem ligou), e devolve o id dela.
+/// O `client_id` é `call:<id>`: uma ligação tem um registro só.
+///
+/// O ponteiro de lido de quem ligou anda até ele, como em toda mensagem
+/// própria. O de quem recebeu fica onde está: as não lidas só contam o
+/// registro da chamada perdida ([`super::read`]).
+pub(crate) async fn insert_call_record(
+    tx: &mut sqlx::SqliteConnection,
+    channel_id: &str,
+    caller_id: &str,
+    call_id: &str,
+    now: i64,
+) -> Result<String, ApiError> {
+    let id = Uuid::now_v7().to_string();
+    sqlx::query(
+        "INSERT INTO messages (id, channel_id, author_id, client_id, body, created_at, kind, call_id)
+         VALUES (?, ?, ?, ?, ?, ?, 'call', ?)",
+    )
+    .bind(&id)
+    .bind(channel_id)
+    .bind(caller_id)
+    .bind(format!("call:{call_id}"))
+    .bind(CALL_BODY)
+    .bind(now)
+    .bind(call_id)
+    .execute(&mut *tx)
+    .await?;
+    read::advance(tx, caller_id, channel_id, &id).await?;
+    Ok(id)
 }
 
-/// O último id de cada canal de texto aberto, em ordem de id do canal.
-pub async fn heads(db: &SqlitePool) -> Result<Vec<ChannelHead>, ApiError> {
-    Ok(sqlx::query_as(
-        "SELECT c.id AS channel_id,
-                (SELECT MAX(m.id) FROM messages m WHERE m.channel_id = c.id) AS last_message_id
-         FROM channels c
-         WHERE c.kind = 'text' AND c.archived_at IS NULL
-         ORDER BY c.id",
-    )
-    .fetch_all(db)
-    .await?)
+/// A última mensagem do canal `channel_id`, se ele tem alguma. É o que a lista
+/// de conversas mostra embaixo do nome.
+pub async fn last(db: &SqlitePool, channel_id: &str) -> Result<Option<Message>, ApiError> {
+    let row: Option<MessageRow> = sqlx::query_as(select_message!(
+        "WHERE m.channel_id = ? ORDER BY m.id DESC LIMIT 1"
+    ))
+    .bind(channel_id)
+    .fetch_optional(db)
+    .await?;
+    Ok(row.map(Message::from))
 }
 
 /// Uma página do histórico.
@@ -248,10 +350,10 @@ pub enum Cursor {
     After(String),
 }
 
-/// Até `limit` mensagens de `channel` no sentido de `cursor`.
+/// Até `limit` mensagens do canal `channel_id` no sentido de `cursor`.
 pub async fn page(
     db: &SqlitePool,
-    channel: &Channel,
+    channel_id: &str,
     cursor: Cursor,
     limit: i64,
 ) -> Result<MessagePage, ApiError> {
@@ -262,7 +364,7 @@ pub async fn page(
             sqlx::query_as(select_message!(
                 "WHERE m.channel_id = ? ORDER BY m.id DESC LIMIT ?"
             ))
-            .bind(&channel.id)
+            .bind(channel_id)
             .bind(fetch)
             .fetch_all(db)
             .await?
@@ -271,7 +373,7 @@ pub async fn page(
             sqlx::query_as(select_message!(
                 "WHERE m.channel_id = ? AND m.id < ? ORDER BY m.id DESC LIMIT ?"
             ))
-            .bind(&channel.id)
+            .bind(channel_id)
             .bind(id)
             .bind(fetch)
             .fetch_all(db)
@@ -281,7 +383,7 @@ pub async fn page(
             sqlx::query_as(select_message!(
                 "WHERE m.channel_id = ? AND m.id > ? ORDER BY m.id ASC LIMIT ?"
             ))
-            .bind(&channel.id)
+            .bind(channel_id)
             .bind(id)
             .bind(fetch)
             .fetch_all(db)

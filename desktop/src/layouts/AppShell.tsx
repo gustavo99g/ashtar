@@ -1,11 +1,15 @@
 import { Outlet } from "react-router-dom";
-import logo from "@/assets/ashtar.svg";
+import { CallBridge } from "@/features/calls";
 import { ChannelDialogs } from "@/features/channels";
+import { DmDock, showDm } from "@/features/dms";
 import { JoinNotices } from "@/features/members";
-import { ChannelNav } from "@/features/server";
+import { NotificationsBridge } from "@/features/notifications";
+import { ChannelNav, ServerMenu } from "@/features/server";
+import { SideDock } from "@/features/side-panel";
 import { MiniShare, VoiceDock } from "@/features/voice";
 /*
- * A moldura de quem já entrou: a coluna do servidor à esquerda e a rota no meio. As
+ * A moldura de quem já entrou: a coluna do servidor à esquerda, a rota no meio e a lateral
+ * (membros e conversas) à direita. As
  * configurações também são filhas daqui e se desenham por cima de tudo (o `SettingsLayout` ocupa
  * a moldura inteira, com `absolute inset-0`), então a coluna continua montada embaixo delas.
  *
@@ -14,9 +18,12 @@ import { MiniShare, VoiceDock } from "@/features/voice";
  * elas cobrirem só a área do meio, com a coluna à mostra. Por isso a miniatura da transmissão tem a
  * própria camada, empilhada sobre o `main` na mesma célula da grade, e não dentro dele.
  *
- * A coluna vem da `features/server` (a sala com quem está nela, `ChannelNav`) e da
+ * A coluna vem da `features/server` (o nome do grupo com o menu de quem gerencia, `ServerMenu`, e
+ * os canais, `ChannelNav`) e da
  * `features/voice` (no pé, o cartão de quem está usando, com o botão de configurações,
- * `VoiceDock`).
+ * `VoiceDock`). A lateral vem da `features/side-panel` (`SideDock`): fica fora da célula do
+ * `main`, então a área do canal, e com ela a camada da miniatura, encolhe quando a lateral abre. É
+ * assim que os encaixes da miniatura contam com a lateral sem saber dela.
  */
 export function AppShell() {
 	return (
@@ -25,10 +32,7 @@ export function AppShell() {
 				aria-label="Servidor"
 				className="flex w-[304px] shrink-0 flex-col bg-card"
 			>
-				<div className="flex h-12 shrink-0 items-center gap-2.5 border-b border-border px-4 text-[15px] font-bold">
-					<img src={logo} alt="" className="size-7 rounded-lg" />
-					Ashtar
-				</div>
+				<ServerMenu />
 				<ChannelNav />
 				<VoiceDock />
 			</aside>
@@ -43,9 +47,19 @@ export function AppShell() {
 				<div className="pointer-events-none relative col-start-1 row-start-1">
 					<MiniShare />
 				</div>
+				{/* As conversas privadas abertas, embaixo e encostadas na lateral: outra camada do
+				    tamanho do `main`, por cima da miniatura. */}
+				<div className="pointer-events-none relative col-start-1 row-start-1">
+					<DmDock />
+				</div>
 			</div>
+			<SideDock />
 			{/* Os diálogos de criar, editar e arquivar canais: abrem pela lista ou pelo cabeçalho do chat. */}
 			<ChannelDialogs />
+			{/* Os avisos: a regra, o ponto de não lido e o clique num cartão. Não desenha nada. */}
+			<NotificationsBridge />
+			{/* As ligações: a voz segue a ligação, e o cartão dela vai para a janela dos avisos. */}
+			<CallBridge showConversation={showDm} />
 		</div>
 	);
 }

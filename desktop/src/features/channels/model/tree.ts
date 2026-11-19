@@ -1,9 +1,9 @@
 /**
- * As mudanças de ordem da lista, sem React: mover um canal ou uma categoria (pelo menu ou
- * arrastando) devolve a lista nova, que vira o `PUT /api/channels/layout`.
+ * As mudanças de ordem da lista, sem React: mover um canal para outra categoria (pelo menu) ou
+ * arrastar um canal ou uma categoria (no modo Organizar) devolve a lista nova, que vira o
+ * `PUT /api/channels/layout`.
  *
- * Um "lugar" de canal é o topo (`null`) ou uma categoria (o id). Mover para cima no primeiro canal
- * de um lugar leva para o fim do lugar de cima; para baixo no último, para o começo do de baixo.
+ * Um "lugar" de canal é o topo (`null`) ou uma categoria (o id).
  */
 import { type CollisionDetection, closestCenter } from "@dnd-kit/core";
 import type { ChannelView, Layout, LayoutRequest } from "@/lib/api";
@@ -109,44 +109,21 @@ export function placeChannel(
 	return rebuild(layout, lists);
 }
 
-/** Um passo para cima (`-1`) ou para baixo (`1`), passando de um lugar para o vizinho na ponta. */
-export function moveChannel(
+/**
+ * O "Mover para" do menu do canal: leva o canal para o fim da categoria `categoryId`, ou do topo
+ * (`null`). `null` se ele já está lá, se a categoria não existe ou se o canal não existe: aí não há
+ * o que gravar.
+ */
+export function moveToCategory(
 	layout: Layout,
 	channelId: string,
-	step: -1 | 1,
+	categoryId: string | null,
 ): Layout | null {
 	const lists = places(layout);
-	const placeIndex = lists.findIndex((p) =>
-		p.channels.some((c) => c.id === channelId),
-	);
-	if (placeIndex < 0) return null;
-	const place = lists[placeIndex];
-	const index = place.channels.findIndex((c) => c.id === channelId);
-	const target = index + step;
-	if (target >= 0 && target < place.channels.length) {
-		return placeChannel(layout, channelId, place.id, target);
-	}
-	const neighbour = lists[placeIndex + step];
-	if (!neighbour) return null;
-	return placeChannel(
-		layout,
-		channelId,
-		neighbour.id,
-		step === -1 ? neighbour.channels.length : 0,
-	);
-}
-
-/** Uma categoria um passo para cima ou para baixo. */
-export function moveCategory(
-	layout: Layout,
-	categoryId: string,
-	step: -1 | 1,
-): Layout | null {
-	const index = layout.categories.findIndex((c) => c.id === categoryId);
-	const target = index + step;
-	if (index < 0 || target < 0 || target >= layout.categories.length)
-		return null;
-	return reorderCategory(layout, index, target);
+	const from = lists.find((p) => p.channels.some((c) => c.id === channelId));
+	const to = lists.find((p) => p.id === categoryId);
+	if (!from || !to || from.id === to.id) return null;
+	return placeChannel(layout, channelId, to.id, to.channels.length);
 }
 
 /**
@@ -185,6 +162,55 @@ export function applyDrop(
 	if (!place) return null;
 	const index = place.channels.findIndex((c) => c.id === to.id);
 	return placeChannel(layout, from.id, place.id, index);
+}
+
+/** Onde desenhar a linha de "vai cair aqui": numa das bordas da linha de id `id`. */
+export interface DropLine {
+	/** O `dragId` do canal, da categoria ou do topo que serve de referência. */
+	id: string;
+	edge: "before" | "after";
+}
+
+/**
+ * A linha que mostra onde o arrastado vai cair se for solto agora. Sai do próprio `applyDrop`: faz a
+ * soltura numa cópia e olha quem ficou de vizinho, então a linha nunca promete um lugar diferente do
+ * que a soltura dá. `null` se soltar ali não muda nada.
+ *
+ * Canal: antes do canal que ficaria embaixo dele; se ficaria por último, depois do de cima; numa
+ * categoria vazia (ou no topo vazio), depois do nome dela. Categoria: antes da categoria de baixo,
+ * ou depois da de cima.
+ */
+export function dropLine(
+	layout: Layout,
+	active: string,
+	over: string,
+): DropLine | null {
+	const next = applyDrop(layout, active, over);
+	const from = parseDragId(active);
+	if (!next || !from || sameOrder(layout, next)) return null;
+
+	if (from.kind === "category") {
+		const index = next.categories.findIndex((c) => c.id === from.id);
+		const below = next.categories[index + 1];
+		if (below) return { id: dragId.category(below.id), edge: "before" };
+		const above = next.categories[index - 1];
+		return above ? { id: dragId.category(above.id), edge: "after" } : null;
+	}
+	if (from.kind !== "channel") return null;
+
+	const place = places(next).find((p) =>
+		p.channels.some((c) => c.id === from.id),
+	);
+	if (!place) return null;
+	const index = place.channels.findIndex((c) => c.id === from.id);
+	const below = place.channels[index + 1];
+	if (below) return { id: dragId.channel(below.id), edge: "before" };
+	const above = place.channels[index - 1];
+	if (above) return { id: dragId.channel(above.id), edge: "after" };
+	return {
+		id: place.id === null ? dragId.top : dragId.category(place.id),
+		edge: "after",
+	};
 }
 
 function reorderCategory(

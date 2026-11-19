@@ -26,9 +26,13 @@ describe("handleVoiceRealtime", () => {
 	it("o ready da volta de uma queda marca a lista como velha; o primeiro, não", () => {
 		const ready: ServerEvent = {
 			type: "ready",
+			call: null,
 			user_id: "u1",
 			online: [],
+			busy: [],
+			status: "available",
 			channels: [],
+			dms: [],
 		};
 		const client = new QueryClient();
 		client.setQueryData(voiceKeys.participants("sala"), [kid]);

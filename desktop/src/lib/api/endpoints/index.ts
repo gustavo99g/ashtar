@@ -11,9 +11,16 @@ export {
 	unarchiveChannel,
 	updateChannel,
 } from "./channels";
+export {
+	acceptCall,
+	type CallHangup,
+	hangUpCall,
+	startCall,
+} from "./calls";
 export { listMessages, listPeople, type PageCursor, sendMessage } from "./chat";
+export { listDms, openDm } from "./dms";
 export { createInvite, getInvite, listInvites, revokeInvite } from "./invites";
-export { getMe, updateMe } from "./me";
+export { getMe, setStatus, updateMe } from "./me";
 export {
 	createRecoveryInvite,
 	getMemberPermissions,
@@ -23,6 +30,7 @@ export {
 	setMemberPermission,
 	unlinkMember,
 } from "./members";
+export { markAllRead, markRead, setMuted } from "./read";
 export { createRealtimeTicket } from "./realtime";
 
 export {

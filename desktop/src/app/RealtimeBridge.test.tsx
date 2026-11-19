@@ -36,6 +36,7 @@ const me: MeResponse = {
 	user,
 	permissions: [],
 	update_channel: "stable",
+	status: "available",
 	can_create_invite: false,
 	can_view_panel: false,
 	can_manage_channels: false,

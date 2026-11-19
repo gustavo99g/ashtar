@@ -16,7 +16,12 @@ use crate::error::ApiError;
 use crate::identity::User;
 use crate::identity::permissions::{Permission, require_permission};
 
-/// O tipo do canal. A chave em texto é a do banco.
+/// O tipo de um canal da lista. A chave em texto é a do banco.
+///
+/// A conversa privada (`dm`, ADR 0021) fica de fora de propósito: ela não é um
+/// [`Channel`] (não tem nome nem posição), e uma consulta da lista que
+/// esquecesse o `kind IN ('text', 'voice')` falha ao ler o tipo, em vez de
+/// mostrar a conversa de alguém.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, TS, sqlx::Type)]
 #[serde(rename_all = "snake_case")]
 #[sqlx(rename_all = "snake_case")]
@@ -115,10 +120,14 @@ async fn get_open(
 }
 
 async fn get(conn: &mut SqliteConnection, id: &str) -> Result<Channel, ApiError> {
-    let channel: Option<Channel> = sqlx::query_as(select_channel!("WHERE id = ?"))
-        .bind(id)
-        .fetch_optional(conn)
-        .await?;
+    // Uma conversa privada não é um canal da lista: editar ou arquivar uma pelo
+    // id dá o mesmo 404 de um id que não existe.
+    let channel: Option<Channel> = sqlx::query_as(select_channel!(
+        "WHERE id = ? AND kind IN ('text', 'voice')"
+    ))
+    .bind(id)
+    .fetch_optional(conn)
+    .await?;
     channel.ok_or_else(|| ApiError::NotFound("Nenhum canal com esse id.".into()))
 }
 
@@ -325,7 +334,7 @@ pub(crate) async fn next_position(
 ) -> Result<i64, ApiError> {
     let last: Option<i64> = sqlx::query_scalar(
         "SELECT MAX(position) FROM channels
-         WHERE category_id IS ? AND archived_at IS NULL",
+         WHERE category_id IS ? AND archived_at IS NULL AND kind IN ('text', 'voice')",
     )
     .bind(category_id)
     .fetch_one(conn)

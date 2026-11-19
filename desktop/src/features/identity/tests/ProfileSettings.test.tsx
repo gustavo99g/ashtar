@@ -22,6 +22,7 @@ function me(displayName: string | null): MeResponse {
 		user,
 		permissions: [],
 		update_channel: "beta",
+		status: "available",
 		can_create_invite: true,
 		can_view_panel: true,
 		can_manage_channels: true,

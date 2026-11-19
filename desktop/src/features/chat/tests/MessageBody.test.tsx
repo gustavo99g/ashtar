@@ -12,6 +12,17 @@ beforeEach(() => {
 });
 
 describe("MessageBody", () => {
+	it("a menção vira o selo com o nome visível, e o @nick escrito fica no title", () => {
+		render(
+			<MessageBody
+				body="valeu @ana"
+				mentioned={[{ id: "a", nick: "ana", display_name: "Ana Lima" }]}
+			/>,
+		);
+		const badge = screen.getByText("@Ana Lima");
+		expect(badge).toHaveAttribute("title", "@ana");
+	});
+
 	it("o texto é texto, nunca HTML, e as quebras de linha ficam", () => {
 		const { container } = render(
 			<MessageBody body={"<b>oi</b>\nsegunda linha"} />,

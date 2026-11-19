@@ -1,71 +1,132 @@
-# NOTES — pendências da v0.2.4 (publicador nativo)
+# NOTES — pendências da v0.3 (conversas privadas)
 
-Lista de verificação da fase descrita no [`PLAN.md`](PLAN.md). Cada item deve ser resolvido ou
-conscientemente adiado (marcar como tal) antes de fechar a fase. A lista da fase anterior está arquivada em
-[`docs/plans/v0.2.3-notes.md`](docs/plans/v0.2.3-notes.md).
+Lista de verificação da fase descrita no [`PLAN.md`](PLAN.md). Cada item deve ser resolvido ou conscientemente
+adiado (marcar como tal) antes de fechar a entrega em que ele está. A lista da fase anterior está arquivada em
+[`docs/plans/v0.2.4-notes.md`](docs/plans/v0.2.4-notes.md).
+
+## Antes de começar
+
+- [ ] **Pendências da v0.2.4** (os `[ ]` de `docs/plans/v0.2.4-notes.md`): a medição em NVIDIA e Intel, tela cheia exclusiva, HDR e
+      notebook com duas GPUs. Decidir se seguem como correções `0.2.4x` em paralelo ou fecham antes.
+- [ ] **A v0.2.5 (VPS)** segue em paralelo. Só a Etapa 23 depende dela.
 
 ## Vindos do BACKLOG
 
-- [x] **Publicador de vídeo e áudio nativo em Rust:** as duas peças, a redução na GPU antes de copiar para a
-      memória e o publicador em si, são as Etapas 2 e 3.
-- [x] **Redução da imagem no caminho do IPC** (o `scale` do libyuv, 5–10 ms no 1080p): deixa de existir com o
-      IPC (Etapa 5). O `fast_image_resize` sai do `Cargo.toml`.
-- [x] **Divisão do `capture_frame` em readback, redução e conversão:** sai com o IPC. O caminho novo tem os
-      próprios números e logs (Etapa 3).
-- [ ] **Linha de base de desempenho em release por preset** (CPU, memória e histograma de intervalos entre
-      frames): a medição da Etapa 6, contra a `0.2.30`.
-- [ ] **Medição e comparação estruturada:** a mesma Etapa 6, com o roteiro e os números na ADR 0017.
-- [x] **Janelas minimizadas no seletor:** lista própria por `EnumWindows`, o selo "Minimizada" e a janela
-      restaurada ao escolher (Etapas 1 e 5). Remedir o tempo da lista com muitas janelas: hoje leva ~95 ms com
-      4, por causa dos ícones.
-- [x] **Miniaturas no seletor** (v0.8 do roadmap, adiantadas): pelo WGC, só dos cards visíveis, sem `Vec<u8>` em
-      JSON, pelo `Channel` do Tauri (Etapa 5).
-- [x] **Janela parada custa uma conversão por volta:** o WGC só entrega imagem quando algo muda, e o caminho novo
-      só codifica imagens novas (Etapa 2).
+- [ ] **Tempo limite no `requestVoiceToken`:** com a API fora do ar, o app fica em "conectando" (Etapa 5).
+- [ ] **`MIN_CLIENT_VERSION=0.2.20`** no `.env` de produção (Etapa 5). É só configuração.
+- [ ] **Volume por usuário**, que o roadmap tinha na v0.5: adiantado para a Etapa 4.
+- [ ] **A trava de uma transmissão por vez** só existe no app. Com as ligações ela precisa valer por sala
+      (Etapa 21).
 
-## Antes do beta
+## v0.3.0 — base visual
 
-- [ ] **Jogo em tela cheia exclusiva:** confere se o WGC captura como janela; se não, o contorno é compartilhar a
-      tela.
-- [ ] **Monitor HDR:** a cor sai lavada na conversão para BT.709?
-- [ ] **Notebook com duas GPUs:** captura, conversão e encoder no mesmo adaptador (decisão 2).
-- [ ] **Janela redimensionada, minimizada e fechada** no meio da transmissão.
-- [ ] **Máquina sem encoder de hardware:** o plano B entra sozinho e o painel mostra "Software".
-- [ ] **Driver atualizado com a transmissão aberta** (dispositivo perdido): a transmissão acaba com aviso, sem
-      fantasma na sala.
-- [ ] **Outras placas do grupo** pelo `encoder-probe.exe` (Etapa 6), principalmente NVIDIA e Intel.
-- [ ] **A API da Etapa 4 no computador de casa** antes de o app ir para o beta.
+- [ ] **Quem vê o menu do servidor:** o Convidar hoje é só do dono. Conferir o que aparece para quem gerencia
+      canais e não é dono (sem Convidar) e para quem não é nenhum dos dois (sem menu).
+- **Submenu nos testes:** o base-ui deixa os itens do submenu com `pointer-events: none` no jsdom. Use o
+  `userEvent` com `pointerEventsCheck: 0` e `fireEvent.click` no item.
+- [ ] **"Criar canal de voz"** aparece no quadro e fica de fora: criar sala de voz é da v0.5.
+- [x] **Sair do modo Organizar com mudanças:** não há por onde sair sem querer. A coluna fica em todas as
+      telas, e o modo dura até o Concluir ou o Desfazer. Fechar o app descarta a cópia. Sem pergunta de
+      confirmação.
+- [x] **409 no Concluir:** busca a árvore, recomeça o modo a partir dela e avisa. A arrumação feita se perde.
+- **Cartão do usuário:** sem botão de fechar (como o canvas) e com o nick no cabeçalho (como a ADR 0020). As
+  seções são filhos do `UserCard`; quem abre decide quais passa.
+- [ ] **Volume individual e o "ficar sem áudio":** o deafen cala as vozes sem apagar o volume de cada um.
+- [ ] **O caminho com ganho (acima de 100%) com várias vozes:** hoje serve a uma trilha, a da transmissão.
+      Conferir o custo e a troca da saída de áudio com cinco pessoas acima de 100%.
+- [ ] **O volume guardado é por pessoa, no computador:** conferir que sobrevive a reinstalar e ao auto-update.
+- **A troca de saída com reforço** não era seguida nem na transmissão (v0.2.4): o contexto só olhava a saída
+  ao ligar. O `RoomAudio` agora escuta o `ActiveDeviceChanged`.
 
-## Volume da transmissão (Etapa 5c)
+## v0.3.1 — todo o chat
 
-- [x] **O jogo chegava baixo** para quem assiste: o nivelador (`media/leveler.rs`) sobe o som até +12 dB, com alvo de
-      ~-18 dBFS e um limitador a partir de ~-2 dBFS; vem ligado, com a chave "Nivelar o volume". Quem assiste vai até
-      200%, por um `AudioContext` só acima de 100%.
-- [ ] **Medir na Etapa 6:** anotar o ganho do log (`áudio da transmissão encerrado`) em dois ou três jogos do grupo.
-      Se ficar sempre no máximo, o alvo pode subir; se distorcer, o `LIMIT` pode descer.
-- [ ] **Teste à mão com dois computadores** (roteiro da 5c): o jogo perto da voz, a chave no meio da transmissão, o
-      silêncio sem chiado, "Sem áudio", o volume a 180% e a troca da saída de áudio.
+### Experimento (Etapa 6)
 
-## A decidir durante a fase
+- [ ] **A notificação do Windows aparece com o app só na bandeja**, instalado (e não só em desenvolvimento)?
+- [ ] **Clicar nela abre a conversa certa?** Se o clique não chegar ao app, vale o plano B (aviso próprio).
+- [ ] **Ponto de não lido** no ícone da bandeja e na barra de tarefas.
+- [ ] **Iniciar com o Windows direto na bandeja**, sem piscar a janela, e convivendo com o auto-update.
+- [ ] **Modo de foco do Windows e jogo em tela cheia:** a notificação some? É o comportamento esperado.
 
-- [ ] **Atalho do pausar:** uma tecla global ou só pela bandeja e pelo painel.
-- [x] **Miniaturas em JPEG ou em RGBA cru** pelo `Channel`: JPEG (480×270, qualidade 80): leve o
-      bastante para 24 cards a 8 fps.
-- [x] **Codec do plano B:** VP8 ou H.264 em software. Ficou o VP8, pela
-      `NativeVideoSource` da livekit; quem assiste decodifica os dois.
+### Banco e API
+
+- [ ] **A migração `0004` refaz a tabela `channels`**, que as mensagens referenciam. Rodar numa cópia do banco
+      de produção e conferir as contagens antes e depois; backup feito antes de aplicar.
+- [ ] **O ponteiro de lido nasce na última mensagem de cada canal**, para todos os membros, na própria
+      migração: ninguém abre a `0.3.10` com tudo como não lido. Conferir também quem entra no grupo depois.
+- [ ] **Toda consulta de canais filtra o tipo** (`kind IN ('text', 'voice')`): a `dm` tem `name` e
+      `position` nulos, e uma consulta esquecida quebra ao ler a linha. Revisar `channels.rs`, `layout.rs`,
+      `categories.rs` e o `admin`.
+- [ ] **Nenhuma rota vaza uma conversa:** o `GET /api/channels`, o layout, os arquivados, o `ready`, o
+      `?after=` da reconexão e o `admin`. Revisar uma a uma, além dos testes.
+- [ ] **O `admin semear` e o `admin membros`** continuam funcionando com o tipo novo.
+- [ ] **App antigo com a API nova:** a `0.3.0` e a `0.2.4x` ignoram os eventos e campos novos? Se não, subir o
+      `MIN_CLIENT_VERSION` junto com a `0.3.10`.
+- [ ] **Conexão atrasada no `broadcast`** (fechamento 4000): a volta pelo `?after=` também traz as conversas.
+- [ ] **Remover alguém do grupo:** as conversas dela ficam só para leitura para quem ficou.
+- [ ] **Menção a quem não lê o canal:** numa conversa privada, `@nick` de um terceiro não notifica ninguém.
+- [ ] **Nick dentro de palavra ou de link** (`email@nick.com`): não vira menção.
+- [ ] **Invisível não pode vazar:** a pessoa invisível some do `ready`, do `GET /api/people` e do
+      `presence.changed` dos outros, mas aparece na sala de voz se entrar nela. Avisar isso no menu.
+
+### App
+
+- [ ] **A lateral na casca do app:** conferir o espaço na sala de voz, no Foco e com a miniatura da
+      transmissão, que hoje encaixa nos cantos.
+- [ ] **A janela da conversa por cima da transmissão:** não pode cobrir os controles da sala.
+- [ ] **Marcar como lido com a janela sem foco:** não marcar. Com o app na bandeja, também não.
+- [ ] **"Marcar tudo como lido"** limpa os canais e as conversas, inclusive as menções, e os números somem
+      na hora na bandeja e na barra de tarefas.
+- [ ] **A linha "novas mensagens"** some depois de lida e não pula com mensagem chegando.
+- [ ] **Duas notificações para a mesma mensagem** (aviso no canto e Windows): só uma.
+- [ ] **Muitas mensagens seguidas** da mesma pessoa: juntar numa notificação.
+- [ ] **Os sons** (mensagem, menção e, na v0.3.2, o toque): próprios ou de licença livre, com a origem
+      anotada no repositório.
+- [ ] **O som da notificação** sai na saída de áudio escolhida em Voz e vídeo, e não toca em Ocupado.
+- [ ] **"Começou a transmitir"** não avisa quem já está na sala nem quem transmite.
+- [ ] **Os textos da aba Notificações e do menu de status**, revisados.
+
+### A decidir durante a entrega
+
+- [ ] **A lateral começa minimizada na sala de voz?** O plano diz que sim, para a transmissão não perder
+      espaço. Conferir no uso.
+- [ ] **`@todos`:** fica de fora por enquanto. Reavaliar depois de uma semana de uso.
+- [ ] **Silenciar com prazo** (1 hora, até amanhã) ou só ligado e desligado. Começa só ligado e desligado.
+- [ ] **Ocupado some sozinho?** Ao reiniciar o app ou no dia seguinte. Começa ficando até a pessoa trocar.
+- [ ] **Fechar uma conversa da lista** (esconder sem apagar): hoje a lista mostra todas.
+
+## v0.3.2 — ligações privadas
+
+### Experimento (Etapa 18)
+
+- [ ] **Botões na notificação do Windows** (Atender e Recusar): o plugin do Tauri dá suporte? Se não, a janela
+      pequena sempre no topo.
+- [ ] **A janela de ligação não pode roubar o foco** de um jogo em tela cheia.
+- [ ] **O toque com a janela escondida:** o WebView escondido toca som? Se não, tocar pelo Rust.
+
+### API e app
+
+- [ ] **O webhook do LiveKit de uma sala privada** não pode sair no `voice.participants` de todos.
+- [ ] **A ligação fica presa** se o app de um dos dois cair: o `room_finished` e um tempo limite fecham o
+      registro.
+- [ ] **Ligar para quem está offline:** o botão fica apagado. Quem está Invisível aparece offline, então
+      também não recebe ligação: conferir se é o que se quer, ou se o Invisível deve tocar mesmo assim.
+- [ ] **Quando quem liga sai da sala:** o plano diz que só ao ser atendido, para não sair à toa numa chamada
+      perdida. Conferir com o quadro "Conversas — aviso antes de ligar".
+- [ ] **Ligar para quem já está em outra ligação privada:** toca normalmente, e atender desliga a outra.
+- [ ] **Os dois ligando ao mesmo tempo:** viram uma ligação só.
+- [ ] **A `:screen` da sala** é derrubada quando a pessoa sai da sala para atender (o kick da ADR 0017).
+- [ ] **A miniatura da transmissão** de quem estava assistindo na sala e atendeu uma ligação: fecha.
+- [ ] **Atualização pendente durante a ligação:** pergunta antes de reiniciar, como na sala.
+- [ ] **Cota do LiveKit**, se a v0.2.5 atrasar: a entrega espera.
 
 ## Riscos e cuidados
 
-- [ ] **Driver da AMD e a ordem da codec API** (decisão 4): uma atualização de driver pode mudar o
-      comportamento. O teste com GPU da Etapa 2 confere o fps gravado no SPS.
-- [ ] **Outras marcas de placa** podem ter as próprias pegadinhas no Media Foundation. O encoder fica atrás de uma
-      interface, para o AMF (SDK da AMD) ou outro entrar se o MF não servir.
-- [ ] **Sem chave para voltar ao IPC:** um problema no beta só se resolve com outra versão. A semana no beta é a
-      rede de segurança.
-- [ ] **Conteúdo com DRM** sai preto também no WGC. O aviso de conteúdo protegido continua na v0.8.
-- [ ] **Cota do LiveKit Cloud:** a `:screen` conta como mais um participante enquanto a VPS não entra (cerca de 1
-      minuto a mais por minuto de transmissão, dos 5.000 do plano gratuito).
-- [ ] **A trava de uma transmissão por vez** continua só no app e agora precisa reconhecer a `:screen` como a
-      transmissão de alguém.
-- [ ] **O `SetForegroundWindow`** só troca o foco se o app estiver em primeiro plano, o que vale no clique de
-      transmitir. Pela bandeja, trocar de fonte pode não trazer a janela para a frente.
+- [ ] **Privacidade é o risco principal da fase.** Qualquer rota ou evento novo tem de passar pela regra de
+      leitura; os testes de vazamento rodam no pipeline e não podem ser pulados.
+- [ ] **A v0.3.1 é grande** (onze etapas). Se apertar, o corte é publicar as conversas com as não lidas
+      (Etapas 7, 8, 11, 12 e 13, mais o ponteiro da 9) e deixar menções, silenciar e status numa `0.3.11`.
+- [ ] **O tempo real com destinatário muda o caminho de todos os eventos.** Um erro ali derruba o chat
+      inteiro: a Etapa 8 sobe sozinha na API e roda uns dias com o app atual antes do resto.
+- [ ] **As notificações dependem do Windows de cada um** (modo de foco, notificações desligadas para o app).
+      O aviso do canto e as não lidas não podem depender delas.

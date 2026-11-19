@@ -1,0 +1,24 @@
+[package]
+name = "notify-probe"
+version = "0.0.1"
+description = "Etapa 6 da v0.3: o que o Windows deixa o Ashtar fazer com notificação, bandeja, barra de tarefas e iniciar junto"
+edition = "2021"
+publish = false
+
+# Fora de qualquer workspace: compila sozinho, sem o libwebrtc do app.
+[workspace]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon", "image-png"] }
+tauri-plugin-notification = "2"
+tauri-plugin-autostart = "2"
+tauri-plugin-single-instance = "2"
+serde = { version = "1", features = ["derive"] }
+
+# O aviso direto pela API do Windows, com botões e com o clique chegando ao app.
+# É a mesma biblioteca que o plugin de notificação usa por baixo.
+[target.'cfg(windows)'.dependencies]
+tauri-winrt-notification = "0.8"

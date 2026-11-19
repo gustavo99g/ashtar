@@ -32,6 +32,11 @@ vi.mock("@/components/ui/toast", async (importOriginal) => ({
 }));
 
 vi.mock("@/lib/tauri/commands", () => ({
+	// A ponta dos avisos, na moldura (`NotificationsBridge`).
+	setUnreadBadge: vi.fn(() => Promise.resolve()),
+	onNotificationOpen: vi.fn(() => Promise.resolve(() => {})),
+	onNotificationAnswer: vi.fn(() => Promise.resolve(() => {})),
+	notificationRing: vi.fn(() => Promise.resolve()),
 	login: vi.fn(),
 	redeem: vi.fn(),
 	accountMarker: vi.fn(),
@@ -198,7 +203,7 @@ describe("quem já tem conta não vê as telas de convite", () => {
 	])("%s leva para o servidor", async (_name, path) => {
 		const router = renderAt(path, { status: "connected", user: kid });
 
-		await screen.findByRole("complementary");
+		await screen.findByRole("complementary", { name: "Servidor" });
 		await vi.waitFor(() =>
 			expect(router.state.location.pathname).toBe(HOME),
 		);

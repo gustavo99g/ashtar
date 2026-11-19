@@ -2,6 +2,7 @@
 //! (`src/bin/admin.rs`) usam as mesmas regras e o mesmo banco.
 
 pub mod avatar;
+pub mod calls;
 pub mod chat;
 pub mod client_policy;
 pub mod db;
@@ -50,6 +51,9 @@ pub struct AppState {
     pub public_url: Arc<str>,
     /// O instalador do "Baixar para Windows", lido do `latest.json`.
     pub download: Arc<DownloadLink>,
+    /// Quanto a ligação toca antes de virar perdida ([`calls::RING_TIMEOUT`];
+    /// os testes usam menos).
+    pub ring_timeout: std::time::Duration,
 }
 
 impl AppState {
@@ -64,6 +68,7 @@ impl AppState {
                 .map(|verifier| Arc::new(WebhookReceiver::new(verifier))),
             public_url: public_url.trim_end_matches('/').into(),
             download: Arc::new(DownloadLink::default()),
+            ring_timeout: calls::RING_TIMEOUT,
         }
     }
 
@@ -103,6 +108,7 @@ pub fn app(state: AppState, policy: Arc<ClientPolicy>) -> Router {
         .route("/auth/redeem", post(routes::auth::redeem))
         .route("/auth/login", post(routes::auth::login))
         .route("/me", get(routes::auth::me).patch(routes::auth::update_me))
+        .route("/me/status", put(routes::auth::set_status))
         .route(
             "/invites",
             get(routes::invites::list).post(routes::invites::create),
@@ -129,7 +135,16 @@ pub fn app(state: AppState, policy: Arc<ClientPolicy>) -> Router {
             "/channels/{id}/messages",
             get(routes::messages::list).post(routes::messages::send),
         )
+        .route("/channels/{id}/read", put(routes::read::mark_read))
+        .route("/channels/{id}/mute", put(routes::read::set_muted))
+        .route("/read-all", post(routes::read::mark_all_read))
         .route("/people", get(routes::people::list))
+        .route("/dms", get(routes::dms::list).post(routes::dms::open))
+        .route("/dms/{id}/call", post(routes::calls::start))
+        .route("/dms/{id}/call/accept", post(routes::calls::accept))
+        .route("/dms/{id}/call/decline", post(routes::calls::decline))
+        .route("/dms/{id}/call/cancel", post(routes::calls::cancel))
+        .route("/dms/{id}/call/end", post(routes::calls::end))
         .route(
             "/channels",
             get(routes::channels::list).post(routes::channels::create),

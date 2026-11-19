@@ -13,6 +13,11 @@
  * Os componentes leem participantes e trilhas pelos hooks do LiveKit (`useParticipants`,
  * `useTracks`...), que funcionam porque a árvore está dentro do `RoomContext`.
  *
+ * A conexão é de um de dois tipos (`kind`): a sala de voz do grupo, ou a ligação privada (ADR 0023),
+ * cuja sala tem o nome da conversa. Uma por vez: entrar numa sai da outra. Quem sabe da ligação (a
+ * sinalização, quem é a outra pessoa) é a `features/calls`; aqui ela é só uma sala com outro
+ * título.
+ *
  * Entra sem assinar nada sozinho (`autoSubscribe: false`): a voz de todo mundo é assinada aqui, e a
  * tela transmitida só enquanto aparece, no Foco ou na miniatura (`subscriptions.ts`).
  *
@@ -81,10 +86,25 @@ export interface VoiceError {
 	message: string;
 }
 
+/** Que tipo de conexão de voz: a sala do grupo, ou uma ligação privada. */
+export type VoiceKind = "room" | "call";
+
+/** Como entrar: o tipo da conexão e, na ligação, o título (o nome da outra pessoa). */
+export interface JoinOptions {
+	kind?: VoiceKind;
+	title?: string;
+}
+
 export interface VoiceContextValue {
 	voiceChannelId: string | null;
+	/** O tipo da conexão atual; `null` fora de qualquer uma. */
+	voiceKind: VoiceKind | null;
+	/** Na ligação, com quem é (o nome visível). */
+	voiceTitle: string | null;
 	/** Só existe depois de conectar. Os componentes da chamada só renderizam com ela. */
 	room: Room | null;
+	/** Quando a conexão atual entrou (`Date.now()`): o tempo da ligação conta daqui. */
+	connectedAt: number | null;
 	connectionState: VoiceConnectionState;
 	error: VoiceError | null;
 	screenShare: ScreenShareController | null;
@@ -99,9 +119,10 @@ export interface VoiceContextValue {
 	undeafen: () => Promise<void>;
 	/**
 	 * Entra na sala (ou troca de sala). Na mesma sala, só tenta de novo depois de um erro ou de
-	 * a conexão cair. A conexão acontece no efeito do `VoiceProvider`.
+	 * a conexão cair. A conexão acontece no efeito do `VoiceProvider`. Sem `options`, é a sala do
+	 * grupo.
 	 */
-	join: (channelId: string) => void;
+	join: (channelId: string, options?: JoinOptions) => void;
 	leave: () => void;
 }
 
@@ -112,6 +133,8 @@ const NOBODY: ReadonlySet<string> = new Set();
 interface VoiceTarget {
 	channelId: string;
 	attempt: number;
+	kind: VoiceKind;
+	title: string | null;
 }
 
 function errorMessage(error: unknown): string {
@@ -136,8 +159,11 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 	/** Sala em que a pessoa quer estar. Mudou, o efeito abaixo sai da anterior e entra na nova. */
 	const [target, setTarget] = useState<VoiceTarget | null>(null);
 	const voiceChannelId = target?.channelId ?? null;
+	const voiceKind = target?.kind ?? null;
+	const voiceTitle = target?.title ?? null;
 
 	const [room, setRoom] = useState<Room | null>(null);
+	const [connectedAt, setConnectedAt] = useState<number | null>(null);
 	const [screenShare, setScreenShare] = useState<ScreenShareController | null>(
 		null,
 	);
@@ -285,6 +311,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 				if (cancelled) return;
 
 				setRoom(nextRoom);
+				setConnectedAt(Date.now());
 				setScreenShare(controller);
 				if (microphoneProblem !== null) setIsMuted(true);
 				setError(
@@ -314,6 +341,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 			void controller.dispose().finally(() => nextRoom.disconnect());
 
 			setRoom(null);
+			setConnectedAt(null);
 			setScreenShare(null);
 			setConnectionState("disconnected");
 			setError(null);
@@ -379,7 +407,10 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 
 		return {
 			voiceChannelId,
+			voiceKind,
+			voiceTitle,
 			room,
+			connectedAt,
 			connectionState,
 			error,
 			screenShare,
@@ -409,13 +440,15 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 					await setMicrophone(true);
 				}
 			},
-			join: (channelId) => {
+			join: (channelId, options) => {
 				const retry =
 					connectionState === "error" || connectionState === "disconnected";
 				if (channelId === voiceChannelId && !retry) return;
 				setTarget((current) => ({
 					channelId,
 					attempt: (current?.attempt ?? 0) + 1,
+					kind: options?.kind ?? "room",
+					title: options?.title ?? null,
 				}));
 				// Já como "conectando", para a tela não piscar um estado parado até o efeito rodar.
 				setConnectionState("connecting");
@@ -426,7 +459,10 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 		};
 	}, [
 		voiceChannelId,
+		voiceKind,
+		voiceTitle,
 		room,
+		connectedAt,
 		connectionState,
 		error,
 		screenShare,
@@ -440,7 +476,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 			<RoomContext.Provider value={room ?? undefined}>
 				{/* muted também cancela a assinatura: quem entrar depois do deafen não é ouvido. */}
 				{/* O deafen cala só as vozes: a transmissão segue no volume do Foco. */}
-				{room && <RoomAudio deafened={isDeafened} />}
+				{room && <RoomAudio room={room} deafened={isDeafened} />}
 				{children}
 			</RoomContext.Provider>
 		</VoiceContext.Provider>

@@ -2,7 +2,7 @@
  * "O que há de novo" (decisão 9 do PLAN da v0.2.0; quadro "Atualização: o que há de novo"): na
  * primeira abertura depois de mudar de versão, mostra a seção do CHANGELOG.md uma vez e guarda a
  * versão como vista. O link da tela Aplicativo abre a mesma janela. Entendi, Esc ou clicar fora
- * fecha.
+ * fecha. Uma lista longa rola por dentro, com o título e o Entendi sempre à vista.
  */
 import { SparklesIcon } from "lucide-react";
 import { useEffect } from "react";
@@ -32,10 +32,10 @@ export function WhatsNewDialog() {
 				if (!next) closeWhatsNew();
 			}}
 		>
-			<DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-[460px]">
+			<DialogContent className="flex max-h-[85vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-[640px]">
 				<div
 					aria-hidden="true"
-					className="flex h-24 items-end justify-center bg-[radial-gradient(ellipse_70%_120%_at_50%_0%,color-mix(in_srgb,var(--color-primary)_45%,transparent),transparent_70%)]"
+					className="flex h-24 shrink-0 items-end justify-center bg-[radial-gradient(ellipse_70%_120%_at_50%_0%,color-mix(in_srgb,var(--color-primary)_45%,transparent),transparent_70%)]"
 				>
 					<img
 						src={logo}
@@ -43,7 +43,7 @@ export function WhatsNewDialog() {
 						className="-mb-5 size-16 rounded-2xl ring-4 ring-card"
 					/>
 				</div>
-				<div className="flex flex-col gap-[22px] px-8 pt-9 pb-7">
+				<div className="flex min-h-0 flex-1 flex-col gap-[22px] px-8 pt-9 pb-7">
 					<div className="flex flex-col items-center gap-2 text-center">
 						<Badge
 							tone="info"
@@ -56,7 +56,7 @@ export function WhatsNewDialog() {
 							O que há de novo na {content?.version}
 						</DialogTitle>
 					</div>
-					<ul className="flex flex-col gap-2.5">
+					<ul className="-mr-4 flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto pr-4">
 						{items.map((item, index) => (
 							<li
 								key={index}
@@ -70,7 +70,7 @@ export function WhatsNewDialog() {
 							</li>
 						))}
 					</ul>
-					<Button size="lg" className="w-full" onClick={closeWhatsNew}>
+					<Button size="lg" className="w-full shrink-0" onClick={closeWhatsNew}>
 						Entendi
 					</Button>
 				</div>

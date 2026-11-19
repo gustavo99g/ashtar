@@ -27,6 +27,30 @@ export type BetaGrant = { origin: Origin,
 granted_at: number | null, };
 
 /**
+ * Em que pé a ligação está, ou como acabou.
+ */
+export type CallOutcome = "ringing" | "answered" | "missed" | "declined" | "cancelled";
+
+/**
+ * O que o registro no histórico leva da ligação (o `call` da [`Message`]).
+ */
+export type CallRecord = { id: string, outcome: CallOutcome, 
+/**
+ * Em segundos, do atender ao desligar. Só na ligação atendida.
+ */
+duration: number | null, };
+
+/**
+ * Uma ligação em andamento como o tempo real leva: quem liga, quem recebe e em
+ * que pé está (`ringing` ou `answered`).
+ */
+export type CallView = { id: string, 
+/**
+ * A conversa: é também o nome da sala no LiveKit.
+ */
+channel_id: string, caller: Author, callee: Author, outcome: CallOutcome, created_at: number, answered_at: number | null, };
+
+/**
  * Uma categoria no pedido de reordenar: o id e os ids dos canais, em ordem.
  */
 export type CategoryOrder = { id: string, channels: Array<string>, };
@@ -40,18 +64,24 @@ export type CategoryView = { id: string, name: string,
 channels: Array<ChannelView>, };
 
 /**
- * A mensagem mais nova de um canal de texto, como o `ready` do tempo real
- * leva: na volta de uma queda, o app compara com a última que tem e só chama o
- * `?after=` dos canais que andaram.
+ * Um canal de texto ou conversa como o `ready` do tempo real leva: a mensagem
+ * mais nova e o estado de quem conectou. Na volta de uma queda, o app compara
+ * o `last_message_id` com a última que tem e só chama o `?after=` dos que
+ * andaram.
  */
 export type ChannelHead = { channel_id: string, 
 /**
  * `None` no canal que ainda não tem mensagem.
  */
-last_message_id: string | null, };
+last_message_id: string | null, state: ReadState, };
 
 /**
- * O tipo do canal. A chave em texto é a do banco.
+ * O tipo de um canal da lista. A chave em texto é a do banco.
+ *
+ * A conversa privada (`dm`, ADR 0021) fica de fora de propósito: ela não é um
+ * [`Channel`] (não tem nome nem posição), e uma consulta da lista que
+ * esquecesse o `kind IN ('text', 'voice')` falha ao ler o tipo, em vez de
+ * mostrar a conversa de alguém.
  */
 export type ChannelKind = "text" | "voice";
 
@@ -67,6 +97,28 @@ category_id: string | null,
  * Só na lista de arquivados.
  */
 archived_at: number | null, };
+
+/**
+ * Uma conversa como a lista do app mostra, do ponto de vista de quem pede.
+ */
+export type Conversation = { 
+/**
+ * O id do canal: é com ele que se lê e se envia, pelas rotas de mensagem.
+ */
+id: string, 
+/**
+ * A outra pessoa. `removed` diz que ela saiu do grupo: a conversa fica só
+ * para leitura.
+ */
+person: Author, 
+/**
+ * `None` na conversa recém-aberta, que ainda não tem mensagem.
+ */
+last_message: Message | null, 
+/**
+ * Até onde quem pede leu, as não lidas, as menções e o silenciar.
+ */
+state: ReadState, };
 
 export type CreateChannelRequest = { name: string, 
 /**
@@ -185,11 +237,21 @@ export type LayoutRequest = {
  */
 version: number, top: Array<string>, categories: Array<CategoryOrder>, };
 
+export type MarkReadRequest = { 
+/**
+ * A mensagem mais nova que a pessoa viu.
+ */
+message_id: string, };
+
 export type MeResponse = { user: UserView, 
 /**
  * Chaves das permissões que o membro tem.
  */
 permissions: Array<string>, update_channel: UpdateChannel, 
+/**
+ * O status de verdade, que só a própria pessoa vê.
+ */
+status: Status, 
 /**
  * O que mostrar ou esconder na interface. Quem decide de verdade é a API.
  */
@@ -228,7 +290,20 @@ joined_with: JoinedWith | null, pending_recovery: PendingRecovery | null, };
 /**
  * Uma mensagem como a API devolve e o WebSocket leva.
  */
-export type Message = { id: string, channel_id: string, client_id: string, author: Author, body: string, created_at: number, };
+export type Message = { id: string, channel_id: string, client_id: string, author: Author, body: string, 
+/**
+ * Os ids de quem a mensagem menciona (`@nick`), achados pela API no envio.
+ */
+mentions: Array<string>, created_at: number, kind: MessageKind, 
+/**
+ * Só no `kind = "call"`: como a ligação acabou e quanto durou.
+ */
+call: CallRecord | null, };
+
+/**
+ * O tipo da mensagem: o texto de alguém, ou o registro de uma ligação.
+ */
+export type MessageKind = "text" | "call";
 
 /**
  * Uma página do histórico.
@@ -244,10 +319,18 @@ messages: Array<Message>,
  */
 has_more: boolean, };
 
+export type MuteRequest = { muted: boolean, };
+
 /**
  * Nick e nome visível, sem o id: o que uma rota sem sessão pode mostrar.
  */
 export type NameView = { nick: string, display_name: string | null, };
+
+export type OpenDmRequest = { 
+/**
+ * O id da outra pessoa.
+ */
+user_id: string, };
 
 /**
  * De onde vem uma permissão (para o `admin permissoes` e o Painel).
@@ -273,15 +356,40 @@ export type PendingRecovery = { invite_id: string, expires_at: number, };
  */
 export type Person = { id: string, nick: string, display_name: string | null, is_owner: boolean, 
 /**
- * Com pelo menos um WebSocket aberto (ou caído há menos de 10 segundos).
+ * Com pelo menos um WebSocket aberto (ou caído há menos de 10 segundos),
+ * e sem estar invisível.
  */
-online: boolean, };
+online: boolean, 
+/**
+ * Só quer dizer alguma coisa com `online`: quem está offline vem como
+ * `available`.
+ */
+status: Shown, };
 
 /**
  * O modelo de um convite novo, como a tela mostra. A chave em texto vai para o
  * banco (`invites.preset`) e para o JSON; não mude uma que já existe.
  */
 export type Preset = "person" | "group" | "custom";
+
+/**
+ * O estado de um canal ou conversa para uma pessoa.
+ */
+export type ReadState = { 
+/**
+ * A última mensagem lida. `None`: não leu nada.
+ */
+last_read_id: string | null, 
+/**
+ * Mensagens dos outros depois do ponteiro, até [`UNREAD_CAP`]. Do registro
+ * de ligação, só a chamada perdida conta.
+ */
+unread: number, 
+/**
+ * Menções à pessoa depois do ponteiro, até [`UNREAD_CAP`]. Conta mesmo
+ * com o canal silenciado.
+ */
+mentions: number, muted: boolean, };
 
 export type RealtimeTicket = { ticket: string, 
 /**
@@ -298,7 +406,7 @@ client_id: string, body: string, };
 /**
  * Tudo o que a API manda pelo WebSocket. O `type` é o nome do evento.
  */
-export type ServerEvent = { "type": "ready", user_id: string, online: Array<string>, channels: Array<ChannelHead>, } | { "type": "pong" } | { "type": "message.created", message: Message, } | { "type": "presence.changed", user_id: string, online: boolean, } | { "type": "voice.participants", channel_id: string, participants: Array<ParticipantView>, } | { "type": "member.joined", person: Person, } | { "type": "member.left", user_id: string, } | { "type": "channels.changed", version: number, };
+export type ServerEvent = { "type": "ready", user_id: string, status: Status, online: Array<string>, busy: Array<string>, channels: Array<ChannelHead>, dms: Array<ChannelHead>, call: CallView | null, } | { "type": "pong" } | { "type": "message.created", message: Message, } | { "type": "presence.changed", user_id: string, online: boolean, status: Shown, } | { "type": "status.changed", status: Status, } | { "type": "voice.participants", channel_id: string, participants: Array<ParticipantView>, } | { "type": "member.joined", person: Person, } | { "type": "member.left", user_id: string, } | { "type": "channels.changed", version: number, } | { "type": "channel.state", channel_id: string, state: ReadState, } | { "type": "call.ringing", call: CallView, } | { "type": "call.accepted", call: CallView, } | { "type": "call.ended", call_id: string, channel_id: string, outcome: CallOutcome, duration: number | null, };
 
 /**
  * A resposta do `redeem` e do `login`. No app, quem recebe é o Rust, que a
@@ -312,6 +420,18 @@ export type SetBetaRequest = { enabled: boolean, };
  * O corpo do `PUT /api/members/{id}/permissions/{key}`.
  */
 export type SetPermissionRequest = { enabled: boolean, };
+
+export type SetStatusRequest = { status: Status, };
+
+/**
+ * O status como os outros veem quem está online.
+ */
+export type Shown = "available" | "busy";
+
+/**
+ * O status que a pessoa escolheu.
+ */
+export type Status = "available" | "busy" | "invisible";
 
 /**
  * De onde o app busca atualizações.

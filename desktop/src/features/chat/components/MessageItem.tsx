@@ -2,6 +2,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, PersonName } from "@/features/identity";
 import type { Message } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import type { Mentionable } from "../model/mentions";
 import { authorName, stampLabel, timeLabel } from "../model/messages";
 import type { PendingMessage } from "../stores/outboxStore";
 import { MessageBody } from "./MessageBody";
@@ -10,22 +11,37 @@ import { MessageBody } from "./MessageBody";
  * Uma mensagem, como no quadro "Canal de texto": a primeira do grupo leva o avatar, o nome (dourado
  * e com o selo Dono, no dono) e "Hoje às 09:14"; as seguintes do mesmo autor só o texto, com a hora
  * aparecendo ao passar o mouse.
+ *
+ * A mensagem que menciona quem lê ganha o fundo dourado suave e um traço dourado à esquerda.
  */
 export function MessageItem({
 	message,
 	startsGroup,
 	ownerId,
+	people,
+	myId,
 }: {
 	message: Message;
 	startsGroup: boolean;
 	ownerId: string | null;
+	/** Quem está no grupo, por id: o nome das menções. */
+	people: ReadonlyMap<string, Mentionable>;
+	myId: string | null;
 }) {
 	const { author } = message;
 	const name = authorName(author);
+	const mentioned = message.mentions
+		.map((id) => people.get(id))
+		.filter((p): p is Mentionable => p !== undefined);
+	const mentionsMe = myId !== null && message.mentions.includes(myId);
 	return (
 		<li
+			data-mentions-me={mentionsMe || undefined}
 			className={cn(
-				"group relative flex gap-4 px-4 hover:bg-secondary/40",
+				"group relative flex gap-4 px-4",
+				mentionsMe
+					? "bg-gold/10 shadow-[inset_2px_0_0_var(--color-gold)] hover:bg-gold/15"
+					: "hover:bg-secondary/40",
 				startsGroup ? "mt-3 py-1" : "py-px",
 			)}
 		>
@@ -63,7 +79,7 @@ export function MessageItem({
 						</time>
 					</div>
 				)}
-				<MessageBody body={message.body} />
+				<MessageBody body={message.body} mentioned={mentioned} />
 			</div>
 		</li>
 	);

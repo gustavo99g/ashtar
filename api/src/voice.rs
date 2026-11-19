@@ -209,6 +209,28 @@ pub(crate) fn livekit_env() -> Result<(String, String, String), String> {
     ))
 }
 
+/// Apaga a sala `room` no LiveKit, o que derruba quem ainda estiver nela. É o
+/// fim da ligação privada (ADR 0023): quando um dos dois sai, o outro não fica
+/// sozinho na sala. Roda à parte, como o [`kick_in_background`]; sala que já
+/// não existe não é erro, e sem as chaves do LiveKit não há o que apagar.
+pub fn delete_room_in_background(room: String) {
+    tokio::spawn(async move {
+        let client = match room_client() {
+            Ok(client) => client,
+            Err(ApiError::Config(_)) => return,
+            Err(error) => {
+                eprintln!("livekit: não deu para apagar a sala {room}: {error}");
+                return;
+            }
+        };
+        match client.delete_room(&room).await {
+            Ok(()) => {}
+            Err(error) if is_not_found(&error) => {}
+            Err(error) => eprintln!("livekit: não deu para apagar a sala {room}: {error}"),
+        }
+    });
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -29,3 +29,27 @@ export function useAppVisible(): boolean {
 
 	return page && !minimized;
 }
+
+/**
+ * Se a janela do app está em foco: à vista e sendo usada agora. É o que conta para dar uma mensagem
+ * como lida (Etapa 13). Com o app na bandeja, minimizado ou atrás de outra janela, `false`.
+ */
+export function useAppFocused(): boolean {
+	const visible = useAppVisible();
+	const [focused, setFocused] = useState(() => document.hasFocus());
+
+	useEffect(() => {
+		const onFocus = () => setFocused(true);
+		const onBlur = () => setFocused(false);
+		window.addEventListener("focus", onFocus);
+		window.addEventListener("blur", onBlur);
+		// Pode ter mudado entre o primeiro desenho e o efeito.
+		setFocused(document.hasFocus());
+		return () => {
+			window.removeEventListener("focus", onFocus);
+			window.removeEventListener("blur", onBlur);
+		};
+	}, []);
+
+	return visible && focused;
+}

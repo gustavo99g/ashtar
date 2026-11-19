@@ -1,5 +1,31 @@
 # O que há de novo no Ashtar
 
+## 0.3.20
+
+- Ligações privadas: abra uma conversa e clique no telefone, no alto da janela, ou em Ligar, no cartão da pessoa. A ligação é só entre vocês dois, e ninguém mais no servidor fica sabendo. Para quem está offline, o botão fica apagado.
+- Quando alguém liga, um cartão aparece no canto da tela, mesmo com o Ashtar na bandeja, com um toque que se repete até você responder. Dá para Recusar, Atender ou Responder com mensagem. Sem resposta em 30 segundos, vira chamada perdida.
+- Estando numa sala, o toque é mais baixo e o botão vira "Sair e atender": você sai da sala e entra na ligação. Quando ela acaba, a conversa mostra "Voltar para a sala", e um clique leva de volta. Antes de você ligar, o Ashtar avisa que você vai sair da sala, e dá para desligar esse aviso em Configurações › Voz e vídeo.
+- A ligação usa a mesma tela da sala: a grade, o Foco, o volume da outra pessoa e a tela compartilhada, de qualquer um dos dois. O alto mostra "Ligação com fulano" e o tempo, e o painel de voz diz "Em ligação", com Desligar.
+- Entrar numa sala durante a ligação pergunta antes, porque a ligação acaba.
+- A lateral mostra a ligação no topo: o avatar com o anel dourado enquanto toca ou durante a ligação, e o telefone vermelho numa chamada perdida, com "Ligar de volta".
+- O histórico da conversa guarda cada ligação: "Ligação encerrada" com a duração, "Chamada perdida", "Ligação recusada" ou "Ligação cancelada", com o botão para ligar de novo. A chamada perdida conta como não lida.
+- Em Ocupado, a ligação não toca nem mostra o cartão: aparece só o avatar na lateral e, na conversa, Recusar e Atender.
+- Conversas privadas: clique em alguém e em Mensagem, ou abra a aba Conversas na lateral direita. A conversa abre numa janela embaixo, e dá para deixar várias abertas como abas. Só vocês dois leem, mas as mensagens não são criptografadas de ponta a ponta: quem administra o servidor consegue ler.
+- A lateral direita ganhou as abas Membros e Conversas, e pode ser minimizada.
+- Não lidas: as conversas mostram quantas mensagens novas chegaram, os canais ficam em destaque, e a linha "Novas mensagens" marca onde você parou. O menu do canal tem "Marcar como lido", e o nome do servidor, "Marcar tudo como lido".
+- Menções: escreva @ e o começo do nick para escolher a pessoa. Quem foi mencionado vê a mensagem em dourado e um número separado.
+- Silenciar: no menu de um canal ou de uma conversa. Silenciado, nada avisa nem conta, a não ser uma menção.
+- Notificações: com o Ashtar atrás de outra janela ou na bandeja, uma mensagem privada ou menção aparece num aviso no canto da tela, com um som curto. Clique para abrir. Também avisa quando alguém começa a transmitir. Ajuste em Configurações › Notificações, onde dá para testar.
+- O ícone da bandeja e o da barra de tarefas ganham uma bolinha vermelha enquanto houver mensagem privada ou menção não lida.
+- Status: clique no seu avatar, no pé da coluna, e escolha Disponível, Ocupado ou Invisível. Ocupado aparece com a bolinha vermelha e cala todos os avisos. Invisível faz você aparecer offline, mas usar tudo normalmente.
+- Iniciar com o Windows: em Configurações › Aplicativo. O Ashtar abre junto com o computador, direto na bandeja, e já recebe as mensagens.
+- A lista de canais ficou mais limpa. As ferramentas só aparecem quando você passa o mouse: a engrenagem no canal e o + na categoria. O botão direito abre o mesmo menu.
+- O nome do servidor, no alto da coluna, virou o menu de quem gerencia os canais: criar canal, criar categoria, organizar e ver os arquivados. Para o dono, também Convidar pessoas.
+- Organizar canais: arrastar agora é num modo próprio. Arrume tudo com calma, e só o Concluir grava, de uma vez. Desfazer volta a lista como estava. Fora do modo, nada se arrasta sem querer.
+- "Mover para", no menu do canal, leva o canal para outra categoria sem arrastar.
+- Clique em qualquer pessoa, na lista de membros ou na lista da sala, para abrir o cartão dela.
+- Volume por pessoa: na sala, clique no bloco de alguém (ou abra o cartão) e ajuste a voz dela de 0 a 200%, ou silencie só para você. Só você ouve a diferença, e o ajuste fica guardado neste computador.
+
 ## 0.2.41
 
 - O Ashtar ganhou servidor próprio: a voz e as transmissões passam por ele, e o app fala com o novo endereço. Nada muda no uso, e acaba o limite mensal que fazia a chamada parar de conectar.

@@ -1,6 +1,8 @@
 //! Rotas do chat: o histórico de um canal e o envio.
 //!
-//! Todo membro ativo lê e escreve nos canais de texto que existem (ADR 0015).
+//! Todo membro ativo lê e escreve nos canais de texto que existem (ADR 0015),
+//! e cada conversa privada é só das duas pessoas dela (ADR 0021). Quem decide é
+//! a regra de leitura, [`access::readable`], e as duas rotas passam por ela.
 
 use axum::Json;
 use axum::extract::rejection::QueryRejection;
@@ -12,12 +14,13 @@ use ts_rs::TS;
 use super::auth::CurrentUser;
 use super::extract::ApiJson;
 use crate::AppState;
-use crate::chat::channels;
+use crate::chat::access::{self, Readable};
 use crate::chat::messages::{
     self, CATCH_UP_MAX, Cursor, Message, MessagePage, PAGE_DEFAULT, PAGE_MAX,
 };
 use crate::db::now;
 use crate::error::ApiError;
+use crate::identity::users;
 use crate::realtime::ServerEvent;
 
 #[derive(Debug, Deserialize)]
@@ -32,7 +35,7 @@ pub struct PageQuery {
 /// 200, para a volta de uma reconexão). `limit` vai de 1 a 100.
 pub async fn list(
     State(state): State<AppState>,
-    CurrentUser(_user): CurrentUser,
+    CurrentUser(user): CurrentUser,
     Path(channel_id): Path<String>,
     query: Result<Query<PageQuery>, QueryRejection>,
 ) -> Result<Json<MessagePage>, ApiError> {
@@ -58,9 +61,9 @@ pub async fn list(
             )));
         }
     };
-    let channel = channels::get_open_text(&state.db, &channel_id).await?;
+    let channel = access::readable(&state.db, &user, &channel_id).await?;
     Ok(Json(
-        messages::page(&state.db, &channel, cursor, limit).await?,
+        messages::page(&state.db, channel.id(), cursor, limit).await?,
     ))
 }
 
@@ -74,14 +77,22 @@ pub struct SendMessageRequest {
 
 /// `POST /api/channels/{id}/messages`: 201 com a mensagem nova, ou 200 com a
 /// que já existia para esse `client_id` (409 se ela é de outro canal). As
-/// regras e o limite de envio ficam no [`messages::create`].
+/// regras e o limite de envio ficam no [`messages::create`]. Numa conversa
+/// privada com quem saiu do grupo, 409.
 pub async fn send(
     State(state): State<AppState>,
     CurrentUser(user): CurrentUser,
     Path(channel_id): Path<String>,
     ApiJson(request): ApiJson<SendMessageRequest>,
 ) -> Result<(StatusCode, Json<Message>), ApiError> {
-    let channel = channels::get_open_text(&state.db, &channel_id).await?;
+    let channel = access::readable(&state.db, &user, &channel_id).await?;
+    if let Readable::Dm(dm) = &channel {
+        // A conversa com quem saiu do grupo continua na lista, só para leitura.
+        let other = users::get_by_id(&state.db, dm.other(&user.id)).await?;
+        if !other.is_active() {
+            return Err(ApiError::Conflict("Essa pessoa saiu do grupo.".into()));
+        }
+    }
     let (message, created) = messages::create(
         &state.db,
         &state.send_limiter,
@@ -93,10 +104,16 @@ pub async fn send(
     )
     .await?;
     let status = if created {
-        // Só a nova vai para o WebSocket: a repetida todo mundo já recebeu.
-        state.hub.publish(&ServerEvent::MessageCreated {
+        // Só a nova vai para o WebSocket: a repetida quem devia já recebeu.
+        // A de um canal de texto vai para todos; a de uma conversa privada, só
+        // para os dois.
+        let event = ServerEvent::MessageCreated {
             message: message.clone(),
-        });
+        };
+        match &channel {
+            Readable::Text(_) => state.hub.publish(&event),
+            Readable::Dm(dm) => state.hub.publish_to(&dm.members, &event),
+        }
         StatusCode::CREATED
     } else {
         StatusCode::OK
