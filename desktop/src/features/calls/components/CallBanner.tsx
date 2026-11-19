@@ -43,9 +43,7 @@ export function CallBanner({ channelId }: { channelId: string }) {
 	const me = useCallStore((state) => state.me);
 	const voiceKind = useMaybeVoice()?.voiceKind ?? null;
 	const navigate = useNavigate();
-	const clock = useCallClock(
-		phase === "in_call" ? (call?.answered_at ?? null) : null,
-	);
+	const clock = useCallClock(phase === "in_call");
 	if (!call) return null;
 	const name = personName(otherPerson(call, me));
 

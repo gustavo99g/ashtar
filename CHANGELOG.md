@@ -1,6 +1,6 @@
 # O que há de novo no Ashtar
 
-## 0.3.20
+## 0.3.21
 
 - Ligações privadas: abra uma conversa e clique no telefone, no alto da janela, ou em Ligar, no cartão da pessoa. A ligação é só entre vocês dois, e ninguém mais no servidor fica sabendo. Para quem está offline, o botão fica apagado.
 - Quando alguém liga, um cartão aparece no canto da tela, mesmo com o Ashtar na bandeja, com um toque que se repete até você responder. Dá para Recusar, Atender ou Responder com mensagem. Sem resposta em 30 segundos, vira chamada perdida.
@@ -25,6 +25,7 @@
 - "Mover para", no menu do canal, leva o canal para outra categoria sem arrastar.
 - Clique em qualquer pessoa, na lista de membros ou na lista da sala, para abrir o cartão dela.
 - Volume por pessoa: na sala, clique no bloco de alguém (ou abra o cartão) e ajuste a voz dela de 0 a 200%, ou silencie só para você. Só você ouve a diferença, e o ajuste fica guardado neste computador.
+- O tempo da ligação, na lateral e na conversa, começa do zero ao atender.
 
 ## 0.2.41
 

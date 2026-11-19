@@ -116,7 +116,7 @@ export function SideCallCards({
 	return (
 		<div className="flex shrink-0 flex-col gap-1.5 border-b border-border p-2">
 			{call && person && (
-				<LiveCard phase={phase} person={person} answeredAt={call.answered_at} />
+				<LiveCard phase={phase} person={person} />
 			)}
 			{missed.map((entry) => (
 				<Card key={entry.channelId}>
@@ -151,15 +151,13 @@ export function SideCallCards({
 function LiveCard({
 	phase,
 	person,
-	answeredAt,
 }: {
 	phase: CallPhase;
 	person: Author;
-	answeredAt: number | null;
 }) {
 	const navigate = useNavigate();
 	const voiceKind = useMaybeVoice()?.voiceKind ?? null;
-	const clock = useCallClock(phase === "in_call" ? answeredAt : null);
+	const clock = useCallClock(phase === "in_call");
 	const name = personName(person);
 
 	if (phase === "ringing" || phase === "calling") {
