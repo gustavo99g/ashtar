@@ -49,7 +49,8 @@ recebe ligação.
 e a conversa mostra a faixa Recusar e Atender.
 
 **A tela da ligação é a da sala** (`VoiceRoom`), com outro cabeçalho e sem Convidar. A tela compartilhada usa
-o publicador nativo como está, e a trava de uma transmissão por vez vale por sala.
+o publicador nativo como está, e a trava de uma transmissão por vez vale por sala (até a v0.4, que tira a
+trava: ADR 0024).
 
 **Só é publicada com o LiveKit na VPS** (v0.2.5): uma ligação com tela compartilhada dos dois lados são até
 quatro conexões contando minutos.

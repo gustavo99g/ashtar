@@ -78,7 +78,7 @@ O aviso de conteúdo protegido está na v0.8 do roadmap (`## Screen Share`); as 
 - [ ] Aviso de possível conteúdo protegido (frames totalmente pretos por vários segundos).
 - [ ] Suporte a Linux (risco principal: WebRTC no WebKitGTK) e versão web.
 - [ ] Qualquer funcionalidade nova de voz além do que já existe.
-- [ ] Câmera (na sala e na ligação privada) e o overlay em jogos, desenhados no canvas e sem versão.
+- [ ] O overlay em jogos, desenhado no canvas e sem versão (a câmera entrou na v0.4).
 - [ ] `@todos`, silenciar com prazo e grupos privados com mais de duas pessoas (fora da v0.3).
 - [ ] Um segundo tema (claro, por exemplo). A troca por `data-theme` já existe desde a v0.2.2 (ADR 0012);
       a opção aparece nas configurações quando o tema existir, com o contraste conferido.

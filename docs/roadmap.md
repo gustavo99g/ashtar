@@ -22,8 +22,8 @@ v0.3  → Conversas privadas
         Lista de canais nova + mensagens privadas + não lidas, menções e notificações
         + status + ligações privadas
         ↓
-v0.4  → Transmissões múltiplas
-        Várias transmissões simultâneas + experiência de quem assiste
+v0.4  → Transmissões múltiplas e câmera
+        Várias transmissões simultâneas + experiência de quem assiste + câmera
         ↓
 v0.5  → Salas e presença
         Várias salas de voz + ausente automático + digitando + sons da voz
@@ -692,27 +692,46 @@ v0.3.2 → ligação privada com a janela fechada + screen share dentro dela
 
 ---
 
-# v0.4 — Transmissões múltiplas
+# v0.4 — Transmissões múltiplas e câmera
 
 ## Objetivo
 
 Permitir que mais de uma pessoa compartilhe a tela ao mesmo tempo, com uma boa experiência para quem
-assiste. Depende do publicador nativo e do LiveKit na VPS, ambos da v0.2.
+assiste, e ligar a câmera na sala e na ligação. Sai numa versão só, a `0.4.0`. Depende do publicador nativo
+e da VPS, que já tem o LiveKit, a API e o banco (Borkcloud). Decisões nas ADRs 0024 (transmissões) e 0025
+(câmera).
 
 ## Transmissões
 
-* várias transmissões simultâneas na mesma sala, com limite configurável;
-* **assinatura seletiva**: quem assiste só recebe a transmissão que abriu, nunca todas
-  automaticamente. Sem isso, o tráfego da VPS cresce com cada transmissão de cada participante;
-* indicador "ao vivo" ao lado de quem está transmitindo, na lista da sala.
+* várias transmissões simultâneas na mesma sala, com limite da API por sala (`MAX_SHARES_PER_ROOM`, padrão 6);
+* o palco do canvas "Várias telas": uma, lado a lado, 2×2, ou uma em foco com as outras na fileira de baixo;
+* a pequena pede a camada leve (o publicador ganha a camada leve depois do experimento da Etapa 1);
+* aviso de transmissão nova também dentro da sala, com Assistir.
+
+A assinatura seletiva (só a transmissão aberta é baixada) já existe desde a v0.2.3.
 
 ## Experiência de quem assiste
 
-* escolher qual transmissão assistir e trocar entre elas;
+* escolher quais assistir, focar uma e trocar entre elas; a miniatura com setas;
 * tela cheia;
-* janela destacada (pop-out);
-* volume do áudio da transmissão separado do volume da voz da pessoa;
-* indicador de quem está assistindo cada transmissão.
+* volume e qualidade (Automática ou Leve) de cada transmissão, guardados por quem transmite;
+* quem está assistindo cada transmissão, para todos;
+* na transmissão em foco: ampliar com a roda do mouse, ver como está chegando e copiar um quadro.
+
+A janela destacada (pop-out) saiu: a miniatura cobre o uso de assistir fora da sala.
+
+## Câmera
+
+* o botão Câmera, com a prévia (dispositivo, 480p/720p/1080p a 30 fps, Espelhar) e a seção em Voz e vídeo;
+* sempre começa desligada;
+* a câmera no bloco da pessoa, na Grade, na fileira do palco e na ligação; quem transmite aparece com ela no
+  canto da própria transmissão;
+* assinada só com os blocos à vista.
+
+## Ordem prática
+
+API (limite) → várias transmissões no app → qualidade e aviso → ferramentas da transmissão em foco → câmera →
+"O que há de novo" das versões puladas → testes no Windows e medição da VPS → `0.4.0`.
 
 ## Critérios de conclusão
 
@@ -721,9 +740,9 @@ duas transmissões simultâneas
  +
 quatro pessoas assistindo, trocando entre elas
  +
-uma noite inteira sem picotes
+quatro câmeras e duas transmissões numa noite sem picotes
  +
-tráfego e CPU da VPS medidos e dentro do plano contratado
+CPU, memória e banda da VPS medidas e dentro do plano contratado
 ```
 
 ---
