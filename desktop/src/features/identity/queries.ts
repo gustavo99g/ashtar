@@ -13,6 +13,7 @@ import {
 	setStatus,
 	updateMe,
 } from "@/lib/api";
+import { useOptionalQueryClient } from "@/lib/query";
 import { redeemInvite, useSession } from "./stores/sessionStore";
 import { rememberStatus, useLastStatus } from "./stores/statusStore";
 
@@ -42,6 +43,23 @@ export function useMe() {
 		queryFn: getMe,
 		enabled: connected,
 	});
+}
+
+/**
+ * O `/api/me` para quem só precisa de uma permissão de enfeite (mostrar ou esconder um botão): o
+ * mesmo do `useMe`, mas sem quebrar fora do `QueryClientProvider`.
+ */
+export function useOptionalMe(): MeResponse | undefined {
+	const connected = useSession().status === "connected";
+	const { client, present } = useOptionalQueryClient();
+	return useQuery(
+		{
+			queryKey: identityKeys.me(),
+			queryFn: getMe,
+			enabled: connected && present,
+		},
+		client,
+	).data;
 }
 
 /**

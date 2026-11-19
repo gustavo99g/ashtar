@@ -17,7 +17,11 @@ import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/toast";
 import { useScreenShareState } from "@/features/screen-share";
 import { useSettingsStore } from "@/features/settings";
-import { SALA, useMaybeVoice, useShareViewers } from "@/features/voice";
+import {
+	useConnectedRoomName,
+	useMaybeVoice,
+	useShareViewers,
+} from "@/features/voice";
 import { ApiError, type Shown } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { callPerson } from "../actions";
@@ -47,6 +51,7 @@ export function CallButton({
 	const name = personName(person);
 	const phase = useCallStore((state) => state.phase);
 	const voice = useMaybeVoice();
+	const roomName = useConnectedRoomName();
 	const voiceKind = voice?.voiceKind ?? null;
 	const room = voice?.room ?? null;
 	const screenShare = voice?.screenShare ?? null;
@@ -99,7 +104,7 @@ export function CallButton({
 		<CallConfirm
 			kind={confirm}
 			name={name}
-			roomName={SALA.name}
+			roomName={roomName}
 			viewers={viewers}
 			onClose={() => setConfirm(null)}
 			onConfirm={(dontAsk) => {

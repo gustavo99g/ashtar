@@ -29,9 +29,15 @@ interface SettingsState {
 	 * "Não perguntar de novo" desliga; Configurações › Voz e vídeo liga de volta.
 	 */
 	askBeforeCall: boolean;
+	/**
+	 * Perguntar antes de trocar de sala transmitindo ou com a câmera ligada (v0.5, ADR 0026): as duas
+	 * acabam na troca. O "Não perguntar de novo" desliga; Configurações › Voz e vídeo liga de volta.
+	 */
+	askBeforeSwitchRoom: boolean;
 	setTheme: (theme: ThemeId) => void;
 	setNotification: (key: keyof NotificationPrefs, enabled: boolean) => void;
 	setAskBeforeCall: (ask: boolean) => void;
+	setAskBeforeSwitchRoom: (ask: boolean) => void;
 }
 
 /** As chaves salvas, com o padrão no lugar de qualquer valor estranho. */
@@ -60,8 +66,11 @@ export const useSettingsStore = create<SettingsState>()(
 			theme: DEFAULT_THEME,
 			notifications: DEFAULT_NOTIFICATIONS,
 			askBeforeCall: true,
+			askBeforeSwitchRoom: true,
 			setTheme: (theme) => set({ theme }),
 			setAskBeforeCall: (askBeforeCall) => set({ askBeforeCall }),
+			setAskBeforeSwitchRoom: (askBeforeSwitchRoom) =>
+				set({ askBeforeSwitchRoom }),
 			setNotification: (key, enabled) =>
 				set((state) => ({
 					notifications: { ...state.notifications, [key]: enabled },
@@ -74,13 +83,19 @@ export const useSettingsStore = create<SettingsState>()(
 				theme: state.theme,
 				notifications: state.notifications,
 				askBeforeCall: state.askBeforeCall,
+				askBeforeSwitchRoom: state.askBeforeSwitchRoom,
 			}),
 			// Um tema que saiu do app (ou um valor estranho no disco) volta para o padrão. Quem vem
 			// de antes da 0.3.10 não tem as chaves de notificação: entram ligadas. O "perguntar antes de
 			// ligar" é da 0.3.20 e também começa ligado.
 			merge: (persisted, current) => {
 				const saved = persisted as
-					| { theme?: unknown; notifications?: unknown; askBeforeCall?: unknown }
+					| {
+							theme?: unknown;
+							notifications?: unknown;
+							askBeforeCall?: unknown;
+							askBeforeSwitchRoom?: unknown;
+					  }
 					| undefined;
 				return {
 					...current,
@@ -89,6 +104,10 @@ export const useSettingsStore = create<SettingsState>()(
 					askBeforeCall:
 						typeof saved?.askBeforeCall === "boolean"
 							? saved.askBeforeCall
+							: true,
+					askBeforeSwitchRoom:
+						typeof saved?.askBeforeSwitchRoom === "boolean"
+							? saved.askBeforeSwitchRoom
 							: true,
 				};
 			},

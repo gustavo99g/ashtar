@@ -79,6 +79,7 @@ function renderNav({ manage = false, at = paths.channel("geral") } = {}) {
 		can_create_invite: true,
 		can_view_panel: true,
 		can_manage_channels: manage,
+		can_move_members: manage,
 	};
 	client.setQueryData(identityKeys.me(), me);
 	client.setQueryData(["channels", "layout"], layout);

@@ -34,7 +34,6 @@ import {
 } from "../../members/hooks/useLiveMembers";
 import { useShareQuality } from "../../room/hooks/useShareQuality";
 import { useVoice } from "../../room/hooks/useVoice";
-import { SALA } from "../../room/model/channel";
 import { stageLayout } from "../model/stageLayout";
 import {
 	focusShare,
@@ -78,7 +77,7 @@ export function VoiceRoom() {
 	const navigate = useNavigate();
 	const call = voiceKind === "call" ? { title: voiceTitle ?? "" } : undefined;
 
-	if (!voiceChannelId || (voiceChannelId !== SALA.id && !call)) {
+	if (!voiceChannelId) {
 		return <Navigate to={paths.server} replace />;
 	}
 

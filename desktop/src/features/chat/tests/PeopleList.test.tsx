@@ -4,13 +4,19 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useSessionStore } from "@/features/identity";
-import { listPeople, listVoiceParticipants, type UserView } from "@/lib/api";
+import {
+	getChannelLayout,
+	listPeople,
+	listVoiceParticipants,
+	type UserView,
+} from "@/lib/api";
 import { PeopleList } from "../components/PeopleList";
 
 vi.mock("@/lib/api", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/lib/api")>()),
 	listPeople: vi.fn(),
 	listVoiceParticipants: vi.fn(),
+	getChannelLayout: vi.fn(),
 }));
 
 const kid: UserView = {
@@ -61,9 +67,53 @@ beforeEach(() => {
 			status: "available",
 		},
 	]);
-	vi.mocked(listVoiceParticipants).mockResolvedValue([
-		{ user_id: "u1", nick: "kid", display_name: "Kid", screen_sharing: false },
-	]);
+	vi.mocked(getChannelLayout).mockResolvedValue({
+		version: 1,
+		top: [],
+		categories: [
+			{
+				id: "voz",
+				name: "Voz",
+				channels: [
+					{
+						id: "sala",
+						kind: "voice",
+						name: "Sala",
+						topic: null,
+						category_id: "voz",
+						archived_at: null,
+					},
+					{
+						id: "squad",
+						kind: "voice",
+						name: "Squad",
+						topic: null,
+						category_id: "voz",
+						archived_at: null,
+					},
+				],
+			},
+		],
+	});
+	vi.mocked(listVoiceParticipants).mockImplementation(async (channelId) =>
+		channelId === "sala"
+			? [
+					{
+						user_id: "u1",
+						nick: "kid",
+						display_name: "Kid",
+						screen_sharing: false,
+					},
+				]
+			: [
+					{
+						user_id: "u2",
+						nick: "ana",
+						display_name: null,
+						screen_sharing: true,
+					},
+				],
+	);
 });
 
 describe("PeopleList", () => {
@@ -112,6 +162,16 @@ describe("PeopleList", () => {
 
 		const other = await screen.findByRole("dialog", { name: "Perfil de bia" });
 		expect(within(other).getByText("Offline")).toBeVisible();
+	});
+
+	it("diz em que sala cada um está, com várias salas", async () => {
+		renderPeople();
+		const rest = await screen.findByRole("region", { name: "Resto" });
+		expect(
+			await within(rest).findByText("Transmitindo na Squad"),
+		).toBeInTheDocument();
+		const owner = screen.getByRole("region", { name: "Dono" });
+		expect(await within(owner).findByText("Na Sala")).toBeInTheDocument();
 	});
 
 	it("o dono fica sempre no topo, mesmo offline", async () => {

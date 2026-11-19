@@ -47,6 +47,8 @@ import {
 	useRef,
 	useState,
 } from "react";
+import { toast } from "@/components/ui/toast";
+import { findChannel, useOptionalChannelLayout } from "@/features/channels";
 import { useSession } from "@/features/identity";
 import {
 	NativeScreenShare,
@@ -54,6 +56,7 @@ import {
 } from "@/features/screen-share";
 import {
 	type ShownSize,
+	stopWatching,
 	useRoomView,
 } from "../../call/stores/roomViewStore";
 import { useShareVolume } from "../../call/stores/shareVolumeStore";
@@ -80,7 +83,9 @@ import {
 	withDeafened,
 } from "../model/voiceState";
 import { useWatchSync } from "../hooks/useWatchSync";
+import { fallbackRoomName } from "../model/channel";
 import { checkSession, requestVoiceToken } from "../queries";
+import { clearVoiceOrder, useVoiceOrder } from "../stores/voiceOrderStore";
 import { RoomAudio } from "./RoomAudio";
 
 export type VoiceConnectionState =
@@ -284,6 +289,16 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 			void controller.dispose();
 			setRoom(null);
 			setScreenShare(null);
+			// A sala foi arquivada (a API apaga a sala no LiveKit, ADR 0026): não há para onde voltar.
+			if (reason === DisconnectReason.ROOM_DELETED && target.kind === "room") {
+				stopWatching();
+				setTarget(null);
+				toast.add({
+					title: "A sala foi arquivada",
+					description: "Você saiu da voz.",
+				});
+				return;
+			}
 			// A API tirou esta pessoa da sala: confere a sessão já. Se ela saiu do grupo, o 401 leva à
 			// tela "saiu do grupo" (pelo `lib/api`), sem esperar a próxima consulta.
 			if (reason === DisconnectReason.PARTICIPANT_REMOVED) {
@@ -361,6 +376,42 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 			setDeafenedIds(NOBODY);
 		};
 	}, [target]);
+
+	// As ordens da API (ADR 0026): alguém pôs esta pessoa em outra sala, ou a tirou da voz. Numa
+	// ligação privada não valem (a API nem manda; um evento atrasado é ignorado).
+	const order = useVoiceOrder((state) => state.order);
+	const layout = useOptionalChannelLayout();
+	useEffect(() => {
+		if (!order) return;
+		clearVoiceOrder();
+		if (target?.kind !== "room") return;
+		if (order.kind === "move") {
+			if (order.channelId === target.channelId) return;
+			stopWatching();
+			setTarget((current) => ({
+				channelId: order.channelId,
+				attempt: (current?.attempt ?? 0) + 1,
+				kind: "room",
+				title: null,
+			}));
+			setConnectionState("connecting");
+			setError(null);
+			const name =
+				(layout && findChannel(layout, order.channelId)?.name) ??
+				fallbackRoomName(order.channelId);
+			toast.add({
+				title: `${order.byName} moveu você`,
+				description: `Agora você está na ${name}.`,
+			});
+		} else {
+			stopWatching();
+			setTarget(null);
+			toast.add({
+				title: "Você foi desconectado da voz",
+				description: `Quem desconectou foi ${order.byName}.`,
+			});
+		}
+	}, [order, target, layout]);
 
 	// Avisa os outros apps a cada troca do deafen (e ao entrar, para começar do estado certo).
 	useEffect(() => {
@@ -464,6 +515,10 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 				const retry =
 					connectionState === "error" || connectionState === "disconnected";
 				if (channelId === voiceChannelId && !retry) return;
+				// Trocou de sala (ADR 0026): o que assistia na outra não existe nesta.
+				if (voiceChannelId !== null && channelId !== voiceChannelId) {
+					stopWatching();
+				}
 				setTarget((current) => ({
 					channelId,
 					attempt: (current?.attempt ?? 0) + 1,

@@ -6,7 +6,7 @@ import {
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
-import { SALA } from "../../room/model/channel";
+import { useConnectedRoomName } from "../../room/hooks/useRoomName";
 
 /*
  * O topo da sala: o nome, um resumo (quantas pessoas, ou quem está sendo assistido) e, à direita,
@@ -25,6 +25,7 @@ interface RoomHeaderProps {
 }
 
 export function RoomHeader({ subtitle, actions, call }: RoomHeaderProps) {
+	const roomName = useConnectedRoomName();
 	return (
 		<header className="flex h-12 shrink-0 items-center gap-2 border-b border-border px-4">
 			{call ? (
@@ -40,7 +41,7 @@ export function RoomHeader({ subtitle, actions, call }: RoomHeaderProps) {
 			) : (
 				<>
 					<Volume2Icon aria-hidden="true" className="size-5 text-ring" />
-					<h1 className="text-[15px] font-bold text-foreground">{SALA.name}</h1>
+					<h1 className="truncate text-[15px] font-bold text-foreground">{roomName}</h1>
 				</>
 			)}
 			{subtitle && (

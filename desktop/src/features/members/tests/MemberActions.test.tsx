@@ -74,6 +74,7 @@ beforeEach(() => {
 		can_create_invite: true,
 		can_view_panel: true,
 		can_manage_channels: true,
+		can_move_members: true,
 	});
 	vi.mocked(listMembers).mockResolvedValue([owner, juju]);
 });

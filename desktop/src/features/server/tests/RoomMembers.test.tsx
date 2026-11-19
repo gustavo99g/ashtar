@@ -12,7 +12,13 @@ const members: ChannelMember[] = [
 async function openCard(name: string, inCall: boolean) {
 	const user = userEvent.setup();
 	render(
-		<RoomMembers members={members} myId="kid" roomName="Sala" inCall={inCall} />,
+		<RoomMembers
+			members={members}
+			myId="kid"
+			roomId="sala"
+			roomName="Sala"
+			inCall={inCall}
+		/>,
 	);
 	await user.click(screen.getByRole("button", { name: new RegExp(name) }));
 	return screen.findByRole("dialog", { name: `Perfil de ${name}` });

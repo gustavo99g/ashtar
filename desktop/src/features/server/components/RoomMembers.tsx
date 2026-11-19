@@ -1,10 +1,17 @@
 import { HeadphoneOffIcon, MicOffIcon } from "lucide-react";
+import { useState } from "react";
 import { Popover, PopoverTrigger } from "@/components/ui/popover";
 import { COLLAPSED_AVATARS } from "@/features/channels";
 import { Avatar } from "@/features/identity";
 import { UserCardPopup } from "@/features/members";
-import { type ChannelMember, LiveBadge, UserVolume } from "@/features/voice";
+import {
+	type ChannelMember,
+	LiveBadge,
+	RoomModeration,
+	UserVolume,
+} from "@/features/voice";
 import { cn } from "@/lib/utils";
+import { useMemberDrag } from "./MemberDrag";
 
 /*
  * Quem está numa sala de voz, do jeito que a coluna mostra: a lista de nomes embaixo da sala
@@ -15,11 +22,13 @@ import { cn } from "@/lib/utils";
 export function RoomMembers({
 	members,
 	myId,
+	roomId,
 	roomName,
 	inCall,
 }: {
 	members: ChannelMember[];
 	myId: string | null;
+	roomId: string;
 	roomName: string;
 	/** Quem usa está nesta sala: aí o cartão dos outros tem o volume. */
 	inCall: boolean;
@@ -31,6 +40,7 @@ export function RoomMembers({
 					<MemberRow
 						member={member}
 						isMe={member.id === myId}
+						roomId={roomId}
 						roomName={roomName}
 						inCall={inCall}
 					/>
@@ -75,18 +85,29 @@ export function AvatarStrip({ members }: { members: ChannelMember[] }) {
 function MemberRow({
 	member,
 	isMe,
+	roomId,
 	roomName,
 	inCall,
 }: {
 	member: ChannelMember;
 	isMe: boolean;
+	roomId: string;
 	roomName: string;
 	inCall: boolean;
 }) {
+	// Controlado, para o "Mover para" e o "Desconectar" fecharem o cartão.
+	const [open, setOpen] = useState(false);
+	const drag = useMemberDrag(
+		{ userId: member.id, name: member.name, roomId },
+		isMe,
+	);
 	return (
-		<Popover>
+		<Popover open={open} onOpenChange={setOpen}>
 			<PopoverTrigger
+				ref={drag.setNodeRef}
+				{...(drag.enabled ? drag.listeners : {})}
 				className={cn(
+					drag.isDragging && "opacity-50",
 					"mx-2 flex w-[calc(100%-16px)] items-center gap-2 rounded-md py-[3px] pr-2 pl-[42px] text-left text-[13px]",
 					"text-muted-foreground hover:bg-secondary hover:text-foreground data-popup-open:bg-secondary",
 					isMe && "text-foreground",
@@ -133,6 +154,14 @@ function MemberRow({
 				{/* Só de quem você está ouvindo, e nunca no seu próprio cartão. */}
 				{inCall && !isMe && (
 					<UserVolume userId={member.id} name={member.name} />
+				)}
+				{!isMe && (
+					<RoomModeration
+						userId={member.id}
+						name={member.name}
+						roomId={roomId}
+						onDone={() => setOpen(false)}
+					/>
 				)}
 			</UserCardPopup>
 		</Popover>

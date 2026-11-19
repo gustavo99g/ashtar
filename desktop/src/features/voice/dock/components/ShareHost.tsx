@@ -10,7 +10,7 @@ import {
 import { useLiveMembers } from "../../members/hooks/useLiveMembers";
 import { useAnnounceShareQuality } from "../../room/hooks/useShareQuality";
 import { useShareViewers } from "../../room/hooks/useShareViewers";
-import { SALA } from "../../room/model/channel";
+import { useConnectedRoomName } from "../../room/hooks/useRoomName";
 import { usePing } from "../hooks/usePing";
 
 /**
@@ -31,6 +31,7 @@ export function ShareHost({
 	useAnnounceShareQuality(room, active ? state.quality : null, viewers);
 	const members = useLiveMembers();
 	const ping = usePing(useSharePanelOpen() ? room : null);
+	const roomName = useConnectedRoomName();
 
 	useEffect(() => {
 		setShareViewers(
@@ -46,7 +47,7 @@ export function ShareHost({
 	return (
 		<SourcePickerHost
 			controller={controller}
-			channelName={SALA.name}
+			channelName={roomName}
 			ping={ping}
 		/>
 	);

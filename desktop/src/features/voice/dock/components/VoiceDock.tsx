@@ -3,7 +3,7 @@ import { ShareNotices } from "../../call/components/ShareNotices";
 import { ShareStartNotices } from "../../call/components/ShareStartNotices";
 import { WatchJanitor } from "../../call/components/WatchJanitor";
 import { useVoice } from "../../room/hooks/useVoice";
-import { SALA } from "../../room/model/channel";
+import { useConnectedRoomName } from "../../room/hooks/useRoomName";
 import { ShareHost } from "./ShareHost";
 import { TrayShare } from "./TrayShare";
 import { UserPanel } from "./UserPanel";
@@ -16,6 +16,7 @@ import { VoiceConnection } from "./VoiceConnection";
  */
 export function VoiceDock() {
 	const { voiceChannelId, room, screenShare } = useVoice();
+	const roomName = useConnectedRoomName();
 
 	return (
 		<div className="shrink-0 px-2 pb-2">
@@ -29,7 +30,7 @@ export function VoiceDock() {
 				) : (
 					<SourcePickerHost
 						controller={screenShare}
-						channelName={SALA.name}
+						channelName={roomName}
 						ping={null}
 					/>
 				))}

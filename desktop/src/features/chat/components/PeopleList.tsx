@@ -9,10 +9,10 @@ import {
 } from "@/features/identity";
 import { UserCardPopup } from "@/features/members";
 import {
-	SALA,
+	type RoomPlace,
 	UserVolume,
+	useRoomOccupancy,
 	useVoiceChannelId,
-	useVoiceParticipants,
 } from "@/features/voice";
 import type { Person } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -39,10 +39,9 @@ import { usePeople } from "../queries";
  */
 export function PeopleList({ actions }: { actions?: PersonActions }) {
 	const { data: people } = usePeople();
-	const { data: inRoom } = useVoiceParticipants(SALA.id);
+	const room = useRoomOccupancy();
 	if (!people) return null;
 
-	const room = new Map(inRoom?.map((p) => [p.user_id, p.screen_sharing]));
 	const byName = (a: Person, b: Person) =>
 		authorName(a).localeCompare(authorName(b), "pt-BR");
 	const owner = people.filter((p) => p.is_owner).sort(byName);
@@ -85,12 +84,12 @@ function Group({
 	/** Sem o "— N" depois do título: o grupo do Dono é de uma pessoa só. */
 	countless?: boolean;
 	people: Person[];
-	room: Map<string, boolean>;
+	room: Map<string, RoomPlace>;
 	actions?: PersonActions;
 }) {
 	const session = useSession();
 	const myId = session.status === "connected" ? session.user.id : null;
-	const inSala = useVoiceChannelId() === SALA.id;
+	const myRoom = useVoiceChannelId();
 	if (people.length === 0) return null;
 	return (
 		<section aria-label={title} className="flex flex-col gap-0.5">
@@ -103,8 +102,12 @@ function Group({
 					<PersonRow
 						key={person.id}
 						person={person}
-						sharing={room.get(person.id)}
-						showVolume={inSala && person.id !== myId}
+						place={room.get(person.id)}
+						showVolume={
+							myRoom !== null &&
+							person.id !== myId &&
+							room.get(person.id)?.roomId === myRoom
+						}
 						actions={person.id !== myId ? actions : undefined}
 					/>
 				))}
@@ -116,14 +119,14 @@ function Group({
 /** Uma pessoa da lista: a linha, que é o botão, e o cartão que ela abre. */
 function PersonRow({
 	person,
-	sharing,
+	place,
 	showVolume,
 	actions,
 }: {
 	person: Person;
-	/** Se transmite na sala; `undefined` para quem não está nela. */
-	sharing: boolean | undefined;
-	/** Você está na sala e esta pessoa não é você: o volume dela aparece se ela também está. */
+	/** A sala de voz em que a pessoa está, e se transmite nela; `undefined` fora de uma. */
+	place: RoomPlace | undefined;
+	/** Esta pessoa está na mesma sala que você, e não é você: o volume dela aparece. */
 	showVolume: boolean;
 	actions?: PersonActions;
 }) {
@@ -157,9 +160,11 @@ function PersonRow({
 						>
 							{authorName(person)}
 						</PersonName>
-						{sharing !== undefined && (
+						{place && (
 							<span className="truncate text-xs text-muted-foreground">
-								{sharing ? `Transmitindo na ${SALA.name}` : `Na ${SALA.name}`}
+								{place.sharing
+									? `Transmitindo na ${place.roomName}`
+									: `Na ${place.roomName}`}
 							</span>
 						)}
 					</span>
@@ -171,12 +176,12 @@ function PersonRow({
 						name: authorName(person),
 						online,
 						busy: person.status === "busy",
-						room: sharing === undefined ? null : { name: SALA.name, sharing },
+						room: place ? { name: place.roomName, sharing: place.sharing } : null,
 					}}
 				>
 					{actions?.(person, () => setOpen(false))}
 					{/* O volume, só de quem está na mesma sala que você. */}
-					{showVolume && sharing !== undefined && (
+					{showVolume && (
 						<UserVolume userId={person.id} name={authorName(person)} />
 					)}
 				</UserCardPopup>

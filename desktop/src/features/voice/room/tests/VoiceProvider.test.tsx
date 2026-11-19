@@ -11,7 +11,7 @@ import {
 } from "@/lib/api";
 import { switchNoiseSuppression } from "../../noise/rnnoise";
 import { useNoiseChoice } from "../../noise/stores/noiseStore";
-import { SALA } from "../model/channel";
+const SALA = { id: "sala" } as const;
 import { useVoice } from "../hooks/useVoice";
 import { VoiceProvider } from "../components/VoiceProvider";
 

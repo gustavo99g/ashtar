@@ -68,6 +68,7 @@ function renderColumn() {
 		can_create_invite: true,
 		can_view_panel: true,
 		can_manage_channels: true,
+		can_move_members: true,
 	};
 	client.setQueryData(identityKeys.me(), me);
 	client.setQueryData(["channels", "layout"], layout);

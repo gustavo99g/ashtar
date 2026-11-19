@@ -84,6 +84,7 @@ describe("os diálogos de canais", () => {
 		await user.click(screen.getByRole("button", { name: "Criar canal" }));
 
 		expect(createChannel).toHaveBeenCalledWith({
+			kind: "text",
 			name: "Jogos Online",
 			category_id: "jogos",
 			topic: undefined,
@@ -92,6 +93,46 @@ describe("os diálogos de canais", () => {
 			expect(router.state.location.pathname).toBe(paths.channel("novo")),
 		);
 		expect(useChannelDialog.getState().dialog).toBeNull();
+	});
+
+	it("Criar sala de voz manda o tipo, sem tópico, e não sai da tela", async () => {
+		vi.mocked(createChannel).mockResolvedValue({
+			id: "squad",
+			kind: "voice",
+			name: "Squad do Kid",
+			topic: null,
+			category_id: "voz",
+			archived_at: null,
+		});
+		vi.mocked(getChannelLayout).mockResolvedValue({
+			version: 2,
+			top: [],
+			categories: [],
+		});
+		const user = userEvent.setup();
+		const router = renderDialogs();
+		act(() => openChannelDialog({ kind: "createChannel", categoryId: "voz" }));
+
+		await user.click(await screen.findByRole("radio", { name: /Voz/ }));
+		expect(
+			screen.getByRole("heading", { name: "Criar sala de voz" }),
+		).toBeInTheDocument();
+		// Sala de voz não tem tópico, e o nome não vira #nome.
+		expect(screen.queryByLabelText("Tópico (opcional)")).not.toBeInTheDocument();
+		await user.type(screen.getByLabelText("Nome"), "Squad do Kid");
+		expect(screen.queryByText(/Vai aparecer como/)).not.toBeInTheDocument();
+		await user.click(screen.getByRole("button", { name: "Criar sala" }));
+
+		expect(createChannel).toHaveBeenCalledWith({
+			kind: "voice",
+			name: "Squad do Kid",
+			category_id: "voz",
+			topic: undefined,
+		});
+		await vi.waitFor(() =>
+			expect(useChannelDialog.getState().dialog).toBeNull(),
+		);
+		expect(router.state.location.pathname).toBe(paths.channel("geral"));
 	});
 
 	it("pelo cabeçalho, o Editar abre já no tópico", async () => {

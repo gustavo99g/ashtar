@@ -16,6 +16,7 @@ import type { CategoryView, ChannelView } from "@/lib/api";
 import { paths } from "@/lib/paths";
 import { cn } from "@/lib/utils";
 import { ChannelMenu } from "./ChannelMenu";
+import { useRoomDrop } from "./MemberDrag";
 import { AvatarStrip, RoomMembers } from "./RoomMembers";
 
 /*
@@ -206,6 +207,7 @@ function VoiceChannelRow({
 	const { join } = useVoice();
 	const { guard, dialog } = useGuardedJoin();
 	const navigate = useNavigate();
+	const drop = useRoomDrop(channel.id, channel.name);
 	const onRoom = useMatch(paths.voiceRoom) !== null;
 	// A sala fica marcada só na tela da chamada: a do servidor agora é o canal de texto.
 	const selected = inCall && onRoom;
@@ -231,7 +233,10 @@ function VoiceChannelRow({
 	}
 
 	return (
-		<li>
+		<li
+			ref={drop.setNodeRef}
+			className={cn(drop.highlighted && "rounded-md bg-selected/40")}
+		>
 			<RowFrame channel={channel} manage={manage}>
 				<button
 					type="button"
@@ -260,6 +265,7 @@ function VoiceChannelRow({
 				<RoomMembers
 					members={members}
 					myId={myId}
+					roomId={channel.id}
 					roomName={channel.name}
 					inCall={inCall}
 				/>

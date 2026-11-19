@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { type ReactNode, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { SALA, useInCall } from "@/features/voice";
+import { useConnectedRoomName, useInCall } from "@/features/voice";
 import {
 	onUpdateFailed,
 	onUpdateReady,
@@ -103,6 +103,7 @@ export function UpdateNotice() {
 	const notice = useUpdaterStore((state) => state.notice);
 	const version = useUpdaterStore((state) => state.readyVersion);
 	const inCall = useInCall();
+	const roomName = useConnectedRoomName();
 
 	if (!notice) {
 		return null;
@@ -142,7 +143,7 @@ export function UpdateNotice() {
 						<PhoneOffIcon />
 					</NoticeIcon>
 					<NoticeText title="Reiniciar agora?">
-						Você sai da chamada na {SALA.name}.
+						{roomName ? `Você sai da chamada na ${roomName}.` : "Você sai da chamada."}
 					</NoticeText>
 					<Button
 						size="sm"
