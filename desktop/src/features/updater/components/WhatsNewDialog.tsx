@@ -1,7 +1,8 @@
 /**
  * "O que há de novo" (decisão 9 do PLAN da v0.2.0; quadro "Atualização: o que há de novo"): na
  * primeira abertura depois de mudar de versão, mostra a seção do CHANGELOG.md uma vez e guarda a
- * versão como vista. O link da tela Aplicativo abre a mesma janela. Entendi, Esc ou clicar fora
+ * versão como vista. Quem pulou versões vê todas desde a última vista, cada uma com o seu título,
+ * da mais nova para a mais velha (v0.4). O link da tela Aplicativo abre a mesma janela. Entendi, Esc ou clicar fora
  * fecha. Uma lista longa rola por dentro, com o título e o Entendi sempre à vista.
  */
 import { SparklesIcon } from "lucide-react";
@@ -20,10 +21,8 @@ export function WhatsNewDialog() {
 		void showWhatsNewOnce();
 	}, []);
 
-	const items = (content?.notes ?? "")
-		.split("\n")
-		.map((line) => line.replace(/^\s*-\s*/, "").trim())
-		.filter((line) => line.length > 0);
+	const sections = content?.sections ?? [];
+	const several = sections.length > 1;
 
 	return (
 		<Dialog
@@ -56,20 +55,35 @@ export function WhatsNewDialog() {
 							O que há de novo na {content?.version}
 						</DialogTitle>
 					</div>
-					<ul className="-mr-4 flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto pr-4">
-						{items.map((item, index) => (
-							<li
-								key={index}
-								className="flex gap-3 text-sm leading-normal text-secondary-foreground"
+					<div className="-mr-4 flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto pr-4">
+						{sections.map((section) => (
+							<section
+								key={section.version}
+								aria-label={several ? `Versão ${section.version}` : undefined}
+								className="flex flex-col gap-2.5"
 							>
-								<span
-									aria-hidden="true"
-									className="mt-2 size-1.5 shrink-0 rounded-full bg-primary"
-								/>
-								{item}
-							</li>
+								{several && (
+									<h3 className="text-xs font-bold tracking-[0.06em] text-muted-foreground uppercase">
+										{section.version}
+									</h3>
+								)}
+								<ul className="flex flex-col gap-2.5">
+									{noteItems(section.notes).map((item, index) => (
+										<li
+											key={index}
+											className="flex gap-3 text-sm leading-normal text-secondary-foreground"
+										>
+											<span
+												aria-hidden="true"
+												className="mt-2 size-1.5 shrink-0 rounded-full bg-primary"
+											/>
+											{item}
+										</li>
+									))}
+								</ul>
+							</section>
 						))}
-					</ul>
+					</div>
 					<Button size="lg" className="w-full shrink-0" onClick={closeWhatsNew}>
 						Entendi
 					</Button>
@@ -77,4 +91,12 @@ export function WhatsNewDialog() {
 			</DialogContent>
 		</Dialog>
 	);
+}
+
+/** As linhas `- ` da seção, sem o traço. */
+function noteItems(notes: string): string[] {
+	return notes
+		.split("\n")
+		.map((line) => line.replace(/^\s*-\s*/, "").trim())
+		.filter((line) => line.length > 0);
 }

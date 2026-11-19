@@ -17,7 +17,10 @@ vi.mock("@/lib/tauri/commands", () => ({
 	whatsNew: vi.fn(),
 }));
 
-const NOTES = { version: "0.2.21", notes: "- Configurações novas." };
+const NOTES = {
+	version: "0.2.21",
+	sections: [{ version: "0.2.21", notes: "- Configurações novas." }],
+};
 
 beforeEach(() => {
 	useUpdaterStore.setState({
@@ -123,6 +126,8 @@ describe("o que há de novo", () => {
 
 		await openWhatsNew();
 		expect(useUpdaterStore.getState().whatsNewOpen).toBe(true);
+		// O link mostra só a versão instalada.
+		expect(whatsNew).toHaveBeenLastCalledWith(null);
 	});
 
 	it("quem já viu antes do persist não vê de novo", async () => {
