@@ -10,9 +10,6 @@
 - A lateral mostra a ligação no topo: o avatar com o anel dourado enquanto toca ou durante a ligação, e o telefone vermelho numa chamada perdida, com "Ligar de volta".
 - O histórico da conversa guarda cada ligação: "Ligação encerrada" com a duração, "Chamada perdida", "Ligação recusada" ou "Ligação cancelada", com o botão para ligar de novo. A chamada perdida conta como não lida.
 - Em Ocupado, a ligação não toca nem mostra o cartão: aparece só o avatar na lateral e, na conversa, Recusar e Atender.
-
-## 0.3.10
-
 - Conversas privadas: clique em alguém e em Mensagem, ou abra a aba Conversas na lateral direita. A conversa abre numa janela embaixo, e dá para deixar várias abertas como abas. Só vocês dois leem, mas as mensagens não são criptografadas de ponta a ponta: quem administra o servidor consegue ler.
 - A lateral direita ganhou as abas Membros e Conversas, e pode ser minimizada.
 - Não lidas: as conversas mostram quantas mensagens novas chegaram, os canais ficam em destaque, e a linha "Novas mensagens" marca onde você parou. O menu do canal tem "Marcar como lido", e o nome do servidor, "Marcar tudo como lido".

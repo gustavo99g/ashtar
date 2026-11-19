@@ -540,7 +540,7 @@ que estavam na v0.5, vêm para cá, porque usam a mesma base.
 
 ## Entregas
 
-A v0.3.0 e a v0.3.1 saem juntas, na versão `0.3.10`: a `0.3.0` não chegou a ser publicada.
+As três entregas da v0.3 saem juntas, na versão `0.3.20`: a `0.3.0` e a `0.3.10` não chegaram a ser publicadas.
 
 ```text
 v0.3.0  Base visual
