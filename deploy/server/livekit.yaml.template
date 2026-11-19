@@ -29,5 +29,13 @@ room:
   # Sala sem ninguém fecha depois de 5 minutos.
   empty_timeout: 300
 
+# Avisa a API (na mesma VPS) de quem entra, sai ou liga a tela: é o que atualiza a lista da sala para
+# quem está fora dela (`voice.participants`). No LiveKit Cloud isso ficava no painel. A assinatura usa
+# a mesma chave do `keys`.
+webhook:
+  api_key: __LIVEKIT_API_KEY__
+  urls:
+    - http://127.0.0.1:3000/webhooks/livekit
+
 logging:
   level: info

@@ -1,59 +1,29 @@
-import {
-	type Participant,
-	type RemoteParticipant,
-	type Room,
-	RoomEvent,
-} from "livekit-client";
-import { useEffect, useState } from "react";
-import { applyViewer, decodeViewer, VIEWERS_TOPIC } from "../model/viewers";
+import type { Room } from "livekit-client";
+import { useMemo } from "react";
+import { viewersOf } from "../model/viewers";
+import { useWatchTable } from "../stores/watchTableStore";
 
 const NONE: ReadonlyMap<string, number> = new Map();
 
 /**
  * Quem está assistindo a própria transmissão (`model/viewers.ts`): a identidade e desde quando
- * (`Date.now()` do primeiro aviso). Vazio sem transmissão: cada uma começa do zero.
+ * (`Date.now()` do primeiro aviso). Vazio sem transmissão.
  */
 export function useShareViewers(
 	room: Room | null,
 	active: boolean,
 ): ReadonlyMap<string, number> {
-	const [viewers, setViewers] = useState<ReadonlyMap<string, number>>(NONE);
+	const me = room?.localParticipant.identity ?? null;
+	return useViewersOf(active ? me : null);
+}
 
-	useEffect(() => {
-		if (!room || !active) return;
-		const me = room.localParticipant.identity;
-		const onData = (
-			payload: Uint8Array,
-			participant?: RemoteParticipant,
-			_kind?: unknown,
-			topic?: string,
-		) => {
-			if (topic !== VIEWERS_TOPIC || !participant) return;
-			const message = decodeViewer(payload);
-			if (!message) return;
-			setViewers((current) =>
-				applyViewer(current, participant.identity, message, me, Date.now()),
-			);
-		};
-		const onLeft = (participant: Participant) => {
-			setViewers((current) =>
-				applyViewer(
-					current,
-					participant.identity,
-					{ watching: null },
-					me,
-					Date.now(),
-				),
-			);
-		};
-		room.on(RoomEvent.DataReceived, onData);
-		room.on(RoomEvent.ParticipantDisconnected, onLeft);
-		return () => {
-			room.off(RoomEvent.DataReceived, onData);
-			room.off(RoomEvent.ParticipantDisconnected, onLeft);
-			setViewers(NONE);
-		};
-	}, [room, active]);
-
-	return viewers;
+/** Quem está assistindo a transmissão de `owner`, e desde quando. Vazio com `owner` nulo. */
+export function useViewersOf(
+	owner: string | null,
+): ReadonlyMap<string, number> {
+	const table = useWatchTable((state) => state.table);
+	return useMemo(
+		() => (owner ? viewersOf(table, owner) : NONE),
+		[table, owner],
+	);
 }

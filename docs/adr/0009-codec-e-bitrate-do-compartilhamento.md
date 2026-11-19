@@ -2,6 +2,7 @@
 
 - **Status:** substituída por 0017 e 0018 (v0.2.4); fica como a medição do caminho IPC
 - **Data:** 2026-10
+- **Atualizada por:** 0024 (a trava de uma transmissão por vez sai na v0.4)
 
 ## Contexto
 

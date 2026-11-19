@@ -122,22 +122,20 @@ async function install() {
 }
 
 /**
- * Na abertura: mostra o "O que há de novo" desta versão uma vez, na primeira abertura depois de
- * atualizar. Sem seção no CHANGELOG.md, não mostra nada.
+ * Na abertura: mostra o "O que há de novo" uma vez, na primeira abertura depois de atualizar, com
+ * todas as versões desde a última vista (quem pulou alguma vê o que mudou nelas também, v0.4). Sem
+ * seção no CHANGELOG.md, não mostra nada.
  */
 export async function showWhatsNewOnce() {
-	const content = await whatsNew().catch(() => null);
-	if (
-		!content ||
-		useUpdaterStore.getState().lastSeenVersion === content.version
-	)
-		return;
+	const { lastSeenVersion } = useUpdaterStore.getState();
+	const content = await whatsNew(lastSeenVersion).catch(() => null);
+	if (!content || lastSeenVersion === content.version) return;
 	useUpdaterStore.setState({ whatsNew: content, whatsNewOpen: true });
 }
 
 /** O link "Ver o que há de novo nesta versão" da tela Aplicativo: abre mesmo que já tenha sido visto. */
 export async function openWhatsNew() {
-	const content = await whatsNew().catch(() => null);
+	const content = await whatsNew(null).catch(() => null);
 	if (content)
 		useUpdaterStore.setState({ whatsNew: content, whatsNewOpen: true });
 }

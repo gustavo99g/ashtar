@@ -72,7 +72,7 @@ pub fn run(log_file: logging::LateFile) {
 
             updater::spawn_periodic_check(app.handle().clone());
             deep_link::register_schemes(app);
-            permissions::allow_microphone(app);
+            permissions::allow_media(app);
             webview_process::refresh(app.handle());
             tray::create(app);
             // A janela dos avisos nasce escondida e já carregada (`notifications.rs`).

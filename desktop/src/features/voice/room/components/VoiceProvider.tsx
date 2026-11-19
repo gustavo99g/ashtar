@@ -27,6 +27,9 @@
  *
  * Entra com o microfone e a saída de Configurações › Voz e vídeo (`deviceChoiceStore.ts`) e troca na hora
  * quando a escolha muda, ou quando o escolhido some e volta (`roomDevices.ts`).
+ *
+ * A câmera (ADR 0025) sai pela mesma conexão, sempre começando desligada: quem cuida dela é o
+ * `useLocalCamera`, e o botão Câmera liga e desliga.
  */
 import { RoomContext } from "@livekit/components-react";
 import {
@@ -49,7 +52,12 @@ import {
 	NativeScreenShare,
 	type ScreenShareController,
 } from "@/features/screen-share";
-import { useRoomView } from "../../call/stores/roomViewStore";
+import {
+	type ShownSize,
+	useRoomView,
+} from "../../call/stores/roomViewStore";
+import { useShareVolume } from "../../call/stores/shareVolumeStore";
+import { useLocalCamera } from "../../camera/hooks/useLocalCamera";
 import { useAudioDevices } from "../../devices/hooks/useAudioDevices";
 import { effectiveDevice, knownDevices } from "../../devices/model/devices";
 import {
@@ -60,13 +68,18 @@ import {
 import { useDeviceChoice } from "../../devices/stores/deviceChoiceStore";
 import { switchNoiseSuppression } from "../../noise/rnnoise";
 import { useNoiseChoice } from "../../noise/stores/noiseStore";
-import { syncSubscription, syncSubscriptions } from "../model/subscriptions";
+import {
+	type SubscriptionView,
+	syncSubscription,
+	syncSubscriptions,
+} from "../model/subscriptions";
 import {
 	encodeVoiceState,
 	parseVoiceState,
 	VOICE_STATE_TOPIC,
 	withDeafened,
 } from "../model/voiceState";
+import { useWatchSync } from "../hooks/useWatchSync";
 import { checkSession, requestVoiceToken } from "../queries";
 import { RoomAudio } from "./RoomAudio";
 
@@ -261,7 +274,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 			syncSubscription(
 				publication,
 				participant,
-				useRoomView.getState().shown,
+				currentView(),
 				nextRoom.localParticipant.identity,
 			);
 		});
@@ -362,12 +375,19 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 			);
 	}, [room, isDeafened]);
 
-	// Ao entrar, e a cada troca do que aparece (o palco do Foco ou a miniatura): assina a voz de
-	// todos e a tela de quem aparece.
+	// Ao entrar, e a cada troca do que aparece (o palco, a miniatura, os blocos da sala) ou da
+	// qualidade escolhida: assina a voz de todos, a tela de quem aparece e as câmeras à vista.
 	const shown = useRoomView((state) => state.shown);
+	const camerasShown = useRoomView((state) => state.camerasShown);
+	const shareSettings = useShareVolume((state) => state.byOwner);
 	useEffect(() => {
-		if (room) syncSubscriptions(room, shown);
-	}, [room, shown]);
+		if (room) syncSubscriptions(room, currentView());
+	}, [room, shown, camerasShown, shareSettings]);
+
+	// Quem assiste o quê (ADR 0024): as transmissões à vista, para a sala, e os avisos dos outros.
+	const shownOwners = useMemo(() => Object.keys(shown).sort(), [shown]);
+	useWatchSync(room, shownOwners);
+	useLocalCamera(room);
 
 	// No meio da chamada, a escolha nova vale na hora, e o escolhido que some ou volta também.
 	useEffect(() => {
@@ -481,4 +501,18 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 			</RoomContext.Provider>
 		</VoiceContext.Provider>
 	);
+}
+
+/**
+ * O que aparece agora, para as assinaturas: as transmissões desenhadas (a de qualidade Leve conta
+ * como pequena, para pedir a camada leve em qualquer tamanho) e os blocos com as câmeras.
+ */
+function currentView(): SubscriptionView {
+	const { shown, camerasShown } = useRoomView.getState();
+	const { byOwner } = useShareVolume.getState();
+	const effective: Record<string, ShownSize> = {};
+	for (const [owner, size] of Object.entries(shown)) {
+		effective[owner] = byOwner[owner]?.quality === "lite" ? "small" : size;
+	}
+	return { shown: effective, cameras: camerasShown };
 }

@@ -97,7 +97,10 @@ function showNotice(
 		case "failed": {
 			// Janela minimizada ou fechada entre a lista e o clique: o Rust não acha a fonte.
 			const id = toast.add({
-				title: "Não deu para compartilhar a tela",
+				title:
+					notice.errorKind === "share_limit"
+						? "A sala está cheia de transmissões"
+						: "Não deu para compartilhar a tela",
 				description:
 					notice.errorKind === "SourceNotFound"
 						? "A janela foi fechada ou minimizada. Escolha outra ou restaure a janela."

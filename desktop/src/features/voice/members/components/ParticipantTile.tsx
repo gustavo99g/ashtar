@@ -1,4 +1,10 @@
-import { HeadphoneOffIcon, MicOffIcon, ScreenShareIcon } from "lucide-react";
+import type { Participant } from "livekit-client";
+import {
+	HeadphoneOffIcon,
+	MicOffIcon,
+	ScreenShareIcon,
+	VideoIcon,
+} from "lucide-react";
 import {
 	Popover,
 	PopoverContent,
@@ -6,6 +12,11 @@ import {
 } from "@/components/ui/popover";
 import { Avatar } from "@/features/identity";
 import { cn } from "@/lib/utils";
+import {
+	CameraVideo,
+	cameraTrackOf,
+} from "../../camera/components/CameraVideo";
+import { useCameraChoice } from "../../camera/stores/cameraChoiceStore";
 import type { ChannelMember } from "../model/members";
 import { UserVolume, UserVolumeMark } from "./UserVolume";
 
@@ -16,10 +27,15 @@ import { UserVolume, UserVolumeMark } from "./UserVolume";
  *
  * Na Grade, clicar no bloco de outra pessoa abre o volume dela, logo abaixo (ADR 0020). Quem não
  * está em 100% ganha a marca no canto de cima, na Grade e na faixa. No próprio bloco, nada.
+ *
+ * Com a câmera ligada (ADR 0025), o vídeo dela toma o lugar do avatar, com o ícone de câmera ao
+ * lado do nome; o anel de quem fala continua. A própria câmera aparece espelhada se a pessoa
+ * escolheu Espelhar.
  */
 
 interface ParticipantTileProps {
-	member: ChannelMember;
+	/** Com o `participant` (quem está na chamada), o bloco mostra a câmera. */
+	member: ChannelMember & { participant?: Participant };
 	isLocal: boolean;
 	size?: "grid" | "strip";
 }
@@ -30,8 +46,10 @@ export function ParticipantTile({
 	size = "grid",
 }: ParticipantTileProps) {
 	const grid = size === "grid";
+	const camera = cameraTrackOf(member.participant);
+	const mirror = useCameraChoice((state) => state.mirror) && isLocal;
 	const tileClass = cn(
-		"relative flex items-center justify-center bg-secondary",
+		"relative flex items-center justify-center overflow-hidden bg-secondary",
 		grid
 			? "aspect-video w-full rounded-[10px]"
 			: "h-20 w-[140px] shrink-0 rounded-lg",
@@ -39,11 +57,28 @@ export function ParticipantTile({
 	);
 	const content = (
 		<>
-			<Avatar
-				nick={member.nick}
-				displayName={member.name}
-				size={grid ? 72 : 32}
-			/>
+			{camera ? (
+				<>
+					<CameraVideo
+						trackRef={camera}
+						mirror={mirror}
+						className="absolute inset-0"
+					/>
+					{/* O anel de quem fala por cima do vídeo. */}
+					{member.speaking && (
+						<span
+							aria-hidden="true"
+							className="pointer-events-none absolute inset-0 rounded-[inherit] shadow-[inset_0_0_0_2px_var(--color-speaking)]"
+						/>
+					)}
+				</>
+			) : (
+				<Avatar
+					nick={member.nick}
+					displayName={member.name}
+					size={grid ? 72 : 32}
+				/>
+			)}
 			{!isLocal && (
 				<UserVolumeMark
 					userId={member.id}
@@ -68,6 +103,12 @@ export function ParticipantTile({
 						<span className="font-normal text-muted-foreground"> (você)</span>
 					)}
 				</span>
+				{camera && (
+					<VideoIcon
+						aria-label="câmera ligada"
+						className={cn(grid ? "size-3.5" : "size-[11px]", "shrink-0 text-muted-foreground")}
+					/>
+				)}
 				<MemberIcons member={member} size={grid ? "size-3.5" : "size-[11px]"} />
 			</span>
 		</>

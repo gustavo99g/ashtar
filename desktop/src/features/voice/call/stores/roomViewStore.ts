@@ -1,40 +1,95 @@
 /**
- * Como a sala está sendo vista: em Grade ou no Foco, assistindo a transmissão de alguém. Fica num
- * store para sobreviver à ida às configurações (a rota da sala desmonta embaixo delas) e para
- * quem está fora da sala (a tela do servidor, um aviso) abrir a sala já assistindo.
+ * Como a sala está sendo vista: em Grade ou no palco, assistindo uma ou várias transmissões (ADR
+ * 0024). Fica num store para sobreviver à ida às configurações (a rota da sala desmonta embaixo
+ * delas) e para quem está fora da sala (a tela do servidor, um aviso) abrir a sala já assistindo.
  *
- * Desde a 0.2.3, quem assiste no Foco e sai da sala continua assistindo na miniatura
- * (`MiniShare`), por cima do canal de texto.
+ * Quem assiste e sai da sala continua assistindo na miniatura (`MiniShare`), uma transmissão por
+ * vez, por cima do canal de texto.
  */
 import { create } from "zustand";
 
+/** O tamanho em que uma transmissão aparece: grande, ou pequena na fileira de baixo. */
+export type ShownSize = "full" | "small";
+
 interface RoomViewState {
-	/** A identidade de quem está sendo assistido; `null` é a Grade. */
-	watching: string | null;
 	/**
-	 * De quem é a transmissão desenhada agora, no palco do Foco ou na miniatura: quem desenha marca
-	 * ao aparecer e desmarca ao sair. Só essa tela é baixada (`subscriptions.ts`). Nas
-	 * configurações, nenhuma das duas aparece, e nada é baixado.
+	 * As transmissões abertas, pelo id de quem transmite, na ordem em que a pessoa abriu. Vazio é a
+	 * Grade.
 	 */
-	shown: string | null;
+	watching: readonly string[];
+	/** A transmissão em foco (grande, com as outras embaixo), ou nenhuma. */
+	focused: string | null;
+	/** Qual transmissão a miniatura mostra quando há várias abertas (as setas trocam). */
+	miniPick: string | null;
+	/**
+	 * As transmissões desenhadas agora, no palco ou na miniatura, e em que tamanho: quem desenha
+	 * marca ao aparecer e desmarca ao sair. Só essas telas são baixadas (`subscriptions.ts`). Nas
+	 * configurações, nenhuma aparece, e nada é baixado.
+	 */
+	shown: Readonly<Record<string, ShownSize>>;
+	/**
+	 * Os blocos de quem está na sala à vista, e em que tamanho: grandes na Grade, pequenos na
+	 * fileira de baixo do palco. Só aí as câmeras são baixadas (ADR 0025); `false` na miniatura, num
+	 * canal de texto ou nas configurações.
+	 */
+	camerasShown: ShownSize | false;
 }
 
 export const useRoomView = create<RoomViewState>()(() => ({
-	watching: null,
-	shown: null,
+	watching: [],
+	focused: null,
+	miniPick: null,
+	shown: {},
+	camerasShown: false,
 }));
 
-/** Abre o Foco na transmissão de `identity`. */
+/** Abre a transmissão de `identity`, junto das que já estão abertas. */
 export function watchShare(identity: string): void {
-	useRoomView.setState({ watching: identity });
+	useRoomView.setState((state) =>
+		state.watching.includes(identity)
+			? state
+			: { watching: [...state.watching, identity] },
+	);
 }
 
-/** Volta para a Grade (e fecha a miniatura). */
+/** Fecha só a transmissão de `identity`. */
+export function unwatchShare(identity: string): void {
+	useRoomView.setState((state) => ({
+		watching: state.watching.filter((id) => id !== identity),
+		focused: state.focused === identity ? null : state.focused,
+		miniPick: state.miniPick === identity ? null : state.miniPick,
+	}));
+}
+
+/** Põe `identity` em foco; de novo na que já está em foco, volta para a divisão. */
+export function focusShare(identity: string | null): void {
+	useRoomView.setState((state) => ({
+		focused: identity === state.focused ? null : identity,
+	}));
+}
+
+/** Escolhe qual transmissão a miniatura mostra. */
+export function pickMiniShare(identity: string): void {
+	useRoomView.setState({ miniPick: identity });
+}
+
+/** Volta para a Grade: fecha todas (e a miniatura). */
 export function stopWatching(): void {
-	useRoomView.setState({ watching: null });
+	useRoomView.setState({ watching: [], focused: null, miniPick: null });
 }
 
-/** A transmissão de `identity` aparece na tela (`null`: nenhuma aparece). */
-export function setShown(identity: string | null): void {
-	useRoomView.setState({ shown: identity });
+/** A transmissão de `identity` aparece na tela, nesse tamanho; `null` tira. */
+export function setShown(identity: string, size: ShownSize | null): void {
+	useRoomView.setState((state) => {
+		if ((state.shown[identity] ?? null) === size) return state;
+		const shown = { ...state.shown };
+		if (size === null) delete shown[identity];
+		else shown[identity] = size;
+		return { shown };
+	});
+}
+
+/** Os blocos da sala aparecem (ou saem): as câmeras passam a ser baixadas (ou deixam de ser). */
+export function setCamerasShown(shown: ShownSize | false): void {
+	useRoomView.setState({ camerasShown: shown });
 }

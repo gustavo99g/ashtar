@@ -5,14 +5,24 @@
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { call } from "./core";
 
-export interface WhatsNew {
+export interface ReleaseNotes {
 	version: string;
 	notes: string;
 }
 
-/** A seção do CHANGELOG.md da versão em execução, ou `null`. */
-export function whatsNew() {
-	return call<WhatsNew | null>("whats_new");
+export interface WhatsNew {
+	/** A versão em execução. */
+	version: string;
+	/** Da mais nova para a mais velha: a instalada e, com `lastSeen`, as que a pessoa pulou. */
+	sections: ReleaseNotes[];
+}
+
+/**
+ * As seções do CHANGELOG.md depois de `lastSeen` até a versão em execução, ou só a dela sem
+ * `lastSeen`. `null` sem nenhuma.
+ */
+export function whatsNew(lastSeen: string | null = null) {
+	return call<WhatsNew | null>("whats_new", { lastSeen });
 }
 
 /** Abre a pasta de logs do app no Explorador de Arquivos. Rejeita com um `AppError`. */

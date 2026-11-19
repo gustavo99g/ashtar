@@ -110,8 +110,9 @@ flowchart LR
   (`core`, `screen-share`, `thumbnails`, `updater`, `app`, `identity`, `notifications`). Tem os tipos do contrato
   (`AppError`, `CaptureSource`, `SourceRef`) e um wrapper tipado por comando e evento.
 - **`features/voice/`**: a conexão com a sala do LiveKit, em subdomínios: `room` (a conexão, mute e
-  deafen), `devices` (microfone e saída), `members` (quem está na sala), `call` (a sala por dentro) e
-  `dock` (o pé da coluna). O padrão das pastas de cada feature está na ADR 0014.
+  deafen), `devices` (microfone e saída), `camera` (a câmera, ADR 0025), `members` (quem está na sala),
+  `call` (a sala por dentro, com o palco de várias transmissões, ADR 0024) e `dock` (o pé da coluna). O
+  padrão das pastas de cada feature está na ADR 0014.
   O volume de cada pessoa fica em `members/stores/userVolumeStore.ts`, no `localStorage`, e chega à
   trilha por `room/model/boost.ts`, que também serve ao som da transmissão (acima de 100%, por um
   `AudioContext` com ganho).

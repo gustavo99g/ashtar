@@ -9,7 +9,7 @@
  *   chegam durante ele são guardados e tratados no final.
  * - As escutas dos eventos começam antes do `screenShareStart`, para não perder um fim precoce.
  */
-import { createScreenToken } from "@/lib/api";
+import { ApiError, createScreenToken } from "@/lib/api";
 import {
 	isAppError,
 	listCaptureSources,
@@ -143,8 +143,8 @@ export class NativeScreenShare implements ScreenShareController {
 				target: {
 					url,
 					token,
-					// Quando começou, a qualidade e o título: a regra de uma transmissão por vez e quem
-					// assiste leem daqui (`shareInfo.ts`).
+					// Quando começou, a qualidade e o título: a ordem das transmissões e quem assiste
+					// leem daqui (`shareInfo.ts`).
 					trackName: shareTrackName({
 						startedAt: Date.now(),
 						quality: request.quality,
@@ -307,6 +307,10 @@ function applyChange(state: ActiveState, change: ShareChange): ActiveState {
 
 function toErrorState(error: unknown): ScreenShareState {
 	if (isAppError(error)) {
+		return { status: "error", kind: error.kind, message: error.message };
+	}
+	// Da API, como o `share_limit` (a sala já tem o máximo de transmissões): a mensagem dela.
+	if (error instanceof ApiError) {
 		return { status: "error", kind: error.kind, message: error.message };
 	}
 	return {

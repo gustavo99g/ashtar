@@ -16,13 +16,16 @@ vi.mock("../components/UserPanel", () => ({ UserPanel: () => null }));
 vi.mock("../components/VoiceConnection", () => ({
 	VoiceConnection: () => null,
 }));
-vi.mock("../../room/components/ShareRaceGuard", () => ({
-	ShareRaceGuard: () => null,
-}));
 vi.mock("../../call/components/ShareNotices", () => ({
 	ShareNotices: () => null,
 }));
 vi.mock("../components/TrayShare", () => ({ TrayShare: () => null }));
+vi.mock("../../call/components/ShareStartNotices", () => ({
+	ShareStartNotices: () => null,
+}));
+vi.mock("../../call/components/WatchJanitor", () => ({
+	WatchJanitor: () => null,
+}));
 // O seletor pede as miniaturas ao Rust, que não existe aqui.
 vi.mock("@/lib/tauri/commands", async (importOriginal) => ({
 	...(await importOriginal<object>()),

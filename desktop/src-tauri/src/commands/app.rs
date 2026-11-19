@@ -12,6 +12,15 @@ use crate::tray;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct WhatsNew {
+    /// A versão instalada.
+    pub version: String,
+    /// As seções a mostrar, da mais nova para a mais velha: só a instalada, ou também as que a
+    /// pessoa pulou desde a última vista.
+    pub sections: Vec<ReleaseNotes>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ReleaseNotes {
     pub version: String,
     /// A seção do `CHANGELOG.md`, em Markdown simples (linhas com `- `).
     pub notes: String,
@@ -48,11 +57,19 @@ pub async fn set_autostart(app: AppHandle, enabled: bool) -> Result<(), AppError
     Ok(())
 }
 
-/// A seção do `CHANGELOG.md` da versão em execução, ou `None` se ela não existe.
+/// As seções do `CHANGELOG.md` depois de `last_seen` até a versão em execução (quem pulou
+/// versões vê todas), ou só a da versão em execução sem `last_seen`. `None` se não há nenhuma.
 #[tauri::command]
-pub async fn whats_new(app: AppHandle) -> Result<Option<WhatsNew>, AppError> {
+pub async fn whats_new(
+    app: AppHandle,
+    last_seen: Option<String>,
+) -> Result<Option<WhatsNew>, AppError> {
     let version = app.package_info().version.to_string();
-    Ok(changelog::for_version(&version).map(|notes| WhatsNew { version, notes }))
+    let sections: Vec<ReleaseNotes> = changelog::since(last_seen.as_deref(), &version)
+        .into_iter()
+        .map(|(version, notes)| ReleaseNotes { version, notes })
+        .collect();
+    Ok((!sections.is_empty()).then_some(WhatsNew { version, sections }))
 }
 
 /// Abre a pasta de logs no Explorador de Arquivos ("Abrir pasta" na tela
