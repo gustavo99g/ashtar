@@ -1,5 +1,16 @@
 # O que há de novo no Ashtar
 
+## 0.3.20
+
+- Ligações privadas: abra uma conversa e clique no telefone, no alto da janela, ou em Ligar, no cartão da pessoa. A ligação é só entre vocês dois, e ninguém mais no servidor fica sabendo. Para quem está offline, o botão fica apagado.
+- Quando alguém liga, um cartão aparece no canto da tela, mesmo com o Ashtar na bandeja, com um toque que se repete até você responder. Dá para Recusar, Atender ou Responder com mensagem. Sem resposta em 30 segundos, vira chamada perdida.
+- Estando numa sala, o toque é mais baixo e o botão vira "Sair e atender": você sai da sala e entra na ligação. Quando ela acaba, a conversa mostra "Voltar para a sala", e um clique leva de volta. Antes de você ligar, o Ashtar avisa que você vai sair da sala, e dá para desligar esse aviso em Configurações › Voz e vídeo.
+- A ligação usa a mesma tela da sala: a grade, o Foco, o volume da outra pessoa e a tela compartilhada, de qualquer um dos dois. O alto mostra "Ligação com fulano" e o tempo, e o painel de voz diz "Em ligação", com Desligar.
+- Entrar numa sala durante a ligação pergunta antes, porque a ligação acaba.
+- A lateral mostra a ligação no topo: o avatar com o anel dourado enquanto toca ou durante a ligação, e o telefone vermelho numa chamada perdida, com "Ligar de volta".
+- O histórico da conversa guarda cada ligação: "Ligação encerrada" com a duração, "Chamada perdida", "Ligação recusada" ou "Ligação cancelada", com o botão para ligar de novo. A chamada perdida conta como não lida.
+- Em Ocupado, a ligação não toca nem mostra o cartão: aparece só o avatar na lateral e, na conversa, Recusar e Atender.
+
 ## 0.3.10
 
 - Conversas privadas: clique em alguém e em Mensagem, ou abra a aba Conversas na lateral direita. A conversa abre numa janela embaixo, e dá para deixar várias abertas como abas. Só vocês dois leem, mas as mensagens não são criptografadas de ponta a ponta: quem administra o servidor consegue ler.

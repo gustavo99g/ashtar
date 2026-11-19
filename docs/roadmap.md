@@ -642,8 +642,9 @@ API, banco e app. Decisões na ADR 0023. **Só é publicada com o LiveKit na VPS
 * a sala da ligação é a própria conversa, com token só para os dois;
 * screen share na ligação, igual ao da sala de voz;
 * tocar, atender, recusar, tempo limite de 30 s e chamada perdida;
-* toca com a janela fechada, pelo aplicativo na bandeja (a notificação com os botões Atender e Recusar, se o
-  plugin do Tauri der suporte no Windows; se não, uma janela própria pequena e sempre no topo);
+* toca com a janela fechada, pelo aplicativo na bandeja, num cartão com Recusar, Atender e Responder com
+  mensagem na janela dos avisos (o experimento da Etapa 18 escolheu ela no lugar da notificação do Windows,
+  que some com o "Não incomodar", ADR 0023);
 * quem liga nunca vê "ocupado": a ligação toca normalmente, mesmo que a outra pessoa esteja numa sala;
 * para quem está offline (ou Invisível), o botão Ligar fica apagado;
 * os outros membros não ficam sabendo da ligação: os dois só saem da lista da sala;

@@ -64,7 +64,9 @@ flowchart LR
   na primeira abertura e o `bring_to_front`.
 - **`notifications.rs`**: a janela dos avisos (ADR 0022), pequena, sem borda e sempre no topo, que o
   frontend enche com os cartões; a consulta ao Windows antes de mostrar (tela cheia, apresentação); e a
-  bolinha de não lido na bandeja e na barra de tarefas.
+  bolinha de não lido na bandeja e na barra de tarefas. A mesma janela leva o cartão da ligação que toca
+  (ADR 0023): o `notification-ring` manda o cartão, e o `notification-answer` traz Atender, Recusar ou
+  Responder de volta à janela principal, que vem para a frente.
 - **`commands/`**: a fronteira com o frontend. Os comandos só recebem argumentos, delegam ao
   `media/` e convertem o resultado. Nenhuma lógica de captura mora aqui.
 - **`media/`**: tudo que envolve a transmissão: a captura, o vídeo na GPU e a publicação.
@@ -137,6 +139,13 @@ flowchart LR
   contexto (status, foco, o que está aberto), a bolinha e o clique. A mesma feature desenha a janela
   dos avisos, que é a segunda página do app (`notifications.html`), e a tela Configurações ›
   Notificações.
+- **`features/calls/`**: as ligações privadas (ADR 0023). A máquina de estados fica em
+  `model/machine.ts`, sem React (parado, chamando, tocando, conectando, em ligação e encerrada), e o
+  `callStore` a guarda. O `CallBridge`, na moldura, faz a voz seguir a ligação: atender sai da sala e
+  entra na da conversa, e o fim sai dela e abre a conversa. Também o botão Ligar, os avisos antes de
+  ligar, a faixa da conversa, o registro no histórico (`CallEntry`), a chamada perdida e o "Voltar para
+  a sala". A tela da ligação é a `VoiceRoom` de sempre, que sabe pelo `VoiceProvider` se a conexão é de
+  sala ou de ligação.
 - **`features/identity/`** também tem o status (Disponível, Ocupado, Invisível), com o último guardado
   no computador para abrir já com ele.
 - **`lib/realtime/`**: o WebSocket da API (ADR 0015), sem React: ticket, `ping`, reconexão com espera
@@ -167,7 +176,11 @@ A crate é uma biblioteca (`lib.rs`) com dois binários: o servidor (`main.rs`) 
   canais" conferido dentro, como em `identity/`) e `layout` (a árvore e a versão que dá o 409). As
   conversas privadas (ADR 0021) são canais `dm` (`dms`), e `access` é a regra de leitura: o canal de
   texto aberto, ou a conversa de que a pessoa faz parte. `read` guarda até onde cada um leu, as não
-  lidas, as menções (achadas em `mentions` no envio) e o silenciar (ADR 0022).
+  lidas, as menções (achadas em `mentions` no envio) e o silenciar (ADR 0022). Uma mensagem tem um
+  `kind`: `text` ou `call`, o registro de uma ligação.
+- **`calls/`**: as ligações privadas (ADR 0023): começar, atender, recusar, desistir e desligar, o
+  tempo limite de 30 s que vira chamada perdida, o fim pela saída da sala do LiveKit e o registro na
+  conversa. No máximo uma ligação aberta por conversa; ao subir, a API fecha as que ficaram de antes.
 - **`realtime/`**: o `Hub` do tempo real: o `broadcast` dos eventos (e o `publish_to`, só para
   algumas pessoas, que leva as mensagens privadas), os tickets de uso único e
   quem está online.
@@ -176,7 +189,8 @@ A crate é uma biblioteca (`lib.rs`) com dois binários: o servidor (`main.rs`) 
 - **`routes/`**: as rotas HTTP, finas sobre as regras: a identidade (`/api/auth/*`, `/api/me`), o
   Painel (`/api/invites`, `/api/members`), a voz (`/api/voice/token`, `/screen-token` e `/participants`, só para uma
   sala aberta do banco, e o da tela só para quem já está nela), o chat (`/api/channels/...`, `/api/categories/...`, `/api/people`), as conversas privadas
-  (`/api/dms`), as lidas e o silenciar (`/api/channels/{id}/read`, `/mute` e `/api/read-all`), o status
+  (`/api/dms`) e as ligações (`/api/dms/{id}/call`, `/accept`, `/decline`, `/cancel` e `/end`; o token
+  da voz aceita o id da conversa só para os dois e só com a ligação atendida), as lidas e o silenciar (`/api/channels/{id}/read`, `/mute` e `/api/read-all`), o status
   (`/api/me/status`), o
   WebSocket (`/api/realtime/ticket` e `/api/realtime`) e o webhook do LiveKit (`/webhooks/livekit`).
   Autenticação por `Authorization: Bearer <token>`; o WebSocket, que não manda cabeçalho, entra com
@@ -190,7 +204,7 @@ A crate é uma biblioteca (`lib.rs`) com dois binários: o servidor (`main.rs`) 
 As decisões estão nas ADRs [0010](docs/adr/0010-banco-sqlite.md),
 [0011](docs/adr/0011-identidade-sessao-convites.md), [0015](docs/adr/0015-chat-e-tempo-real.md) e
 [0016](docs/adr/0016-canais-e-categorias.md). Os testes de integração ficam em `api/tests/`
-(`identity.rs`, `chat.rs`, `channels.rs`, `dms.rs`, `read.rs` e `realtime.rs`, este com a API numa porta
+(`identity.rs`, `chat.rs`, `channels.rs`, `dms.rs`, `read.rs`, `calls.rs` e `realtime.rs`, este com a API numa porta
 de verdade).
 
 ## Fluxos
