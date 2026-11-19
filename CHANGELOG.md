@@ -1,5 +1,9 @@
 # O que há de novo no Ashtar
 
+## 0.3.21
+
+- O tempo da ligação, na lateral e na conversa, começa do zero ao atender. Antes ele podia começar em um minuto, por causa da diferença entre o relógio do computador e o do servidor.
+
 ## 0.3.20
 
 - Ligações privadas: abra uma conversa e clique no telefone, no alto da janela, ou em Ligar, no cartão da pessoa. A ligação é só entre vocês dois, e ninguém mais no servidor fica sabendo. Para quem está offline, o botão fica apagado.
