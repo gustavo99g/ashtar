@@ -11,6 +11,7 @@ vi.mock("@/lib/tauri/commands", () => ({
 	notificationLayout: vi.fn(() => Promise.resolve()),
 	notificationOpen: vi.fn(() => Promise.resolve()),
 	onNotificationCard: vi.fn(() => Promise.resolve(() => {})),
+	onNotificationRing: vi.fn(() => Promise.resolve(() => {})),
 }));
 
 // O jsdom não tem `ResizeObserver`; a altura em si é coisa da janela de verdade.

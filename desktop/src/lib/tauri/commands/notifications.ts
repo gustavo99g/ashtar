@@ -59,3 +59,32 @@ export function onNotificationOpen(
 ): Promise<UnlistenFn> {
 	return listenIfTauri("notification-open", callback);
 }
+
+/**
+ * Põe na janela dos avisos o cartão da ligação recebida, ou o tira (`null`). Não pergunta ao
+ * Windows: a ligação toca mesmo com tela cheia (ADR 0023).
+ */
+export function notificationRing(card: unknown) {
+	if (!isTauri()) return Promise.resolve();
+	return call<void>("notification_ring", { card });
+}
+
+/** Um botão do cartão da ligação: a resposta vai para a janela principal. */
+export function notificationAnswer(answer: unknown) {
+	if (!isTauri()) return Promise.resolve();
+	return call<void>("notification_answer", { answer });
+}
+
+/** Na janela dos avisos: escuta o cartão da ligação (ou o `null` que o tira). */
+export function onNotificationRing(
+	callback: (card: unknown) => void,
+): Promise<UnlistenFn> {
+	return listenIfTauri("notification-ring", callback);
+}
+
+/** Na janela principal: escuta o botão apertado no cartão da ligação. */
+export function onNotificationAnswer(
+	callback: (answer: unknown) => void,
+): Promise<UnlistenFn> {
+	return listenIfTauri("notification-answer", callback);
+}

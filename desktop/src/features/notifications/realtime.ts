@@ -46,6 +46,8 @@ function show(card: CardInput): void {
 function onMessage(message: Message, queryClient: QueryClient): void {
 	const me = useUnreadStore.getState().me;
 	if (!me || message.author.id === me) return;
+	// O registro de uma ligação não vira aviso: quem toca e mostra a perdida é a `features/calls`.
+	if (message.kind === "call") return;
 	const layout = queryClient.getQueryData<Layout>(channelsKeys.layout());
 	// Sem a lista de canais, não dá para saber se é conversa ou canal: melhor não avisar errado.
 	if (!layout) return;

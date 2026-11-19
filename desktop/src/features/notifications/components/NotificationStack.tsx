@@ -16,11 +16,19 @@ import {
 	notificationLayout,
 	notificationOpen,
 	onNotificationCard,
+	onNotificationRing,
 } from "@/lib/tauri/commands";
 import { cn } from "@/lib/utils";
 import { type Card, parseCard } from "../model/cards";
+import { parseRing } from "../model/ring";
 import { playSound } from "../model/sound";
-import { addCard, removeCard, useStack } from "../stores/stackStore";
+import {
+	addCard,
+	removeCard,
+	setRing,
+	useStack,
+} from "../stores/stackStore";
+import { IncomingCall } from "./IncomingCall";
 
 /** Quanto um cartão fica na tela. */
 export const CARD_MS = 6000;
@@ -35,28 +43,44 @@ export function receiveCard(value: unknown): void {
 	if (card.sound) playSound(card.sound);
 }
 
+/**
+ * Recebe o cartão da ligação (ou o `null` que o tira). O tema pode ter mudado, como no
+ * [`receiveCard`].
+ */
+export function receiveRing(value: unknown): void {
+	const ring = parseRing(value);
+	if (ring) void useSettingsStore.persist.rehydrate();
+	setRing(ring);
+}
+
 export function NotificationStack() {
 	const cards = useStack((stack) => stack.cards);
+	const ring = useStack((stack) => stack.ring);
 	const list = useRef<HTMLDivElement>(null);
 
 	useEffect(() => {
-		const stop = onNotificationCard(receiveCard);
-		return () => void stop.then((unlisten) => unlisten());
+		const stopCards = onNotificationCard(receiveCard);
+		const stopRing = onNotificationRing(receiveRing);
+		return () => {
+			void stopCards.then((unlisten) => unlisten());
+			void stopRing.then((unlisten) => unlisten());
+		};
 	}, []);
 
 	// A altura da pilha decide o tamanho da janela; sem cartões, ela some.
+	const empty = cards.length === 0 && ring === null;
 	useLayoutEffect(() => {
 		const element = list.current;
 		if (!element) return;
 		const report = () =>
 			void notificationLayout(
-				cards.length === 0 ? 0 : Math.ceil(element.offsetHeight),
+				empty ? 0 : Math.ceil(element.offsetHeight),
 			).catch(() => {});
 		report();
 		const observer = new ResizeObserver(report);
 		observer.observe(element);
 		return () => observer.disconnect();
-	}, [cards.length]);
+	}, [empty, cards.length]);
 
 	return (
 		<div
@@ -65,6 +89,7 @@ export function NotificationStack() {
 			aria-label="Avisos"
 			className="group/stack flex flex-col gap-2 p-2"
 		>
+			{ring && <IncomingCall key={ring.callId} ring={ring} />}
 			{cards.map((card) => (
 				<NotificationCard key={card.key} card={card} />
 			))}

@@ -20,6 +20,11 @@
 //! **O clique** num cartão chega pelo comando `notification_open`: a janela principal vem para a
 //! frente e recebe o alvo ([`NOTIFICATION_OPEN`]), para abrir a conversa, o canal ou a sala.
 //!
+//! **A ligação recebida** (ADR 0023) é mais um cartão nesta janela, no topo da pilha
+//! ([`NOTIFICATION_RING`]), e o toque sai daqui. Ela não passa pelo [`is_quiet`]: uma ligação
+//! aparece mesmo com um jogo em tela cheia. Os botões dela voltam para a janela principal
+//! ([`NOTIFICATION_ANSWER`]), que é quem tem a sessão.
+//!
 //! **O ponto de não lido** ([`set_badge`]): o ícone da bandeja ganha uma bolinha vermelha e a janela
 //! principal ganha o selo na barra de tarefas. O selo é de janela: com o app na bandeja, só a
 //! bolinha aparece, e o selo volta junto com a janela.
@@ -37,6 +42,14 @@ pub const NOTIFICATION_CARD: &str = "notification-card";
 
 /// O evento que leva à janela principal o alvo de um cartão clicado (contrato com o frontend).
 pub const NOTIFICATION_OPEN: &str = "notification-open";
+
+/// O evento que leva à janela dos avisos o cartão da ligação recebida, ou `null` para tirá-lo
+/// (contrato com o frontend, ADR 0023).
+pub const NOTIFICATION_RING: &str = "notification-ring";
+
+/// O evento que leva à janela principal o botão apertado no cartão da ligação (contrato com o
+/// frontend).
+pub const NOTIFICATION_ANSWER: &str = "notification-answer";
 
 /// A largura da janela, em pixels lógicos: a do cartão mais a sombra.
 const WIDTH: f64 = 376.0;

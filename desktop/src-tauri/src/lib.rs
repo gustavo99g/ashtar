@@ -113,6 +113,8 @@ pub fn run(log_file: logging::LateFile) {
             commands::notifications::notification_show,
             commands::notifications::notification_layout,
             commands::notifications::notification_open,
+            commands::notifications::notification_ring,
+            commands::notifications::notification_answer,
             commands::notifications::set_unread_badge,
             commands::identity::login,
             commands::identity::redeem,
