@@ -8,7 +8,7 @@ import {
 	Volume2Icon,
 	VolumeXIcon,
 } from "lucide-react";
-import { type ComponentProps, type ReactNode, useEffect } from "react";
+import { type ComponentProps, type ReactNode, useEffect, useRef } from "react";
 import { Slider } from "@/components/ui/slider";
 import { Spinner } from "@/components/ui/spinner";
 import { Avatar } from "@/features/identity";
@@ -22,6 +22,11 @@ import {
 	setShareVolume,
 	toggleShareMuted,
 } from "../stores/shareVolumeStore";
+import {
+	CopyFrameButton,
+	InboundStatsButton,
+	ZoomableVideo,
+} from "./FocusTools";
 import { ShareQualityButton } from "./ShareQualityButton";
 import { LiveBadge } from "./LiveBadge";
 import { PausedCover } from "./PausedCover";
@@ -33,7 +38,8 @@ import { ShareViewers } from "./ShareViewers";
  * (`shareVolumeStore.ts`) e vale para a próxima transmissão da mesma pessoa.
  *
  * A transmissão em foco (sozinha no palco: a focada ou a única aberta) ganha também a tela cheia e
- * as ferramentas de quem assiste (`tools`): ampliar, copiar um quadro e ver como está chegando.
+ * as ferramentas de quem assiste (`FocusTools.tsx`): ampliar, copiar um quadro e ver como está
+ * chegando.
  * Lado a lado e no 2×2, nenhuma delas aparece (combinado em 19/11).
  *
  * A tela de quem transmite só é baixada enquanto este bloco existe, no tamanho dele (`setShown`).
@@ -54,10 +60,6 @@ interface ScreenStageProps {
 	onStop: () => void;
 	fullscreen: boolean;
 	onToggleFullscreen: () => void;
-	/** As ferramentas da transmissão em foco, à esquerda dos botões de sempre. */
-	tools?: ReactNode;
-	/** O vídeo, para quem amplia ou copia trocar a imagem (`children` no lugar do `VideoTrack`). */
-	video?: ReactNode;
 }
 
 export function ScreenStage({
@@ -71,24 +73,29 @@ export function ScreenStage({
 	onStop,
 	fullscreen,
 	onToggleFullscreen,
-	tools,
-	video,
 }: ScreenStageProps) {
 	const owner = shareOwner(share.participant.identity);
 	useShownAs(owner, "full");
 	const { remoteAudio, heard } = useShareAudio(share);
 
 	const ready = share.publication.isSubscribed && share.publication.track;
+	const box = useRef<HTMLElement>(null);
+	const video = (
+		<VideoTrack trackRef={share} className="size-full object-contain" />
+	);
 
 	return (
 		<section
 			aria-label={`Transmissão de ${sharer.name}`}
+			ref={box}
 			className="group/stage relative flex min-h-0 min-w-0 flex-1 items-center justify-center overflow-hidden rounded-[10px] bg-rail"
 		>
 			{ready ? (
-				(video ?? (
-					<VideoTrack trackRef={share} className="size-full object-contain" />
-				))
+				inFocus ? (
+					<ZoomableVideo>{video}</ZoomableVideo>
+				) : (
+					video
+				)
 			) : (
 				<Spinner className="size-6 text-primary" />
 			)}
@@ -112,7 +119,14 @@ export function ScreenStage({
 				)}
 			</div>
 			<div className="absolute right-3.5 bottom-3.5 flex items-center gap-2">
-				{inFocus && tools}
+				{inFocus && ready && (
+					<>
+						<InboundStatsButton share={share} />
+						<CopyFrameButton
+							videoOf={() => box.current?.querySelector("video") ?? null}
+						/>
+					</>
+				)}
 				<ShareQualityButton owner={owner} name={sharer.name} />
 				{remoteAudio && (
 					<div className="flex h-9 items-center rounded-lg bg-rail/85 pr-3">
