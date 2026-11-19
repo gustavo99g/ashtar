@@ -82,11 +82,16 @@ pub enum ServerEvent {
     /// Alguém com "Mover membros" pôs a pessoa em outra sala (ADR 0026). Só vai
     /// para as conexões dela: o app troca de sala sozinho, sem perguntar.
     #[serde(rename = "voice.moved")]
-    VoiceMoved { channel_id: String, by: String },
+    VoiceMoved {
+        channel_id: String,
+        by: String,
+        /// O nome de quem moveu, para o aviso.
+        by_name: String,
+    },
     /// Alguém com "Mover membros" tirou a pessoa da voz. Só vai para as conexões
     /// dela: o app sai da sala com o aviso e não tenta voltar.
     #[serde(rename = "voice.disconnected")]
-    VoiceDisconnected { by: String },
+    VoiceDisconnected { by: String, by_name: String },
     #[serde(rename = "member.joined")]
     MemberJoined { person: Person },
     /// Alguém foi removido: sai da coluna de membros.

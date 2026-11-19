@@ -171,7 +171,7 @@ async fn mover_manda_o_evento_so_para_quem_foi_movido() {
     assert!(to.includes(&ana_id) && !to.includes(&owner_id));
     assert_eq!(
         *event,
-        json!({ "type": "voice.moved", "channel_id": squad, "by": owner_id })
+        json!({ "type": "voice.moved", "channel_id": squad, "by": owner_id, "by_name": "Kid" })
     );
 }
 
@@ -289,7 +289,7 @@ async fn desconectar_avisa_a_pessoa_de_quem_tirou() {
     let (event, to) = &events[0];
     assert_eq!(
         *event,
-        json!({ "type": "voice.disconnected", "by": ctx.owner.id })
+        json!({ "type": "voice.disconnected", "by": ctx.owner.id, "by_name": "Kid" })
     );
     assert!(to.includes(&ana_id) && !to.includes(&ctx.owner.id));
 }

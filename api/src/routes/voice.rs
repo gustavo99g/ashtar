@@ -281,6 +281,7 @@ pub async fn move_member(
         &ServerEvent::VoiceMoved {
             channel_id: destination.id,
             by: user.id.clone(),
+            by_name: user.shown_name().to_owned(),
         },
     );
     let hub = state.hub.clone();
@@ -313,6 +314,7 @@ pub async fn disconnect_member(
         &[&target.id],
         &ServerEvent::VoiceDisconnected {
             by: user.id.clone(),
+            by_name: user.shown_name().to_owned(),
         },
     );
     voice::remove_from_room_in_background(from, target.id);
