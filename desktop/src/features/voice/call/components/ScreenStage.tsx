@@ -1,4 +1,5 @@
 import { type TrackReference, VideoTrack } from "@livekit/components-react";
+import type { Participant } from "livekit-client";
 import {
 	Maximize2Icon,
 	MaximizeIcon,
@@ -14,6 +15,10 @@ import { Spinner } from "@/components/ui/spinner";
 import { Avatar } from "@/features/identity";
 import { shareOwner } from "@/features/screen-share";
 import { cn } from "@/lib/utils";
+import {
+	CameraVideo,
+	cameraTrackOf,
+} from "../../camera/components/CameraVideo";
 import type { ChannelMember } from "../../members/model/members";
 import { useShareAudio } from "../hooks/useShareAudio";
 import { setShown, type ShownSize } from "../stores/roomViewStore";
@@ -43,11 +48,15 @@ import { ShareViewers } from "./ShareViewers";
  * Lado a lado e no 2×2, nenhuma delas aparece (combinado em 19/11).
  *
  * A tela de quem transmite só é baixada enquanto este bloco existe, no tamanho dele (`setShown`).
+ *
+ * Quem transmite com a câmera ligada aparece com ela pequena no canto da própria transmissão, em
+ * cima do nome (ADR 0025), e não num bloco a mais.
  */
 
 interface ScreenStageProps {
 	share: TrackReference;
-	sharer: ChannelMember;
+	/** Com o `participant`, a câmera de quem transmite aparece no canto. */
+	sharer: ChannelMember & { participant?: Participant };
 	/** "1080p · 30 fps", quando se sabe. */
 	spec?: string;
 	/** Sozinha no palco: a tela cheia e as ferramentas aparecem. */
@@ -80,6 +89,7 @@ export function ScreenStage({
 
 	const ready = share.publication.isSubscribed && share.publication.track;
 	const box = useRef<HTMLElement>(null);
+	const camera = cameraTrackOf(sharer.participant);
 	const video = (
 		<VideoTrack trackRef={share} className="size-full object-contain" />
 	);
@@ -107,6 +117,18 @@ export function ScreenStage({
 				owner={owner}
 				className="absolute top-3.5 right-3.5 opacity-0 transition-opacity group-hover/stage:opacity-100 group-focus-within/stage:opacity-100"
 			/>
+			{camera && (
+				<div
+					aria-label={`Câmera de ${sharer.name}`}
+					role="img"
+					className={cn(
+						"absolute left-3.5 aspect-video overflow-hidden rounded-lg bg-rail ring-1 ring-border-strong",
+						inFocus ? "bottom-16 w-48" : "bottom-14 w-32",
+					)}
+				>
+					<CameraVideo trackRef={camera} />
+				</div>
+			)}
 			<div className="absolute bottom-3.5 left-3.5 flex min-w-0 items-center gap-2 rounded-lg bg-rail/85 py-1.5 pr-2.5 pl-1.5">
 				<Avatar nick={sharer.nick} displayName={sharer.name} size={26} />
 				<span className="truncate text-[13px] font-semibold text-foreground">

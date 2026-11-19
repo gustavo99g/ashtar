@@ -6,6 +6,11 @@ import { VoiceSettings } from "../components/VoiceSettings";
 import type { DeviceInfo } from "../model/devices";
 import { chooseDevice, useDeviceChoice } from "../stores/deviceChoiceStore";
 
+// A câmera tem os próprios testes; aqui, só o áudio.
+vi.mock("../../camera/components/CameraOptions", () => ({
+	CameraOptions: () => null,
+}));
+
 const WINDOWS: DeviceInfo[] = [
 	{
 		kind: "audioinput",

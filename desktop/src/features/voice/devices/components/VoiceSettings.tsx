@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { useSettingsStore } from "@/features/settings";
+import { CameraOptions } from "../../camera/components/CameraOptions";
 import { setSuppression, useNoiseChoice } from "../../noise/stores/noiseStore";
 import { useAudioDevices } from "../hooks/useAudioDevices";
 import {
@@ -23,7 +24,8 @@ import { chooseDevice, useDeviceChoice } from "../stores/deviceChoiceStore";
 
 /*
  * Configurações › Voz e vídeo (quadro "Configurações — voz e vídeo"). O bloco Dispositivos (a
- * entrada e a saída) e, desde a 0.2.3, a Supressão de ruído do bloco Processamento de voz. O resto
+ * entrada e a saída) e, desde a 0.2.3, a Supressão de ruído do bloco Processamento de voz. Desde a
+ * 0.4, a Câmera (ADR 0025): a prévia, o dispositivo, a qualidade e Espelhar. O resto
  * do quadro (eco, ganho, modo de entrada, tela) fica para a v0.2.5 e a v0.6 (BACKLOG).
  *
  * A escolha vale na hora, também no meio de uma chamada (`VoiceProvider`). Um dispositivo escolhido
@@ -56,6 +58,9 @@ export function VoiceSettings() {
 					<DevicePicker kind="input" label="Entrada" devices={devices} />
 					<DevicePicker kind="output" label="Saída" devices={devices} />
 				</div>
+			</Section>
+			<Section title="Câmera">
+				<CameraOptions className="max-w-[420px]" />
 			</Section>
 			<Section title="Processamento de voz">
 				<NoiseSwitch />

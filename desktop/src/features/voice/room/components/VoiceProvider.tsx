@@ -27,6 +27,9 @@
  *
  * Entra com o microfone e a saída de Configurações › Voz e vídeo (`deviceChoiceStore.ts`) e troca na hora
  * quando a escolha muda, ou quando o escolhido some e volta (`roomDevices.ts`).
+ *
+ * A câmera (ADR 0025) sai pela mesma conexão, sempre começando desligada: quem cuida dela é o
+ * `useLocalCamera`, e o botão Câmera liga e desliga.
  */
 import { RoomContext } from "@livekit/components-react";
 import {
@@ -54,6 +57,7 @@ import {
 	useRoomView,
 } from "../../call/stores/roomViewStore";
 import { useShareVolume } from "../../call/stores/shareVolumeStore";
+import { useLocalCamera } from "../../camera/hooks/useLocalCamera";
 import { useAudioDevices } from "../../devices/hooks/useAudioDevices";
 import { effectiveDevice, knownDevices } from "../../devices/model/devices";
 import {
@@ -383,6 +387,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 	// Quem assiste o quê (ADR 0024): as transmissões à vista, para a sala, e os avisos dos outros.
 	const shownOwners = useMemo(() => Object.keys(shown).sort(), [shown]);
 	useWatchSync(room, shownOwners);
+	useLocalCamera(room);
 
 	// No meio da chamada, a escolha nova vale na hora, e o escolhido que some ou volta também.
 	useEffect(() => {

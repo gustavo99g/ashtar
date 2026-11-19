@@ -7,12 +7,13 @@ import {
 	ScreenShareIcon,
 } from "lucide-react";
 import type { ScreenShareController } from "@/features/screen-share";
+import { CameraButton } from "../../camera/components/CameraButton";
 import { useVoice } from "../../room/hooks/useVoice";
 import { BarButton } from "./buttons";
 import { ShareButton } from "./ShareButton";
 
 /*
- * A barra de baixo da sala: Microfone, Áudio (o deafen), Tela e Sair. Sem o controller (ainda
+ * A barra de baixo da sala: Microfone, Áudio (o deafen), Câmera, Tela e Sair. Sem o controller (ainda
  * conectando), o Tela fica desativado. Na ligação privada, o Sair é o Desligar.
  */
 export function CallControls({
@@ -47,6 +48,7 @@ export function CallControls({
 			>
 				{isDeafened ? <HeadphoneOffIcon /> : <HeadphonesIcon />}
 			</BarButton>
+			<CameraButton />
 			{controller ? (
 				<ShareButton controller={controller} variant="bar" />
 			) : (
