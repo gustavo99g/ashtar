@@ -96,16 +96,21 @@ export function countMessage(message: Message): void {
 		if (known && message.id <= known) return store;
 		const current = store.byChannel[id] ?? EMPTY_STATE;
 		const mine = message.author.id === store.me;
+		// Do registro de ligação (ADR 0023), só a chamada perdida conta, como na API.
+		const counts =
+			message.kind !== "call" || message.call?.outcome === "missed";
 		const next: ReadState = mine
 			? { ...current, last_read_id: message.id, unread: 0, mentions: 0 }
-			: {
-					...current,
-					unread: Math.min(UNREAD_CAP, current.unread + 1),
-					mentions:
-						store.me && message.mentions.includes(store.me)
-							? Math.min(UNREAD_CAP, current.mentions + 1)
-							: current.mentions,
-				};
+			: !counts
+				? current
+				: {
+						...current,
+						unread: Math.min(UNREAD_CAP, current.unread + 1),
+						mentions:
+							store.me && message.mentions.includes(store.me)
+								? Math.min(UNREAD_CAP, current.mentions + 1)
+								: current.mentions,
+					};
 		return {
 			byChannel: { ...store.byChannel, [id]: next },
 			newest: { ...store.newest, [id]: message.id },

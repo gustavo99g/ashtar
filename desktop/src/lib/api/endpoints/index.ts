@@ -11,6 +11,12 @@ export {
 	unarchiveChannel,
 	updateChannel,
 } from "./channels";
+export {
+	acceptCall,
+	type CallHangup,
+	hangUpCall,
+	startCall,
+} from "./calls";
 export { listMessages, listPeople, type PageCursor, sendMessage } from "./chat";
 export { listDms, openDm } from "./dms";
 export { createInvite, getInvite, listInvites, revokeInvite } from "./invites";

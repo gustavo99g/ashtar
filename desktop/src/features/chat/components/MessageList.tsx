@@ -45,6 +45,12 @@ interface MessageListProps {
 	unreadAfter?: string | null;
 	/** Avisa quando o fim do histórico entra ou sai da vista: é o que conta para marcar como lido. */
 	onSeeingEndChange?: (seeingEnd: boolean) => void;
+	/**
+	 * Desenha o registro de uma ligação (`kind = "call"`, ADR 0023) no lugar da mensagem. Quem
+	 * conhece as ligações é a conversa privada, que passa isto; sem isto, o registro aparece como
+	 * uma mensagem comum ("Ligação").
+	 */
+	renderCall?: (message: Message) => ReactNode;
 }
 
 /**
@@ -72,6 +78,7 @@ export function MessageList({
 	onDiscard,
 	unreadAfter,
 	onSeeingEndChange,
+	renderCall,
 }: MessageListProps) {
 	const ref = useRef<HTMLDivElement>(null);
 	const lineRef = useRef<HTMLLIElement>(null);
@@ -202,13 +209,17 @@ export function MessageList({
 									Novas mensagens
 								</li>
 							)}
-							<MessageItem
-								message={row.message}
-								startsGroup={row.startsGroup}
-								ownerId={ownerId}
-								people={people}
-								myId={myId}
-							/>
+							{row.message.kind === "call" && renderCall ? (
+								<li>{renderCall(row.message)}</li>
+							) : (
+								<MessageItem
+									message={row.message}
+									startsGroup={row.startsGroup}
+									ownerId={ownerId}
+									people={people}
+									myId={myId}
+								/>
+							)}
 						</RowWithDay>
 					))}
 					{pending.map((message) => (

@@ -8,6 +8,7 @@ import {
 	type ChannelMember,
 	memberFromApi,
 	useLiveMembers,
+	useGuardedJoin,
 	useVoice,
 	useVoiceParticipants,
 } from "@/features/voice";
@@ -203,6 +204,7 @@ function VoiceChannelRow({
 	const session = useSession();
 	const myId = session.status === "connected" ? session.user.id : null;
 	const { join } = useVoice();
+	const { guard, dialog } = useGuardedJoin();
 	const navigate = useNavigate();
 	const onRoom = useMatch(paths.voiceRoom) !== null;
 	// A sala fica marcada só na tela da chamada: a do servidor agora é o canal de texto.
@@ -217,8 +219,15 @@ function VoiceChannelRow({
 	if (!shown) return null;
 
 	function openRoom() {
-		if (!inCall) join(channel.id);
-		if (!onRoom) void navigate(paths.voiceRoom);
+		if (inCall) {
+			if (!onRoom) void navigate(paths.voiceRoom);
+			return;
+		}
+		// Numa ligação privada, entrar na sala encerra a ligação: pergunta antes.
+		guard(channel.name, () => {
+			join(channel.id);
+			void navigate(paths.voiceRoom);
+		});
 	}
 
 	return (
@@ -246,6 +255,7 @@ function VoiceChannelRow({
 					)}
 				</button>
 			</RowFrame>
+			{dialog}
 			{!collapsed && members.length > 0 && (
 				<RoomMembers
 					members={members}

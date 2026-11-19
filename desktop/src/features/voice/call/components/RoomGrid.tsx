@@ -8,15 +8,23 @@ import { Children, type ReactNode } from "react";
  */
 
 const TILE_MAX = 360;
+/** Na ligação privada são só dois lugares, maiores (quadro "Ligação privada — os dois"). */
+export const CALL_TILE_MAX = 520;
 const GAP = 12;
 const PADDING = 24;
 
-export function RoomGrid({ children }: { children: ReactNode }) {
+export function RoomGrid({
+	children,
+	tileMax = TILE_MAX,
+}: {
+	children: ReactNode;
+	tileMax?: number;
+}) {
 	const count = Math.max(1, Children.toArray(children).length);
 	return (
 		<div
 			className="mx-auto grid w-full flex-1 grid-cols-[repeat(auto-fit,minmax(280px,1fr))] content-center gap-3 p-6"
-			style={{ maxWidth: count * TILE_MAX + (count - 1) * GAP + 2 * PADDING }}
+			style={{ maxWidth: count * tileMax + (count - 1) * GAP + 2 * PADDING }}
 		>
 			{children}
 		</div>

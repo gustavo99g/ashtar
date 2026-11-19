@@ -24,8 +24,14 @@ export const DEFAULT_NOTIFICATIONS: NotificationPrefs = {
 interface SettingsState {
 	theme: ThemeId;
 	notifications: NotificationPrefs;
+	/**
+	 * Perguntar antes de ligar estando numa sala (o "Ligar para fulano?", Etapa 20 da v0.3). O
+	 * "Não perguntar de novo" desliga; Configurações › Voz e vídeo liga de volta.
+	 */
+	askBeforeCall: boolean;
 	setTheme: (theme: ThemeId) => void;
 	setNotification: (key: keyof NotificationPrefs, enabled: boolean) => void;
+	setAskBeforeCall: (ask: boolean) => void;
 }
 
 /** As chaves salvas, com o padrão no lugar de qualquer valor estranho. */
@@ -53,7 +59,9 @@ export const useSettingsStore = create<SettingsState>()(
 		(set) => ({
 			theme: DEFAULT_THEME,
 			notifications: DEFAULT_NOTIFICATIONS,
+			askBeforeCall: true,
 			setTheme: (theme) => set({ theme }),
+			setAskBeforeCall: (askBeforeCall) => set({ askBeforeCall }),
 			setNotification: (key, enabled) =>
 				set((state) => ({
 					notifications: { ...state.notifications, [key]: enabled },
@@ -65,17 +73,23 @@ export const useSettingsStore = create<SettingsState>()(
 			partialize: (state) => ({
 				theme: state.theme,
 				notifications: state.notifications,
+				askBeforeCall: state.askBeforeCall,
 			}),
 			// Um tema que saiu do app (ou um valor estranho no disco) volta para o padrão. Quem vem
-			// de antes da 0.3.10 não tem as chaves de notificação: entram ligadas.
+			// de antes da 0.3.10 não tem as chaves de notificação: entram ligadas. O "perguntar antes de
+			// ligar" é da 0.3.20 e também começa ligado.
 			merge: (persisted, current) => {
 				const saved = persisted as
-					| { theme?: unknown; notifications?: unknown }
+					| { theme?: unknown; notifications?: unknown; askBeforeCall?: unknown }
 					| undefined;
 				return {
 					...current,
 					theme: isThemeId(saved?.theme) ? saved.theme : DEFAULT_THEME,
 					notifications: readNotifications(saved?.notifications),
+					askBeforeCall:
+						typeof saved?.askBeforeCall === "boolean"
+							? saved.askBeforeCall
+							: true,
 				};
 			},
 		},

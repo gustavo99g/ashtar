@@ -95,6 +95,18 @@ describe("as não lidas", () => {
 		expect(Object.keys(useUnreadStore.getState().byChannel)).toEqual(["d-ana"]);
 	});
 
+	it("do registro de uma ligação, só a chamada perdida conta, como na API", () => {
+		const record = (id: string, outcome: "missed" | "declined") => ({
+			...message(id, "d-ana", "ana"),
+			kind: "call" as const,
+			call: { id: `c-${id}`, outcome, duration: null },
+		});
+		created(record("m7", "declined"));
+		expect(of("d-ana")?.unread).toBe(0);
+		created(record("m8", "missed"));
+		expect(of("d-ana")?.unread).toBe(1);
+	});
+
 	it("mensagem dos outros soma uma; com menção a mim, soma a menção também", () => {
 		created(message("m4"));
 		expect(of("geral")).toEqual(state({ last_read_id: "m1", unread: 3 }));

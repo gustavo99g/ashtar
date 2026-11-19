@@ -1,6 +1,7 @@
 import { Outlet } from "react-router-dom";
+import { CallBridge } from "@/features/calls";
 import { ChannelDialogs } from "@/features/channels";
-import { DmDock } from "@/features/dms";
+import { DmDock, showDm } from "@/features/dms";
 import { JoinNotices } from "@/features/members";
 import { NotificationsBridge } from "@/features/notifications";
 import { ChannelNav, ServerMenu } from "@/features/server";
@@ -57,6 +58,8 @@ export function AppShell() {
 			<ChannelDialogs />
 			{/* Os avisos: a regra, o ponto de não lido e o clique num cartão. Não desenha nada. */}
 			<NotificationsBridge />
+			{/* As ligações: a voz segue a ligação, e o cartão dela vai para a janela dos avisos. */}
+			<CallBridge showConversation={showDm} />
 		</div>
 	);
 }

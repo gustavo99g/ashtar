@@ -101,6 +101,18 @@ describe("a lista de conversas", () => {
 		const lines = conversation("d", "ana", message("m", "ana", "um\n\n  dois"));
 		expect(preview(lines, "eu")).toBe("um dois");
 	});
+
+	it("o registro de uma ligação vira o resultado dela", () => {
+		const call = (outcome: "missed" | "answered", author: string) =>
+			conversation("d", "ana", {
+				...message("m", author, "Ligação"),
+				kind: "call",
+				call: { id: "c", outcome, duration: outcome === "answered" ? 60 : null },
+			});
+		expect(preview(call("missed", "ana"), "eu")).toBe("Chamada perdida");
+		expect(preview(call("missed", "eu"), "eu")).toBe("Ninguém atendeu");
+		expect(preview(call("answered", "ana"), "eu")).toBe("Ligação encerrada");
+	});
 });
 
 describe("há quanto tempo", () => {

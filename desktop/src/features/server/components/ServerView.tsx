@@ -11,6 +11,7 @@ import {
 	memberFromApi,
 	peopleNowLabel,
 	SALA,
+	useGuardedJoin,
 	useVoice,
 	useVoiceParticipants,
 	watchShare,
@@ -25,6 +26,7 @@ import { Starfield } from "./Starfield";
 export function ServerView() {
 	const navigate = useNavigate();
 	const { voiceChannelId, join } = useVoice();
+	const { guard, dialog } = useGuardedJoin();
 	const inCall = voiceChannelId === SALA.id;
 	const query = useVoiceParticipants(SALA.id, { enabled: !inCall });
 
@@ -34,15 +36,19 @@ export function ServerView() {
 
 	/** Entra na sala; com `watch`, a sala já abre assistindo a transmissão dessa pessoa. */
 	function enter(watch?: string) {
-		join(SALA.id);
-		if (watch) watchShare(watch);
-		void navigate(paths.voiceRoom);
+		// Numa ligação privada, entrar na sala encerra a ligação: pergunta antes.
+		guard(SALA.name, () => {
+			join(SALA.id);
+			if (watch) watchShare(watch);
+			void navigate(paths.voiceRoom);
+		});
 	}
 
 	const members = query.data?.map(memberFromApi);
 
 	return (
 		<div className="flex h-full flex-col">
+			{dialog}
 			<header className="flex h-12 shrink-0 items-center gap-2 border-b border-border px-4">
 				<Volume2Icon
 					aria-hidden="true"

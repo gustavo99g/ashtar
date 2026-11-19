@@ -6,7 +6,7 @@ import {
 } from "@/components/ui/states";
 import { useSession } from "@/features/identity";
 import { useMarkRead, useUnreadMarker } from "@/features/unread";
-import { isApiError, type Person } from "@/lib/api";
+import { isApiError, type Message, type Person } from "@/lib/api";
 import { useAppFocused } from "@/lib/visibility";
 import type { Mentionable } from "../model/mentions";
 import { useMessages, usePeople, useSendMessage } from "../queries";
@@ -34,6 +34,8 @@ export function ChatConversation({
 	compact = false,
 	readOnly,
 	mentionable,
+	aboveComposer,
+	renderCall,
 }: {
 	channelId: string;
 	listLabel: string;
@@ -44,6 +46,10 @@ export function ChatConversation({
 	readOnly?: ReactNode;
 	/** Quem dá para mencionar no campo. Sem isto, todo o grupo (o canal de texto). */
 	mentionable?: readonly Mentionable[];
+	/** Uma faixa em cima do campo de escrever (o "Voltar para a sala" do fim de uma ligação). */
+	aboveComposer?: ReactNode;
+	/** O registro de uma ligação no histórico (ver `MessageList`). */
+	renderCall?: (message: Message) => ReactNode;
 }) {
 	const query = useMessages(channelId);
 	const pending = usePending(channelId);
@@ -84,6 +90,7 @@ export function ChatConversation({
 					onDiscard={discard}
 					unreadAfter={unreadAfter}
 					onSeeingEndChange={setSeeingEnd}
+					renderCall={renderCall}
 				/>
 			) : query.isError ? (
 				<Centered>
@@ -98,6 +105,7 @@ export function ChatConversation({
 					<LoadingState />
 				</Centered>
 			)}
+			{aboveComposer}
 			{readOnly ?? (
 				<Composer
 					channelId={channelId}

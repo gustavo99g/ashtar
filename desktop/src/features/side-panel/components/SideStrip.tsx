@@ -4,6 +4,8 @@ import {
 	UsersIcon,
 } from "lucide-react";
 import type { ReactNode } from "react";
+import { SideCallAvatars } from "@/features/calls";
+import { showDm } from "@/features/dms";
 import { CountBadge } from "@/features/unread";
 import {
 	openSideTab,
@@ -14,7 +16,8 @@ import {
 
 /**
  * A lateral minimizada, como no quadro "Lateral — minimizada na sala": uma faixa de 52 com o
- * botão de abrir, um traço e os ícones das duas abas. Clicar num ícone abre a lateral já naquela
+ * botão de abrir, um traço, a ligação e as chamadas perdidas (`SideCallAvatars`) e os ícones das
+ * duas abas. Clicar num ícone abre a lateral já naquela
  * aba; o botão de cima abre na aba em que ela estava.
  */
 export function SideStrip({
@@ -33,6 +36,7 @@ export function SideStrip({
 				<PanelRightOpenIcon aria-hidden="true" className="size-[18px]" />
 			</StripButton>
 			<span aria-hidden="true" className="h-px w-6 bg-border" />
+			<SideCallAvatars onOpenConversation={showDm} />
 			<TabButton context={context} tab="members" label="Membros">
 				<UsersIcon aria-hidden="true" className="size-5" />
 			</TabButton>

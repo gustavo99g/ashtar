@@ -43,7 +43,10 @@ function dayKey(seconds: number): string {
 	return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
 }
 
-/** Monta as linhas: grupo novo quando muda o autor, passa de 5 minutos ou muda o dia. */
+/**
+ * Monta as linhas: grupo novo quando muda o autor, passa de 5 minutos ou muda o dia, e em volta
+ * do registro de uma ligação.
+ */
 export function conversationRows(
 	messages: Message[],
 	now = new Date(),
@@ -57,6 +60,9 @@ export function conversationRows(
 			newDay ||
 			previous === null ||
 			previous.author.id !== message.author.id ||
+			// O registro de uma ligação é uma linha à parte: não entra no grupo de ninguém.
+			previous.kind === "call" ||
+			message.kind === "call" ||
 			message.created_at - previous.created_at > GROUP_GAP_SECONDS;
 		previous = message;
 		return {

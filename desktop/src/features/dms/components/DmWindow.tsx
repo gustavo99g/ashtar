@@ -1,6 +1,14 @@
 import { BellIcon, BellOffIcon, MinusIcon, XIcon } from "lucide-react";
-import type { ReactNode } from "react";
+import { type ReactNode, useEffect } from "react";
+import {
+	CallBanner,
+	CallButton,
+	CallEntry,
+	clearMissed,
+	ReturnToRoom,
+} from "@/features/calls";
 import { ChatConversation } from "@/features/chat";
+import { useSession } from "@/features/identity";
 import { setChannelMuted, useReadState } from "@/features/unread";
 import type { Conversation, Shown } from "@/lib/api";
 import { personName } from "../model/conversations";
@@ -17,6 +25,10 @@ import { DmAvatar } from "./DmAvatar";
  * O sino do cabeçalho silencia a conversa (Etapa 14): ela para de somar no número dourado, a não
  * ser pelas menções.
  *
+ * A ligação (ADR 0023) entra aqui também: o Ligar no cabeçalho, a faixa de chamando, tocando ou em
+ * ligação embaixo dele, o registro de cada ligação no histórico e, ao fim, o "Voltar para a sala"
+ * em cima do campo. Abrir a conversa apaga a chamada perdida dela da lateral.
+ *
  * O campo ganha o foco ao abrir (é o `Composer` que faz isso, a cada `channelId` novo), e o Esc,
  * com o foco em qualquer ponto da janela, fecha.
  */
@@ -31,6 +43,9 @@ export function DmWindow({
 	const { person } = conversation;
 	const name = personName(person);
 	const { muted } = useReadState(conversation.id);
+	const session = useSession();
+	const myId = session.status === "connected" ? session.user.id : null;
+	useEffect(() => clearMissed(conversation.id), [conversation.id]);
 	return (
 		<section
 			aria-label={`Conversa com ${name}`}
@@ -58,6 +73,12 @@ export function DmWindow({
 									: "Offline"}
 					</span>
 				</span>
+				<CallButton
+					variant="icon"
+					person={person}
+					presence={presence}
+					resolveDm={() => Promise.resolve(conversation.id)}
+				/>
 				<HeaderButton
 					label="Silenciar conversa"
 					pressed={muted}
@@ -81,12 +102,22 @@ export function DmWindow({
 					<XIcon aria-hidden="true" className="size-[15px]" />
 				</HeaderButton>
 			</header>
+			<CallBanner channelId={conversation.id} />
 			<ChatConversation
 				channelId={conversation.id}
 				listLabel={`Mensagens com ${name}`}
 				composerLabel={`Mensagem para ${name}`}
 				compact
 				mentionable={person.removed ? [] : [person]}
+				aboveComposer={<ReturnToRoom channelId={conversation.id} />}
+				renderCall={(message) => (
+					<CallEntry
+						message={message}
+						myId={myId}
+						person={person.removed ? null : person}
+						presence={presence}
+					/>
+				)}
 				start={
 					<p className="px-4 pt-6 pb-2 text-xs leading-relaxed text-muted-foreground">
 						Este é o começo da sua conversa com {name}. As mensagens privadas

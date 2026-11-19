@@ -9,6 +9,7 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { useSettingsStore } from "@/features/settings";
 import { setSuppression, useNoiseChoice } from "../../noise/stores/noiseStore";
 import { useAudioDevices } from "../hooks/useAudioDevices";
 import {
@@ -59,6 +60,37 @@ export function VoiceSettings() {
 			<Section title="Processamento de voz">
 				<NoiseSwitch />
 			</Section>
+			<Section title="Ligações">
+				<AskBeforeCallSwitch />
+			</Section>
+		</div>
+	);
+}
+
+/**
+ * O "Ligar para fulano?" de quem está numa sala (Etapa 20 da v0.3). O "Não perguntar de novo" do
+ * próprio aviso desliga; aqui liga de volta. O aviso de quem está transmitindo aparece sempre.
+ */
+function AskBeforeCallSwitch() {
+	const labelId = useId();
+	const ask = useSettingsStore((state) => state.askBeforeCall);
+	const setAsk = useSettingsStore((state) => state.setAskBeforeCall);
+	return (
+		<div className="flex items-center justify-between gap-6 border-b border-border py-3">
+			<span className="flex flex-col gap-[3px]">
+				<span id={labelId} className="text-sm font-medium text-foreground">
+					Perguntar antes de ligar estando numa sala
+				</span>
+				<span className="text-xs text-muted-foreground">
+					A ligação tira você da sala quando a outra pessoa atende.
+				</span>
+			</span>
+			<Switch
+				checked={ask}
+				onCheckedChange={setAsk}
+				aria-labelledby={labelId}
+				variant={"blue"}
+			/>
 		</div>
 	);
 }

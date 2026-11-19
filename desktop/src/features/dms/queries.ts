@@ -101,23 +101,25 @@ export function touchConversation(
 }
 
 /**
- * Abre a janela da conversa com `userId`, criando a conversa na API se ainda não existe. Rejeita
+ * Abre a janela da conversa com `userId`, criando a conversa na API se ainda não existe, e devolve
+ * o id dela. Rejeita
  * com o erro da API (a pessoa saiu do grupo, sem rede): quem chama mostra.
  */
 export function useOpenDm() {
 	const queryClient = useQueryClient();
 	return useCallback(
-		async (userId: string) => {
+		async (userId: string): Promise<string> => {
 			const known = queryClient
 				.getQueryData<Conversation[]>(dmsKeys.list())
 				?.find((c) => c.person.id === userId);
 			if (known) {
 				showDm(known.id);
-				return;
+				return known.id;
 			}
 			const conversation = await openDm({ user_id: userId });
 			upsertConversation(queryClient, conversation);
 			showDm(conversation.id);
+			return conversation.id;
 		},
 		[queryClient],
 	);

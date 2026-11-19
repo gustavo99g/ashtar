@@ -1,7 +1,8 @@
 import { MessageCircleIcon } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { ApiError } from "@/lib/api";
+import { CallButton } from "@/features/calls";
+import { ApiError, type Shown } from "@/lib/api";
 import { useOpenDm } from "../queries";
 
 /**
@@ -48,5 +49,30 @@ export function DmButton({
 				</p>
 			)}
 		</div>
+	);
+}
+
+/**
+ * O Ligar do cartão de uma pessoa (Etapa 20 da v0.3): abre a conversa com ela (criando, se
+ * precisar) e liga. Offline, fica apagado com o motivo.
+ */
+export function DmCallButton({
+	person,
+	presence,
+	onCalled,
+}: {
+	person: { id: string; nick: string; display_name: string | null };
+	presence: Shown | null;
+	onCalled?: () => void;
+}) {
+	const openDm = useOpenDm();
+	return (
+		<CallButton
+			variant="card"
+			person={person}
+			presence={presence}
+			resolveDm={() => openDm(person.id)}
+			onCalled={onCalled}
+		/>
 	);
 }

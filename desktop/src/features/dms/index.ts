@@ -1,4 +1,4 @@
-export { DmButton } from "./components/DmButton";
+export { DmButton, DmCallButton } from "./components/DmButton";
 export { DmDock } from "./components/DmDock";
 export { DmList } from "./components/DmList";
 export { dmsKeys, useDmsUnread } from "./queries";

@@ -2,7 +2,7 @@
  * O que a aba Conversas mostra de cada conversa privada: a ordem, a busca, o começo da última
  * mensagem e há quanto tempo foi. Tudo função pura, com os testes ao lado.
  */
-import type { Conversation, Person, Shown } from "@/lib/api";
+import type { CallOutcome, Conversation, Person, Shown } from "@/lib/api";
 
 /** O nome que aparece: o nome visível ou, sem ele, o nick. */
 export function personName(person: {
@@ -72,12 +72,34 @@ export function peopleToStart(
 		.sort((a, b) => personName(a).localeCompare(personName(b), "pt-BR"));
 }
 
-/** O começo da última mensagem, numa linha só: "Você: fechou, depois da live". */
+/**
+ * O começo da última mensagem, numa linha só: "Você: fechou, depois da live". O registro de uma
+ * ligação vira o resultado dela: "Chamada perdida", "Ligação encerrada".
+ */
 export function preview(conversation: Conversation, myId: string | null) {
 	const last = conversation.last_message;
 	if (!last) return "";
+	if (last.kind === "call" && last.call) {
+		return callPreview(last.call.outcome, last.author.id === myId);
+	}
 	const line = last.body.replace(/\s+/g, " ").trim();
 	return last.author.id === myId ? `Você: ${line}` : line;
+}
+
+/** O registro de uma ligação na lista. `mine`: eu liguei. */
+function callPreview(outcome: CallOutcome, mine: boolean): string {
+	switch (outcome) {
+		case "answered":
+			return "Ligação encerrada";
+		case "missed":
+			return mine ? "Ninguém atendeu" : "Chamada perdida";
+		case "declined":
+			return "Ligação recusada";
+		case "cancelled":
+			return "Ligação cancelada";
+		default:
+			return "Ligação";
+	}
 }
 
 /**

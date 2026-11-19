@@ -35,6 +35,8 @@ vi.mock("@/lib/tauri/commands", () => ({
 	// A ponta dos avisos, na moldura (`NotificationsBridge`).
 	setUnreadBadge: vi.fn(() => Promise.resolve()),
 	onNotificationOpen: vi.fn(() => Promise.resolve(() => {})),
+	onNotificationAnswer: vi.fn(() => Promise.resolve(() => {})),
+	notificationRing: vi.fn(() => Promise.resolve()),
 	login: vi.fn(),
 	redeem: vi.fn(),
 	accountMarker: vi.fn(),
