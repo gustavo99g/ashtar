@@ -6,7 +6,7 @@
 //! também soma 1 na versão da lista ([`super::layout::bump`]) e devolve essa
 //! versão, que a rota publica no `channels.changed`.
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, SqliteConnection, SqlitePool};
 use ts_rs::TS;
 use uuid::Uuid;
@@ -22,7 +22,7 @@ use crate::identity::permissions::{Permission, require_permission};
 /// [`Channel`] (não tem nome nem posição), e uma consulta da lista que
 /// esquecesse o `kind IN ('text', 'voice')` falha ao ler o tipo, em vez de
 /// mostrar a conversa de alguém.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, TS, sqlx::Type)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS, sqlx::Type)]
 #[serde(rename_all = "snake_case")]
 #[sqlx(rename_all = "snake_case")]
 #[ts(export, export_to = "index.ts")]
@@ -182,19 +182,33 @@ pub fn normalize_topic(input: &str) -> Result<Option<String>, ApiError> {
     Ok(Some(topic.to_owned()))
 }
 
-/// Cria um canal de texto no fim da categoria (ou do topo, sem categoria).
-/// Criar sala de voz fica para a v0.5. Devolve o canal e a versão nova.
-pub async fn create_text(
+/// Cria um canal no fim da categoria (ou do topo, sem categoria): um canal de
+/// texto, com o nome `#nome` e o tópico opcional, ou uma sala de voz (v0.5), com
+/// o nome livre e sem tópico. Devolve o canal e a versão nova.
+pub async fn create(
     db: &SqlitePool,
     actor: &User,
+    kind: ChannelKind,
     name: &str,
     category_id: Option<&str>,
     topic: Option<&str>,
     now: i64,
 ) -> Result<(Channel, i64), ApiError> {
     require_permission(db, actor, Permission::ManageChannels).await?;
-    let name = normalize_text_name(name)?;
-    let topic = topic.map(normalize_topic).transpose()?.flatten();
+    let (name, topic) = match kind {
+        ChannelKind::Text => (
+            normalize_text_name(name)?,
+            topic.map(normalize_topic).transpose()?.flatten(),
+        ),
+        ChannelKind::Voice => {
+            if topic.is_some_and(|topic| !topic.trim().is_empty()) {
+                return Err(ApiError::InvalidRequest(
+                    "Sala de voz não tem tópico.".into(),
+                ));
+            }
+            (validate_label(name)?, None)
+        }
+    };
     let mut tx = db.begin_with("BEGIN IMMEDIATE").await?;
     if let Some(category_id) = category_id {
         layout::require_open_category(&mut tx, category_id).await?;
@@ -203,9 +217,10 @@ pub async fn create_text(
     let position = next_position(&mut tx, category_id).await?;
     sqlx::query(
         "INSERT INTO channels (id, kind, name, topic, category_id, position, created_at)
-         VALUES (?, 'text', ?, ?, ?, ?, ?)",
+         VALUES (?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(&id)
+    .bind(kind)
     .bind(&name)
     .bind(&topic)
     .bind(category_id)
@@ -249,9 +264,14 @@ pub async fn update(
         (Some(name), ChannelKind::Text) => normalize_text_name(name)?,
         (Some(name), ChannelKind::Voice) => validate_label(name)?,
     };
-    let topic = match edit.topic {
-        None => channel.topic.clone(),
-        Some(topic) => normalize_topic(topic)?,
+    let topic = match (edit.topic, channel.kind) {
+        (None, _) => channel.topic.clone(),
+        (Some(topic), ChannelKind::Voice) if !topic.trim().is_empty() => {
+            return Err(ApiError::InvalidRequest(
+                "Sala de voz não tem tópico.".into(),
+            ));
+        }
+        (Some(topic), _) => normalize_topic(topic)?,
     };
     if name == channel.name && topic == channel.topic {
         return Ok((channel, None));

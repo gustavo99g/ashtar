@@ -20,7 +20,6 @@ use crate::AppState;
 use crate::calls;
 use crate::chat::dms;
 use crate::db::now;
-use crate::realtime::ServerEvent;
 use crate::voice;
 
 /// Os eventos que mudam a lista de quem está numa sala.
@@ -121,10 +120,7 @@ pub async fn livekit(
     match room_update(&event) {
         Some(RoomUpdate::Empty(room)) => {
             state.hub.start_voice_read(&room);
-            state.hub.publish(&ServerEvent::VoiceParticipants {
-                channel_id: room,
-                participants: Vec::new(),
-            });
+            state.hub.publish_voice_participants(room, Vec::new());
         }
         // Relê à parte: o LiveKit espera a resposta, e a consulta leva até 5 s.
         Some(RoomUpdate::Reread(room)) => {
@@ -145,10 +141,7 @@ async fn reread(state: AppState, room: String) {
     };
     match participants {
         Ok(participants) if state.hub.is_latest_voice_read(&room, n) => {
-            state.hub.publish(&ServerEvent::VoiceParticipants {
-                channel_id: room,
-                participants,
-            });
+            state.hub.publish_voice_participants(room, participants);
         }
         Ok(_) => {}
         Err(error) => eprintln!("livekit: não deu para reler a sala {room}: {error}"),

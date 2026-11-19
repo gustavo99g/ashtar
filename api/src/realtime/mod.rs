@@ -79,6 +79,14 @@ pub enum ServerEvent {
         channel_id: String,
         participants: Vec<ParticipantView>,
     },
+    /// Alguém com "Mover membros" pôs a pessoa em outra sala (ADR 0026). Só vai
+    /// para as conexões dela: o app troca de sala sozinho, sem perguntar.
+    #[serde(rename = "voice.moved")]
+    VoiceMoved { channel_id: String, by: String },
+    /// Alguém com "Mover membros" tirou a pessoa da voz. Só vai para as conexões
+    /// dela: o app sai da sala com o aviso e não tenta voltar.
+    #[serde(rename = "voice.disconnected")]
+    VoiceDisconnected { by: String },
     #[serde(rename = "member.joined")]
     MemberJoined { person: Person },
     /// Alguém foi removido: sai da coluna de membros.
@@ -164,6 +172,9 @@ struct Inner {
     /// Para cada sala, o número da última releitura pedida ao LiveKit: uma
     /// resposta velha que chega depois da nova não é publicada.
     voice_reads: HashMap<String, u64>,
+    /// Quem está em cada sala de voz, pela última lista publicada
+    /// (`voice.participants`). As salas das ligações privadas nunca entram.
+    voice_rooms: HashMap<String, Vec<String>>,
 }
 
 pub struct Hub {
@@ -362,6 +373,42 @@ impl Hub {
         *n
     }
 
+    /// Publica a lista de quem está na sala `room` e guarda quem é, para saber
+    /// em que sala cada pessoa está ([`Hub::room_of`]).
+    pub fn publish_voice_participants(&self, room: String, participants: Vec<ParticipantView>) {
+        let ids: Vec<String> = participants.iter().map(|p| p.user_id.clone()).collect();
+        {
+            let mut inner = self.lock();
+            if ids.is_empty() {
+                inner.voice_rooms.remove(&room);
+            } else {
+                inner.voice_rooms.insert(room.clone(), ids);
+            }
+        }
+        self.publish(&ServerEvent::VoiceParticipants {
+            channel_id: room,
+            participants,
+        });
+    }
+
+    /// A sala de voz em que `user_id` está, pela última lista de cada sala.
+    pub fn room_of(&self, user_id: &str) -> Option<String> {
+        self.lock()
+            .voice_rooms
+            .iter()
+            .find(|(_, ids)| ids.iter().any(|id| id == user_id))
+            .map(|(room, _)| room.clone())
+    }
+
+    /// Quem está na sala `room` agora, pela última lista publicada.
+    pub fn people_in(&self, room: &str) -> Vec<String> {
+        self.lock()
+            .voice_rooms
+            .get(room)
+            .cloned()
+            .unwrap_or_default()
+    }
+
     /// Se a releitura `n` ainda é a última pedida para `room`.
     pub fn is_latest_voice_read(&self, room: &str, n: u64) -> bool {
         self.lock().voice_reads.get(room) == Some(&n)
@@ -555,6 +602,38 @@ mod tests {
         assert_eq!(event["type"], "status.changed");
         assert!(!to.includes("u2"));
         assert!(rx.try_recv().is_err());
+    }
+
+    fn person(id: &str) -> ParticipantView {
+        ParticipantView {
+            user_id: id.into(),
+            nick: id.into(),
+            display_name: None,
+            screen_sharing: false,
+        }
+    }
+
+    #[test]
+    fn o_hub_sabe_em_que_sala_cada_um_esta() {
+        let hub = Hub::default();
+        let mut rx = hub.subscribe();
+        hub.publish_voice_participants("sala".into(), vec![person("u1"), person("u2")]);
+        hub.publish_voice_participants("squad".into(), vec![person("u3")]);
+        assert_eq!(next_event(&mut rx)["type"], "voice.participants");
+        assert_eq!(hub.room_of("u2").as_deref(), Some("sala"));
+        assert_eq!(hub.room_of("u3").as_deref(), Some("squad"));
+        assert_eq!(hub.room_of("u4"), None);
+
+        // Trocou de sala: sai de uma lista e entra na outra.
+        hub.publish_voice_participants("sala".into(), vec![person("u1")]);
+        hub.publish_voice_participants("squad".into(), vec![person("u3"), person("u2")]);
+        assert_eq!(hub.room_of("u2").as_deref(), Some("squad"));
+        assert_eq!(hub.people_in("squad"), ["u3", "u2"]);
+
+        // A sala vazia some.
+        hub.publish_voice_participants("squad".into(), vec![]);
+        assert_eq!(hub.room_of("u3"), None);
+        assert!(hub.people_in("squad").is_empty());
     }
 
     #[test]

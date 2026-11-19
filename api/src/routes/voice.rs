@@ -18,9 +18,12 @@ use crate::AppState;
 use crate::calls;
 use crate::chat::{channels, dms};
 use crate::error::ApiError;
-use crate::identity::User;
+use crate::identity::permissions::{Permission, require_permission};
+use crate::identity::{User, users};
+use crate::realtime::ServerEvent;
 use crate::voice::{
-    ParticipantView, RoomParticipant, join_participants, list_room, livekit_env, screen_identity,
+    self, ParticipantView, RoomParticipant, join_participants, list_room, livekit_env,
+    screen_identity,
 };
 
 /// A resposta do `voice/token`.
@@ -206,6 +209,114 @@ pub async fn participants(
     channels::get_open_voice(&state.db, &query.channel_id).await?;
     let room = list_room(&query.channel_id).await?;
     Ok(Json(join_participants(&state.db, room).await?))
+}
+
+/// Quanto o app de quem foi movido tem para trocar de sala sozinho, antes de a
+/// API tirá-lo da sala antiga (o app antigo não conhece o `voice.moved`).
+pub const MOVE_GRACE: Duration = Duration::from_secs(10);
+
+#[derive(Debug, Deserialize, TS)]
+#[ts(export, export_to = "index.ts")]
+pub struct MoveMemberRequest {
+    pub user_id: String,
+    pub channel_id: String,
+}
+
+#[derive(Debug, Deserialize, TS)]
+#[ts(export, export_to = "index.ts")]
+pub struct DisconnectMemberRequest {
+    pub user_id: String,
+}
+
+/// A sala de voz do grupo em que `user_id` está: pela lista que o hub guarda e,
+/// sem ela, perguntando ao LiveKit. Uma ligação privada não conta: ninguém é
+/// movido de dentro de uma.
+async fn voice_room_of(state: &AppState, user_id: &str) -> Result<Option<String>, ApiError> {
+    let room = match state.hub.room_of(user_id) {
+        Some(room) => Some(room),
+        None => voice::find_room_of(user_id).await?,
+    };
+    let Some(room) = room else { return Ok(None) };
+    Ok(channels::get_open_voice(&state.db, &room)
+        .await
+        .ok()
+        .map(|channel| channel.id))
+}
+
+/// O membro ativo `user_id`, ou 404.
+async fn active_member(state: &AppState, user_id: &str) -> Result<User, ApiError> {
+    users::find_by_id(&state.db, user_id)
+        .await?
+        .filter(User::is_active)
+        .ok_or_else(|| ApiError::NotFound("Nenhum membro com esse id.".into()))
+}
+
+/// `POST /api/voice/move`: põe alguém em outra sala de voz (ADR 0026). Só com
+/// "Mover membros". A API não move ninguém sozinha: manda o `voice.moved` para
+/// as conexões da pessoa, e o app dela troca de sala pelo mesmo caminho do
+/// clique. Se ela continuar na sala antiga depois de [`MOVE_GRACE`] (um app que
+/// não conhece o evento), a API a tira de lá.
+///
+/// 409 para quem não está numa sala de voz (nem numa ligação conta) e para quem
+/// já está na sala de destino.
+pub async fn move_member(
+    State(state): State<AppState>,
+    CurrentUser(user): CurrentUser,
+    ApiJson(request): ApiJson<MoveMemberRequest>,
+) -> Result<axum::http::StatusCode, ApiError> {
+    require_permission(&state.db, &user, Permission::MoveMembers).await?;
+    let target = active_member(&state, &request.user_id).await?;
+    validate_channel_id(&request.channel_id)?;
+    let destination = channels::get_open_voice(&state.db, &request.channel_id).await?;
+    let Some(from) = voice_room_of(&state, &target.id).await? else {
+        return Err(ApiError::Conflict(
+            "Essa pessoa não está numa sala de voz.".into(),
+        ));
+    };
+    if from == destination.id {
+        return Err(ApiError::Conflict("Essa pessoa já está nessa sala.".into()));
+    }
+    state.hub.publish_to(
+        &[&target.id],
+        &ServerEvent::VoiceMoved {
+            channel_id: destination.id,
+            by: user.id.clone(),
+        },
+    );
+    let hub = state.hub.clone();
+    let grace = state.move_grace;
+    tokio::spawn(async move {
+        tokio::time::sleep(grace).await;
+        if hub.room_of(&target.id).as_deref() == Some(from.as_str()) {
+            voice::remove_from_room_in_background(from, target.id);
+        }
+    });
+    Ok(axum::http::StatusCode::NO_CONTENT)
+}
+
+/// `POST /api/voice/disconnect`: tira alguém da voz (ADR 0026), com a mesma
+/// permissão de mover. O `voice.disconnected` vai antes, para o app dela mostrar
+/// quem desconectou e não tentar voltar; a conexão cai em seguida.
+pub async fn disconnect_member(
+    State(state): State<AppState>,
+    CurrentUser(user): CurrentUser,
+    ApiJson(request): ApiJson<DisconnectMemberRequest>,
+) -> Result<axum::http::StatusCode, ApiError> {
+    require_permission(&state.db, &user, Permission::MoveMembers).await?;
+    let target = active_member(&state, &request.user_id).await?;
+    let Some(from) = voice_room_of(&state, &target.id).await? else {
+        return Err(ApiError::Conflict(
+            "Essa pessoa não está numa sala de voz.".into(),
+        ));
+    };
+    state.hub.publish_to(
+        &[&target.id],
+        &ServerEvent::VoiceDisconnected {
+            by: user.id.clone(),
+        },
+    );
+    voice::remove_from_room_in_background(from, target.id);
+    Ok(axum::http::StatusCode::NO_CONTENT)
 }
 
 /// Tamanho máximo do id de canal (e, portanto, do nome da sala no LiveKit).

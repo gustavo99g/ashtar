@@ -16,11 +16,12 @@ use super::auth::CurrentUser;
 use super::extract::ApiJson;
 use crate::AppState;
 use crate::chat::categories;
-use crate::chat::channels::{self, ChannelEdit, ChannelView};
+use crate::chat::channels::{self, ChannelEdit, ChannelKind, ChannelView};
 use crate::chat::layout::{self, Archived, Layout, LayoutRequest};
 use crate::db::now;
 use crate::error::ApiError;
 use crate::realtime::ServerEvent;
+use crate::voice;
 
 /// Avisa todo mundo que a lista mudou. `None` é a repetição que não mudou nada
 /// (arquivar o que já estava arquivado): não há o que avisar.
@@ -49,6 +50,10 @@ pub async fn archived(
 #[derive(Debug, Deserialize, TS)]
 #[ts(export, export_to = "index.ts")]
 pub struct CreateChannelRequest {
+    /// `text` (o padrão) ou `voice`.
+    #[serde(default)]
+    #[ts(optional)]
+    pub kind: Option<ChannelKind>,
     pub name: String,
     /// Sem categoria, o canal vai para o fim do topo.
     #[serde(default)]
@@ -59,15 +64,16 @@ pub struct CreateChannelRequest {
     pub topic: Option<String>,
 }
 
-/// `POST /api/channels`: um canal de texto novo.
+/// `POST /api/channels`: um canal de texto ou uma sala de voz nova.
 pub async fn create(
     State(state): State<AppState>,
     CurrentUser(user): CurrentUser,
     ApiJson(request): ApiJson<CreateChannelRequest>,
 ) -> Result<(StatusCode, Json<ChannelView>), ApiError> {
-    let (channel, version) = channels::create_text(
+    let (channel, version) = channels::create(
         &state.db,
         &user,
+        request.kind.unwrap_or(ChannelKind::Text),
         &request.name,
         request.category_id.as_deref(),
         request.topic.as_deref(),
@@ -106,13 +112,19 @@ pub async fn update(
     Ok(Json(channel.into()))
 }
 
-/// `POST /api/channels/{id}/archive`.
+/// `POST /api/channels/{id}/archive`. Arquivar uma sala de voz com gente dentro
+/// apaga a sala no LiveKit, o que tira todo mundo dela (ADR 0026): o app vê a
+/// sala sumir e mostra "A sala foi arquivada".
 pub async fn archive(
     State(state): State<AppState>,
     CurrentUser(user): CurrentUser,
     Path(id): Path<String>,
 ) -> Result<StatusCode, ApiError> {
+    let voice_room = channels::get_open_voice(&state.db, &id).await.is_ok();
     let version = channels::archive(&state.db, &user, &id, now()).await?;
+    if voice_room && version.is_some() {
+        voice::delete_room_in_background(id);
+    }
     changed(&state, version);
     Ok(StatusCode::NO_CONTENT)
 }

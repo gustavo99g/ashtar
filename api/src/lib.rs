@@ -54,6 +54,9 @@ pub struct AppState {
     /// Quanto a ligação toca antes de virar perdida ([`calls::RING_TIMEOUT`];
     /// os testes usam menos).
     pub ring_timeout: std::time::Duration,
+    /// Quanto quem foi movido tem para trocar de sala sozinho
+    /// ([`routes::voice::MOVE_GRACE`]; os testes usam menos).
+    pub move_grace: std::time::Duration,
 }
 
 impl AppState {
@@ -69,6 +72,7 @@ impl AppState {
             public_url: public_url.trim_end_matches('/').into(),
             download: Arc::new(DownloadLink::default()),
             ring_timeout: calls::RING_TIMEOUT,
+            move_grace: routes::voice::MOVE_GRACE,
         }
     }
 
@@ -105,6 +109,8 @@ pub fn app(state: AppState, policy: Arc<ClientPolicy>) -> Router {
         .route("/voice/token", post(routes::voice::voice_token))
         .route("/voice/participants", get(routes::voice::participants))
         .route("/voice/screen-token", post(routes::voice::screen_token))
+        .route("/voice/move", post(routes::voice::move_member))
+        .route("/voice/disconnect", post(routes::voice::disconnect_member))
         .route("/auth/redeem", post(routes::auth::redeem))
         .route("/auth/login", post(routes::auth::login))
         .route("/me", get(routes::auth::me).patch(routes::auth::update_me))

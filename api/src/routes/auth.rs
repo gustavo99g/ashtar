@@ -89,6 +89,9 @@ pub struct MeResponse {
     pub can_view_panel: bool,
     /// Se a lista de canais mostra criar, editar, arquivar e arrastar.
     pub can_manage_channels: bool,
+    /// Se o cartão mostra "Mover para" e "Desconectar da voz", e se os avatares
+    /// das salas se arrastam.
+    pub can_move_members: bool,
 }
 
 #[derive(Debug, Deserialize, TS)]
@@ -209,6 +212,7 @@ async fn me_response(state: &AppState, user: &User) -> Result<MeResponse, ApiErr
         can_manage_channels: effective
             .iter()
             .any(|(p, _)| *p == Permission::ManageChannels),
+        can_move_members: effective.iter().any(|(p, _)| *p == Permission::MoveMembers),
     })
 }
 

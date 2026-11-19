@@ -120,7 +120,11 @@ last_message: Message | null,
  */
 state: ReadState, };
 
-export type CreateChannelRequest = { name: string, 
+export type CreateChannelRequest = { 
+/**
+ * `text` (o padrão) ou `voice`.
+ */
+kind?: ChannelKind, name: string, 
 /**
  * Sem categoria, o canal vai para o fim do topo.
  */
@@ -146,6 +150,8 @@ export type CreatedInviteView = { id: string, code: string, link: string, expire
 preset: Preset | null, };
 
 export type DeviceView = { linked_at: number, };
+
+export type DisconnectMemberRequest = { user_id: string, };
 
 /**
  * O corpo de toda resposta de erro.
@@ -263,7 +269,12 @@ can_view_panel: boolean,
 /**
  * Se a lista de canais mostra criar, editar, arquivar e arrastar.
  */
-can_manage_channels: boolean, };
+can_manage_channels: boolean, 
+/**
+ * Se o cartão mostra "Mover para" e "Desconectar da voz", e se os avatares
+ * das salas se arrastam.
+ */
+can_move_members: boolean, };
 
 /**
  * Quem criou, o alvo da recuperação ou quem entrou: id, nick e nome visível.
@@ -318,6 +329,8 @@ messages: Array<Message>,
  * `after`).
  */
 has_more: boolean, };
+
+export type MoveMemberRequest = { user_id: string, channel_id: string, };
 
 export type MuteRequest = { muted: boolean, };
 
@@ -406,7 +419,7 @@ client_id: string, body: string, };
 /**
  * Tudo o que a API manda pelo WebSocket. O `type` é o nome do evento.
  */
-export type ServerEvent = { "type": "ready", user_id: string, status: Status, online: Array<string>, busy: Array<string>, channels: Array<ChannelHead>, dms: Array<ChannelHead>, call: CallView | null, } | { "type": "pong" } | { "type": "message.created", message: Message, } | { "type": "presence.changed", user_id: string, online: boolean, status: Shown, } | { "type": "status.changed", status: Status, } | { "type": "voice.participants", channel_id: string, participants: Array<ParticipantView>, } | { "type": "member.joined", person: Person, } | { "type": "member.left", user_id: string, } | { "type": "channels.changed", version: number, } | { "type": "channel.state", channel_id: string, state: ReadState, } | { "type": "call.ringing", call: CallView, } | { "type": "call.accepted", call: CallView, } | { "type": "call.ended", call_id: string, channel_id: string, outcome: CallOutcome, duration: number | null, };
+export type ServerEvent = { "type": "ready", user_id: string, status: Status, online: Array<string>, busy: Array<string>, channels: Array<ChannelHead>, dms: Array<ChannelHead>, call: CallView | null, } | { "type": "pong" } | { "type": "message.created", message: Message, } | { "type": "presence.changed", user_id: string, online: boolean, status: Shown, } | { "type": "status.changed", status: Status, } | { "type": "voice.participants", channel_id: string, participants: Array<ParticipantView>, } | { "type": "voice.moved", channel_id: string, by: string, } | { "type": "voice.disconnected", by: string, } | { "type": "member.joined", person: Person, } | { "type": "member.left", user_id: string, } | { "type": "channels.changed", version: number, } | { "type": "channel.state", channel_id: string, state: ReadState, } | { "type": "call.ringing", call: CallView, } | { "type": "call.accepted", call: CallView, } | { "type": "call.ended", call_id: string, channel_id: string, outcome: CallOutcome, duration: number | null, };
 
 /**
  * A resposta do `redeem` e do `login`. No app, quem recebe é o Rust, que a
