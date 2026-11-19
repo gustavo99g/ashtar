@@ -40,3 +40,6 @@ dist-ssr
 *.db-shm
 # O livekit-server baixado pelo desktop/scripts/livekit-dev.ps1
 .livekit
+
+# O cache do tsc
+*.tsbuildinfo
