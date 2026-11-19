@@ -1,6 +1,6 @@
 # 0023 — Ligações privadas
 
-- **Status:** proposta (falta o resultado do experimento da ligação recebida, Etapa 18 da v0.3)
+- **Status:** proposta (passa a aceita com a `0.3.20` no estável, Etapa 23 da v0.3)
 - **Data:** 2026-11
 
 ## Contexto
@@ -54,8 +54,23 @@ o publicador nativo como está, e a trava de uma transmissão por vez vale por s
 **Só é publicada com o LiveKit na VPS** (v0.2.5): uma ligação com tela compartilhada dos dois lados são até
 quatro conexões contando minutos.
 
-**A ligação recebida com a janela fechada:** a decidir pelo experimento da Etapa 18 (a notificação do Windows
-com botões, ou uma janela própria, pequena, sempre no topo, que não rouba o foco). O resultado entra aqui.
+**A ligação recebida toca na janela dos avisos** (Etapa 18, pelo que o `notify-probe` já tinha respondido na
+Etapa 6). As duas formas funcionaram: a notificação do Windows traz os botões até o app (`botão Some("reply")`), e
+a janela própria aparece sem roubar o foco. Vale a janela própria, a mesma dos avisos da ADR 0022, porque:
+
+- a notificação do Windows some com o "Não incomodar" ligado e nem fica na central; uma ligação que não aparece
+  vira perdida sem a pessoa saber por quê;
+- a janela própria já existe, carregada e escondida desde o início do app: o cartão da ligação é mais um cartão
+  nela, com Recusar, Atender e Responder com mensagem;
+- ela está à vista enquanto toca, então o toque em repetição sai dela, sem a dúvida do áudio de uma janela
+  escondida (a pergunta 6 do experimento, que segue sem resposta para a janela principal).
+
+O cartão da ligação fica em cima da pilha, sempre no mesmo lugar, com a janela principal aberta ou fechada: um
+lugar só para atender. Ele não passa pelo `SHQueryUserNotificationState` dos avisos: uma ligação aparece mesmo
+com um jogo em tela cheia sem borda. Na tela cheia exclusiva, a janela não consegue ficar por cima, e o que vale
+é o toque. Quem está numa sala ouve o toque mais baixo. Em Ocupado, nem cartão nem toque (o app nem manda o
+cartão). Os botões não chamam a API da janela dos avisos: eles voltam para a janela principal, que é quem tem a
+sessão, e só Atender e Responder com mensagem trazem a janela para a frente.
 
 ## Alternativas consideradas
 
@@ -82,4 +97,6 @@ com botões, ou uma janela própria, pequena, sempre no topo, que não rouba o f
 - Uma ligação presa (o app de alguém caiu) se resolve pelo webhook, pelo tempo limite e pela limpeza ao subir a
   API.
 - A v0.3.2 depende da v0.2.5.
+- O toque com a janela principal escondida não depende do WebView dela: toca a janela dos avisos. O roteiro da
+  `0.3.20` confere o cartão por cima de um jogo em tela cheia sem borda e o toque com a tela cheia exclusiva.
 - Rever se entrarem os grupos privados (mais de duas pessoas): "acaba quando um sai" deixa de valer.

@@ -54,6 +54,8 @@ function message(id: string, channelId: string, authorId: string, body: string):
 		body,
 		mentions: [],
 		created_at: Math.floor(Date.now() / 1000),
+		kind: "text",
+		call: null,
 	};
 }
 

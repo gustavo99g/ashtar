@@ -109,6 +109,20 @@ a dúvida do som com a janela principal escondida. A bandeja e o selo funcionara
 conferir no roteiro da `0.3.10` (Etapa 17): o reinício com o iniciar com o Windows e o aviso com um jogo em
 tela cheia. Detalhes na ADR 0022.
 
+## A ligação recebida (Etapa 18)
+
+A Etapa 18 pedia este mesmo experimento para a ligação. As respostas que ela precisa já estão na tabela acima:
+
+- **A notificação do Windows aceita botões e eles chegam ao app** (pergunta 3), com a janela escondida na
+  bandeja. Mas com o "Não incomodar" ela não aparece nem fica na central (pergunta 7): uma ligação perdida sem
+  aviso nenhum.
+- **A janela própria aparece sem roubar o foco** (plano B) e continua aparecendo com o "Não incomodar".
+
+**Conclusão:** a ligação recebida usa a janela dos avisos da Etapa 15, com um cartão próprio no topo da pilha
+(Recusar, Atender e Responder com mensagem), e o toque em repetição sai dessa janela, que está à vista enquanto
+toca. Não foi preciso uma segunda janela `incoming-call`. Fica para o roteiro da `0.3.20` (Etapa 23): o cartão
+por cima de um jogo em tela cheia sem borda, e o toque com a tela cheia exclusiva. Detalhes na ADR 0023.
+
 ## O que eu espero, antes de rodar
 
 Escrito sem ter rodado, só pelo que as bibliotecas dizem. É para comparar com o que der.

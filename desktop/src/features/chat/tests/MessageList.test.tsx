@@ -52,6 +52,8 @@ function message(id: string): Message {
 		body: `mensagem ${id}`,
 		mentions: [],
 		created_at: Math.floor(Date.now() / 1000),
+		kind: "text",
+		call: null,
 	};
 }
 

@@ -6,6 +6,7 @@ import { handleMembersRealtime } from "../realtime";
 
 const ready: ServerEvent = {
 	type: "ready",
+	call: null,
 	user_id: "u1",
 	online: [],
 	busy: [],

@@ -16,6 +16,8 @@ function message(id: string, authorId: string, body = "oi"): Message {
 		body,
 		mentions: [],
 		created_at: 1,
+		kind: "text",
+		call: null,
 	};
 }
 

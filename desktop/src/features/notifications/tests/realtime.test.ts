@@ -37,6 +37,8 @@ function message(channelId: string, mentions: string[] = [], author = "ana"): Me
 		body: "oi, vai entrar na sala hoje?",
 		mentions,
 		created_at: 1,
+		kind: "text",
+		call: null,
 	};
 }
 

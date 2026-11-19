@@ -88,6 +88,7 @@ describe("o status de quem usa", () => {
 		handleIdentityRealtime(
 			{
 				type: "ready",
+				call: null,
 				user_id: "kid",
 				status: "invisible",
 				online: [],

@@ -27,6 +27,30 @@ export type BetaGrant = { origin: Origin,
 granted_at: number | null, };
 
 /**
+ * Em que pé a ligação está, ou como acabou.
+ */
+export type CallOutcome = "ringing" | "answered" | "missed" | "declined" | "cancelled";
+
+/**
+ * O que o registro no histórico leva da ligação (o `call` da [`Message`]).
+ */
+export type CallRecord = { id: string, outcome: CallOutcome, 
+/**
+ * Em segundos, do atender ao desligar. Só na ligação atendida.
+ */
+duration: number | null, };
+
+/**
+ * Uma ligação em andamento como o tempo real leva: quem liga, quem recebe e em
+ * que pé está (`ringing` ou `answered`).
+ */
+export type CallView = { id: string, 
+/**
+ * A conversa: é também o nome da sala no LiveKit.
+ */
+channel_id: string, caller: Author, callee: Author, outcome: CallOutcome, created_at: number, answered_at: number | null, };
+
+/**
  * Uma categoria no pedido de reordenar: o id e os ids dos canais, em ordem.
  */
 export type CategoryOrder = { id: string, channels: Array<string>, };
@@ -270,7 +294,16 @@ export type Message = { id: string, channel_id: string, client_id: string, autho
 /**
  * Os ids de quem a mensagem menciona (`@nick`), achados pela API no envio.
  */
-mentions: Array<string>, created_at: number, };
+mentions: Array<string>, created_at: number, kind: MessageKind, 
+/**
+ * Só no `kind = "call"`: como a ligação acabou e quanto durou.
+ */
+call: CallRecord | null, };
+
+/**
+ * O tipo da mensagem: o texto de alguém, ou o registro de uma ligação.
+ */
+export type MessageKind = "text" | "call";
 
 /**
  * Uma página do histórico.
@@ -348,7 +381,8 @@ export type ReadState = {
  */
 last_read_id: string | null, 
 /**
- * Mensagens dos outros depois do ponteiro, até [`UNREAD_CAP`].
+ * Mensagens dos outros depois do ponteiro, até [`UNREAD_CAP`]. Do registro
+ * de ligação, só a chamada perdida conta.
  */
 unread: number, 
 /**
@@ -372,7 +406,7 @@ client_id: string, body: string, };
 /**
  * Tudo o que a API manda pelo WebSocket. O `type` é o nome do evento.
  */
-export type ServerEvent = { "type": "ready", user_id: string, status: Status, online: Array<string>, busy: Array<string>, channels: Array<ChannelHead>, dms: Array<ChannelHead>, } | { "type": "pong" } | { "type": "message.created", message: Message, } | { "type": "presence.changed", user_id: string, online: boolean, status: Shown, } | { "type": "status.changed", status: Status, } | { "type": "voice.participants", channel_id: string, participants: Array<ParticipantView>, } | { "type": "member.joined", person: Person, } | { "type": "member.left", user_id: string, } | { "type": "channels.changed", version: number, } | { "type": "channel.state", channel_id: string, state: ReadState, };
+export type ServerEvent = { "type": "ready", user_id: string, status: Status, online: Array<string>, busy: Array<string>, channels: Array<ChannelHead>, dms: Array<ChannelHead>, call: CallView | null, } | { "type": "pong" } | { "type": "message.created", message: Message, } | { "type": "presence.changed", user_id: string, online: boolean, status: Shown, } | { "type": "status.changed", status: Status, } | { "type": "voice.participants", channel_id: string, participants: Array<ParticipantView>, } | { "type": "member.joined", person: Person, } | { "type": "member.left", user_id: string, } | { "type": "channels.changed", version: number, } | { "type": "channel.state", channel_id: string, state: ReadState, } | { "type": "call.ringing", call: CallView, } | { "type": "call.accepted", call: CallView, } | { "type": "call.ended", call_id: string, channel_id: string, outcome: CallOutcome, duration: number | null, };
 
 /**
  * A resposta do `redeem` e do `login`. No app, quem recebe é o Rust, que a

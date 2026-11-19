@@ -67,6 +67,8 @@ function message(id: string, body: string, clientId = id): Message {
 		body,
 		mentions: [],
 		created_at: Math.floor(Date.now() / 1000),
+		kind: "text",
+		call: null,
 	};
 }
 

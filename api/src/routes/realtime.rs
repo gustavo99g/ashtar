@@ -25,6 +25,8 @@ use ts_rs::TS;
 
 use super::auth::CurrentUser;
 use crate::AppState;
+use crate::calls::{self, CallView};
+use crate::chat::dms;
 use crate::chat::read::{self, ChannelHead};
 use crate::error::ApiError;
 use crate::identity::status::{self, Shown};
@@ -106,7 +108,7 @@ async fn run(hub: Arc<Hub>, db: SqlitePool, user_id: String, mut socket: WebSock
     hub.connect(&user_id, status);
     let mut events = hub.subscribe();
     match heads(&db, &user_id).await {
-        Ok((channels, dms)) => {
+        Ok((channels, dms, call)) => {
             let online = hub.online();
             let ready = ServerEvent::Ready {
                 user_id: user_id.clone(),
@@ -119,6 +121,7 @@ async fn run(hub: Arc<Hub>, db: SqlitePool, user_id: String, mut socket: WebSock
                 online: online.into_iter().map(|(id, _)| id).collect(),
                 channels,
                 dms,
+                call,
             };
             if send(&mut socket, &ready).await {
                 serve(&user_id, &mut socket, &mut events).await;
@@ -133,14 +136,23 @@ async fn run(hub: Arc<Hub>, db: SqlitePool, user_id: String, mut socket: WebSock
 }
 
 /// O que o `ready` leva do chat: os canais de texto, que são de todos, e as
-/// conversas privadas de `user_id`, cada um com o estado de leitura dele.
+/// conversas privadas de `user_id`, cada um com o estado de leitura dele, e a
+/// ligação em que a pessoa está, se está numa.
 async fn heads(
     db: &SqlitePool,
     user_id: &str,
-) -> Result<(Vec<ChannelHead>, Vec<ChannelHead>), ApiError> {
+) -> Result<(Vec<ChannelHead>, Vec<ChannelHead>, Option<CallView>), ApiError> {
+    let call = match calls::current_for(db, user_id).await? {
+        Some(call) => match dms::get(db, &call.channel_id).await? {
+            Some(dm) => Some(calls::view(db, &dm, &call).await?),
+            None => None,
+        },
+        None => None,
+    };
     Ok((
         read::heads(db, user_id).await?,
         read::dm_heads(db, user_id).await?,
+        call,
     ))
 }
 

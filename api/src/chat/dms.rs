@@ -151,6 +151,18 @@ pub async fn find_for(
     row.map(|row| from_key(row.id, &row.dm_key)).transpose()
 }
 
+/// A conversa `channel_id`, sem conferir quem pede. É para o que não vem de uma
+/// pessoa (o webhook do LiveKit, o tempo limite da ligação); as rotas usam o
+/// [`find_for`].
+pub async fn get(db: &SqlitePool, channel_id: &str) -> Result<Option<Dm>, ApiError> {
+    let row: Option<DmRow> =
+        sqlx::query_as("SELECT id, dm_key FROM channels WHERE id = ? AND kind = 'dm'")
+            .bind(channel_id)
+            .fetch_optional(db)
+            .await?;
+    row.map(|row| from_key(row.id, &row.dm_key)).transpose()
+}
+
 /// A conversa como `viewer` a vê: a outra pessoa e a última mensagem.
 pub async fn view(db: &SqlitePool, dm: &Dm, viewer: &User) -> Result<Conversation, ApiError> {
     let other = users::get_by_id(db, dm.other(&viewer.id)).await?;

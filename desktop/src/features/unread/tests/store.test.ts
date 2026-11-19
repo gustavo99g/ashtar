@@ -43,6 +43,8 @@ function message(
 		body: id,
 		mentions,
 		created_at: 1,
+		kind: "text",
+		call: null,
 	};
 }
 
@@ -53,6 +55,7 @@ const of = (id: string) => useUnreadStore.getState().byChannel[id];
 beforeEach(() => {
 	handleUnreadRealtime({
 		type: "ready",
+		call: null,
 		user_id: "kid",
 		status: "available",
 		online: [],
@@ -81,6 +84,7 @@ describe("as não lidas", () => {
 		}));
 		handleUnreadRealtime({
 			type: "ready",
+			call: null,
 			user_id: "kid",
 			status: "available",
 			online: [],

@@ -55,6 +55,8 @@ beforeEach(() => {
 						body: "oi",
 						mentions: [],
 						created_at: 1,
+						kind: "text",
+						call: null,
 					},
 				],
 				has_more: false,

@@ -29,6 +29,8 @@ function message(id: string, channelId: string): Message {
 		body: `mensagem ${id}`,
 		mentions: [],
 		created_at: 1,
+		kind: "text",
+		call: null,
 	};
 }
 
@@ -78,6 +80,7 @@ describe("handleDmsRealtime", () => {
 		const { send, invalidate } = setup();
 		const ready: ServerEvent = {
 			type: "ready",
+			call: null,
 			user_id: "eu",
 			status: "available",
 			online: [],

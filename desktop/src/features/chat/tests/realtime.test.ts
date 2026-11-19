@@ -30,6 +30,8 @@ function message(id: string, authorId = "ana"): Message {
 		body: "oi",
 		mentions: [],
 		created_at: 1,
+		kind: "text",
+		call: null,
 	};
 }
 
@@ -110,6 +112,7 @@ describe("handleChatRealtime", () => {
 		const client = setup();
 		const ready = {
 			type: "ready" as const,
+			call: null,
 			user_id: "u1",
 			online: ["ana", "bia"],
 			busy: ["ana"],

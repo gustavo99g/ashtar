@@ -548,6 +548,16 @@ async fn a_migracao_deixa_todo_mundo_com_zero_nao_lidas() {
             row("u2", "velho", Some("m3")),
         ]
     );
+    // As consultas de hoje precisam das migrações seguintes (o tipo da
+    // mensagem é da 0007).
+    for sql in [
+        include_str!("../migrations/0006_status.sql"),
+        include_str!("../migrations/0007_ligacoes.sql"),
+    ] {
+        let mut tx = db.begin().await.unwrap();
+        sqlx::raw_sql(sql).execute(&mut *tx).await.unwrap();
+        tx.commit().await.unwrap();
+    }
     for user in ["u1", "u2"] {
         for head in api::chat::read::heads(&db, user).await.unwrap() {
             assert_eq!(head.state.unread, 0, "{user} em {}", head.channel_id);

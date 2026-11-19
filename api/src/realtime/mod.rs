@@ -16,6 +16,7 @@ use serde::Serialize;
 use tokio::sync::broadcast;
 use ts_rs::TS;
 
+use crate::calls::{CallOutcome, CallView};
 use crate::chat::messages::Message;
 use crate::chat::read::{ChannelHead, ReadState};
 use crate::identity::status::{Shown, Status};
@@ -42,7 +43,8 @@ pub enum ServerEvent {
     /// O primeiro evento de toda conexão, só para ela: quem é, o status dela,
     /// quem está online agora (sem os invisíveis) e quem desses está ocupado, e
     /// cada canal de texto e conversa privada dela com a mensagem mais
-    /// nova e o estado de leitura.
+    /// nova e o estado de leitura. Se a pessoa está numa ligação (tocando ou
+    /// atendida), ela vem no `call`: é o que acerta quem reconecta no meio.
     #[serde(rename = "ready")]
     Ready {
         user_id: String,
@@ -51,6 +53,7 @@ pub enum ServerEvent {
         busy: Vec<String>,
         channels: Vec<ChannelHead>,
         dms: Vec<ChannelHead>,
+        call: Option<CallView>,
     },
     /// A resposta ao `ping` que o app manda a cada 25 segundos.
     #[serde(rename = "pong")]
@@ -92,6 +95,23 @@ pub enum ServerEvent {
     ChannelState {
         channel_id: String,
         state: ReadState,
+    },
+    /// Uma ligação começou a tocar (ADR 0023). Como os outros `call.*`, só vai
+    /// para as duas pessoas da conversa.
+    #[serde(rename = "call.ringing")]
+    CallRinging { call: CallView },
+    /// A ligação foi atendida: os dois pedem o token da sala da conversa.
+    #[serde(rename = "call.accepted")]
+    CallAccepted { call: CallView },
+    /// A ligação acabou, de qualquer jeito. A `duration`, em segundos, só vem
+    /// na atendida. O registro no histórico chega logo depois, pelo
+    /// `message.created`.
+    #[serde(rename = "call.ended")]
+    CallEnded {
+        call_id: String,
+        channel_id: String,
+        outcome: CallOutcome,
+        duration: Option<i64>,
     },
 }
 

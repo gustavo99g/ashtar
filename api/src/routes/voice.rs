@@ -15,8 +15,10 @@ use ts_rs::TS;
 use super::auth::CurrentUser;
 use super::extract::ApiJson;
 use crate::AppState;
-use crate::chat::channels;
+use crate::calls;
+use crate::chat::{channels, dms};
 use crate::error::ApiError;
+use crate::identity::User;
 use crate::voice::{
     ParticipantView, RoomParticipant, join_participants, list_room, livekit_env, screen_identity,
 };
@@ -42,13 +44,16 @@ pub struct VoiceTokenRequest {
 /// nos metadados (`{"nick": "..."}`): o cartão da sala mostra os dois, e a cor
 /// do avatar sai do nick. Trocar o nome visível vale na próxima entrada, porque
 /// o nome vai dentro do token.
+///
+/// O `channel_id` também pode ser o de uma conversa privada (ADR 0023): a sala
+/// da ligação tem o nome da conversa. Aí o token é só das duas pessoas dela, e
+/// só com a ligação atendida.
 pub async fn voice_token(
     State(state): State<AppState>,
     CurrentUser(user): CurrentUser,
     ApiJson(request): ApiJson<VoiceTokenRequest>,
 ) -> Result<Json<JoinVoiceResponse>, ApiError> {
-    validate_channel_id(&request.channel_id)?;
-    channels::get_open_voice(&state.db, &request.channel_id).await?;
+    check_room(&state, &user, &request.channel_id).await?;
     let (api_key, api_secret, url) = livekit_env().map_err(ApiError::Config)?;
     let token = create_voice_token(
         &api_key,
@@ -68,14 +73,13 @@ const SCREEN_TOKEN_TTL: Duration = Duration::from_secs(5 * 60);
 
 /// `POST /api/voice/screen-token`: o token da conexão `{user_id}:screen`, que o app usa para
 /// transmitir a tela direto do Rust (ADR 0017). Só para quem já está na sala de voz: 409 para os
-/// outros.
+/// outros. Vale na ligação privada como na sala, pela mesma regra do [`voice_token`].
 pub async fn screen_token(
     State(state): State<AppState>,
     CurrentUser(user): CurrentUser,
     ApiJson(request): ApiJson<VoiceTokenRequest>,
 ) -> Result<Json<JoinVoiceResponse>, ApiError> {
-    validate_channel_id(&request.channel_id)?;
-    channels::get_open_voice(&state.db, &request.channel_id).await?;
+    check_room(&state, &user, &request.channel_id).await?;
     let room = list_room(&request.channel_id).await?;
     if !in_room(&room, &user.id) {
         return Err(ApiError::Conflict(
@@ -93,6 +97,24 @@ pub async fn screen_token(
     )
     .map_err(ApiError::Config)?;
     Ok(Json(JoinVoiceResponse { token, url }))
+}
+
+/// Se `user` pode entrar na sala `channel_id`: uma sala de voz aberta, ou a
+/// conversa privada dele com a ligação atendida. A conversa dos outros cai no
+/// mesmo 404 de uma sala que não existe; a própria, sem ligação atendida, 409.
+async fn check_room(state: &AppState, user: &User, channel_id: &str) -> Result<(), ApiError> {
+    validate_channel_id(channel_id)?;
+    if let Some(dm) = dms::find_for(&state.db, &user.id, channel_id).await? {
+        return if calls::is_answered(&state.db, &dm.id).await? {
+            Ok(())
+        } else {
+            Err(ApiError::Conflict(
+                "A ligação ainda não foi atendida.".into(),
+            ))
+        };
+    }
+    channels::get_open_voice(&state.db, channel_id).await?;
+    Ok(())
 }
 
 /// Se `user_id` está na sala pela voz (a `:screen` não conta: ela some da lista).

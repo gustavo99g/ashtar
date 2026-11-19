@@ -7,6 +7,7 @@ use uuid::Uuid;
 
 use super::access::Readable;
 use super::{mentions, read};
+use crate::calls::{CallOutcome, CallRecord};
 use crate::error::{ApiError, unique_violation};
 use crate::identity::User;
 use crate::limiter::SendLimiter;
@@ -32,6 +33,20 @@ pub struct Author {
     pub removed: bool,
 }
 
+/// O tipo da mensagem: o texto de alguém, ou o registro de uma ligação.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export, export_to = "index.ts")]
+pub enum MessageKind {
+    Text,
+    /// O registro de uma ligação (ADR 0023), de quem ligou. O `body` é
+    /// "Ligação", para o app antigo; o que vale é o `call`.
+    Call,
+}
+
+/// O texto do registro de ligação, que é o que um app antigo mostra.
+pub const CALL_BODY: &str = "Ligação";
+
 /// Uma mensagem como a API devolve e o WebSocket leva.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
 #[ts(export, export_to = "index.ts")]
@@ -44,6 +59,9 @@ pub struct Message {
     /// Os ids de quem a mensagem menciona (`@nick`), achados pela API no envio.
     pub mentions: Vec<String>,
     pub created_at: i64,
+    pub kind: MessageKind,
+    /// Só no `kind = "call"`: como a ligação acabou e quanto durou.
+    pub call: Option<CallRecord>,
 }
 
 #[derive(FromRow)]
@@ -59,6 +77,11 @@ struct MessageRow {
     removed_at: Option<i64>,
     /// Os ids mencionados, separados por vírgula; `NULL` sem menção.
     mentions: Option<String>,
+    kind: String,
+    call_id: Option<String>,
+    call_outcome: Option<String>,
+    call_answered_at: Option<i64>,
+    call_ended_at: Option<i64>,
 }
 
 impl From<MessageRow> for Message {
@@ -76,6 +99,23 @@ impl From<MessageRow> for Message {
             body: row.body,
             mentions: split_mentions(row.mentions.as_deref()),
             created_at: row.created_at,
+            kind: if row.kind == "call" {
+                MessageKind::Call
+            } else {
+                MessageKind::Text
+            },
+            call: row.call_id.map(|id| CallRecord {
+                id,
+                outcome: row
+                    .call_outcome
+                    .as_deref()
+                    .and_then(CallOutcome::parse)
+                    .unwrap_or(CallOutcome::Missed),
+                duration: match (row.call_answered_at, row.call_ended_at) {
+                    (Some(start), Some(end)) => Some((end - start).max(0)),
+                    _ => None,
+                },
+            }),
         }
     }
 }
@@ -99,8 +139,11 @@ macro_rules! select_message {
             "SELECT m.id, m.channel_id, m.client_id, m.body, m.created_at,
                     u.id AS author_id, u.nick, u.display_name, u.removed_at,
                     (SELECT group_concat(x.user_id) FROM mentions x
-                      WHERE x.message_id = m.id) AS mentions
-             FROM messages m JOIN users u ON u.id = m.author_id ",
+                      WHERE x.message_id = m.id) AS mentions,
+                    m.kind, m.call_id, k.outcome AS call_outcome,
+                    k.answered_at AS call_answered_at, k.ended_at AS call_ended_at
+             FROM messages m JOIN users u ON u.id = m.author_id
+             LEFT JOIN calls k ON k.id = m.call_id ",
             $rest
         )
     };
@@ -233,12 +276,44 @@ async fn find_existing(
     }
 }
 
-async fn get(db: &SqlitePool, id: &str) -> Result<Message, ApiError> {
+pub(crate) async fn get(db: &SqlitePool, id: &str) -> Result<Message, ApiError> {
     let row: MessageRow = sqlx::query_as(select_message!("WHERE m.id = ?"))
         .bind(id)
         .fetch_one(db)
         .await?;
     Ok(row.into())
+}
+
+/// Grava, dentro da transação `tx`, o registro da ligação `call_id` na conversa
+/// `channel_id`, como mensagem de `caller_id` (quem ligou), e devolve o id dela.
+/// O `client_id` é `call:<id>`: uma ligação tem um registro só.
+///
+/// O ponteiro de lido de quem ligou anda até ele, como em toda mensagem
+/// própria. O de quem recebeu fica onde está: as não lidas só contam o
+/// registro da chamada perdida ([`super::read`]).
+pub(crate) async fn insert_call_record(
+    tx: &mut sqlx::SqliteConnection,
+    channel_id: &str,
+    caller_id: &str,
+    call_id: &str,
+    now: i64,
+) -> Result<String, ApiError> {
+    let id = Uuid::now_v7().to_string();
+    sqlx::query(
+        "INSERT INTO messages (id, channel_id, author_id, client_id, body, created_at, kind, call_id)
+         VALUES (?, ?, ?, ?, ?, ?, 'call', ?)",
+    )
+    .bind(&id)
+    .bind(channel_id)
+    .bind(caller_id)
+    .bind(format!("call:{call_id}"))
+    .bind(CALL_BODY)
+    .bind(now)
+    .bind(call_id)
+    .execute(&mut *tx)
+    .await?;
+    read::advance(tx, caller_id, channel_id, &id).await?;
+    Ok(id)
 }
 
 /// A última mensagem do canal `channel_id`, se ele tem alguma. É o que a lista

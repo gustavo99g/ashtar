@@ -8,6 +8,7 @@ const layout: Layout = { version: 5, top: [], categories: [] };
 
 const ready: ServerEvent = {
 	type: "ready",
+	call: null,
 	user_id: "u1",
 	online: [],
 	busy: [],

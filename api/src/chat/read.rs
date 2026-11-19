@@ -22,7 +22,8 @@ pub const UNREAD_CAP: i64 = 100;
 pub struct ReadState {
     /// A última mensagem lida. `None`: não leu nada.
     pub last_read_id: Option<String>,
-    /// Mensagens dos outros depois do ponteiro, até [`UNREAD_CAP`].
+    /// Mensagens dos outros depois do ponteiro, até [`UNREAD_CAP`]. Do registro
+    /// de ligação, só a chamada perdida conta.
     pub unread: i64,
     /// Menções à pessoa depois do ponteiro, até [`UNREAD_CAP`]. Conta mesmo
     /// com o canal silenciado.
@@ -69,7 +70,8 @@ impl From<HeadRow> for ChannelHead {
 }
 
 /// O `SELECT` de [`HeadRow`] para a pessoa `?1`, seguido do resto da consulta.
-/// O `100` é o [`UNREAD_CAP`]. As minhas mensagens não contam como não lidas.
+/// O `100` é o [`UNREAD_CAP`]. As minhas mensagens não contam como não lidas,
+/// e dos registros de ligação (ADR 0023) só conta o da chamada perdida.
 macro_rules! select_head {
     ($rest:literal) => {
         concat!(
@@ -78,7 +80,10 @@ macro_rules! select_head {
                     s.last_read_id,
                     (SELECT MIN(COUNT(*), 100) FROM messages m
                       WHERE m.channel_id = c.id AND m.author_id <> ?1
-                        AND m.id > COALESCE(s.last_read_id, '')) AS unread,
+                        AND m.id > COALESCE(s.last_read_id, '')
+                        AND (m.kind = 'text'
+                             OR EXISTS (SELECT 1 FROM calls k
+                                        WHERE k.id = m.call_id AND k.outcome = 'missed'))) AS unread,
                     (SELECT MIN(COUNT(*), 100) FROM mentions x
                       WHERE x.channel_id = c.id AND x.user_id = ?1
                         AND x.message_id > COALESCE(s.last_read_id, '')) AS mentions,

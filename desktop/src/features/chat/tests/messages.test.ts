@@ -34,6 +34,8 @@ function message(authorId: string, created_at: number): Message {
 		body: "oi",
 		mentions: [],
 		created_at,
+		kind: "text",
+		call: null,
 	};
 }
 

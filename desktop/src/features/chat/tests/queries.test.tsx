@@ -34,6 +34,8 @@ function message(id: string, authorId = "ana", channelId = "geral"): Message {
 		body: `mensagem ${id}`,
 		mentions: [],
 		created_at: 1,
+		kind: "text",
+		call: null,
 	};
 }
 
