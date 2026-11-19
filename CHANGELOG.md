@@ -1,7 +1,16 @@
 # O que há de novo no Ashtar
 
-## 0.3.0
+## 0.3.10
 
+- Conversas privadas: clique em alguém e em Mensagem, ou abra a aba Conversas na lateral direita. A conversa abre numa janela embaixo, e dá para deixar várias abertas como abas. Só vocês dois leem, mas as mensagens não são criptografadas de ponta a ponta: quem administra o servidor consegue ler.
+- A lateral direita ganhou as abas Membros e Conversas, e pode ser minimizada.
+- Não lidas: as conversas mostram quantas mensagens novas chegaram, os canais ficam em destaque, e a linha "Novas mensagens" marca onde você parou. O menu do canal tem "Marcar como lido", e o nome do servidor, "Marcar tudo como lido".
+- Menções: escreva @ e o começo do nick para escolher a pessoa. Quem foi mencionado vê a mensagem em dourado e um número separado.
+- Silenciar: no menu de um canal ou de uma conversa. Silenciado, nada avisa nem conta, a não ser uma menção.
+- Notificações: com o Ashtar atrás de outra janela ou na bandeja, uma mensagem privada ou menção aparece num aviso no canto da tela, com um som curto. Clique para abrir. Também avisa quando alguém começa a transmitir. Ajuste em Configurações › Notificações, onde dá para testar.
+- O ícone da bandeja e o da barra de tarefas ganham uma bolinha vermelha enquanto houver mensagem privada ou menção não lida.
+- Status: clique no seu avatar, no pé da coluna, e escolha Disponível, Ocupado ou Invisível. Ocupado aparece com a bolinha vermelha e cala todos os avisos. Invisível faz você aparecer offline, mas usar tudo normalmente.
+- Iniciar com o Windows: em Configurações › Aplicativo. O Ashtar abre junto com o computador, direto na bandeja, e já recebe as mensagens.
 - A lista de canais ficou mais limpa. As ferramentas só aparecem quando você passa o mouse: a engrenagem no canal e o + na categoria. O botão direito abre o mesmo menu.
 - O nome do servidor, no alto da coluna, virou o menu de quem gerencia os canais: criar canal, criar categoria, organizar e ver os arquivados. Para o dono, também Convidar pessoas.
 - Organizar canais: arrastar agora é num modo próprio. Arrume tudo com calma, e só o Concluir grava, de uma vez. Desfazer volta a lista como estava. Fora do modo, nada se arrasta sem querer.

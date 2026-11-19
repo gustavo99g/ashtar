@@ -540,6 +540,8 @@ que estavam na v0.5, vêm para cá, porque usam a mesma base.
 
 ## Entregas
 
+A v0.3.0 e a v0.3.1 saem juntas, na versão `0.3.10`: a `0.3.0` não chegou a ser publicada.
+
 ```text
 v0.3.0  Base visual
         lista de canais nova + modo Organizar + cartão do usuário + volume individual
@@ -601,8 +603,9 @@ API, banco e app. Decisões nas ADRs 0021 e 0022.
 
 **Notificações**
 
-* aviso no canto do app para mensagem privada e menção; notificação do Windows com a janela minimizada ou na
-  bandeja;
+* aviso para mensagem privada e menção numa janela própria do Ashtar, no canto da tela, com até três cartões
+  (o experimento da Etapa 6 escolheu ela no lugar da notificação do Windows, ADR 0022); a tela cheia segura o
+  aviso;
 * ponto de não lido no ícone da bandeja e na barra de tarefas;
 * sons de mensagem privada e de menção;
 * notificação "fulano começou a transmitir", para quem não está na sala (adiantada da v0.5);

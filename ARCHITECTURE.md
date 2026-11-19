@@ -60,6 +60,11 @@ flowchart LR
   panic.
 - **`error.rs`**: o `AppError`, único tipo de erro devolvido ao frontend, serializado como
   `{ kind, message }`.
+- **`tray.rs`**: o ícone da bandeja; fechar a janela a esconde ali. **`window.rs`**: o tamanho da janela
+  na primeira abertura e o `bring_to_front`.
+- **`notifications.rs`**: a janela dos avisos (ADR 0022), pequena, sem borda e sempre no topo, que o
+  frontend enche com os cartões; a consulta ao Windows antes de mostrar (tela cheia, apresentação); e a
+  bolinha de não lido na bandeja e na barra de tarefas.
 - **`commands/`**: a fronteira com o frontend. Os comandos só recebem argumentos, delegam ao
   `media/` e convertem o resultado. Nenhuma lógica de captura mora aqui.
 - **`media/`**: tudo que envolve a transmissão: a captura, o vídeo na GPU e a publicação.
@@ -100,7 +105,7 @@ flowchart LR
 ### Frontend do app (`desktop/src/`)
 
 - **`lib/tauri/commands/`**: a única pasta que importa `@tauri-apps/api`, com um arquivo por assunto
-  (`core`, `screen-share`, `thumbnails`, `updater`, `app`, `identity`). Tem os tipos do contrato
+  (`core`, `screen-share`, `thumbnails`, `updater`, `app`, `identity`, `notifications`). Tem os tipos do contrato
   (`AppError`, `CaptureSource`, `SourceRef`) e um wrapper tipado por comando e evento.
 - **`features/voice/`**: a conexão com a sala do LiveKit, em subdomínios: `room` (a conexão, mute e
   deafen), `devices` (microfone e saída), `members` (quem está na sala), `call` (a sala por dentro) e
@@ -121,6 +126,19 @@ flowchart LR
 - **`features/members/`**: os membros no Painel e o `UserCard`, o cartão que abre ao clicar em
   alguém na lista de membros e na lista da sala. As ações do cartão são seções que quem abre passa
   como filhos.
+- **`features/side-panel/`**: a lateral direita da moldura, com as abas Membros e Conversas.
+- **`features/dms/`**: as conversas privadas (ADR 0021): a lista da aba Conversas, o botão Mensagem
+  do cartão e as janelas abertas embaixo (`openDmsStore`, no `localStorage`). O histórico de cada
+  conversa é o mesmo cache do `features/chat`: para a API, uma conversa é um canal.
+- **`features/unread/`**: as não lidas, as menções e o silenciar de cada canal e conversa (ADR 0022),
+  num store sem disco que o `ready` enche a cada conexão; o marcar como lido com o app em foco.
+- **`features/notifications/`**: os avisos (ADR 0022). A regra fica em `model/decide.ts`; o
+  `realtime.ts` decide e manda o cartão pelo Rust; o `NotificationsBridge`, na moldura, mantém o
+  contexto (status, foco, o que está aberto), a bolinha e o clique. A mesma feature desenha a janela
+  dos avisos, que é a segunda página do app (`notifications.html`), e a tela Configurações ›
+  Notificações.
+- **`features/identity/`** também tem o status (Disponível, Ocupado, Invisível), com o último guardado
+  no computador para abrir já com ele.
 - **`lib/realtime/`**: o WebSocket da API (ADR 0015), sem React: ticket, `ping`, reconexão com espera
   crescente e o aviso de cada evento, com `resumed` no `ready` da volta de uma queda. A única pasta
   que abre `WebSocket`. Quem liga a conexão à sessão e passa cada evento ao `realtime.ts` de cada
@@ -140,19 +158,26 @@ LiveKit, só tokens já assinados. O que ainda falta entra conforme o roadmap
 A crate é uma biblioteca (`lib.rs`) com dois binários: o servidor (`main.rs`) e o `admin` temporário
 (`src/bin/admin.rs`).
 
-- **`identity/`**: as regras de membros, dispositivo, sessão, convites e permissões. Toda ação de
+- **`identity/`**: as regras de membros, dispositivo, sessão, convites, permissões e o status
+  (`status.rs`; o Invisível sai como offline para os outros, em toda rota e evento). Toda ação de
   administração recebe quem a faz (`actor`) e passa por `permissions::can`, o único lugar que decide quem
   pode o quê. As rotas e o `admin` chamam as mesmas funções.
 - **`chat/`**: as regras do chat. `messages` (texto, envio sem duplicar pelo `client_id`, histórico
   em páginas pelo id UUID v7), `channels` e `categories` (criar, editar, arquivar, com "Gerenciar
-  canais" conferido dentro, como em `identity/`) e `layout` (a árvore e a versão que dá o 409).
-- **`realtime/`**: o `Hub` do tempo real: o `broadcast` dos eventos, os tickets de uso único e
+  canais" conferido dentro, como em `identity/`) e `layout` (a árvore e a versão que dá o 409). As
+  conversas privadas (ADR 0021) são canais `dm` (`dms`), e `access` é a regra de leitura: o canal de
+  texto aberto, ou a conversa de que a pessoa faz parte. `read` guarda até onde cada um leu, as não
+  lidas, as menções (achadas em `mentions` no envio) e o silenciar (ADR 0022).
+- **`realtime/`**: o `Hub` do tempo real: o `broadcast` dos eventos (e o `publish_to`, só para
+  algumas pessoas, que leva as mensagens privadas), os tickets de uso único e
   quem está online.
 - **`voice.rs`**: o que fala com o LiveKit: quem está numa sala e tirar alguém de todas. A `:screen` de
   alguém não é participante: só marca o dono como transmitindo, e sai da sala junto com ele.
 - **`routes/`**: as rotas HTTP, finas sobre as regras: a identidade (`/api/auth/*`, `/api/me`), o
   Painel (`/api/invites`, `/api/members`), a voz (`/api/voice/token`, `/screen-token` e `/participants`, só para uma
-  sala aberta do banco, e o da tela só para quem já está nela), o chat (`/api/channels/...`, `/api/categories/...`, `/api/people`), o
+  sala aberta do banco, e o da tela só para quem já está nela), o chat (`/api/channels/...`, `/api/categories/...`, `/api/people`), as conversas privadas
+  (`/api/dms`), as lidas e o silenciar (`/api/channels/{id}/read`, `/mute` e `/api/read-all`), o status
+  (`/api/me/status`), o
   WebSocket (`/api/realtime/ticket` e `/api/realtime`) e o webhook do LiveKit (`/webhooks/livekit`).
   Autenticação por `Authorization: Bearer <token>`; o WebSocket, que não manda cabeçalho, entra com
   o ticket.
@@ -165,7 +190,8 @@ A crate é uma biblioteca (`lib.rs`) com dois binários: o servidor (`main.rs`) 
 As decisões estão nas ADRs [0010](docs/adr/0010-banco-sqlite.md),
 [0011](docs/adr/0011-identidade-sessao-convites.md), [0015](docs/adr/0015-chat-e-tempo-real.md) e
 [0016](docs/adr/0016-canais-e-categorias.md). Os testes de integração ficam em `api/tests/`
-(`identity.rs`, `chat.rs`, `channels.rs` e `realtime.rs`, este com a API numa porta de verdade).
+(`identity.rs`, `chat.rs`, `channels.rs`, `dms.rs`, `read.rs` e `realtime.rs`, este com a API numa porta
+de verdade).
 
 ## Fluxos
 
