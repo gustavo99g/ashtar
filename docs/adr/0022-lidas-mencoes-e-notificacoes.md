@@ -3,6 +3,7 @@
 - **Status:** proposta (o experimento de notificações, Etapa 6 da v0.3, já decidiu o caminho; vira aceita no
   lançamento da `0.3.10`)
 - **Data:** 2026-11
+- **Atualizada por:** 0027 (o status Ausente, o "digitando…" e os sons da sala)
 
 ## Contexto
 
