@@ -22,6 +22,7 @@ import {
 	setShareVolume,
 	toggleShareMuted,
 } from "../stores/shareVolumeStore";
+import { ShareQualityButton } from "./ShareQualityButton";
 import { LiveBadge } from "./LiveBadge";
 import { PausedCover } from "./PausedCover";
 import { ShareViewers } from "./ShareViewers";
@@ -112,6 +113,7 @@ export function ScreenStage({
 			</div>
 			<div className="absolute right-3.5 bottom-3.5 flex items-center gap-2">
 				{inFocus && tools}
+				<ShareQualityButton owner={owner} name={sharer.name} />
 				{remoteAudio && (
 					<div className="flex h-9 items-center rounded-lg bg-rail/85 pr-3">
 						<StageButton

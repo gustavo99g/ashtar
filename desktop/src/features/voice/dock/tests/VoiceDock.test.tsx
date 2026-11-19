@@ -20,6 +20,9 @@ vi.mock("../../call/components/ShareNotices", () => ({
 	ShareNotices: () => null,
 }));
 vi.mock("../components/TrayShare", () => ({ TrayShare: () => null }));
+vi.mock("../../call/components/ShareStartNotices", () => ({
+	ShareStartNotices: () => null,
+}));
 vi.mock("../../call/components/WatchJanitor", () => ({
 	WatchJanitor: () => null,
 }));

@@ -56,6 +56,7 @@ import {
 } from "../stores/shareVolumeStore";
 import { LiveBadge } from "./LiveBadge";
 import { PausedCover } from "./PausedCover";
+import { ShareQualityButton } from "./ShareQualityButton";
 
 /*
  * A miniatura da transmissão: quem assiste alguém no Foco e sai da sala (para um canal de texto)
@@ -351,6 +352,11 @@ function MiniShareFrame({
 							<span className="min-w-0 flex-1 truncate text-xs font-semibold text-foreground">
 								{sharer.name}
 							</span>
+							<ShareQualityButton
+								owner={sharerId}
+								name={sharer.name}
+								compact
+							/>
 							{remoteAudio && (
 								<>
 									<MiniButton
