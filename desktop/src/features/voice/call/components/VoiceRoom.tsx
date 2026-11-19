@@ -1,4 +1,11 @@
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import type { TrackReference } from "@livekit/components-react";
+import {
+	type ReactNode,
+	type RefObject,
+	useEffect,
+	useRef,
+	useState,
+} from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/components/ui/states";
@@ -15,26 +22,41 @@ import {
 	useThumbnails,
 } from "@/features/screen-share";
 import { paths } from "@/lib/paths";
+import { cn } from "@/lib/utils";
 import type { CaptureSource } from "@/lib/tauri/commands";
 import {
 	ConnectingTile,
 	ParticipantTile,
 } from "../../members/components/ParticipantTile";
-import { useLiveMembers } from "../../members/hooks/useLiveMembers";
+import {
+	type LiveMember,
+	useLiveMembers,
+} from "../../members/hooks/useLiveMembers";
 import { useShareQuality } from "../../room/hooks/useShareQuality";
 import { useVoice } from "../../room/hooks/useVoice";
 import { SALA } from "../../room/model/channel";
-import { stopWatching, useRoomView, watchShare } from "../stores/roomViewStore";
+import { stageLayout } from "../model/stageLayout";
+import {
+	focusShare,
+	setCamerasShown,
+	stopWatching,
+	unwatchShare,
+	useRoomView,
+	watchShare,
+} from "../stores/roomViewStore";
 import { CallControls } from "./CallControls";
 import { CALL_TILE_MAX, RoomGrid } from "./RoomGrid";
 import { LayoutToggle, RoomHeader } from "./RoomHeader";
-import { ScreenStage } from "./ScreenStage";
+import { LiveBadge } from "./LiveBadge";
+import { ScreenStage, SmallShare } from "./ScreenStage";
 import { ShareTile } from "./ShareTile";
 
 /*
  * A sala de voz por dentro. Grade e Foco mostram as mesmas trilhas: a Grade, todo mundo e o lugar
- * de cada transmissão; o Foco, a transmissão que a pessoa escolheu assistir, com os outros numa
- * faixa embaixo (a tela cheia leva os dois juntos). A chamada mora no `VoiceProvider`, acima do
+ * de cada transmissão; o Foco (o palco), as transmissões que a pessoa abriu, arrumadas pelo
+ * `stageLayout` (uma, lado a lado, 2×2, ou uma em foco com as outras pequenas), com quem está na
+ * chamada numa faixa embaixo (a tela cheia leva os dois juntos). Várias pessoas transmitem ao mesmo
+ * tempo (ADR 0024). A chamada mora no `VoiceProvider`, acima do
  * router: sair desta tela não sai da sala.
  *
  * A ligação privada (ADR 0023, Etapa 21 da v0.3) usa esta mesma tela: o cabeçalho vira "Ligação
@@ -153,56 +175,51 @@ function ConnectedRoom({
 	onExit: () => void;
 	call?: { title: string };
 }) {
-	const { screenShare, room, connectedAt } = useVoice();
+	const { screenShare, connectedAt } = useVoice();
 	const connectedFor = useConnectedClock(connectedAt);
 	const { data: me } = useMe();
 
 	const members = useLiveMembers();
 	const shareState = useScreenShareState(screenShare);
-	// Todas as publicações de tela, assinadas ou não.
-	// Uma transmissão por vez: de fora, só a que vale pela regra (as outras param sozinhas).
-	const { winner } = useScreenShares();
-	const remote = winner && !winner.isOwn ? winner : undefined;
-	const remoteShare = remote?.track;
-	const trackInfo = parseShareTrackName(remoteShare?.publication.trackName);
-	// A qualidade pode ter mudado depois de publicar: vale o aviso de quem transmite.
-	const announced = useShareQuality(
-		room,
-		remote?.ownerId,
-		remoteShare?.publication.trackName,
-	);
-	const remoteInfo =
-		trackInfo && announced ? { ...trackInfo, quality: announced } : trackInfo;
-
-	const watching = useRoomView((state) => state.watching);
-	const watched = remote?.ownerId === watching ? remoteShare : undefined;
-
-	// A transmissão assistida acabou: volta para a Grade. Só depois de ela ter aparecido, porque
-	// no primeiro desenho a lista de trilhas ainda vem vazia.
-	const watchedSeen = useRef(false);
-	if (watched) watchedSeen.current = true;
-	useEffect(() => {
-		if (watching && !watched && watchedSeen.current) {
-			watchedSeen.current = false;
-			stopWatching();
-		}
-	}, [watching, watched]);
-
+	// Todas as transmissões da sala, assinadas ou não, da mais antiga para a mais nova (ADR 0024).
+	const remotes = useScreenShares().filter((share) => !share.isOwn);
 	const memberOf = (identity: string) =>
 		members.find((member) => member.id === identity);
-	const remoteSharer = remote ? memberOf(remote.ownerId) : undefined;
 
-	const sharer = watched ? remoteSharer : undefined;
-	const focus = Boolean(watched && sharer);
-	// O Foco inteiro (a transmissão e a faixa de quem está na chamada): é ele que vai para a tela cheia.
-	const focusView = useRef<HTMLDivElement>(null);
+	const watching = useRoomView((state) => state.watching);
+	const focused = useRoomView((state) => state.focused);
+	// As abertas que estão no ar, na ordem em que a pessoa abriu.
+	const open = watching.filter((id) =>
+		remotes.some((share) => share.ownerId === id && memberOf(id)),
+	);
+	const layout = stageLayout(open, focused);
+	const stage = open.length > 0;
+	// As que estão no ar e a pessoa não abriu: aparecem com Assistir embaixo do palco.
+	const notOpen = remotes.filter(
+		(share) => !open.includes(share.ownerId) && memberOf(share.ownerId),
+	);
 
-	const subtitle =
-		focus && sharer
-			? `Assistindo ${sharer.name}`
-			: call
-				? clockLabel(connectedFor)
-				: `${members.length} ${members.length === 1 ? "participante" : "participantes"}`;
+	// Os blocos da sala à vista: as câmeras são baixadas, grandes na Grade e pequenas no palco.
+	useEffect(() => {
+		setCamerasShown(stage ? "small" : "full");
+		return () => setCamerasShown(false);
+	}, [stage]);
+
+	// O palco inteiro (as transmissões e a faixa de quem está na chamada) vai para a tela cheia.
+	const stageView = useRef<HTMLDivElement>(null);
+	const fullscreen = useFullscreen(stageView);
+
+	const firstOpen = open[0] ? memberOf(open[0]) : undefined;
+	const subtitle = stage
+		? open.length === 1 && firstOpen
+			? `Assistindo ${firstOpen.name}`
+			: `Assistindo ${open.length} transmissões`
+		: call
+			? clockLabel(connectedFor)
+			: `${members.length} ${members.length === 1 ? "participante" : "participantes"}`;
+
+	const shareOf = (id: string) =>
+		remotes.find((share) => share.ownerId === id);
 
 	return (
 		<RoomFrame
@@ -216,11 +233,12 @@ function ConnectedRoom({
 								<QuickInvite canViewPanel={me.can_view_panel} />
 							)}
 							<LayoutToggle
-								focus={focus}
-								focusAvailable={remoteShare !== undefined}
+								focus={stage}
+								focusAvailable={remotes.length > 0}
 								onGrid={stopWatching}
 								onFocus={() => {
-									if (remote) watchShare(remote.ownerId);
+									const first = remotes[0];
+									if (first) watchShare(first.ownerId);
 								}}
 							/>
 						</>
@@ -235,22 +253,73 @@ function ConnectedRoom({
 				/>
 			}
 		>
-			{focus && watched && sharer ? (
+			{stage ? (
 				<div
-					ref={focusView}
+					ref={stageView}
 					className="flex min-h-0 flex-1 flex-col items-center gap-4 px-6 pt-5 pb-4 [&:fullscreen]:bg-background"
 				>
-					<ScreenStage
-						share={watched}
-						sharer={sharer}
-						spec={remoteInfo ? shareSpec(remoteInfo) : undefined}
-						fullscreenTarget={focusView}
-						onStop={stopWatching}
-					/>
+					<div
+						className={cn(
+							"grid min-h-0 w-full flex-1 gap-3",
+							layout.columns === 2 ? "grid-cols-2" : "grid-cols-1",
+							layout.main.length > 2 && "grid-rows-2",
+						)}
+					>
+						{layout.main.map((id) => {
+							const share = shareOf(id);
+							const sharer = memberOf(id);
+							if (!share || !sharer) return null;
+							return (
+								<WatchedShare
+									key={id}
+									share={share.track}
+									sharer={sharer}
+									inFocus={layout.inFocus === id}
+									focused={focused === id}
+									canFocus={open.length > 1}
+									onFocus={() => focusShare(id)}
+									onStop={() => unwatchShare(id)}
+									fullscreen={fullscreen.active}
+									onToggleFullscreen={fullscreen.toggle}
+								/>
+							);
+						})}
+					</div>
 					<div
 						aria-label="Participantes"
-						className="flex max-w-full shrink-0 gap-2 overflow-x-auto"
+						className="flex max-w-full shrink-0 items-center gap-2 overflow-x-auto"
 					>
+						{layout.strip.map((id) => {
+							const share = shareOf(id);
+							const sharer = memberOf(id);
+							if (!share || !sharer) return null;
+							return (
+								<SmallShare
+									key={id}
+									share={share.track}
+									sharer={sharer}
+									onFocus={() => focusShare(id)}
+								/>
+							);
+						})}
+						{notOpen.map((share) => {
+							const sharer = memberOf(share.ownerId);
+							if (!sharer) return null;
+							return (
+								<button
+									key={share.ownerId}
+									type="button"
+									onClick={() => watchShare(share.ownerId)}
+									className="flex h-[90px] w-40 shrink-0 flex-col items-center justify-center gap-1 rounded-[10px] border border-dashed border-live/70 bg-rail px-2 text-center hover:bg-secondary"
+								>
+									<LiveBadge />
+									<span className="max-w-full truncate text-xs font-semibold text-foreground">
+										{sharer.name}
+									</span>
+									<span className="text-[11px] text-primary">Assistir</span>
+								</button>
+							);
+						})}
 						{members.map((member) => (
 							<ParticipantTile
 								key={member.id}
@@ -270,20 +339,27 @@ function ConnectedRoom({
 							paused={shareState.paused}
 						/>
 					)}
-					{remoteShare && remoteSharer && (
-						<ShareTile
-							title={`${remoteSharer.name} está transmitindo`}
-							source={remoteInfo?.title}
-							action={
-								<Button
-									className="h-[34px]"
-									onClick={() => watchShare(remoteSharer.id)}
-								>
-									Assistir transmissão
-								</Button>
-							}
-						/>
-					)}
+					{remotes.map((share) => {
+						const sharer = memberOf(share.ownerId);
+						if (!sharer) return null;
+						return (
+							<ShareTile
+								key={share.ownerId}
+								title={`${sharer.name} está transmitindo`}
+								source={
+									parseShareTrackName(share.track.publication.trackName)?.title
+								}
+								action={
+									<Button
+										className="h-[34px]"
+										onClick={() => watchShare(sharer.id)}
+									>
+										Assistir transmissão
+									</Button>
+								}
+							/>
+						);
+					})}
 					{members.map((member) => (
 						<ParticipantTile
 							key={member.id}
@@ -295,6 +371,63 @@ function ConnectedRoom({
 			)}
 		</RoomFrame>
 	);
+}
+
+/** Uma transmissão aberta no palco, com a qualidade que quem transmite avisou por último. */
+function WatchedShare({
+	share,
+	sharer,
+	...props
+}: {
+	share: TrackReference;
+	sharer: LiveMember;
+	inFocus: boolean;
+	focused: boolean;
+	canFocus: boolean;
+	onFocus: () => void;
+	onStop: () => void;
+	fullscreen: boolean;
+	onToggleFullscreen: () => void;
+}) {
+	const { room } = useVoice();
+	const trackInfo = parseShareTrackName(share.publication.trackName);
+	// A qualidade pode ter mudado depois de publicar: vale o aviso de quem transmite.
+	const announced = useShareQuality(
+		room,
+		sharer.id,
+		share.publication.trackName,
+	);
+	const info =
+		trackInfo && announced ? { ...trackInfo, quality: announced } : trackInfo;
+	return (
+		<ScreenStage
+			share={share}
+			sharer={sharer}
+			spec={info ? shareSpec(info) : undefined}
+			{...props}
+		/>
+	);
+}
+
+/** A tela cheia do `target` (a do próprio webview): se está nela, e o botão que entra e sai. */
+function useFullscreen(target: RefObject<HTMLElement | null>) {
+	const [active, setActive] = useState(false);
+	useEffect(() => {
+		const onChange = () =>
+			setActive(
+				document.fullscreenElement !== null &&
+					document.fullscreenElement === target.current,
+			);
+		document.addEventListener("fullscreenchange", onChange);
+		return () => document.removeEventListener("fullscreenchange", onChange);
+	}, [target]);
+	return {
+		active,
+		toggle: () => {
+			if (document.fullscreenElement) void document.exitFullscreen();
+			else void target.current?.requestFullscreen();
+		},
+	};
 }
 
 /** O lugar da própria transmissão: a imagem que está indo, os ajustes e o parar. */

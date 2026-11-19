@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+	compareShares,
 	decodeShareQuality,
 	encodeShareQuality,
 	parseShareTrackName,
 	shareSpec,
 	shareTrackName,
-	shareWinner,
 } from "../model/shareInfo";
 
 const name = (startedAt: number) =>
@@ -49,31 +49,27 @@ describe("nome da trilha", () => {
 	});
 });
 
-describe("shareWinner", () => {
-	it("continua quem começou antes", () => {
+describe("compareShares", () => {
+	const sorted = (list: { identity: string; trackName: string }[]) =>
+		[...list].sort(compareShares).map((share) => share.identity);
+
+	it("a que começou antes vem primeiro", () => {
 		const juju = { identity: "u-juju", trackName: name(1000) };
 		const kid = { identity: "u-kid", trackName: name(1001) };
-		expect(shareWinner([juju, kid])).toBe(juju);
-		expect(shareWinner([kid, juju])).toBe(juju);
+		expect(sorted([kid, juju])).toEqual(["u-juju", "u-kid"]);
+		expect(sorted([juju, kid])).toEqual(["u-juju", "u-kid"]);
 	});
 
 	it("no empate, a menor identidade, nos dois lados", () => {
 		const a = { identity: "a", trackName: name(1000) };
 		const b = { identity: "b", trackName: name(1000) };
-		expect(shareWinner([a, b])).toBe(a);
-		expect(shareWinner([b, a])).toBe(a);
+		expect(sorted([b, a])).toEqual(["a", "b"]);
 	});
 
 	it("sem horário conta como a mais antiga", () => {
 		const old = { identity: "z", trackName: "screen-share" };
 		const kid = { identity: "a", trackName: name(1) };
-		expect(shareWinner([kid, old])).toBe(old);
-	});
-
-	it("com uma só, ela; sem nenhuma, nada", () => {
-		const kid = { identity: "u-kid", trackName: name(5) };
-		expect(shareWinner([kid])).toBe(kid);
-		expect(shareWinner([])).toBeUndefined();
+		expect(sorted([kid, old])).toEqual(["z", "a"]);
 	});
 });
 

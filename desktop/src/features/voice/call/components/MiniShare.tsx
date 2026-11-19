@@ -1,5 +1,7 @@
 import { type TrackReference, VideoTrack } from "@livekit/components-react";
 import {
+	ChevronLeftIcon,
+	ChevronRightIcon,
 	ChevronsLeftIcon,
 	ChevronsRightIcon,
 	DoorOpenIcon,
@@ -41,7 +43,12 @@ import {
 	setMiniCorner,
 	useMiniShare,
 } from "../stores/miniShareStore";
-import { setShown, stopWatching, useRoomView } from "../stores/roomViewStore";
+import {
+	pickMiniShare,
+	setShown,
+	unwatchShare,
+	useRoomView,
+} from "../stores/roomViewStore";
 import {
 	MAX_SHARE_VOLUME,
 	setShareVolume,
@@ -52,7 +59,9 @@ import { PausedCover } from "./PausedCover";
 
 /*
  * A miniatura da transmissão: quem assiste alguém no Foco e sai da sala (para um canal de texto)
- * continua vendo a transmissão num quadro de 320×180 num canto da área do canal. Passando o mouse,
+ * continua vendo a transmissão num quadro de 320×180 num canto da área do canal. Com várias abertas,
+ * ela mostra uma de cada vez, e as setas (com o "1/2") trocam qual, sem voltar para a sala; só a que
+ * aparece é baixada (ADR 0024). Passando o mouse,
  * aparecem recolher e o X (que para de assistir) em cima, "Voltar para a sala" no meio e o volume
  * embaixo.
  *
@@ -71,41 +80,65 @@ export function MiniShare() {
 	const watching = useRoomView((state) => state.watching);
 	const inRoom = useMatch(paths.voiceRoom) !== null;
 	const inSettings = useMatch(`${paths.settings.root}/*`) !== null;
-	if (!room || !watching || inRoom || inSettings) return null;
+	if (!room || watching.length === 0 || inRoom || inSettings) return null;
 	return <WatchedShare watching={watching} />;
 }
 
-/** Acha a transmissão assistida; se ela acabou, para de assistir. */
-function WatchedShare({ watching }: { watching: string }) {
-	const { winner } = useScreenShares();
+/**
+ * Acha a transmissão que a miniatura mostra (ADR 0024): com várias abertas, a que estava em foco,
+ * a escolhida pelas setas ou a primeira aberta. As que acabam saem da lista no `WatchJanitor`.
+ */
+function WatchedShare({ watching }: { watching: readonly string[] }) {
+	const shares = useScreenShares();
 	const members = useLiveMembers();
-	const watched =
-		winner && !winner.isOwn && winner.ownerId === watching
-			? winner.track
-			: undefined;
-	const sharer = members.find((member) => member.id === watching);
+	const focused = useRoomView((state) => state.focused);
+	const miniPick = useRoomView((state) => state.miniPick);
 
-	// Como no Foco: só depois de a transmissão ter aparecido, porque no primeiro desenho a lista
-	// de trilhas ainda vem vazia.
-	const seen = useRef(false);
-	if (watched) seen.current = true;
-	useEffect(() => {
-		if (!watched && seen.current) {
-			seen.current = false;
-			stopWatching();
-		}
-	}, [watched]);
+	const open = watching.filter((id) =>
+		shares.some(
+			(share) =>
+				!share.isOwn &&
+				share.ownerId === id &&
+				members.some((member) => member.id === id),
+		),
+	);
+	const current =
+		(miniPick && open.includes(miniPick) ? miniPick : null) ??
+		(focused && open.includes(focused) ? focused : null) ??
+		open[0];
+	const watched = shares.find((share) => share.ownerId === current)?.track;
+	const sharer = members.find((member) => member.id === current);
 
-	if (!watched || !sharer) return null;
-	return <MiniShareFrame share={watched} sharer={sharer} />;
+	if (!current || !watched || !sharer) return null;
+	const index = open.indexOf(current);
+	const step = (delta: number) => {
+		const next = open[(index + delta + open.length) % open.length];
+		if (next) pickMiniShare(next);
+	};
+	return (
+		<MiniShareFrame
+			share={watched}
+			sharer={sharer}
+			position={open.length > 1 ? { index, total: open.length } : null}
+			onPrevious={() => step(-1)}
+			onNext={() => step(1)}
+		/>
+	);
 }
 
 function MiniShareFrame({
 	share,
 	sharer,
+	position,
+	onPrevious,
+	onNext,
 }: {
 	share: TrackReference;
 	sharer: ChannelMember;
+	/** Com várias abertas: qual esta é, para as setas e o "1/2". */
+	position: { index: number; total: number } | null;
+	onPrevious: () => void;
+	onNext: () => void;
 }) {
 	const navigate = useNavigate();
 	const corner = useMiniShare((state) => state.corner);
@@ -117,8 +150,8 @@ function MiniShareFrame({
 
 	const sharerId = shareOwner(share.participant.identity);
 	useEffect(() => {
-		setShown(sharerId);
-		return () => setShown(null);
+		setShown(sharerId, "full");
+		return () => setShown(sharerId, null);
 	}, [sharerId]);
 	const { remoteAudio, heard } = useShareAudio(share);
 
@@ -265,7 +298,28 @@ function MiniShareFrame({
 					</span>
 				) : (
 					<div className="absolute inset-0 flex flex-col justify-between bg-gradient-to-b from-rail/80 via-rail/30 to-rail/90 p-2 opacity-0 transition-opacity group-hover/mini:opacity-100 group-focus-within/mini:opacity-100">
-						<div className="flex justify-end gap-1">
+						<div className="flex items-center justify-end gap-1">
+							{position && (
+								<div className="mr-auto flex items-center gap-1 rounded-md bg-rail/85 pr-1.5">
+									<MiniButton
+										aria-label="Transmissão anterior"
+										className="bg-transparent"
+										onClick={onPrevious}
+									>
+										<ChevronLeftIcon />
+									</MiniButton>
+									<span className="font-mono text-[11px] text-secondary-foreground">
+										{position.index + 1}/{position.total}
+									</span>
+									<MiniButton
+										aria-label="Próxima transmissão"
+										className="bg-transparent"
+										onClick={onNext}
+									>
+										<ChevronRightIcon />
+									</MiniButton>
+								</div>
+							)}
 							<MiniButton
 								aria-label="Recolher a miniatura"
 								onClick={() => setMiniCollapsed(true)}
@@ -276,7 +330,10 @@ function MiniShareFrame({
 									<ChevronsRightIcon />
 								)}
 							</MiniButton>
-							<MiniButton aria-label="Parar de assistir" onClick={stopWatching}>
+							<MiniButton
+								aria-label="Parar de assistir"
+								onClick={() => unwatchShare(sharerId)}
+							>
 								<XIcon />
 							</MiniButton>
 						</div>
@@ -299,7 +356,7 @@ function MiniShareFrame({
 									<MiniButton
 										aria-label="Silenciar transmissão"
 										aria-pressed={heard === 0}
-										onClick={toggleShareMuted}
+										onClick={() => toggleShareMuted(sharerId)}
 									>
 										{heard === 0 ? (
 											<VolumeXIcon />
@@ -314,7 +371,7 @@ function MiniShareFrame({
 										min={0}
 										max={MAX_SHARE_VOLUME}
 										value={heard}
-										onValueChange={setShareVolume}
+										onValueChange={(value) => setShareVolume(sharerId, value)}
 										className="w-20"
 									/>
 								</>

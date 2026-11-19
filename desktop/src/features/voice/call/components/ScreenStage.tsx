@@ -1,32 +1,22 @@
+import { type TrackReference, VideoTrack } from "@livekit/components-react";
 import {
-	type TrackReference,
-	useRoomContext,
-	VideoTrack,
-} from "@livekit/components-react";
-
-import {
+	Maximize2Icon,
 	MaximizeIcon,
 	MinimizeIcon,
+	Minimize2Icon,
 	Volume1Icon,
 	Volume2Icon,
 	VolumeXIcon,
 } from "lucide-react";
-import {
-	type ComponentProps,
-	type ReactNode,
-	type RefObject,
-	useEffect,
-	useState,
-} from "react";
+import { type ComponentProps, type ReactNode, useEffect } from "react";
 import { Slider } from "@/components/ui/slider";
 import { Spinner } from "@/components/ui/spinner";
 import { Avatar } from "@/features/identity";
 import { shareOwner } from "@/features/screen-share";
 import { cn } from "@/lib/utils";
 import type { ChannelMember } from "../../members/model/members";
-import { encodeViewer, VIEWERS_TOPIC } from "../../room/model/viewers";
 import { useShareAudio } from "../hooks/useShareAudio";
-import { setShown } from "../stores/roomViewStore";
+import { setShown, type ShownSize } from "../stores/roomViewStore";
 import {
 	MAX_SHARE_VOLUME,
 	setShareVolume,
@@ -34,13 +24,18 @@ import {
 } from "../stores/shareVolumeStore";
 import { LiveBadge } from "./LiveBadge";
 import { PausedCover } from "./PausedCover";
+import { ShareViewers } from "./ShareViewers";
 
 /*
- * O Foco: a transmissão grande, com quem transmite no canto, o volume do áudio da transmissão, a
- * tela cheia e o Parar de assistir. O volume fica gravado (`shareVolumeStore.ts`) e vale para a próxima
- * transmissão; a tela cheia é a do próprio webview e vale para o Foco inteiro (`fullscreenTarget`),
- * com a faixa de quem está na chamada. A tela de quem transmite só é baixada enquanto este palco
- * existe, e enquanto ele existe quem transmite sabe que esta pessoa assiste (`room/model/viewers.ts`).
+ * Uma transmissão no palco (ADR 0024): o vídeo, quem transmite no canto, quem está assistindo, o
+ * volume do áudio dela, Focar e Parar de assistir. O volume fica gravado por quem transmite
+ * (`shareVolumeStore.ts`) e vale para a próxima transmissão da mesma pessoa.
+ *
+ * A transmissão em foco (sozinha no palco: a focada ou a única aberta) ganha também a tela cheia e
+ * as ferramentas de quem assiste (`tools`): ampliar, copiar um quadro e ver como está chegando.
+ * Lado a lado e no 2×2, nenhuma delas aparece (combinado em 19/11).
+ *
+ * A tela de quem transmite só é baixada enquanto este bloco existe, no tamanho dele (`setShown`).
  */
 
 interface ScreenStageProps {
@@ -48,90 +43,82 @@ interface ScreenStageProps {
 	sharer: ChannelMember;
 	/** "1080p · 30 fps", quando se sabe. */
 	spec?: string;
-	/** O que vai para a tela cheia: o Foco inteiro, com a faixa de baixo. */
-	fullscreenTarget: RefObject<HTMLElement | null>;
+	/** Sozinha no palco: a tela cheia e as ferramentas aparecem. */
+	inFocus: boolean;
+	/** Se foi a pessoa que pôs esta em foco (o botão vira "Dividir"). */
+	focused: boolean;
+	/** Se dá para pôr em foco ou voltar para a divisão (com uma só aberta, não há o que dividir). */
+	canFocus: boolean;
+	onFocus: () => void;
 	onStop: () => void;
+	fullscreen: boolean;
+	onToggleFullscreen: () => void;
+	/** As ferramentas da transmissão em foco, à esquerda dos botões de sempre. */
+	tools?: ReactNode;
+	/** O vídeo, para quem amplia ou copia trocar a imagem (`children` no lugar do `VideoTrack`). */
+	video?: ReactNode;
 }
 
 export function ScreenStage({
 	share,
 	sharer,
 	spec,
-	fullscreenTarget,
+	inFocus,
+	focused,
+	canFocus,
+	onFocus,
 	onStop,
+	fullscreen,
+	onToggleFullscreen,
+	tools,
+	video,
 }: ScreenStageProps) {
-	const [fullscreen, setFullscreen] = useState(false);
-
-	// Marca ao aparecer e desmarca ao sair: o `VoiceProvider` assina e cancela a tela.
-	const sharerId = shareOwner(share.participant.identity);
-	useEffect(() => {
-		setShown(sharerId);
-		return () => setShown(null);
-	}, [sharerId]);
-
-	const room = useRoomContext();
-	useEffect(() => {
-		const send = (watching: string | null) =>
-			room.localParticipant
-				.publishData(encodeViewer({ watching }), {
-					reliable: true,
-					topic: VIEWERS_TOPIC,
-				})
-				.catch((error: unknown) => {
-					console.warn("Aviso de quem assiste não foi:", error);
-				});
-		void send(sharerId);
-		return () => {
-			void send(null);
-		};
-	}, [room, sharerId]);
-
+	const owner = shareOwner(share.participant.identity);
+	useShownAs(owner, "full");
 	const { remoteAudio, heard } = useShareAudio(share);
-	useEffect(() => {
-		const onChange = () =>
-			setFullscreen(document.fullscreenElement === fullscreenTarget.current);
-		document.addEventListener("fullscreenchange", onChange);
-		return () => document.removeEventListener("fullscreenchange", onChange);
-	}, [fullscreenTarget]);
-
-	function toggleFullscreen() {
-		if (document.fullscreenElement) void document.exitFullscreen();
-		else void fullscreenTarget.current?.requestFullscreen();
-	}
 
 	const ready = share.publication.isSubscribed && share.publication.track;
 
 	return (
 		<section
 			aria-label={`Transmissão de ${sharer.name}`}
-			className="relative flex min-h-0 w-full flex-1 items-center justify-center overflow-hidden rounded-[10px] bg-rail"
+			className="group/stage relative flex min-h-0 min-w-0 flex-1 items-center justify-center overflow-hidden rounded-[10px] bg-rail"
 		>
 			{ready ? (
-				<VideoTrack trackRef={share} className="size-full object-contain" />
+				(video ?? (
+					<VideoTrack trackRef={share} className="size-full object-contain" />
+				))
 			) : (
 				<Spinner className="size-6 text-primary" />
 			)}
 			{ready && share.publication.isMuted && <PausedCover />}
-			<LiveBadge size="md" className="absolute top-3.5 left-3.5" />
-			<div className="absolute bottom-3.5 left-3.5 flex items-center gap-2 rounded-lg bg-rail/85 py-1.5 pr-2.5 pl-1.5">
+			<div className="absolute top-3.5 left-3.5 flex items-center gap-2">
+				<LiveBadge size="md" />
+			</div>
+			<ShareViewers
+				owner={owner}
+				className="absolute top-3.5 right-3.5 opacity-0 transition-opacity group-hover/stage:opacity-100 group-focus-within/stage:opacity-100"
+			/>
+			<div className="absolute bottom-3.5 left-3.5 flex min-w-0 items-center gap-2 rounded-lg bg-rail/85 py-1.5 pr-2.5 pl-1.5">
 				<Avatar nick={sharer.nick} displayName={sharer.name} size={26} />
-				<span className="text-[13px] font-semibold text-foreground">
+				<span className="truncate text-[13px] font-semibold text-foreground">
 					{sharer.name}
 				</span>
-				{spec && (
+				{spec && inFocus && (
 					<span className="font-mono text-[11px] text-secondary-foreground">
 						{spec}
 					</span>
 				)}
 			</div>
 			<div className="absolute right-3.5 bottom-3.5 flex items-center gap-2">
+				{inFocus && tools}
 				{remoteAudio && (
 					<div className="flex h-9 items-center rounded-lg bg-rail/85 pr-3">
 						<StageButton
-							aria-label="Silenciar transmissão"
+							aria-label={`Silenciar a transmissão de ${sharer.name}`}
 							aria-pressed={heard === 0}
 							className="bg-transparent"
-							onClick={toggleShareMuted}
+							onClick={() => toggleShareMuted(owner)}
 						>
 							{heard === 0 ? (
 								<VolumeXIcon />
@@ -142,12 +129,12 @@ export function ScreenStage({
 							)}
 						</StageButton>
 						<Slider
-							aria-label="Volume da transmissão"
+							aria-label={`Volume da transmissão de ${sharer.name}`}
 							min={0}
 							max={MAX_SHARE_VOLUME}
 							value={heard}
-							onValueChange={setShareVolume}
-							className="w-28"
+							onValueChange={(value) => setShareVolume(owner, value)}
+							className={inFocus ? "w-28" : "w-20"}
 						/>
 						<span
 							className={cn(
@@ -159,13 +146,24 @@ export function ScreenStage({
 						</span>
 					</div>
 				)}
-				<StageButton
-					aria-label="Tela cheia"
-					aria-pressed={fullscreen}
-					onClick={toggleFullscreen}
-				>
-					{fullscreen ? <MinimizeIcon /> : <MaximizeIcon />}
-				</StageButton>
+				{canFocus && (
+					<StageButton
+						aria-label={focused ? "Dividir o palco" : `Focar em ${sharer.name}`}
+						aria-pressed={focused}
+						onClick={onFocus}
+					>
+						{focused ? <Minimize2Icon /> : <Maximize2Icon />}
+					</StageButton>
+				)}
+				{inFocus && (
+					<StageButton
+						aria-label="Tela cheia"
+						aria-pressed={fullscreen}
+						onClick={onToggleFullscreen}
+					>
+						{fullscreen ? <MinimizeIcon /> : <MaximizeIcon />}
+					</StageButton>
+				)}
 				<StageButton
 					className="w-auto px-3 text-[13px] font-semibold"
 					onClick={onStop}
@@ -177,7 +175,57 @@ export function ScreenStage({
 	);
 }
 
-function StageButton({
+/**
+ * Uma transmissão pequena, na fileira de baixo (ADR 0024): a borda dourada, TRANSMITINDO e o nome.
+ * Clicar põe ela em foco. Pede a camada leve, e o áudio dela continua tocando.
+ */
+export function SmallShare({
+	share,
+	sharer,
+	onFocus,
+}: {
+	share: TrackReference;
+	sharer: ChannelMember;
+	onFocus: () => void;
+}) {
+	const owner = shareOwner(share.participant.identity);
+	useShownAs(owner, "small");
+	useShareAudio(share);
+	const ready = share.publication.isSubscribed && share.publication.track;
+
+	return (
+		<button
+			type="button"
+			aria-label={`Focar na transmissão de ${sharer.name}`}
+			onClick={onFocus}
+			className="relative flex h-[90px] w-40 shrink-0 items-center justify-center overflow-hidden rounded-[10px] bg-rail ring-2 ring-live hover:brightness-110"
+		>
+			{ready ? (
+				<VideoTrack
+					trackRef={share}
+					className="pointer-events-none size-full object-contain"
+				/>
+			) : (
+				<Spinner className="size-4 text-primary" />
+			)}
+			{ready && share.publication.isMuted && <PausedCover compact />}
+			<LiveBadge className="absolute top-1.5 left-1.5" />
+			<span className="absolute inset-x-1.5 bottom-1.5 truncate text-left text-[11px] font-semibold text-foreground [text-shadow:0_1px_2px_rgb(0_0_0/0.8)]">
+				{sharer.name}
+			</span>
+		</button>
+	);
+}
+
+/** Marca a transmissão de `owner` como à vista, nesse tamanho, e desmarca ao sair. */
+function useShownAs(owner: string, size: ShownSize) {
+	useEffect(() => {
+		setShown(owner, size);
+		return () => setShown(owner, null);
+	}, [owner, size]);
+}
+
+export function StageButton({
 	className,
 	children,
 	...props

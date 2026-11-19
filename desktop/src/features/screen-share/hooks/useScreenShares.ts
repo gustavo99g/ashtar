@@ -4,7 +4,7 @@ import {
 	useTracks,
 } from "@livekit/components-react";
 import { Track } from "livekit-client";
-import { shareOwner, shareWinner } from "../model/shareInfo";
+import { compareShares, shareOwner } from "../model/shareInfo";
 
 /** Uma transmissão da sala, com o dono já resolvido (a trilha é da `:screen` dele). */
 export interface ScreenShare {
@@ -16,26 +16,28 @@ export interface ScreenShare {
 }
 
 /**
- * As transmissões da sala, pelas publicações (assinadas ou não), e a que vale quando há mais de
- * uma (`shareWinner`). Usa hooks do LiveKit: só com a sala conectada.
+ * As transmissões da sala, pelas publicações (assinadas ou não), da mais antiga para a mais nova
+ * (`compareShares`), a própria inclusive. Usa hooks do LiveKit: só com a sala conectada.
  */
-export function useScreenShares(): {
-	shares: ScreenShare[];
-	winner: ScreenShare | undefined;
-} {
+export function useScreenShares(): ScreenShare[] {
 	const me = useRoomContext().localParticipant.identity;
-	const shares = useTracks([Track.Source.ScreenShare], {
+	return useTracks([Track.Source.ScreenShare], {
 		onlySubscribed: false,
-	}).map((track) => {
-		const ownerId = shareOwner(track.participant.identity);
-		return { track, ownerId, isOwn: ownerId === me };
-	});
-	const winner = shareWinner(
-		shares.map((share) => ({
-			share,
-			identity: share.track.participant.identity,
-			trackName: share.track.publication.trackName,
-		})),
-	)?.share;
-	return { shares, winner };
+	})
+		.map((track) => {
+			const ownerId = shareOwner(track.participant.identity);
+			return { track, ownerId, isOwn: ownerId === me };
+		})
+		.sort((a, b) =>
+			compareShares(
+				{
+					identity: a.track.participant.identity,
+					trackName: a.track.publication.trackName,
+				},
+				{
+					identity: b.track.participant.identity,
+					trackName: b.track.publication.trackName,
+				},
+			),
+		);
 }

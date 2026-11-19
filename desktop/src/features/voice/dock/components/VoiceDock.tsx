@@ -1,6 +1,6 @@
 import { SourcePickerHost } from "@/features/screen-share";
 import { ShareNotices } from "../../call/components/ShareNotices";
-import { ShareRaceGuard } from "../../room/components/ShareRaceGuard";
+import { WatchJanitor } from "../../call/components/WatchJanitor";
 import { useVoice } from "../../room/hooks/useVoice";
 import { SALA } from "../../room/model/channel";
 import { ShareHost } from "./ShareHost";
@@ -10,8 +10,8 @@ import { VoiceConnection } from "./VoiceConnection";
 
 /**
  * O pé da coluna do servidor: o painel "Voz conectada" enquanto há chamada e o cartão de quem está
- * usando. O seletor de fonte, o painel da transmissão, os avisos, a regra de uma transmissão por
- * vez e as opções da bandeja moram aqui porque a coluna fica montada em todas as telas da chamada.
+ * usando. O seletor de fonte, o painel da transmissão, os avisos, o fechamento das transmissões que
+ * acabaram e as opções da bandeja moram aqui porque a coluna fica montada em todas as telas da chamada.
  */
 export function VoiceDock() {
 	const { voiceChannelId, room, screenShare } = useVoice();
@@ -34,7 +34,7 @@ export function VoiceDock() {
 				))}
 			{screenShare && <ShareNotices controller={screenShare} />}
 			{screenShare && <TrayShare controller={screenShare} />}
-			{room && screenShare && <ShareRaceGuard controller={screenShare} />}
+			{room && <WatchJanitor />}
 		</div>
 	);
 }
