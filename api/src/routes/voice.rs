@@ -71,9 +71,30 @@ pub async fn voice_token(
 /// confere o token na entrada (e o app pede outro a cada transmissão).
 const SCREEN_TOKEN_TTL: Duration = Duration::from_secs(5 * 60);
 
+/// Quantas transmissões uma sala aceita ao mesmo tempo, sem `MAX_SHARES_PER_ROOM` no `.env`.
+const DEFAULT_MAX_SHARES: usize = 6;
+
+/// O limite de transmissões por sala (ADR 0024): `MAX_SHARES_PER_ROOM`, ou 6. Um valor que não é
+/// um número de 1 para cima vale o padrão: o limite é proteção da VPS, e um erro de digitação não
+/// pode travar todas as transmissões.
+fn max_shares() -> usize {
+    parse_max_shares(std::env::var("MAX_SHARES_PER_ROOM").ok().as_deref())
+}
+
+fn parse_max_shares(value: Option<&str>) -> usize {
+    value
+        .and_then(|value| value.trim().parse::<usize>().ok())
+        .filter(|value| *value > 0)
+        .unwrap_or(DEFAULT_MAX_SHARES)
+}
+
 /// `POST /api/voice/screen-token`: o token da conexão `{user_id}:screen`, que o app usa para
 /// transmitir a tela direto do Rust (ADR 0017). Só para quem já está na sala de voz: 409 para os
 /// outros. Vale na ligação privada como na sala, pela mesma regra do [`voice_token`].
+///
+/// Com a sala no limite de transmissões, 409 `share_limit`. A própria transmissão não conta: quem
+/// troca de fonte pede um token de novo. Duas pessoas pedindo o último lugar juntas podem passar as
+/// duas; o limite é uma proteção, não uma conta exata.
 pub async fn screen_token(
     State(state): State<AppState>,
     CurrentUser(user): CurrentUser,
@@ -85,6 +106,10 @@ pub async fn screen_token(
         return Err(ApiError::Conflict(
             "Entre na sala de voz antes de transmitir.".into(),
         ));
+    }
+    let limit = max_shares();
+    if other_shares(&room, &user.id) >= limit {
+        return Err(ApiError::ShareLimit(limit));
     }
     let (api_key, api_secret, url) = livekit_env().map_err(ApiError::Config)?;
     let token = create_screen_token(
@@ -120,6 +145,13 @@ async fn check_room(state: &AppState, user: &User, channel_id: &str) -> Result<(
 /// Se `user_id` está na sala pela voz (a `:screen` não conta: ela some da lista).
 fn in_room(room: &[RoomParticipant], user_id: &str) -> bool {
     room.iter().any(|p| p.identity == user_id)
+}
+
+/// Quantas pessoas, fora `user_id`, estão transmitindo na sala.
+fn other_shares(room: &[RoomParticipant], user_id: &str) -> usize {
+    room.iter()
+        .filter(|p| p.screen_sharing && p.identity != user_id)
+        .count()
 }
 
 #[derive(Debug, Deserialize)]
@@ -271,6 +303,31 @@ mod tests {
         assert!(in_room(&room, "kid"));
         assert!(!in_room(&room, "marcao"));
         assert!(!in_room(&[], "kid"));
+    }
+
+    #[test]
+    fn a_propria_transmissao_nao_conta_no_limite() {
+        let person = |identity: &str, screen_sharing| RoomParticipant {
+            identity: identity.into(),
+            screen_sharing,
+        };
+        let room = [
+            person("kid", true),
+            person("juju", true),
+            person("marcao", false),
+            person("rafa", true),
+        ];
+        assert_eq!(other_shares(&room, "kid"), 2);
+        assert_eq!(other_shares(&room, "marcao"), 3);
+        assert_eq!(other_shares(&[], "kid"), 0);
+    }
+
+    #[test]
+    fn limite_de_transmissoes_do_env() {
+        assert_eq!(parse_max_shares(None), DEFAULT_MAX_SHARES);
+        for (value, expected) in [("3", 3), (" 2 ", 2), ("0", 6), ("muitas", 6), ("", 6)] {
+            assert_eq!(parse_max_shares(Some(value)), expected, "{value:?}");
+        }
     }
 
     #[test]

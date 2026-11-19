@@ -160,7 +160,7 @@ min_version?: string, };
  * O `kind` de toda recusa da API. O app decide o que mostrar por ele, nunca
  * pela mensagem.
  */
-export type ErrorKind = "unauthenticated" | "unknown_device" | "forbidden" | "invalid_invite" | "invalid_nick" | "invalid_display_name" | "nick_taken" | "invalid_device_key" | "device_already_linked" | "invalid_request" | "not_found" | "conflict" | "too_many_attempts" | "too_many_messages" | "internal" | "client_outdated";
+export type ErrorKind = "unauthenticated" | "unknown_device" | "forbidden" | "invalid_invite" | "invalid_nick" | "invalid_display_name" | "nick_taken" | "invalid_device_key" | "device_already_linked" | "invalid_request" | "not_found" | "conflict" | "too_many_attempts" | "too_many_messages" | "internal" | "client_outdated" | "share_limit";
 
 /**
  * Se a linha é uma [`Permission`] (o dono pode ligar e desligar) ou uma

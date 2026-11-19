@@ -36,6 +36,8 @@ pub enum ErrorKind {
     Internal,
     /// Da `ClientPolicy`: o app está abaixo da versão mínima (426).
     ClientOutdated,
+    /// A sala já tem o máximo de transmissões ao mesmo tempo (`MAX_SHARES_PER_ROOM`, ADR 0024).
+    ShareLimit,
 }
 
 /// O corpo de toda resposta de erro.
@@ -81,6 +83,9 @@ pub enum ApiError {
     TooManyAttempts,
     #[error("Calma: muitas mensagens seguidas.")]
     TooManyMessages,
+    /// A sala chegou ao limite de transmissões; o número é o limite.
+    #[error("Já tem {0} transmissões nesta sala. Espere uma acabar para transmitir.")]
+    ShareLimit(usize),
     #[error("Erro interno no servidor.")]
     Internal(#[from] sqlx::Error),
     /// Falta configuração no servidor (uma variável do `.env`, por exemplo).
@@ -116,6 +121,7 @@ impl ApiError {
             Self::Conflict(_) => (StatusCode::CONFLICT, ErrorKind::Conflict),
             Self::TooManyAttempts => (StatusCode::TOO_MANY_REQUESTS, ErrorKind::TooManyAttempts),
             Self::TooManyMessages => (StatusCode::TOO_MANY_REQUESTS, ErrorKind::TooManyMessages),
+            Self::ShareLimit(_) => (StatusCode::CONFLICT, ErrorKind::ShareLimit),
             Self::Internal(_) | Self::Config(_) | Self::LiveKit(_) => {
                 (StatusCode::INTERNAL_SERVER_ERROR, ErrorKind::Internal)
             }
