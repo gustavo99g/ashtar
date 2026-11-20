@@ -1,5 +1,22 @@
 # O que há de novo no Ashtar
 
+## 0.6.0
+
+- Configurações › Voz e vídeo ficou completa: o volume do microfone e o volume geral de saída (de 0 a 200%, por cima do volume de cada pessoa), Testar microfone, com o medidor, e as chaves de Supressão de ruído, Cancelamento de eco e Controle automático de ganho. Tudo vale no meio da chamada, sem sair da sala.
+- Detecção de voz: abaixo da sensibilidade, o microfone manda silêncio, sem aparecer cortado para os outros. A sensibilidade automática acompanha o barulho de fundo; desligue o automático para arrastar a marca dourada.
+- Pressionar para falar: escolha o modo em Voz e vídeo e o atalho em Configurações › Atalhos. Vale tecla do teclado ou botão lateral e do meio do mouse, e funciona com o jogo em foco, sem roubar a tecla dele. Em Notificações, dá para ligar um clique curto ao apertar e ao soltar.
+- Atalhos globais em Configurações › Atalhos: Desativar microfone, Desativar áudio, Pressionar para falar, Atender ligação e Recusar ou desligar. Clique em Trocar e aperte a combinação; Esc cancela.
+- Falou com o microfone mutado? O painel de voz avisa "Você está mutado". Dá para desligar em Voz e vídeo.
+- A régua no alto de Configurações › Notificações ajusta o volume de todos os sons do Ashtar, sem mexer nas vozes.
+- A voz volta sozinha: se a conexão cair, ou o computador voltar da suspensão, o painel mostra "Reconectando…" e o Ashtar entra de novo na mesma sala, com o mesmo mute.
+- A transmissão também volta sozinha depois de uma queda, sem parar a captura. Quem transmite vê o aviso "Conexão perdida", e quem assiste vê "Reconectando a transmissão…" no lugar da imagem.
+- Tirou o fone ou o microfone no meio da sala? O Ashtar passa para o padrão do Windows e avisa; quando ele volta, troca de volta. Sem nenhum microfone, você entra mutado, e quando um é conectado aparece "Ativar microfone".
+- Sem conexão com o servidor por mais de 5 segundos, uma faixa no alto da janela mostra quando é a próxima tentativa, com Tentar agora. A sala de voz continua funcionando enquanto isso.
+- Quem está com a conexão ruim ganha um ícone de sinal laranja (instável) ou vermelho (ruim) na sala. Clique na pessoa para ver o ping e a perda de pacotes dela.
+- Testar conexão, em Voz e vídeo: mostra o ping até o servidor e se a voz vai pelo caminho direto ou pelo reserva, mais lento.
+- Enviar logs, em Configurações › Aplicativo: manda os registros dos últimos 2 dias para o dono do servidor, com um campo para contar o que aconteceu. Só o dono vê.
+- Para o dono, o Painel de controle ganhou Logs, para ver e baixar o que chegou (com aviso quando chega um), e Servidor, que mostra se a API e a voz estão no ar, o disco livre e o último backup.
+
 ## 0.5.0
 
 - Várias salas de voz: quem gerencia os canais cria uma sala pelo mesmo "Criar canal", escolhendo Voz, e pode renomear e arquivar. A Sala de sempre continua lá e não pode ser arquivada.
