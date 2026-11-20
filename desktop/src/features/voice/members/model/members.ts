@@ -18,7 +18,12 @@ export interface ChannelMember {
 	micOff?: boolean;
 	/** Só dentro da chamada: desligou o áudio (deafen). */
 	deafened?: boolean;
+	/** Só dentro da chamada, e só quando está ruim: a qualidade que o LiveKit dá (decisão 15). */
+	connection?: ConnectionTrouble;
 }
+
+/** `unstable`: a qualidade `poor` do LiveKit (laranja); `bad`: `lost` (vermelho). */
+export type ConnectionTrouble = "unstable" | "bad";
 
 /** Um participante da lista da API (`GET /api/voice/participants`). */
 export function memberFromApi(participant: ParticipantView): ChannelMember {

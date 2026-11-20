@@ -6,6 +6,8 @@ import { Avatar } from "@/features/identity";
 import { UserCardPopup } from "@/features/members";
 import {
 	type ChannelMember,
+	ConnectionMark,
+	ConnectionSection,
 	LiveBadge,
 	RoomModeration,
 	UserVolume,
@@ -125,7 +127,8 @@ function MemberRow({
 				<span className={cn("min-w-0 truncate", isMe && "text-gold")}>
 					{member.name}
 				</span>
-				<span className="ml-auto flex shrink-0 items-center">
+				<span className="ml-auto flex shrink-0 items-center gap-1">
+					<ConnectionMark connection={member.connection} className="size-3.5" />
 					{member.sharing ? (
 						<LiveBadge />
 					) : member.deafened ? (
@@ -154,6 +157,12 @@ function MemberRow({
 				{/* Só de quem você está ouvindo, e nunca no seu próprio cartão. */}
 				{inCall && !isMe && (
 					<UserVolume userId={member.id} name={member.name} />
+				)}
+				{inCall && (
+					<ConnectionSection
+						userId={member.id}
+						connection={member.connection}
+					/>
 				)}
 				{!isMe && (
 					<RoomModeration

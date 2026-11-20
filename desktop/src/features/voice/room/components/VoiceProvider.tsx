@@ -88,7 +88,14 @@ import {
 	VOICE_STATE_TOPIC,
 	withDeafened,
 } from "../model/voiceState";
+import { useVoiceStatsBroadcast } from "../hooks/useVoiceStatsBroadcast";
 import { useWatchSync } from "../hooks/useWatchSync";
+import { parseVoiceStats } from "../model/voiceStats";
+import {
+	clearVoiceStats,
+	forgetVoiceStats,
+	setVoiceStats,
+} from "../stores/voiceStatsStore";
 import { fallbackRoomName } from "../model/channel";
 import {
 	nextAttempt,
@@ -366,13 +373,18 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 					setDeafenedIds((current) =>
 						withDeafened(current, participant.identity, state.deafened),
 					);
+					return;
 				}
+				// Os números da conexão de quem mandou (`voiceStats.ts`), a cada 5 segundos.
+				const stats = parseVoiceStats(payload);
+				if (stats) setVoiceStats(participant.identity, stats);
 			},
 		);
 		nextRoom.on(RoomEvent.ParticipantDisconnected, (participant) => {
 			setDeafenedIds((current) =>
 				withDeafened(current, participant.identity, false),
 			);
+			forgetVoiceStats(participant.identity);
 		});
 		// Quem entra depois não recebeu o aviso: repete só para essa pessoa.
 		nextRoom.on(RoomEvent.ParticipantConnected, (participant) => {
@@ -516,6 +528,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 			setConnectionState(recovery.current ? "reconnecting" : "disconnected");
 			setError(null);
 			setDeafenedIds(NOBODY);
+			clearVoiceStats();
 		};
 	}, [target]);
 
@@ -589,6 +602,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 	// Quem assiste o quê (ADR 0024): as transmissões à vista, para a sala, e os avisos dos outros.
 	const shownOwners = useMemo(() => Object.keys(shown).sort(), [shown]);
 	useWatchSync(room, shownOwners);
+	useVoiceStatsBroadcast(room);
 	useLocalCamera(room);
 
 	// No meio da chamada, a escolha nova vale na hora, e o escolhido que some ou volta também.

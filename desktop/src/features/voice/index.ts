@@ -12,6 +12,8 @@ export {
 	useCanMoveMembers,
 	useMoveTargets,
 } from "./members/components/RoomModeration";
+export { ConnectionMark } from "./members/components/ConnectionMark";
+export { ConnectionSection } from "./members/components/ConnectionSection";
 export { UserVolume } from "./members/components/UserVolume";
 export { useLiveMembers } from "./members/hooks/useLiveMembers";
 export {
