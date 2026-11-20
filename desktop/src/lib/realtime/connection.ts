@@ -69,6 +69,10 @@ export interface Realtime {
 	 * devolve `false`: quem manda repete o que importa no próximo `open`.
 	 */
 	send: (event: ClientEvent) => boolean;
+	/** Quando é a próxima tentativa (`Date.now()`), ou `null` fora da espera. Avisa pelo `onStatus`. */
+	nextRetryAt: () => number | null;
+	/** Fora do ar, esperando: tenta já, sem esperar a vez ("Tentar agora" da faixa). */
+	retryNow: () => void;
 }
 
 /** Quanto esperar antes da tentativa número `attempt` (0 é a primeira volta). */
@@ -95,17 +99,29 @@ export function createRealtime(deps: RealtimeDeps): Realtime {
 	let pingTimer: ReturnType<typeof setInterval> | undefined;
 	let idleTimer: ReturnType<typeof setTimeout> | undefined;
 	let retryTimer: ReturnType<typeof setTimeout> | undefined;
+	let retryAt: number | null = null;
 
 	function setStatus(next: RealtimeStatus) {
 		if (status === next) return;
 		status = next;
-		for (const listener of statusListeners) listener(next);
+		emit();
+	}
+
+	function emit() {
+		for (const listener of statusListeners) listener(status);
+	}
+
+	function setRetryAt(next: number | null) {
+		if (retryAt === next) return;
+		retryAt = next;
+		emit();
 	}
 
 	function clearTimers() {
 		clearInterval(pingTimer);
 		clearTimeout(idleTimer);
 		clearTimeout(retryTimer);
+		setRetryAt(null);
 	}
 
 	/** Solta o socket atual sem ouvir mais nada dele. */
@@ -124,6 +140,7 @@ export function createRealtime(deps: RealtimeDeps): Realtime {
 		const delay = backoffMs(attempt, random());
 		attempt += 1;
 		retryTimer = setTimeout(() => void open(generation), delay);
+		setRetryAt(Date.now() + delay);
 	}
 
 	function end() {
@@ -137,6 +154,7 @@ export function createRealtime(deps: RealtimeDeps): Realtime {
 	}
 
 	async function open(round: number) {
+		setRetryAt(null);
 		if (status !== "reconnecting") setStatus("connecting");
 		let ticket: string;
 		try {
@@ -196,6 +214,12 @@ export function createRealtime(deps: RealtimeDeps): Realtime {
 			setStatus("idle");
 		},
 		status: () => status,
+		nextRetryAt: () => retryAt,
+		retryNow() {
+			if (!running || retryAt === null) return;
+			clearTimeout(retryTimer);
+			void open(generation);
+		},
 		send(event) {
 			if (status !== "open" || socket?.readyState !== 1) return false;
 			socket.send(JSON.stringify(event));

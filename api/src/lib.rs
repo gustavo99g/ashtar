@@ -13,6 +13,7 @@ pub mod limiter;
 pub mod realtime;
 pub mod routes;
 pub mod secret;
+pub mod timeout;
 pub mod voice;
 
 use std::sync::Arc;
@@ -174,6 +175,10 @@ pub fn app(state: AppState, policy: Arc<ClientPolicy>) -> Router {
             post(routes::channels::unarchive_category),
         )
         .route("/realtime/ticket", post(routes::realtime::ticket))
+        .layer(middleware::from_fn_with_state(
+            timeout::REQUEST_TIMEOUT,
+            timeout::limit,
+        ))
         .layer(middleware::from_fn_with_state(
             policy,
             client_policy::enforce,

@@ -61,7 +61,7 @@ Levantado na `dev` (`196cb41`), para o plano não refazer:
 | 5 | 2 | App: a voz volta sozinha | Feita |
 | 6 | 2 | Rust e app: a transmissão nativa volta sozinha | Feita |
 | 7 | 2 | App: microfone e saída desconectados | Feita |
-| 8 | 2 | API e app: "Sem conexão com o servidor" | Pendente |
+| 8 | 2 | API e app: "Sem conexão com o servidor" | Feita |
 | 9 | 2 | API e app: a qualidade da conexão e o Testar conexão | Pendente |
 | 10 | 2 | API, Rust e app: "Enviar logs" e o estado do servidor | Pendente |
 | 11 | — | Teste com três computadores, sem publicar | Pendente |
@@ -373,6 +373,11 @@ oferece Ativar microfone.
 
 **Pronto quando:** derrubar a API por 30 segundos mostra a faixa, a sala de voz continua, e quando a API volta a
 faixa some e as mensagens mandadas por outros nesse tempo aparecem.
+
+**Como ficou:** na API, o middleware `timeout.rs` (e não o `TimeoutLayer`, para o erro sair no corpo de sempre, com o
+`kind` `timeout` e o 504) vale para as rotas do `/api`, fora o WebSocket; o `UPLOAD_TIMEOUT` (120 s) fica para os
+logs. No app, o `connection.ts` expõe a próxima tentativa e o `retryNow`, e a `ConnectionBanner` fica em cima da
+moldura (as configurações não a cobrem). A busca do que mudou na volta já existia (o `ready` com `resumed`).
 
 ## Etapa 9: API e app, a qualidade da conexão e o Testar conexão
 
