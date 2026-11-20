@@ -1,93 +1,81 @@
-# NOTES — pendências da v0.5 (salas e presença)
+# NOTES — pendências da v0.6 (confiabilidade e configurações)
 
-Lista de verificação da fase descrita no [`PLAN.md`](PLAN.md). Cada item deve
-ser resolvido ou conscientemente adiado (marcar como tal) antes de fechar a entrega em que ele está.
+Lista de verificação da fase descrita no [`PLAN.md`](PLAN.md).
+Cada item deve ser resolvido ou conscientemente adiado (marcar como tal) antes de fechar a entrega em que ele está.
 
 ## Antes de começar
 
-- [x] **A v0.4 na `dev`.** O PR #20 entrou na `dev` (`f98f84a`), e a fase começou dela. O `PLAN.md` e o `NOTES.md`
-      da v0.3 e o plano da v0.4 foram para `docs/plans/`; os `[ ]` que sobraram ficam resolvidos ou adiados lá.
-- [ ] **O canvas:** conferir se o quadro "Criar canal" tem a escolha Texto/Voz e se existe desenho para o Ausente,
-      o "digitando…" e o arrastar entre salas. O que faltar segue o estilo dos quadros vizinhos.
+- [ ] **A v0.5 na beta.** A `0.5.0` sai pela beta; os `[ ]` do `NOTES.md` da v0.5 são conferidos no teste dela. O que
+      sobrar fica marcado como adiado em `docs/plans/v0.5-notes.md`, e o que pede código entra aqui.
+- [ ] **O canvas:** os cinco quadros novos da Etapa 0 (fileira "Confiabilidade (0.6)") desenhados; falta o Kid conferir.
 
-## Parte 1 — salas
+## Parte 1 — configurações e atalhos
 
-### API
+### Cadeia do microfone
 
-- [ ] **Arquivar uma sala com gente dentro** tira também as conexões `:screen`, não só as de voz.
-- [ ] **Mover quem está saindo da sala** no mesmo instante: o 409 de "em nenhuma sala" não pode virar erro na tela
-      de quem moveu.
-- [ ] **A remoção dos 10 segundos** é cancelada quando a pessoa sai da sala antiga sozinha, e não tira ela da sala
-      nova se as duas tiverem o mesmo id de conexão.
-- [x] **`membros.mover` no Painel** e no `admin permissoes`, e no `README.md` do `deploy/server/`. O Painel e o `admin permissoes` listam todas as permissões sozinhos; o `README.md` do `deploy/server/` não lista nenhuma.
+- [ ] **O `AudioWorklet` no WebView2** junto do RNNoise: o custo de CPU dos dois na mesma cadeia.
+- [ ] **O portão não corta o começo das palavras** (10 ms para abrir) nem o fim (300 ms para fechar).
+- [ ] **A sensibilidade automática** com ventilador e com teclado mecânico: não abre com o teclado.
+- [ ] **O volume de entrada acima de 100%** não distorce com o RNNoise depois (o ganho vem antes).
+- [ ] **A migração do `noiseStore`**: quem desligou a supressão continua com ela desligada.
+- [ ] **Eco e ganho automático** trocados no meio da chamada: a trilha é refeita e a cadeia volta.
 
-### App
+### Voz e vídeo
 
-- [x] **Nenhum `SALA` sobra** fora dos testes, inclusive no `UpdateNotice` (o aviso de atualização que espera a
-      pessoa sair da sala). Feito: o id da sala vem do `VoiceProvider`.
-- [ ] **Trocar de sala rápido**, várias vezes seguidas: a pessoa nunca fica em duas salas, nem em nenhuma.
-- [ ] **Trocar de sala com o token falhando** (API fora): a pessoa fica na sala antiga, com o erro, e não sem sala.
-- [ ] **A transmissão que acaba ao trocar:** quem assistia na sala antiga vê ela acabar normalmente.
-- [ ] **O "Voltar para a sala"** depois de uma ligação volta para a sala de onde a pessoa saiu, e some se ela foi
-      arquivada no meio.
-- [ ] **Ser movido no meio de uma pergunta** (o diálogo de trocar transmitindo aberto): o `voice.moved` ganha.
-- [x] **Ser movido estando numa ligação privada:** a API recusa (409), e o cartão nem mostra "Mover para". `tests/voice.rs` (409), e o "Mover para" só aparece no cartão de quem está numa sala.
-- [ ] **A reconexão automática** não traz de volta quem foi desconectado.
-- [ ] **O arrastar não briga** com o clique no avatar (que abre o cartão) nem com o modo Organizar.
-- [ ] **A categoria recolhida** com gente na sala (o `AvatarStrip`): dá para arrastar dali também? Decidir.
-- [ ] **Os textos** de criar sala, do aviso de trocar transmitindo, de "Mover para", "Desconectar da voz", "fulano
-      moveu você", "Você foi desconectado" e "A sala foi arquivada", revisados.
+- [ ] **O volume de saída** por cima do volume de cada pessoa e do reforço acima de 100% (`boost.ts`).
+- [ ] **Testar microfone** fora da sala devolve o som na saída escolhida; dentro, só o medidor.
+- [ ] **Os padrões da transmissão** chegam ao seletor de fontes, e mudar no seletor não muda o padrão.
 
-### Canais e salas restritos
+### Gancho e atalhos
 
-- [x] **Nenhum vazamento por evento:** passar todos os tipos do `ServerEvent` pelo filtro, com um teste que falha
-      quando entra um tipo novo com `channel_id` sem passar por ele. O `ServerEvent::of_channel` não tem `_`, e o `publish` para todos recusa um evento de canal.
-- [x] **O "começou a transmitir"** de uma sala restrita não chega a quem está fora. Vem do `voice.participants`, que só sai para quem acessa a sala.
-- [ ] **A busca de mensagens da v0.7** já nasce passando pela `can_access` (anotar na ADR 0028).
-- [x] **Quem gerencia vê tudo** (decisão 16): confirmado em 19/11. O dono tem todas as permissões e faz todas as
-      ações, em tudo.
-- [ ] **Um canal restrito e arquivado:** continua escondido nos Canais arquivados para quem está fora.
-- [x] **Quem saiu do grupo** sai de todas as listas. `tests/restricted.rs`.
-- [ ] **O "Voltar para a sala"** depois de uma ligação, se a pessoa perdeu o acesso no meio: some.
-- [ ] **O modo Organizar** de quem gerencia mostra os restritos com o cadeado, e a ordem gravada não muda a dos
-      outros.
-- [ ] **A lista com muita gente** no diálogo: rola e tem busca.
+- [ ] **Um jogo em tela cheia exclusiva** recebe a tecla do pressionar para falar e o Ashtar também.
+- [ ] **Um jogo como administrador** (UIPI): o atalho não chega. Explicar na aba Atalhos.
+- [ ] **Os anti-cheats dos jogos do grupo** não reclamam do gancho.
+- [ ] **O gancho não é desligado pelo Windows** depois de uma hora de uso (o tempo do callback).
+- [ ] **O teclado ABNT2:** os nomes das teclas (Ç, as acentuadas) aparecem certos.
+- [ ] **A tecla segurada** (repetição) dispara o atalho de mutar uma vez só.
+- [ ] **Alt+Tab com a tecla do pressionar para falar apertada:** o portão fecha quando ela solta, mesmo em outra
+      janela.
+- [ ] **Os textos** da aba Atalhos, do aviso de combinação repetida e do "Pressionar para falar: V", revisados.
 
-## Parte 2 — presença e sons
+## Parte 2 — confiabilidade
 
-### Ausente
+### Voz e transmissão
 
-- [ ] **O `GetLastInputInfo`** conta o mouse e o teclado de qualquer janela, inclusive de um jogo em tela cheia
-      exclusiva. O controle não conta, e por isso a regra da sala (decisão 11).
-- [ ] **Computador bloqueado ou dormindo:** a conexão cai e a pessoa fica offline, não Ausente. Conferir que, ao
-      voltar, não fica presa em Ausente.
-- [x] **Duas conexões da mesma pessoa** (reconexão no meio): o hub não deixa uma conexão velha ociosa travar o
-      Ausente. `tests/realtime.rs`: só fica Ausente com todas as conexões ociosas.
-- [ ] **O app antigo** (`0.4.x`) não manda `idle`: aparece sempre Disponível. Aceito durante o beta.
-- [ ] **A bolinha amarela** em todos os lugares em que a de status aparece, com o contraste conferido.
+- [ ] **Quem foi desconectado, movido ou perdeu o acesso** não reconecta.
+- [ ] **A sala arquivada no meio da reconexão:** desiste, com o aviso de arquivada.
+- [ ] **A reconexão durante uma ligação privada** volta para a ligação, e só se a outra pessoa ainda está nela.
+- [ ] **A câmera não volta ligada** depois da reconexão.
+- [ ] **A suspensão do Windows** com a sala aberta: ao voltar, reconecta sem ficar em duas salas.
+- [ ] **A transmissão que volta:** quem assistia continua assistindo, com o mesmo volume e a mesma qualidade.
+- [ ] **O limite de transmissões** (6) não recusa quem está voltando.
 
-### Digitando
+### Dispositivos
 
-- [ ] **Quem perde a permissão do canal** no meio para de receber o `typing` dele.
-- [x] **O Invisível** não manda nada, nem nas conversas privadas. O app e a API descartam.
-- [ ] **Colar um texto grande** conta como digitar, uma vez.
-- [x] **A linha reservada** embaixo da caixa não pula a conversa quando aparece e some.
+- [ ] **Bluetooth** que troca de perfil (o fone vira "mãos livres" ao abrir o microfone): não fica em laço de
+      aviso.
+- [ ] **O aviso não repete** quando o mesmo dispositivo some e volta várias vezes seguidas.
 
-### Sons
+### Servidor
 
-- [ ] **Os sons gerados** no mesmo volume dos de hoje (`dm.wav`, `mention.wav`, `ring.wav`), conferidos no fone e na
-      caixa de som.
-- [x] **Entrar numa sala cheia** toca um som só, e não um por pessoa que já estava.
-- [x] **Trocar de sala** não toca a saída de todo mundo da sala velha.
-- [x] **Os sons tocam na saída escolhida** em Voz e vídeo, como os da voz.
-- [x] **Ocupado** não cala os sons da sala, mas continua calando os de mensagem e menção.
+- [ ] **A faixa não pisca** em quedas menores que 5 segundos.
+- [ ] **As consultas recarregadas** ao voltar: nada fica velho (não lidas, membros online, canais).
+- [ ] **O `TimeoutLayer`** não corta o WebSocket nem o upload dos logs.
+
+### Qualidade da conexão
+
+- [ ] **O `ConnectionQuality` do LiveKit** chega para todos os participantes, não só para o próprio.
+- [ ] **A mensagem `voice.stats`** não pesa (uma a cada 5 s por pessoa).
+
+### Logs
+
+- [ ] **O tamanho do `.zip`** de 2 dias de log, com uma noite de transmissão.
+- [ ] **O disco da VPS:** a pasta `data/logs/` entra no backup? Decidir (sugestão: não, são de 30 dias).
+- [ ] **O texto do botão** diz que só o dono vê, e que os logs têm nicks.
 
 ## Riscos e cuidados
 
-- [ ] **A troca de sala é a parte mais delicada da fase.** Hoje entrar e sair são caminhos separados, com a
-      ligação no meio; a troca junta os dois sem passar pela tela vazia, e precisa da mesma limpeza (transmissão,
-      câmera, `watching`, miniatura). Os testes do `VoiceProvider` cobrem a troca antes do resto.
-- [ ] **Mover é poder sobre os outros.** Só quem tem a permissão, nunca para dentro de uma ligação privada, e a
-      pessoa sempre fica sabendo quem moveu ou desconectou.
-- [ ] **A presença não pode contar o que a pessoa faz.** O Ausente diz só que ela parou de mexer, nunca o que estava
-      aberto, e o Invisível não aparece em nada novo (nem digitando, nem ausente).
+- [ ] **O gancho global vê todas as teclas do computador.** O Rust só compara com a lista de atalhos e não grava nem
+      manda nada além do nome do atalho; nenhuma tecla vai para o log.
+- [ ] **Os logs saem do computador da pessoa.** Só quando ela clica, nunca sozinhos, e o conteúdo é o mesmo da pasta
+      que ela já pode abrir.

@@ -2,7 +2,7 @@
 
 - **Status:** proposta (vira aceita com os números da Etapa 6 da v0.2.4)
 - **Data:** 2026-11
-- **Atualizada por:** 0024 (várias transmissões por sala; a camada leve sai do experimento da v0.4)
+- **Atualizada por:** 0024 (várias transmissões por sala; a camada leve sai do experimento da v0.4) e 0030 (a `:screen` reconecta sem parar a captura)
 
 ## Contexto
 

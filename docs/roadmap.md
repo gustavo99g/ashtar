@@ -749,8 +749,8 @@ CPU, memória e banda da VPS medidas e dentro do plano contratado
 
 # v0.5 — Salas e presença
 
-Sai numa versão só, a `0.5.0`. O plano está em [`docs/plans/`](plans/) quando a fase fechar; as decisões, nas ADRs
-0026, 0027 e 0028.
+Sai numa versão só, a `0.5.0`. O plano está em [`docs/plans/v0.5-salas-e-presenca.md`](plans/v0.5-salas-e-presenca.md); as
+decisões, nas ADRs 0026, 0027 e 0028.
 
 ## Objetivo
 
@@ -805,31 +805,38 @@ ficar inativo → status muda para ausente
 
 # v0.6 — Confiabilidade e configurações
 
+Sai numa versão só, a `0.6.0`. O plano está no `PLAN.md` da raiz enquanto a fase anda; as decisões, nas ADRs 0029 e
+0030.
+
 ## Objetivo
 
-Deixar o aplicativo confiável e ajustável para uso todos os dias.
+Deixar o aplicativo confiável e ajustável para uso todos os dias. A tela de configurações (Perfil, Voz e vídeo,
+Notificações e Aplicativo), o tempo limite do lado do app, a reconexão do WebSocket, a troca de dispositivo, o ping
+da chamada e a tela "Este computador saiu do grupo" já saíram antes (v0.2.2 a v0.5).
 
 ## Configurações
 
-* tela de configurações única: dispositivos, atalhos, notificações e áudio (supressão de ruído da
-  v0.2), para que as opções novas das próximas versões tenham um lugar fixo;
-* teste de microfone.
+* o resto da aba Voz e vídeo: volume de entrada e de saída, teste de microfone, modo de entrada (detecção de voz
+  com a sensibilidade automática ou manual, ou pressionar para falar), cancelamento de eco, controle automático de
+  ganho e os padrões da transmissão (qualidade e áudio);
+* uma aba Atalhos.
 
 ## Atalhos globais
 
-* mute e push-to-talk, funcionando com um jogo em foco;
-* configuráveis na tela de configurações.
+* mutar, ensurdecer, pressionar para falar, atender e recusar ou desligar a ligação, funcionando com um jogo em
+  foco, pelo teclado e pelos botões do mouse;
+* configuráveis na aba Atalhos (o do overlay fica de fora, com o overlay).
 
 ## Confiabilidade
 
-* tratamento consistente de erros e timeouts na API;
-* API indisponível: tentativa de reconexão e feedback visual;
-* reconexão e recuperação do LiveKit (voz e screen share);
-* sessão inválida: volta para a tela de convite;
-* dispositivos: microfone desconectado, saída indisponível, troca de dispositivo;
+* tempo limite por pedido na API;
+* API indisponível: a faixa "Sem conexão com o servidor", com nova tentativa, e os dados recarregados ao voltar;
+* reconexão da voz com token novo depois que o LiveKit desiste, e ao voltar da suspensão do Windows;
+* reconexão da transmissão nativa sem parar a captura;
+* dispositivos: microfone e saída desconectados, com aviso e volta ao escolhido;
 * **indicador de qualidade da conexão** por participante (ping e perda de pacotes), para saber se um
   picote vem da rede de quem transmite ou de quem assiste;
-* botão "enviar logs", que manda os logs recentes para a API, sem precisar procurar a pasta.
+* botão "Enviar logs", que manda os logs recentes para a API, e a tela Logs no Painel de controle do dono.
 
 Estados de interface:
 
@@ -854,6 +861,8 @@ trocar o microfone pela tela de configurações, sem sair da voz
 desconectar o microfone → aviso e recuperação ao reconectar
  +
 queda de rede curta → recuperação sem estado inconsistente
+ +
+mandar os logs pelo app → o dono baixa pelo Painel
 ```
 
 ---

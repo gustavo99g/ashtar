@@ -1,485 +1,393 @@
-# Plano — v0.5: salas e presença
+# Plano — v0.6: confiabilidade e configurações
 
-As pendências estão no [`NOTES.md`](NOTES.md). O plano da fase anterior está arquivado em
-[`docs/plans/v0.4-transmissoes-e-camera.md`](docs/plans/v0.4-transmissoes-e-camera.md).
+> As pendências estão em [`NOTES.md`](NOTES.md). O plano da v0.5 está em
+> [`docs/plans/v0.5-salas-e-presenca.md`](docs/plans/v0.5-salas-e-presenca.md).
 
-A v0.5 tira a sala única do app: quem gerencia os canais cria salas de voz nas mesmas categorias dos canais de
-texto, e qualquer pessoa troca de sala com um clique. Quem tem a permissão nova move os outros de sala, pelo cartão
-ou arrastando na lista, e também os desconecta da voz. Cada canal de texto e cada sala de voz pode ser restrito a
-uma lista de pessoas, e some para quem está fora dela. Em volta disso, a presença ganha o Ausente (manual e
-automático), o "digitando…" e os sons da sala.
+A v0.6 deixa o Ashtar ajustável e confiável para o uso de todo dia. A aba Voz e vídeo ganha o que ficou guardado
+desde a v0.2.2 (volumes, teste de microfone, detecção de voz com sensibilidade, eco e ganho, os padrões da
+transmissão), e uma aba nova, Atalhos, traz o pressionar para falar e os atalhos globais, que funcionam com um jogo
+em foco. Em volta disso, o app passa a se recuperar sozinho de uma queda curta (voz, transmissão nativa e
+servidor), avisa quando o microfone some, mostra a qualidade da conexão de cada pessoa na sala e manda os logs para
+o dono com um clique.
 
-Sai numa versão só, a `0.5.0`, pelo beta antes do estável. O trabalho anda em duas partes, mas nenhuma é publicada
+Sai numa versão só, a `0.6.0`, pelo beta antes do estável. O trabalho anda em duas partes, mas nenhuma é publicada
 sozinha:
 
 | Parte | O que é | Mexe em |
 |---|---|---|
-| 1 | Salas: criar, editar e arquivar sala de voz, o fim da sala fixa, trocar de sala, mover e desconectar alguém, e os canais e salas restritos | API, banco e app |
-| 2 | Presença e sons: Ausente, "digitando…" e os sons da sala | API e app |
+| 1 | Configurações: a aba Voz e vídeo completa, o gancho de teclado e mouse, a aba Atalhos e o pressionar para falar | App e Rust |
+| 2 | Confiabilidade: reconexão da voz e da transmissão, dispositivos, "Sem conexão com o servidor", qualidade da conexão e "Enviar logs" | App, Rust e API |
 
-**Objetivo da fase:** o grupo se divide em mais de uma sala na mesma noite, cada um vê onde os outros estão e o que
-estão fazendo, e ninguém precisa sair e entrar de novo para trocar de sala.
+**Objetivo da fase:** uma noite inteira de jogo sem ninguém precisar sair e entrar de novo na sala: o pressionar
+para falar funciona com o jogo em foco, uma queda curta de rede volta sozinha, e quando algo der errado o dono
+recebe os logs sem ninguém procurar pasta.
 
-**Fora do escopo:** o "Reconectando" e o resto da confiabilidade (v0.6); anexos, imagens e o resto do chat
-avançado (v0.7); a seção Moderação do cartão, com silenciar e deixar surdo para todos (v0.8, combinado em 19/11); status com texto
-livre (fora, combinado em 19/11); chat de texto dentro da sala de voz (fora, combinado em 19/11); limite de pessoas
-por sala (fora, combinado em 19/11); as pendências da v0.2.4, que continuam fora.
+**Fora do escopo:** o overlay em jogos e o atalho dele (sem versão); o perfil (nick e foto) e o chat avançado
+(v0.7); a moderação do cartão (v0.8); as pendências da v0.2.4, que continuam fora.
 
-Base: a branch da v0.4 (PR #20, `f98f84a`), até a `0.4.0` chegar ao estável; depois, a `dev` com a `0.4.x`. Em cada
-etapa, `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings` e `cargo test` (em `api/` e em
-`desktop/src-tauri/`) e `pnpm lint`, `pnpm build` e `pnpm test` (em `desktop/`) devem passar.
+Base: a `dev` com a `0.5.0`. Em cada etapa, `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings` e
+`cargo test` (em `api/` e em `desktop/src-tauri/`) e `pnpm lint`, `pnpm build` e `pnpm test` (em `desktop/`) devem
+passar.
 
 ## O que já existe
 
-Levantado na branch da v0.4, para o plano não refazer:
+Levantado na `dev` (`196cb41`), para o plano não refazer:
 
-- **O banco e a API já têm salas de voz.** A tabela `channels` guarda `kind` (`text` ou `voice`), a sala Sala é a
-  linha `sala`, e o `POST /api/voice/token` e o `GET /api/voice/participants` já aceitam qualquer sala de voz
-  aberta (ADR 0016). O que falta é o `POST /api/channels` aceitar `kind: voice`.
-- **A lista de canais já mostra quem está em cada sala** (`RoomMembers` e `AvatarStrip` na `ChannelRow`), pelo
-  evento `voice.participants`, que já vem com o `channel_id`.
-- **O indicador de quem fala já existe**, nos blocos (`ParticipantTile`) e na lista da sala em que a pessoa está.
-- **O app assume uma sala só:** a constante `SALA` (`features/voice/room/model/channel.ts`) é usada em 12 arquivos,
-  e o diálogo de criar canal só cria canal de texto.
+- **A tela de configurações já existe**, com Perfil, Voz e vídeo, Notificações e Aplicativo, e o Painel de controle
+  do dono. Voz e vídeo tem os dispositivos (Entrada e Saída), a câmera, a supressão de ruído (liga e desliga o
+  RNNoise) e o aviso antes de ligar. Falta o resto do quadro "Configurações — voz e vídeo".
+- **O dispositivo que some já cai no padrão do Windows** (`effectiveDevice` no `VoiceProvider`), e volta quando
+  reaparece, mas sem aviso nenhum.
+- **A API já tem tempo limite do lado do app** (10 s no `lib/api/client.ts`, o erro `timeout`), e o estado "sem
+  conexão" existe como componente (`components/ui/states.tsx`), usado só em algumas telas.
+- **O WebSocket já reconecta sozinho** (`lib/realtime/connection.ts`, com `reconnecting` e `ended`), mas a interface
+  não mostra nada enquanto isso.
+- **A voz já mostra "Sem conexão com a sala"** quando a sala cai, mas só sai dali clicando de novo. As quedas curtas
+  o próprio `livekit-client` resolve (`Reconnecting`), e o painel mostra "Conectando…" no lugar de "Reconectando…".
+- **A transmissão nativa avisa quando cai** (`on_lost` no `media/publisher.rs`), e hoje isso encerra a transmissão.
+- **O ping da chamada já é medido** (`features/voice/dock/model/ping.ts`, do `getStats`) e aparece no painel de voz.
+- **A sessão inválida já leva à tela "Este computador saiu do grupo"** (`unknown_device`, v0.2.2). Só conferir.
+- **A pasta de logs** já aparece em Aplicativo, com "Abrir pasta"; o Rust guarda 7 dias (`logging.rs`).
 
 ## Progresso
 
 | Etapa | Parte | Descrição | Status |
 |---|---|---|---|
-| 0 | — | Decisões: ADRs 0026, 0027 e 0028, roadmap, BACKLOG | Concluída |
-| 1 | 1 | API: criar, editar e arquivar sala de voz | Concluída |
-| 2 | 1 | App: o fim da sala fixa | Concluída |
-| 3 | 1 | App: criar, editar e arquivar sala de voz | Concluída |
-| 4 | 1 | App: trocar de sala | Concluída |
-| 5 | 1 | API: a permissão Mover membros, mover e desconectar | Concluída |
-| 6 | 1 | App: Mover para e Desconectar no cartão | Concluída |
-| 7 | 1 | App: arrastar uma pessoa para outra sala | Concluída |
-| 8 | 1 | API: canais e salas restritos, a lista e a regra de acesso | Concluída |
-| 9 | 1 | API: os eventos, as menções e as não lidas de um canal restrito | Concluída |
-| 10 | 1 | App: canais e salas restritos | Concluída |
-| 11 | 2 | API: o status Ausente | Concluída |
-| 12 | 2 | App: Ausente manual e automático | Concluída |
-| 13 | 2 | API e app: "digitando…" | Concluída |
-| 14 | 2 | App: os sons da sala | Concluída |
-| 15 | — | Teste com três computadores, sem publicar | Pendente |
-| 16 | — | Lançamento da `0.5.0` | Pendente |
+| 0 | — | Decisões: ADRs 0029 e 0030, roadmap, BACKLOG, canvas | Feita |
+| 1 | 1 | App: a cadeia do microfone (volume de entrada, portão e RNNoise) | Pendente |
+| 2 | 1 | App: a aba Voz e vídeo completa | Pendente |
+| 3 | 1 | Rust: o gancho de teclado e mouse | Pendente |
+| 4 | 1 | App: a aba Atalhos e o pressionar para falar | Pendente |
+| 5 | 2 | App: a voz volta sozinha | Pendente |
+| 6 | 2 | Rust e app: a transmissão nativa volta sozinha | Pendente |
+| 7 | 2 | App: microfone e saída desconectados | Pendente |
+| 8 | 2 | API e app: "Sem conexão com o servidor" | Pendente |
+| 9 | 2 | App: a qualidade da conexão de cada pessoa | Pendente |
+| 10 | 2 | API, Rust e app: "Enviar logs" | Pendente |
+| 11 | — | Teste com três computadores, sem publicar | Pendente |
+| 12 | — | Lançamento da `0.6.0` | Pendente |
 
-Dependências: a 1 e a 2 andam juntas, e a 3 e a 4 usam as duas. A 5 vai para a `dev` e para o servidor sozinha,
-antes do lançamento: o app atual nunca chama as rotas novas. A 6 e a 7 usam a 4 (a pessoa movida troca de sala
-pelo mesmo caminho) e a 5. A 8 usa a 1 e a 5 (mover para uma sala restrita), a 9 usa a 8, e a 10 usa a 3, a 8 e a 9. Na parte 2, a 11 vem antes da 12; a 13 e a 14 não dependem de nada da parte 1 e podem
-andar em paralelo com ela.
+Dependências: a 2 usa a 1; a 4 usa a 1 (o portão abre e fecha pelo atalho) e a 3. A parte 2 não depende da parte
+1 e pode andar em paralelo. A 6 usa a 5 (a transmissão volta depois da voz). A API da 10 pode ir para o servidor antes do
+lançamento: o app atual nunca chama a rota nova.
 
-Branch: `claude/project-thread-qf02oy`, saída da `dev`, num pull request só para a `dev`. As etapas 0 a 14 estão
-nela; a 15 e a 16 são do Kid, com os três computadores.
-
-### Como ficou (o que mudou do plano)
-
-- **A Sala não pode ser arquivada** (decisão 3): continua protegida, como o `#geral`, e pode ser renomeada. Alguma sala
-  de voz existe sempre, e o app antigo entra nela pelo id.
-- **A lista de acesso** é a `channel_members` das conversas privadas, com a coluna `restricted` em `channels`
-  (migração `0008`), e não uma `channel_access` nova. Ela vai junto do canal para quem o vê, não só para quem
-  gerencia: o @ e o "Mover para" usam.
-- **Sem cache da lista** (Etapa 9): quem recebe cada evento de canal é lido no banco na hora (`access::audience`). O
-  `ServerEvent::of_channel` marca os eventos de canal sem `_` no `match`, e o `publish` para todos recusa um deles nos
-  testes.
-- **O cadeado** aparece para todos que veem o canal restrito, não só para quem gerencia.
-- **O Ausente** precisou refazer a tabela `users` (migração `0009`), porque o `CHECK` do status não aceita valor novo.
-  Numa ligação privada, como numa sala, ninguém fica ausente sozinho.
-- **O `idle_seconds`** (`commands/presence.rs`) só compila e roda no Windows: conferir na Etapa 15. O app só é publicado na Etapa 16, que leva a
-branch para a `dev` (beta) e depois para a `main`.
+Branch: `claude/project-thread-oj6xia`, com um pull request para a `dev` que recebe as etapas em commits separados. O
+app só é publicado na Etapa 12, que leva a `dev` para o beta e depois para a `main`.
 
 ## Decisões
 
 As decisões de arquitetura vão para as ADRs, que são a fonte:
 
-- `0026-varias-salas-de-voz.md`: criar sala de voz, o fim da sala fixa, trocar de sala, mover e desconectar
-  (atualiza a 0016 e a 0020).
-- `0028-canais-restritos.md`: canais de texto e salas de voz restritos (decisões 14 a 18), que atualiza a 0021 (a
-  regra de leitura ganha o terceiro caso) e a 0016.
-- `0027-ausente-e-digitando.md`: o Ausente manual e automático, e o "digitando…" (atualiza a 0022, que tem os
-  status).
+- `0029-configuracoes-de-voz-e-atalhos.md`: a cadeia do microfone, a detecção de voz, o pressionar para falar e o
+  gancho de teclado e mouse (decisões 1 a 8).
+- `0030-reconexao-e-estados.md`: a reconexão da voz e da transmissão, os dispositivos, a faixa do servidor, a
+  qualidade da conexão e os logs (decisões 9 a 17).
 
-Os sons da sala não pedem ADR: entram na seção de sons da 0022.
+### Combinado (20/11)
 
-### Combinado (19/11)
-
-- **A v0.5 sai numa versão só**, a `0.5.0`, com as salas, a presença e os sons juntos.
-- **Entram** as seis frentes propostas: criar sala de voz, trocar de sala, mover alguém, Ausente, "digitando…" e os
-  sons da sala.
-- **Entram dois extras:** arrastar uma pessoa de uma sala para outra na lista de canais, e "Desconectar da voz" no
-  cartão, com a mesma permissão de mover.
-- **Entram os canais e salas restritos** (19/11): cada canal de texto e cada sala de voz pode ter as pessoas
-  associadas, e quem está fora da lista nem vê nem interage. Silenciar e ensurdecer alguém para todos ficam na v0.8.
-- **O dono tem todas as permissões** e pode fazer todas as ações, em tudo; quem tem "Gerenciar canais" também vê
-  os canais restritos, para editar as listas.
-- **Ficam de fora:** status com texto livre e chat de texto dentro da sala de voz.
-- **Todas as sugestões do levantamento foram aceitas** (decisões 1 a 13 abaixo).
-- **A VPS (Borkcloud) já hospeda tudo**, com franquia ilimitada. Várias salas não aumentam a saída: cada pessoa
-  continua numa sala só.
+- **A v0.6 sai numa versão só**, a `0.6.0`.
+- **Entram as duas partes propostas**, com todas as sugestões aceitas: pressionar para falar pelo teclado e pelos
+  botões laterais do mouse; a detecção de voz com a sensibilidade automática e manual; os logs guardados na API e
+  vistos pelo dono no Painel; a qualidade da conexão como um ícone que só aparece quando está ruim, com os números
+  no cartão; os itens abertos do `NOTES.md` da v0.5 conferidos no teste da beta `0.5.0`, e o que sobrar adiado para
+  cá.
+- **Os atalhos de ligação** (Atender e Recusar ou desligar), que estão no quadro "Configurações — atalhos", entram
+  junto, porque usam o mesmo gancho. O atalho do overlay fica fora.
+- **As telas que faltam no canvas** (aviso de dispositivo, faixa do servidor, qualidade da conexão, "Enviar logs" e
+  a lista do Painel) são desenhadas na Etapa 0, no estilo dos quadros vizinhos.
 
 ### Decidido neste plano
 
-**Salas (parte 1)**
+**Configurações e atalhos (parte 1)**
 
-1. **Quem cria sala de voz é quem tem "Gerenciar canais"**, a mesma permissão dos canais de texto. Criar, editar
-   (nome) e arquivar sala de voz usam o mesmo menu do servidor, o mesmo menu do canal e o mesmo modo Organizar da
-   v0.3. O nome da sala é livre, de 1 a 32 caracteres, como já valida o `validate_label`.
-2. **Sem limite de pessoas por sala.**
-3. **A sala Sala deixa de ser especial.** Ela continua no banco como a linha `sala` e pode ser renomeada, mas,
-   como o `#geral`, não pode ser arquivada: alguma sala de voz existe sempre, e o app antigo entra nela pelo id. O app não guarda mais nenhuma sala fixa: a sala conectada é um id num store, e tudo
-   que hoje lê o `SALA` (o painel de voz, o alto da sala, a volta da ligação, o aviso de atualização, a lista de
-   pessoas) lê esse id. Arquivar a sala com gente dentro desconecta todo mundo dela, com o aviso "A sala foi
-   arquivada".
-4. **Trocar de sala é um clique.** Clicar em outra sala de voz, já conectado, sai da atual e entra na nova, sem
-   pergunta. A câmera desliga e a transmissão acaba (as duas são da sala), e por isso, transmitindo ou com a câmera
-   ligada, o clique pergunta antes: "Trocar de sala encerra a sua transmissão", igual ao aviso da ligação, com a
-   mesma chave para não perguntar mais. Durante uma ligação, a pergunta da ligação continua valendo. O microfone
-   e o surdo continuam como estavam.
-5. **Quem move é quem tem "Mover membros"**, uma permissão nova, dada por pessoa no Painel, como as outras. O dono
-   tem todas. "Desconectar da voz" usa a mesma permissão.
-6. **Mover é a pessoa trocar de sala sozinha, por ordem da API.** O `POST /api/voice/move` confere a permissão, a
-   sala de destino e que a pessoa está numa sala de voz (não numa ligação privada), e manda um evento
-   `voice.moved` só para as conexões dela; o app dela troca de sala pelo mesmo caminho da decisão 4, sem perguntar.
-   A transmissão e a câmera dela acabam. O `MoveParticipant` do LiveKit não é usado: o app precisa de um token novo
-   de qualquer jeito, e a `:screen` do publicador nativo é outra conexão. Se o app não trocar em 10 segundos (app
-   antigo, ou travado), a API tira a pessoa da sala antiga com o `remove_participant`.
-7. **Desconectar tira a pessoa da voz.** O `POST /api/voice/disconnect` manda `voice.disconnected` para ela e tira
-   as duas conexões (a da voz e a `:screen`) com o `remove_participant`. O app dela sai da sala com o aviso "Você
-   foi desconectado da voz por fulano" e não tenta reconectar.
-8. **Mover e desconectar aparecem no cartão** da pessoa, para quem tem a permissão, só quando ela está numa sala
-   de voz: "Mover para" abre a lista das outras salas, e "Desconectar da voz" fica em vermelho, sem pergunta.
-   Ninguém se move pelo cartão (a própria pessoa troca clicando na sala).
-9. **Arrastar uma pessoa para outra sala**, na lista de canais, faz o mesmo que "Mover para". Só quem tem a
-   permissão arrasta, só os avatares dentro das salas, e funciona fora do modo Organizar: é uma exceção à regra
-   "arrastar só no modo Organizar" da ADR 0020, porque ali nada da lista muda de lugar. A sala embaixo do mouse
-   fica em destaque, e soltar fora de uma sala não faz nada. No modo Organizar, os avatares não se arrastam.
+1. **O microfone passa por uma cadeia só**, num `AudioContext`: o volume de entrada (um ganho de 0 a 200%), o
+   RNNoise (se ligado) e o portão da detecção de voz, nessa ordem. É o mesmo processador do LiveKit que hoje põe o
+   RNNoise na trilha (`setProcessor`), e fica ligado sempre que qualquer etapa dele vale alguma coisa. O nível que o
+   medidor e a sensibilidade mostram é o da saída do ganho, antes do portão.
+2. **A detecção de voz é um portão, não um mute.** Abaixo da sensibilidade, o portão manda silêncio na trilha, que
+   continua publicada e sem o ícone de microfone cortado para os outros. Abre em 10 ms e fecha 300 ms depois de a voz
+   cair, para não comer o fim das palavras. A sensibilidade automática segue o ruído de fundo (o piso medido nos
+   últimos segundos, mais uma margem); a manual é uma régua em dB, de -100 a 0, com a marca dourada do quadro.
+3. **O pressionar para falar é o mesmo portão**, aberto pelo atalho em vez da voz, com os mesmos 300 ms para fechar
+   depois de soltar. Os dois modos são exclusivos, como no quadro: escolher um atalho de pressionar para falar não
+   troca o modo sozinho, mas o modo Pressionar para falar sem atalho mostra o aviso para definir um. Com o portão
+   aberto pelo atalho, o seu avatar ganha o anel de quem fala, como hoje.
+4. **Mutado ganha do portão.** Mutar e ensurdecer continuam desligando o microfone como hoje (`setMicrophoneEnabled`);
+   o portão só vale com o microfone ligado.
+5. **Os atalhos globais vêm de um gancho do Windows, no Rust** (`WH_KEYBOARD_LL` e `WH_MOUSE_LL`, numa thread
+   própria com o laço de mensagens). O gancho só olha, nunca segura a tecla: o jogo continua recebendo tudo. O
+   `RegisterHotKey` (e o plugin de atalhos do Tauri) segura a tecla, e por isso não serve (BACKLOG da v0.2.2).
+6. **Atalhos de agora:** Desativar microfone, Desativar áudio, Pressionar para falar, Atender ligação e Recusar ou
+   desligar, como no quadro. Os padrões são os do quadro (`Ctrl+Shift+M`, `Ctrl+Shift+D`, nenhum, `Ctrl+Shift+A` e
+   `Ctrl+Shift+E`). Uma combinação é até três modificadores e uma tecla, ou um botão do mouse (os laterais, `X1` e
+   `X2`, e o do meio), sozinho ou com modificadores. O clique esquerdo e o direito não podem.
+7. **Gravar um atalho** é como no quadro "Configurações — atalhos (gravando)": Trocar põe a linha gravando, a próxima
+   combinação apertada vira o atalho, Esc ou Cancelar desiste. Enquanto grava, os atalhos não disparam. A mesma
+   combinação em duas linhas não pode: a nova mostra quem já usa ("Já é o atalho de Desativar microfone").
+8. **Os atalhos e o modo de entrada ficam no computador**, no `settingsStore` (como os dispositivos), e o app manda a
+   lista para o Rust ao abrir e a cada mudança. O Rust só avisa "apertou" e "soltou" com o nome do atalho; quem decide
+   o que fazer é o app.
 
-**Presença e sons (parte 2)**
+**Confiabilidade (parte 2)**
 
-10. **O Ausente tem dois jeitos.** Manual, como um quarto status no menu do seu painel (Disponível, Ausente,
-    Ocupado e Invisível), com a bolinha amarela da lua; e automático, quando a pessoa está Disponível e passa 10
-    minutos sem tocar no teclado nem no mouse, no Windows inteiro, não só no Ashtar. O automático volta a
-    Disponível no primeiro toque. Ocupado e Invisível não viram Ausente. Ausente não cala nada: avisos, sons,
-    notificações e toque de ligação continuam (quem cala é o Ocupado).
-11. **Numa sala de voz, ninguém fica ausente sozinho.** Quem joga de controle não toca no teclado nem no mouse e
-    pareceria ausente no meio da conversa. O Ausente manual continua valendo dentro da sala. A inatividade vem do
-    Windows (`GetLastInputInfo`, no Rust), lida a cada 30 segundos; o app só avisa a API quando o estado muda.
-12. **"Digitando…" nos canais e nas conversas privadas.** Aparece embaixo da caixa de texto ("fulano está
-    digitando…", "fulano e beltrano estão digitando…", "várias pessoas estão digitando…"), e, nas conversas
-    privadas, também na lista de conversas, no lugar da última mensagem. Só vai para quem pode ler o canal ou a
-    conversa. O Invisível não mostra que está digitando.
-13. **Os sons da sala:** alguém entrou, alguém saiu, você mutou, desmutou, ficou surdo e voltou, e alguém começou
-    ou parou de transmitir na sua sala. Cada um tem uma chave em Configurações › Notificações, ligada por padrão, e
-    todos tocam também em Ocupado, porque a pessoa está na sala. Os sons de entrada e saída só tocam na sala em que
-    a pessoa está, e não tocam para ela mesma entrando (o som de entrar é o próprio). São originais, gerados para o
-    projeto, como os de mensagem e o toque de hoje (`assets/sounds/`).
-
-**Mais da parte 1: canais e salas restritos**
-
-14. **Qualquer canal de texto ou sala de voz pode ser restrito** a uma lista de pessoas. Sem restrição, é de todos,
-    como hoje. Quem tem "Gerenciar canais" liga a restrição e escolhe as pessoas no diálogo de editar o canal ("Quem
-    tem acesso"), e também ao criar.
-15. **Para quem está fora da lista, o canal não existe.** Não aparece na lista de canais, nem as mensagens, as não
-    lidas, as menções, o "digitando…", quem está na sala, o "começou a transmitir" e os sons dela. A API trata o id
-    como um que não existe (o mesmo `NotFound` da conversa dos outros, ADR 0021). Uma categoria em que a pessoa não vê
-    nenhum canal também some para ela.
-16. **O dono e quem tem "Gerenciar canais" veem todos**, porque precisam para editar as listas. O diálogo diz isso
-    ("quem gerencia os canais também tem acesso"), para ninguém achar que o canal é só das pessoas marcadas.
-17. **A trava é da API.** A regra de leitura (`chat/access.rs`) ganha o terceiro caso, o canal restrito; o
-    `POST /api/voice/token` passa pela mesma regra; e cada evento de um canal restrito só sai para as conexões de
-    quem tem acesso, como as mensagens privadas. Assim vale também para um app antigo.
-18. **Perder o acesso tira a pessoa na hora.** Tirar alguém da lista (ou restringir um canal sem ele): o canal some
-    da lista dele; se ele estava com o canal aberto, volta para o primeiro canal; se estava na sala, é desconectado
-    com o aviso "Você não tem mais acesso a esta sala". "Mover para" e o arrastar não oferecem uma sala restrita para
-    quem está fora dela, e a menção a quem não tem acesso não notifica (a sugestão do @ só mostra quem tem).
+9. **A voz volta sozinha.** Quando o `livekit-client` desiste (o `Disconnected` que não foi pedido, nem a sala
+   arquivada, nem a pessoa tirada ou movida), o app pede um token novo e entra de novo na mesma sala, com espera de
+   1, 2, 5, 10, 20 e 30 segundos, e depois a cada 30 até 5 minutos. Durante isso o painel mostra "Reconectando…" (o
+   quadro "Estados e avisos"), com o desligar ao lado. Depois de 5 minutos, fica o "Sem conexão com a sala" de hoje,
+   com Tentar de novo. O mute e o surdo voltam como estavam; a câmera não volta (decisão da v0.4: nunca liga
+   sozinha).
+10. **O Windows acordando conta como queda.** Ao voltar da suspensão, o app reconecta a voz na hora, sem esperar o
+    LiveKit perceber.
+11. **A transmissão nativa volta sozinha.** Quando a `:screen` cai e a voz continua, o Rust entra de novo com um
+    token novo, sem parar a captura nem o encoder, e quem assiste vê "Conexão perdida — reconectando" no lugar da
+    imagem por alguns segundos. Quem transmite vê o aviso "Conexão perdida" do quadro. Se a voz também caiu, a
+    transmissão espera a voz voltar e entra em seguida. Se não voltar em 2 minutos, acaba como hoje.
+12. **Microfone desconectado:** o app troca para o padrão do Windows na hora, sem sair da sala, e mostra o aviso
+    "Seu microfone foi desconectado — usando o padrão do Windows". Quando o escolhido volta, troca de volta e o aviso
+    some. Sem nenhum microfone, entra mutado, com o aviso "Nenhum microfone encontrado". A saída segue a mesma regra,
+    com o aviso dela.
+13. **"Sem conexão com o servidor"** é uma faixa no alto da janela, embaixo da barra de título, que aparece quando o
+    WebSocket fica mais de 5 segundos sem conectar (quedas menores não piscam nada). Mostra a próxima tentativa
+    ("Tentando de novo em 8 s") e Tentar agora. Quando volta, a faixa some e o app recarrega o que pode ter mudado
+    (canais, membros, não lidas e as mensagens do canal aberto). A voz não depende da faixa: com a API fora e o
+    LiveKit no ar, a sala continua.
+14. **A API ganha tempo limite** de 30 segundos por pedido (o `TimeoutLayer` do `tower-http`), com o erro `timeout`
+    no mesmo formato dos outros. As rotas de upload (logs) ficam com 120.
+15. **A qualidade da conexão aparece só quando está ruim.** Um ícone de sinal no bloco da pessoa, em laranja
+    (Instável) ou vermelho (Ruim), lido do `ConnectionQuality` que o LiveKit já calcula para cada um; com a conexão
+    boa, nada. No cartão da pessoa (na sala), a seção Conexão mostra o ping e a perda de pacotes dela. Os números vêm
+    da própria pessoa: cada app manda os seus a cada 5 segundos por uma mensagem de dados da sala (como o surdo). O
+    app antigo não manda, e o cartão mostra só o ícone.
+16. **"Enviar logs"** em Configurações › Aplicativo junta os logs dos últimos 2 dias num `.zip` (no Rust), com a
+    versão do app e do Windows, e manda para a API (`POST /api/logs`, até 10 MB). Um campo opcional deixa a pessoa
+    dizer o que aconteceu. A API grava o arquivo no disco, ao lado do banco, e guarda os últimos 30 dias. Os logs não
+    têm mensagens, mas têm nicks e ids; o texto do botão diz que só o dono vê.
+17. **O dono vê os logs no Painel**, numa tela nova, Logs: quem mandou, quando, a versão, o que a pessoa escreveu, e
+    Baixar. Só o dono (a permissão é dele, não vira permissão por pessoa). Quando chega um, o dono recebe o aviso no
+    canto, como o de quem entrou no grupo.
 
 ---
 
-## Etapa 0: ADRs, roadmap e BACKLOG
+## Etapa 0: ADRs, roadmap, BACKLOG e canvas
 
-Só documentos. Fecha as decisões antes de qualquer código.
+Só documentos e desenho.
 
-- ADR **0026** (decisões 1 a 9), que atualiza a 0016 ("só canais de texto são criados agora") e a 0020 (a exceção
-  do arrastar).
-- ADR **0027** (decisões 10 a 12), que atualiza a 0022 (os status) e recebe a decisão 13 na seção de sons.
-- ADR **0028** (decisões 14 a 18), que atualiza a 0021 (a regra de leitura ganha o canal restrito) e a 0016.
-- `docs/roadmap.md`: a v0.5 com uma versão só (`0.5.0`); sai o "speaking indicator", que já existe; entram mover
-  e desconectar pelo cartão e arrastando, e os canais e salas restritos; saem o status com texto e o chat na sala de voz.
-- `BACKLOG.md`: sai o "Mover para outra sala" da v0.5.
-- `docs/roadmap.md`, na v0.8: "tirar da sala" sai da moderação (vem para a v0.5, como Desconectar da voz).
-- O `PLAN.md` e o `NOTES.md` da v0.3 e o plano da v0.4 vão para `docs/plans/`, e a raiz recebe estes.
+- O `PLAN.md` e o `NOTES.md` da v0.5 vão para `docs/plans/`, e a raiz recebe estes. Os `[ ]` da v0.5 que o teste da
+  beta `0.5.0` não resolver ficam marcados como adiados lá, e os que pedem código entram no `NOTES.md` da v0.6.
+- ADR **0029** (decisões 1 a 8) e ADR **0030** (decisões 9 a 17). A 0030 atualiza a 0016 (a sala) e a 0017 (o
+  publicador nativo, que passa a reconectar).
+- `docs/roadmap.md`: a v0.6 com a versão única, os atalhos de ligação, a lista do que já existia e o "Enviar logs"
+  com o Painel.
+- `BACKLOG.md`: saem os dois itens da v0.6 (a aba Voz e vídeo e o "Reconectando"), e o "Abrir pasta de logs" da
+  v0.2.2, que já existe.
+- Canvas: os quadros "Aviso — dispositivo desconectado", "Faixa — sem conexão com o servidor", "Voz — qualidade da
+  conexão" (o bloco e o cartão), "Configurações — aplicativo (enviar logs)" e "Painel de controle — logs".
 
-**Pronto quando:** as três ADRs estão em `docs/adr/`, a 0016, a 0020, a 0021 e a 0022 apontam para elas, e o roadmap tem a
-v0.5 nova.
-
----
-
-# Parte 1: salas
-
-API, banco e app.
-
-## Etapa 1: API, criar, editar e arquivar sala de voz
-
-`api/src/routes/channels.rs` e `api/src/chat/channels.rs`.
-
-- O `POST /api/channels` aceita `kind` (`text` por padrão, ou `voice`). A sala de voz não tem tópico; o nome passa
-  pelo `validate_label`, como já faz o `update`.
-- Arquivar uma sala de voz com gente dentro tira todo mundo com o `remove_participant` (as conexões de voz e as
-  `:screen`), e manda `voice.disconnected` com o motivo `archived` (decisão 3). Desarquivar volta a sala vazia.
-- O `channels.changed` já avisa a lista; nada muda nele.
-- O OpenAPI e o cliente gerado (`lib/api/generated`) passam a ter o `kind` no corpo.
-- Testes: criar sala de voz com e sem a permissão; nome vazio e com 33 caracteres; tópico numa sala de voz dá 400;
-  arquivar uma sala com gente chama a remoção.
-
-**Pronto quando:** dá para criar uma segunda sala de voz pela API, entrar nela com o `POST /api/voice/token` e
-arquivá-la com alguém dentro.
-
-## Etapa 2: app, o fim da sala fixa
-
-`features/voice/room/` e quem lê o `SALA`.
-
-- Sai o `SALA` de `model/channel.ts`. A sala conectada passa a ser o `channelId` do estado da chamada (que já
-  existe para a ligação privada), e o nome vem da lista de canais.
-- Os 12 arquivos que usam o `SALA` passam a ler a sala conectada: `ServerView`, `UpdateNotice`, `VoiceConnection`,
-  `VoiceDock`, `ShareHost`, `RoomHeader`, `VoiceRoom`, `CallButton`, `ReturnToRoom` e `PeopleList`.
-- A volta da ligação ("Voltar para a sala") lembra de qual sala a pessoa saiu, e não da Sala.
-- A ADR 0014 previa `server/channels/` e `features/presence/` na v0.5: a lista de canais já está em
-  `features/channels/`, e a presença entra em `features/presence/` na parte 2.
-
-**Pronto quando:** nenhum `SALA` sobra fora dos testes; entrar na Sala funciona como antes; com uma segunda sala
-criada pela API, dá para entrar nela pela lista.
-
-## Etapa 3: app, criar, editar e arquivar sala de voz
-
-`features/channels/components/ChannelDialogs.tsx` e o menu do servidor.
-
-- O diálogo de criar canal ganha a escolha do tipo, Texto ou Voz, no topo, como no quadro "Criar canal" do canvas.
-  Na voz, some o tópico e o nome não vira minúsculas.
-- "Criar canal" no menu do servidor e o + da categoria abrem o mesmo diálogo, com Texto marcado.
-- Editar e arquivar sala de voz já passam pelo menu do canal; conferir os textos ("Arquivar sala de voz").
-- Criar a sala não entra nela (diferente do canal de texto, que abre): só aparece na lista.
-
-**Pronto quando:** quem tem "Gerenciar canais" cria, renomeia, move de categoria e arquiva uma sala de voz pelo
-app, e os outros veem na hora.
-
-## Etapa 4: app, trocar de sala
-
-`features/voice/room/` e `features/channels/`.
-
-- Clicar em outra sala, já conectado, faz `leave` da atual e `join` da nova, com um token novo, sem passar pela
-  tela vazia. O painel "Voz conectada" mostra a sala nova assim que o token chega.
-- Transmitindo ou com a câmera ligada, o clique pergunta antes (decisão 4), com a chave "Não perguntar de novo",
-  junto da chave da ligação em Configurações › Voz e vídeo.
-- A transmissão acaba pelo caminho de sempre (o publicador nativo para a `:screen`); a câmera desliga.
-- O que a pessoa assistia na sala antiga sai da lista do `watching`; a miniatura some.
-- O microfone, o surdo e os volumes por pessoa continuam.
-- A troca vira uma função só (`switchRoom(channelId, { reason })`), que a Etapa 6 reaproveita para o `voice.moved`.
-
-**Pronto quando:** trocar de sala com o microfone ligado não deixa a pessoa nas duas salas ao mesmo tempo (conferir
-no `voice.participants` das duas); trocar transmitindo pergunta e a transmissão acaba na sala antiga.
-
-## Etapa 5: API, mover e desconectar
-
-`api/src/identity/permissions.rs`, `api/src/routes/voice.rs` e `api/src/realtime/`.
-
-- `Permission::MoveMembers` (`membros.mover`, "Mover membros"), dada por pessoa no Painel; o dono tem.
-- `POST /api/voice/move` (`user_id`, `channel_id`): confere a permissão, a sala de destino aberta, e que a pessoa
-  está numa sala de voz (a `list_room` das salas, ou o `voice.participants` guardado); 409 se ela está numa
-  ligação ou em nenhuma sala, e 409 se já está na sala de destino. Manda `voice.moved` (`channel_id`, `by`) só
-  para as conexões dela, e agenda a remoção da sala antiga em 10 segundos, cancelada se ela sair antes
-  (decisão 6).
-- `POST /api/voice/disconnect` (`user_id`): mesma permissão; manda `voice.disconnected` (`by`) e tira as conexões
-  de voz e `:screen` com o `remove_participant` (decisão 7).
-- Testes: sem permissão dá 403; mover quem está em ligação dá 409; o evento só vai para as conexões da pessoa; a
-  remoção agendada acontece sem a saída e é cancelada com ela.
-
-**Pronto quando:** as rotas estão na `dev` e no servidor, com os testes; mover alguém com um app de hoje (que não
-conhece o `voice.moved`) tira a pessoa da sala em 10 segundos.
-
-## Etapa 6: app, Mover para e Desconectar no cartão
-
-`features/members/` (o cartão) e `features/voice/room/`.
-
-- O cartão ganha "Mover para" (com a lista das outras salas) e "Desconectar da voz", só para quem tem a permissão e
-  só quando a pessoa do cartão está numa sala de voz (decisão 8).
-- O app de quem é movido ouve o `voice.moved` e chama o `switchRoom` da Etapa 4, sem perguntar, com o aviso "fulano
-  moveu você para Squad".
-- O `voice.disconnected` tira a pessoa da sala com o aviso (de quem desconectou, ou "A sala foi arquivada") e
-  desliga a reconexão automática dessa vez.
-- A permissão nova aparece no Painel, na lista de permissões por pessoa.
-
-**Pronto quando:** mover alguém que está transmitindo leva a pessoa para a outra sala, sem a transmissão, e ela vê o
-aviso; desconectar não reconecta sozinho.
-
-## Etapa 7: app, arrastar uma pessoa para outra sala
-
-`features/server/components/RoomMembers.tsx` e `ChannelRow.tsx`.
-
-- Os avatares dentro das salas ficam arrastáveis para quem tem a permissão, fora do modo Organizar (decisão 9). A
-  mesma biblioteca de arrastar do modo Organizar, com outro contexto, para os dois não se misturarem.
-- A sala embaixo do mouse ganha o destaque; soltar chama o `POST /api/voice/move`. Soltar na própria sala ou fora
-  de uma sala não faz nada.
-- A própria pessoa não se arrasta (ela troca clicando).
-- A ADR 0020 ganha a exceção.
-
-**Pronto quando:** arrastar alguém de uma sala para outra move a pessoa; sem a permissão, os avatares não se
-arrastam; no modo Organizar, também não.
-
-## Etapa 8: API, canais e salas restritos, a lista e a regra de acesso
-
-`api/src/chat/access.rs`, `api/src/chat/channels.rs`, `api/src/chat/layout.rs`, `api/src/routes/channels.rs`,
-`api/src/routes/voice.rs` e o banco.
-
-- Migração `0008`: a coluna `restricted` em `channels` e a tabela `channel_access` (`channel_id`, `user_id`).
-- O `POST` e o `PATCH` do canal aceitam `restricted` e a lista (`member_ids`), com "Gerenciar canais".
-- `access.rs`: uma função só, `can_access(user, channel)`, usada pelo `readable` (texto) e por uma `joinable` nova
-  (voz): sem restrição, todos; restrito, a lista, o dono e quem gerencia (decisões 15 e 16).
-- O `GET /api/channels` (o `layout.rs`) só devolve os canais que a pessoa acessa, e esconde a categoria vazia para
-  ela; a lista de cada canal só vai para quem gerencia.
-- O `POST /api/voice/token` e o `GET /api/voice/participants` passam pela `joinable` (404 como um id que não
-  existe); o `POST /api/voice/move` dá 409 para quem não acessa a sala de destino.
-- Tirar da lista com a pessoa na sala: `voice.disconnected` com o motivo `no_access` e `remove_participant`.
-- Quem sai do grupo sai de todas as listas.
-- Testes: quem está fora não vê o canal no `GET /api/channels`, não lê, não escreve e não entra na sala (404); o
-  dono e quem gerencia veem; a categoria só com canais restritos some; tirar da lista desconecta da sala.
-
-**Pronto quando:** com um canal e uma sala restritos, um cliente de teste fora da lista não acha nenhum dos dois por
-nenhuma rota.
-
-## Etapa 9: API, os eventos, as menções e as não lidas de um canal restrito
-
-`api/src/realtime/`, `api/src/chat/mentions.rs` e `api/src/chat/read.rs`.
-
-- O filtro na saída de cada conexão (o mesmo das mensagens privadas, ADR 0021) passa a usar a `can_access` para
-  todo evento com `channel_id`: `message.created` e os outros do chat, `typing`, `voice.participants` e o estado de
-  lido.
-- O `channels.changed` continua indo para todos (cada um recarrega e recebe só o que acessa); mudar a lista de um
-  canal manda ele também, para o canal aparecer ou sumir na hora.
-- Menção a quem não acessa o canal não grava nem notifica; as não lidas e o "Marcar tudo como lido" só contam os
-  canais que a pessoa acessa.
-- O "começou a transmitir" de uma sala restrita só vai para quem acessa.
-- A lista de acessos fica num cache em memória, atualizado no `PATCH`, para o filtro não ir ao banco a cada evento.
-- Testes: quem está fora não recebe nenhum evento do canal, nem o `voice.participants` da sala; a menção a ele não
-  conta; entrar na lista faz o canal aparecer sem reiniciar.
-
-**Pronto quando:** com duas pessoas dentro e uma fora, conversar e falar no canal e na sala restritos não chega
-nada, de nenhum tipo, à de fora.
-
-## Etapa 10: app, canais e salas restritos
-
-`features/channels/components/ChannelDialogs.tsx`, `features/server/` e `features/chat/`.
-
-- O diálogo de criar e de editar canal (texto e voz) ganha "Restrito" (a chave) e "Quem tem acesso", com a lista de
-  membros para marcar, uma busca e o aviso de que quem gerencia também tem acesso (decisão 16).
-- Para quem gerencia, o canal restrito tem um cadeado na lista; para os outros, nada muda, porque eles só recebem os
-  canais que acessam.
-- Perder o acesso com o canal aberto volta para o primeiro canal, com o aviso "Você não tem mais acesso a este
-  canal"; o `voice.disconnected` com `no_access` mostra o da sala (decisão 18).
-- A sugestão do @ mostra só quem acessa o canal; "Mover para" e o arrastar não oferecem a sala para quem está fora.
-- Os rascunhos e o último canal aberto de um canal que sumiu são esquecidos.
-
-**Pronto quando:** restringir o #staff e a Squad para duas pessoas some com os dois para as outras na hora; tirar
-alguém da lista com o canal aberto e com ele na sala tira ele dos dois.
+**Pronto quando:** as duas ADRs estão em `docs/adr/`, a 0016 e a 0017 apontam para elas, o roadmap tem a v0.6 nova e
+os cinco quadros estão no canvas.
 
 ---
 
-# Parte 2: presença e sons
+# Parte 1: configurações e atalhos
 
-API e app.
+## Etapa 1: app, a cadeia do microfone
 
-## Etapa 11: API, o status Ausente
+`features/voice/noise/` vira `features/voice/input/`.
 
-`api/src/identity/status.rs` e `api/src/realtime/`.
+- O processador de hoje (`rnnoise.ts`, `createProcessor`) vira a cadeia da decisão 1: `GainNode` do volume de
+  entrada, o RNNoise opcional e o portão, num `AudioWorklet` só para o portão (mede o nível em blocos de 10 ms e
+  aplica o ganho com rampa curta, sem clique).
+- Um store `inputStore` com o volume de entrada, o modo (`voice` ou `ptt`), a sensibilidade (`auto` ou um número em
+  dB), o eco e o ganho automático. O `noiseStore` entra nele, migrando o valor guardado.
+- O nível medido sai da cadeia para a interface (`useInputLevel`), a 20 por segundo, sem passar por estado do React a
+  cada bloco.
+- O `switchNoiseSuppression` vira `applyInputChain`: põe, troca ou tira o processador quando qualquer opção muda,
+  também no meio da chamada. Eco e ganho automático mudam as restrições da captura (`restartTrack`).
+- O portão expõe `setHeld(boolean)` para o pressionar para falar (Etapa 4).
+- Testes: o portão abre acima e fecha 300 ms abaixo; a sensibilidade automática segue o piso; a migração do
+  `noiseStore`.
 
-- `Status::Away` (manual) entra ao lado de Disponível, Ocupado e Invisível, e `Shown::Away` no que os outros veem.
-  Migração no banco se o status for guardado com `CHECK`.
-- O app manda pelo WebSocket `{"type": "idle", "idle": true|false}`; o hub guarda por conexão, e a pessoa aparece
-  Ausente quando o status dela é Disponível e todas as conexões dela estão ociosas (decisão 10). Ocupado e
-  Invisível não mudam.
-- O `presence.changed` já leva o `Shown`; nada novo no evento.
-- Testes no hub: Disponível ocioso aparece Ausente; Ocupado ocioso continua Ocupado; duas conexões, uma ociosa,
-  continua Disponível; Ausente manual não volta sozinho.
+**Pronto quando:** com o volume de entrada em 50% a voz chega mais baixa para os outros; com a sensibilidade manual
+alta, falar baixo não passa e o ícone de microfone dos outros não muda.
 
-**Pronto quando:** um cliente de teste ocioso aparece Ausente para os outros, e volta ao mandar `idle: false`.
+## Etapa 2: app, a aba Voz e vídeo completa
 
-## Etapa 12: app, Ausente manual e automático
+`features/voice/devices/components/VoiceSettings.tsx`, seguindo o quadro "Configurações — voz e vídeo".
 
-`features/presence/` (nova, ADR 0014), `src-tauri/src/commands/` e o menu do painel.
+- **Dispositivos:** a régua de volume embaixo de Entrada e de Saída. O volume de saída multiplica todas as vozes e
+  transmissões (o `RoomAudio` e o `boost.ts`), por cima do volume de cada pessoa.
+- **Testar microfone:** abre o microfone escolhido pela mesma cadeia e devolve o som na saída escolhida, com o
+  medidor de 20 barras do quadro. Parar de testar fecha tudo. Numa sala, o teste não toca o próprio som (eco para os
+  outros): só o medidor, lido da trilha publicada.
+- **Modo de entrada:** os dois cartões, Detecção de voz e Pressionar para falar, o atalho com Gravar atalho (a mesma
+  gravação da Etapa 4) e o bloco da sensibilidade, com a chave do automático e a régua com a marca dourada, que
+  passa a ser arrastável com o automático desligado.
+- **Processamento de voz:** Supressão de ruído (a de hoje), Cancelamento de eco e Controle automático de ganho.
+- **Compartilhamento de tela:** Qualidade padrão (os presets do publicador nativo: Movimento e Nitidez) e Áudio
+  padrão; o seletor de fontes passa a abrir com esses valores. A nota de conteúdo protegido fica.
+- As seções de hoje (Câmera e Ligações) continuam, depois de Processamento.
+- Testes: o volume de saída por cima do volume da pessoa; o teste para ao sair da tela.
 
-- O comando `idle_seconds` no Rust, com o `GetLastInputInfo`; o app lê a cada 30 s e manda o `idle` só quando o
-  estado muda, com o limite de 10 minutos (decisão 11).
-- Numa sala de voz, o app manda sempre `idle: false`.
-- O menu de status ganha Ausente, com a bolinha amarela da lua; a bolinha aparece em todo lugar em que a de status
-  já aparece (lista de membros, cartão, conversas, painel).
-- Ausente não entra em nenhuma regra de aviso: conferir que o `Busy` continua sendo o único que cala.
+**Pronto quando:** o quadro confere, e cada opção vale no meio de uma chamada, sem sair da sala.
 
-**Pronto quando:** dez minutos sem mexer, fora de uma sala, viram Ausente para os outros, e um toque no mouse volta;
-numa sala, jogando de controle por meia hora, ninguém vê Ausente.
+## Etapa 3: Rust, o gancho de teclado e mouse
 
-## Etapa 13: API e app, "digitando…"
+`desktop/src-tauri/src/shortcuts/` (novo).
 
-`api/src/realtime/` e `features/chat/` e `features/dms/`.
+- Uma thread com `SetWindowsHookExW(WH_KEYBOARD_LL)` e `WH_MOUSE_LL` e o laço `GetMessageW`. Cada evento atualiza o
+  conjunto de teclas apertadas e compara com a lista de atalhos; o callback devolve sempre `CallNextHookEx` (decisão
+  5) e faz o mínimo (o Windows desliga um gancho que demora mais de ~300 ms): manda o evento por um canal para outra
+  thread, que fala com o Tauri.
+- Comandos: `shortcuts_set(lista)` e `shortcuts_record(bool)` (no modo gravar, manda cada combinação apertada para o
+  app e não dispara nenhum atalho). Eventos para o app: `shortcut` com `{ id, pressed }` e `shortcut-recorded` com a
+  combinação.
+- As teclas guardadas pelo código virtual (`VK_*`), com o nome mostrado vindo do `GetKeyNameTextW` (o teclado ABNT2
+  mostra o nome certo).
+- Repetição do teclado (a tecla segurada manda vários `WM_KEYDOWN`) conta uma vez. Soltar qualquer tecla da
+  combinação solta o atalho.
+- Testes do casamento das combinações (sem o Windows): modificadores em qualquer ordem, a repetição, o botão do
+  mouse com e sem modificador.
 
-- O app manda `{"type": "typing", "channel_id": ...}` (canal ou conversa) ao digitar, no máximo a cada 3 s, e para
-  ao enviar ou apagar tudo. A API confere que a pessoa pode ler o canal (a permissão por canal da ADR 0021, ou ser
-  das duas da conversa) e manda `typing` (`channel_id`, `user_id`) para as conexões de quem pode ler, menos a dela.
-  O Invisível não manda nada (decisão 12).
-- No app, um store guarda quem está digitando em cada canal, e cada entrada some em 6 s sem repetição, ou na hora em
-  que chega uma mensagem da pessoa.
-- A linha embaixo da caixa de texto, com os três textos da decisão 12, sem empurrar a caixa (o espaço fica
-  reservado).
-- Na lista de conversas, "digitando…" em itálico no lugar da última mensagem.
-- Testes na API: quem não pode ler o canal não recebe; o Invisível não manda. No app: as entradas expiram, e a
-  mensagem que chega apaga a entrada.
+**Pronto quando:** com o Ashtar minimizado e um jogo em foco, o app recebe "apertou" e "soltou" do atalho, e o jogo
+continua recebendo a tecla.
 
-**Pronto quando:** com duas pessoas numa conversa e três num canal, o "digitando…" aparece para os outros em menos
-de um segundo e some ao enviar.
+## Etapa 4: app, a aba Atalhos e o pressionar para falar
 
-## Etapa 14: app, os sons da sala
+`features/settings/` ganha a tela Atalhos, seguindo os quadros "Configurações — atalhos" e "(gravando)".
 
-`features/notifications/model/sound.ts`, `assets/sounds/` e Configurações › Notificações.
+- A aba Atalhos no menu, em Ajustes, depois de Voz e vídeo. As seções Voz (Desativar microfone, Desativar áudio,
+  Pressionar para falar) e Ligações (Atender ligação, Recusar ou desligar). Sem a seção Overlay.
+- Cada linha: as teclas, Trocar (ou Definir, quando não tem) e o X para tirar. Restaurar padrões no alto.
+- `useGlobalShortcuts`, montado uma vez no `AppShell`: manda a lista para o Rust e liga cada atalho à ação (o
+  `toggleMute`, o `toggleDeafen`, o `setHeld` do portão, o atender e o recusar da ligação que está tocando).
+- O modo Pressionar para falar: o portão fica fechado até o atalho, e o painel de voz mostra a tecla embaixo do nome
+  da sala ("Pressionar para falar: V").
+- Testes: duas linhas com a mesma combinação; gravar e cancelar; o atalho de atender sem ligação tocando não faz nada.
 
-- Os sons novos, gerados para o projeto (curtos, no mesmo estilo e volume dos de mensagem e do toque): entrar,
-  sair, mutar, desmutar, surdo, sair do surdo, transmissão começou e transmissão acabou.
-- Entrada e saída vêm do `voice.participants` da sala em que a pessoa está, comparando com a lista anterior; trocar
-  de sala não toca a saída de todos da sala velha, só o som de entrar da nova.
-- A transmissão que começa e acaba vem da trilha `:screen` da sala; não toca para a própria.
-- Uma chave por som em Configurações › Notificações, ligadas por padrão, com o botão de testar; tocam também em
-  Ocupado (decisão 13).
-- Muita gente entrando junto (a sala abrindo) toca um som só.
-
-**Pronto quando:** com três pessoas, cada evento toca o som certo uma vez, para quem está na sala, e desligar a chave
-cala só aquele som.
-
----
-
-## Etapa 15: teste com três computadores
-
-Nada é publicado: os apps saem do build da `feature/0.5`, instalados à mão.
-
-1. A API das Etapas 1, 5, 8, 9, 11 e 13 no servidor.
-2. Roteiro: criar a sala Squad, entrar, trocar entre Sala e Squad com o microfone ligado, trocar transmitindo e com
-   a câmera, mover alguém pelo cartão e arrastando (inclusive quem está transmitindo), desconectar alguém, arquivar
-   uma sala com gente dentro, restringir um canal e uma sala e tirar da lista alguém
-   que está com o canal aberto e na sala, ficar 10 minutos parado fora da sala e dentro dela, o Ausente manual, o "digitando…"
-   num canal e numa conversa, e todos os sons, com e sem Ocupado.
-3. Uma ligação privada com uma pessoa numa sala e outra em outra: "Sair e atender" e "Voltar para a sala" voltam
-   para a sala certa.
-
-**Pronto quando:** o roteiro passa.
-
-## Etapa 16: lançamento da `0.5.0`
-
-1. `0.5.0` no beta, com a seção `## 0.5.0` do `CHANGELOG.md`, que cobre a fase inteira.
-2. Uma semana no beta antes do estável; problema vira `0.5.1`.
-3. `MIN_CLIENT_VERSION` em `0.5.0` junto da publicação no estável: a `0.4.x` só conhece a Sala, não sabe trocar de
-   sala nem ser movida (a remoção dos 10 segundos cobre o beta).
-4. `README.md`, `ARCHITECTURE.md` e `docs/roadmap.md` em dia; as ADRs 0026 e 0027 passam a aceitas.
-
-**Pronto quando:** a `0.5.0` está no estável e o grupo passa uma noite dividido em duas salas, trocando e sendo
-movido, sem ninguém ficar preso em duas salas nem fora de todas.
+**Pronto quando:** dá para jogar com o pressionar para falar no botão lateral do mouse, e mutar pelo teclado, sem
+tirar o foco do jogo.
 
 ---
 
-**Critério de pronto da fase:** o "pronto quando" da Etapa 16, e todos os itens do `NOTES.md` resolvidos ou
-conscientemente adiados.
+# Parte 2: confiabilidade
+
+## Etapa 5: app, a voz volta sozinha
+
+`features/voice/room/components/VoiceProvider.tsx`.
+
+- O `Disconnected` que não foi pedido (decisão 9) não limpa a sala: muda o estado para `reconnecting` e agenda a
+  próxima tentativa, pelo mesmo caminho do "tentar de novo" (`attempt` no `VoiceTarget`).
+- O `VoiceConnection` mostra "Reconectando…" (o quadro) para o `reconnecting` do LiveKit e para as tentativas do app,
+  e não mais "Conectando…".
+- O Rust avisa o app quando o Windows volta da suspensão (`WM_POWERBROADCAST`, `PBT_APMRESUMEAUTOMATIC`), e o app
+  força uma tentativa na hora (decisão 10).
+- A transmissão que o app assiste volta a ser assinada sozinha, e a miniatura continua.
+- Testes: a sequência de esperas; o `Disconnected` pedido, o arquivado e o movido não tentam de novo; o mute e o
+  surdo voltam.
+
+**Pronto quando:** tirar o cabo de rede por 20 segundos e devolver traz a pessoa de volta para a sala, com o mesmo
+mute, sem clicar em nada.
+
+## Etapa 6: Rust e app, a transmissão nativa volta sozinha
+
+`media/publisher.rs`, `media/share.rs` e `features/screen-share/`.
+
+- O `on_lost` deixa de encerrar a transmissão: o `Publisher` guarda a captura e o encoder, pede um token novo da
+  `:screen` ao app (um evento, que o app responde com o comando de sempre) e entra de novo, republicando as trilhas
+  (decisão 11).
+- O app mostra o aviso "Conexão perdida" do quadro para quem transmite, e quem assiste vê "Reconectando a
+  transmissão…" no bloco.
+- Depois de 2 minutos sem voltar, acaba como hoje, com o aviso "A transmissão caiu".
+- Testes: o `share_e2e.rs` ganha o caso de derrubar a `:screen` e ver a trilha voltar.
+
+**Pronto quando:** derrubar a conexão de quem transmite por 10 segundos e devolver traz a transmissão de volta para
+quem assistia, sem ninguém clicar.
+
+## Etapa 7: app, microfone e saída desconectados
+
+`features/voice/devices/` e `features/voice/room/`.
+
+- Quando o dispositivo efetivo muda porque o escolhido sumiu (decisão 12), o aviso do quadro "Aviso — dispositivo
+  desconectado" aparece no canto, e some quando ele volta ou com o X.
+- A troca no meio da chamada usa o `switchActiveDevice` do LiveKit, e a cadeia do microfone é refeita na trilha nova.
+- Sem nenhum microfone: entra mutado com o aviso; quando um aparece, o aviso oferece Ativar microfone.
+- Testes: sumir e voltar; trocar pela tela de configurações na chamada.
+
+**Pronto quando:** tirar o fone USB no meio da sala passa a voz para o microfone do notebook com o aviso, e devolver
+o fone volta para ele.
+
+## Etapa 8: API e app, "Sem conexão com o servidor"
+
+`api/src/lib.rs` e `desktop/src/app/`.
+
+- API: o `TimeoutLayer` (decisão 14), com o erro `timeout` no formato de sempre e um teste.
+- App: a faixa do quadro "Faixa — sem conexão com o servidor" no `AppShell`, lendo o `useRealtimeStatus`; o
+  `connection.ts` expõe quando é a próxima tentativa e um `retryNow()`.
+- Ao voltar, o `RealtimeBridge` invalida as consultas de canais, membros, não lidas e do canal aberto.
+- Mandar mensagem com a faixa aparecendo usa o estado de envio de hoje, com o "Tentar de novo".
+- Conferir que a sessão inválida leva à tela "Este computador saiu do grupo", e que um 401 qualquer refaz o login
+  antes de desistir.
+
+**Pronto quando:** derrubar a API por 30 segundos mostra a faixa, a sala de voz continua, e quando a API volta a
+faixa some e as mensagens mandadas por outros nesse tempo aparecem.
+
+## Etapa 9: app, a qualidade da conexão de cada pessoa
+
+`features/voice/room/` e o cartão do usuário.
+
+- O ícone do quadro "Voz — qualidade da conexão" no `ParticipantTile`, lendo o `ConnectionQualityChanged` (decisão
+  15). Também na linha da pessoa na lista da sala, ao lado do nome.
+- A mensagem de dados `voice.stats` (`{ ping, loss }`) a cada 5 segundos, no mesmo tópico do surdo, só para a sala.
+  O ping vem do `ping.ts`; a perda, do `getStats` da trilha do microfone.
+- A seção Conexão no cartão da pessoa na sala: ping, perda e o texto (Boa, Instável, Ruim).
+
+**Pronto quando:** limitar a rede de um computador (perda de 10% no `clumsy`) faz o ícone aparecer para os outros, e o
+cartão dele mostra a perda.
+
+## Etapa 10: API, Rust e app, "Enviar logs"
+
+`api/src/routes/logs.rs` (novo), `desktop/src-tauri/src/logging.rs` e `features/updater/components/AppSettings.tsx`.
+
+- API: `POST /api/logs` (corpo `.zip` com o texto e a versão nos cabeçalhos, até 10 MB, um a cada 5 minutos por
+  pessoa), `GET /api/logs` e `GET /api/logs/{id}`, as duas só para o dono. Os arquivos ficam em
+  `data/logs/`, com uma linha na tabela `log_reports`; a limpeza dos 30 dias roda junto do backup. O evento
+  `logs.received` para o dono.
+- Rust: o comando `logs_bundle`, que junta os arquivos dos últimos 2 dias e um `info.txt` (versão do app, do Windows,
+  da GPU) num `.zip` na memória.
+- App: o botão "Enviar logs" em Aplicativo, ao lado de "Abrir pasta", com o campo "O que aconteceu?" e a confirmação
+  ("Logs enviados. O dono vai ver."). A tela Logs no Painel de controle, e o aviso no canto para o dono.
+- Testes: o limite de tamanho e de frequência; quem não é dono recebe 404 na lista; a limpeza.
+
+**Pronto quando:** um membro manda os logs pelo app e o dono baixa o `.zip` pelo Painel.
+
+---
+
+## Etapa 11: teste com três computadores
+
+Sem publicar. Os cenários:
+
+- uma hora de jogo com o pressionar para falar no botão do mouse e o mute pelo teclado, com o jogo em tela cheia;
+- a detecção de voz com o automático, com ventilador e teclado de fundo;
+- tirar o cabo de rede de quem transmite por 20 segundos; suspender o computador de quem está na sala e voltar;
+- tirar e devolver o fone USB no meio da sala;
+- derrubar a API por um minuto, com a sala aberta;
+- mandar os logs e baixar no Painel.
+
+## Etapa 12: lançamento da `0.6.0`
+
+- `0.6.0` no beta, uma semana de uso, depois o estável. Problema no beta vira `0.6.1`.
+- As notas do "O que há de novo" (`CHANGELOG.md`), revisadas.
+- A API da Etapa 10 já está no servidor desde antes.
+
+---
+
+## Riscos
+
+- **O gancho de teclado é o ponto mais delicado.** Um callback lento faz o Windows desligar o gancho em silêncio, e
+  um jogo rodando como administrador não manda as teclas para um app comum (UIPI). O primeiro caso é tratado com o
+  canal (o callback só copia o evento); o segundo é aceito e explicado na aba Atalhos. Alguns anti-cheats olham
+  ganchos globais: o Discord usa o mesmo caminho, mas conferir com os jogos do grupo na Etapa 11.
+- **O portão mexe no áudio de todo mundo.** Uma sensibilidade automática ruim corta palavras. Por isso o padrão é o
+  automático com margem folgada, e a régua mostra o nível ao vivo.
+- **A reconexão não pode trazer de volta quem não devia voltar.** Quem foi desconectado, movido, ou perdeu o acesso à
+  sala (v0.5) não reconecta; os testes da Etapa 5 cobrem cada motivo.
