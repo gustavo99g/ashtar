@@ -93,7 +93,7 @@ describe("o status de quem usa", () => {
 				user_id: "kid",
 				status: "invisible",
 				online: [],
-				busy: [],
+				busy: [], away: [],
 				channels: [],
 				dms: [],
 			},

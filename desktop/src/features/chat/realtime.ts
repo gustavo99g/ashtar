@@ -59,11 +59,16 @@ export function handleChatRealtime(
 		case "ready": {
 			const online = new Set(event.online);
 			const busy = new Set(event.busy);
+			const away = new Set(event.away);
 			updatePeople(queryClient, (people) =>
 				people.map((person) => ({
 					...person,
 					online: online.has(person.id),
-					status: busy.has(person.id) ? "busy" : "available",
+					status: busy.has(person.id)
+						? "busy"
+						: away.has(person.id)
+							? "away"
+							: "available",
 				})),
 			);
 			if (info.resumed) {

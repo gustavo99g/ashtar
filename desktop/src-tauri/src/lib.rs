@@ -118,7 +118,8 @@ pub fn run(log_file: logging::LateFile) {
             commands::notifications::set_unread_badge,
             commands::identity::login,
             commands::identity::redeem,
-            commands::identity::account_marker
+            commands::identity::account_marker,
+            commands::presence::idle_seconds
         ])
         .build(tauri::generate_context!())
         .expect("error while running tauri application");

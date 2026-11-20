@@ -175,7 +175,7 @@ function PersonRow({
 						nick: person.nick,
 						name: authorName(person),
 						online,
-						busy: person.status === "busy",
+						status: person.status,
 						room: place ? { name: place.roomName, sharing: place.sharing } : null,
 					}}
 				>

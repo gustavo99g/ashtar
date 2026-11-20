@@ -1,5 +1,5 @@
 /**
- * O status (ADR 0022): o que cada um quer dizer, como no quadro "Status — menu no seu painel".
+ * O status (ADR 0022 e 0027): o que cada um quer dizer, como no quadro "Status — menu no seu painel".
  *
  * `Status` é o de verdade, que só a própria pessoa vê. `Shown` é o que os outros veem de quem está
  * online: o Invisível sai da API como offline, então nunca chega aqui como status de outra pessoa.
@@ -14,6 +14,12 @@ export interface StatusOption {
 
 export const STATUS_OPTIONS: readonly StatusOption[] = [
 	{ value: "available", label: "Disponível", description: "Tudo normal." },
+	{
+		value: "away",
+		label: "Ausente",
+		description:
+			"Os outros veem que você saiu. Os avisos continuam. Também liga sozinho depois de 10 minutos parado.",
+	},
 	{
 		value: "busy",
 		label: "Ocupado",

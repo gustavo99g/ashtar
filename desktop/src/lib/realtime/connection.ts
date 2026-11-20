@@ -14,7 +14,7 @@
  * estava fora, as features buscam de novo ao recebê-lo. O primeiro `ready` de um `start` não é
  * volta: as listas acabaram de ser buscadas ao abrir a tela.
  */
-import { isRetryable, type ServerEvent } from "@/lib/api";
+import { type ClientEvent, isRetryable, type ServerEvent } from "@/lib/api";
 
 export type RealtimeStatus =
 	/** Parada: sem sessão. */
@@ -64,6 +64,11 @@ export interface Realtime {
 	status: () => RealtimeStatus;
 	onEvent: (listener: RealtimeListener) => () => void;
 	onStatus: (listener: (status: RealtimeStatus) => void) => () => void;
+	/**
+	 * Manda um evento do app (o Ausente, o "digitando…"). Sem o socket aberto, não manda nada e
+	 * devolve `false`: quem manda repete o que importa no próximo `open`.
+	 */
+	send: (event: ClientEvent) => boolean;
 }
 
 /** Quanto esperar antes da tentativa número `attempt` (0 é a primeira volta). */
@@ -191,6 +196,11 @@ export function createRealtime(deps: RealtimeDeps): Realtime {
 			setStatus("idle");
 		},
 		status: () => status,
+		send(event) {
+			if (status !== "open" || socket?.readyState !== 1) return false;
+			socket.send(JSON.stringify(event));
+			return true;
+		},
 		onEvent(listener) {
 			eventListeners.add(listener);
 			return () => eventListeners.delete(listener);

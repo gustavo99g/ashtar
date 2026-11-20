@@ -85,7 +85,7 @@ describe("handleDmsRealtime", () => {
 			user_id: "eu",
 			status: "available",
 			online: [],
-			busy: [],
+			busy: [], away: [],
 			channels: [],
 			dms: [],
 		};

@@ -22,7 +22,7 @@ import { paths } from "@/lib/paths";
 
 /**
  * O menu de status, como no quadro "Status — menu no seu painel": abre no avatar e no nome do
- * painel (`trigger`), com quem você é no alto, os três status (cada um com a explicação) e o atalho
+ * painel (`trigger`), com quem você é no alto, os quatro status (cada um com a explicação) e o atalho
  * Editar perfil. Trocar vale na hora; se a API recusar, volta.
  */
 export function StatusMenu({

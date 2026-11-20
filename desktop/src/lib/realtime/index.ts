@@ -7,7 +7,7 @@
  * Só esta pasta abre WebSocket (regra do `eslint.config.js`).
  */
 import { useSyncExternalStore } from "react";
-import { createRealtimeTicket, realtimeUrl } from "@/lib/api";
+import { type ClientEvent, createRealtimeTicket, realtimeUrl } from "@/lib/api";
 import {
 	createRealtime,
 	type RealtimeListener,
@@ -44,6 +44,11 @@ export function stopRealtime(): void {
 export function restartRealtime(): void {
 	realtime.stop();
 	realtime.start();
+}
+
+/** Manda um evento do app pelo socket; `false` com ele fechado. */
+export function sendRealtime(event: ClientEvent): boolean {
+	return realtime.send(event);
 }
 
 /** Assina os eventos. Devolve a função que desfaz. */
