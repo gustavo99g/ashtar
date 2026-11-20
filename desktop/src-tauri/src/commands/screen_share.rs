@@ -64,9 +64,27 @@ impl ShareEndedPayload {
     }
 }
 
+/// Nome do evento de queda da conexão da transmissão: a captura segue, o frontend pede um token
+/// novo e chama [`screen_share_reconnect`] (contrato com o frontend).
+pub const SCREEN_SHARE_LINK_LOST: &str = "screen-share-link-lost";
+
+/// Payload de `screen-share-link-lost`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LinkLostPayload {
+    pub session_id: u64,
+}
+
 /// Traduz um evento do manager para o evento Tauri correspondente.
 fn emit_share_event(app: &AppHandle, event: ShareEvent) {
     let (name, payload) = match event {
+        ShareEvent::LinkLost { session_id } => {
+            warn!(session_id, "a conexão da transmissão caiu");
+            if let Err(error) = app.emit(SCREEN_SHARE_LINK_LOST, LinkLostPayload { session_id }) {
+                warn!(event = SCREEN_SHARE_LINK_LOST, %error, "falha ao emitir evento para o frontend");
+            }
+            return;
+        }
         ShareEvent::Ended { session_id, reason } => (
             SCREEN_SHARE_ENDED,
             ShareEndedPayload::new(session_id, reason),
@@ -277,6 +295,18 @@ pub async fn screen_share_stop(
     run_blocking(move || manager.stop(session_id)).await
 }
 
+/// Volta a conexão de uma transmissão que caiu, com um token novo, sem parar a captura. Um id que
+/// já acabou é ignorado.
+#[tauri::command]
+pub async fn screen_share_reconnect(
+    manager: State<'_, Arc<ShareManager>>,
+    session_id: u64,
+    target: ShareTarget,
+) -> Result<(), AppError> {
+    let manager = Arc::clone(manager.inner());
+    run_blocking(move || manager.reconnect(session_id, &target)).await
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -402,5 +432,10 @@ mod tests {
         // sairia, e ninguém o ouviria.
         assert_eq!(SCREEN_SHARE_ENDED, "screen-share-ended");
         assert_eq!(SCREEN_SHARE_AUDIO_ENDED, "screen-share-audio-ended");
+        assert_eq!(SCREEN_SHARE_LINK_LOST, "screen-share-link-lost");
+        assert_eq!(
+            serde_json::to_value(LinkLostPayload { session_id: 3 }).unwrap(),
+            serde_json::json!({ "sessionId": 3 })
+        );
     }
 }

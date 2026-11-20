@@ -6,6 +6,7 @@
 import { Segmented, SegmentedItem } from "@/components/ui/segmented";
 import { Switch } from "@/components/ui/switch";
 import type { Quality } from "@/lib/tauri/commands";
+import { cn } from "@/lib/utils";
 import type { AudioChoice, useShareControls } from "../hooks/useShareControls";
 import type { ScreenShareState } from "../model/controller";
 import { QUALITY_ORDER, QUALITY_PRESETS } from "../model/presets";
@@ -37,6 +38,18 @@ export function ShareControls({
 	const labels = compact ? AUDIO_SHORT : AUDIO_LABELS;
 	return (
 		<div className={compact ? "flex flex-col gap-3" : "grid grid-cols-2 gap-6"}>
+			{state.link === "lost" && (
+				<p
+					role="status"
+					className={cn(
+						"text-xs leading-normal text-warning-text",
+						!compact && "col-span-2",
+					)}
+				>
+					A conexão da transmissão caiu. Quem assiste vê a tela parada enquanto ela
+					volta.
+				</p>
+			)}
 			<section className="flex flex-col gap-2">
 				<ControlLabel>Qualidade</ControlLabel>
 				<Segmented

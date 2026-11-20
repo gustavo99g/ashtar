@@ -8,6 +8,7 @@ use tauri_plugin_autostart::ManagerExt;
 use crate::changelog;
 use crate::commands::run_blocking;
 use crate::error::AppError;
+use crate::log_bundle;
 use crate::tray;
 
 #[derive(Debug, Clone, Serialize)]
@@ -70,6 +71,27 @@ pub async fn whats_new(
         .map(|(version, notes)| ReleaseNotes { version, notes })
         .collect();
     Ok((!sections.is_empty()).then_some(WhatsNew { version, sections }))
+}
+
+/// Junta os logs dos últimos 2 dias e o `info.txt` num `.zip` ("Enviar logs", v0.6). Volta os
+/// bytes crus (um `ArrayBuffer` no JavaScript), que o app manda para a API.
+#[tauri::command]
+pub async fn logs_bundle(app: AppHandle) -> Result<tauri::ipc::Response, AppError> {
+    let dir = app
+        .path()
+        .app_log_dir()
+        .map_err(|error| AppError::Internal(format!("sem a pasta de logs: {error}")))?;
+    let version = app.package_info().version.to_string();
+    let bytes = run_blocking(move || {
+        let info = log_bundle::info(
+            &version,
+            log_bundle::windows_version(),
+            crate::media::video::gpu_name(),
+        );
+        log_bundle::bundle(&dir, std::time::SystemTime::now(), &info)
+    })
+    .await?;
+    Ok(tauri::ipc::Response::new(bytes))
 }
 
 /// Abre a pasta de logs no Explorador de Arquivos ("Abrir pasta" na tela

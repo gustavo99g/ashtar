@@ -60,6 +60,8 @@ export function SettingsLayout() {
 	const showPanel = useMe().data?.can_view_panel === true;
 	const channel = useMe().data?.update_channel;
 	const showServer = useMe().data?.can_manage_channels === true;
+	// Os logs e o estado do servidor são só do dono, e não viram permissão (decisão 17).
+	const isOwner = useMe().data?.user.is_owner === true;
 
 	useEffect(() => {
 		const onKeyDown = (event: KeyboardEvent) => {
@@ -84,6 +86,7 @@ export function SettingsLayout() {
 				<MenuSeparator />
 				<MenuGroup label="Ajustes">
 					<MenuItem to={paths.settings.voice}>Voz e vídeo</MenuItem>
+					<MenuItem to={paths.settings.shortcuts}>Atalhos</MenuItem>
 					<MenuItem to={paths.settings.notifications}>Notificações</MenuItem>
 					<MenuItem to={paths.settings.app}>Aplicativo</MenuItem>
 				</MenuGroup>
@@ -108,6 +111,12 @@ export function SettingsLayout() {
 						>
 							<MenuItem to={paths.settings.invites}>Convites</MenuItem>
 							<MenuItem to={paths.settings.members}>Membros</MenuItem>
+							{isOwner && (
+								<>
+									<MenuItem to={paths.settings.logs}>Logs</MenuItem>
+									<MenuItem to={paths.settings.server}>Servidor</MenuItem>
+								</>
+							)}
 						</MenuGroup>
 					</>
 				)}

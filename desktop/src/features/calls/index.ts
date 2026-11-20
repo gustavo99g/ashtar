@@ -1,4 +1,5 @@
-export { CallBanner } from "./components/CallBanner";
+export { acceptRinging, declineOrHangUp } from "./actions";
+export { act as runCallAction, CallBanner } from "./components/CallBanner";
 export { CallBridge } from "./components/CallBridge";
 export { CallButton } from "./components/CallButton";
 export { CallEntry } from "./components/CallEntry";

@@ -27,9 +27,11 @@ const TIMEOUT_MS = 10_000;
 export async function apiFetch(
 	path: string,
 	init: RequestInit = {},
+	/** Mais tempo que os 10 segundos, para subir um arquivo (os logs). */
+	timeoutMs = TIMEOUT_MS,
 ): Promise<Response> {
 	const sent = sessionToken();
-	const response = await send(path, init, sent);
+	const response = await send(path, init, sent, timeoutMs);
 	if (response.ok) return response;
 
 	let error = await failure(response);
@@ -38,7 +40,7 @@ export async function apiFetch(
 		sent !== null &&
 		(await renewSession(sent))
 	) {
-		const retried = await send(path, init, sessionToken());
+		const retried = await send(path, init, sessionToken(), timeoutMs);
 		if (retried.ok) return retried;
 		error = await failure(retried);
 	}
@@ -64,6 +66,7 @@ async function send(
 	path: string,
 	init: RequestInit,
 	token: string | null,
+	timeoutMs: number,
 ): Promise<Response> {
 	const headers = new Headers(init.headers);
 	headers.set("X-App-Version", __APP_VERSION__);
@@ -72,7 +75,7 @@ async function send(
 		headers.set("Authorization", `Bearer ${token}`);
 	}
 
-	const timeout = AbortSignal.timeout(TIMEOUT_MS);
+	const timeout = AbortSignal.timeout(timeoutMs);
 	try {
 		return await fetch(apiUrl(path), {
 			...init,

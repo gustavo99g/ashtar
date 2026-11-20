@@ -56,6 +56,16 @@ export function subscribeRealtime(listener: RealtimeListener): () => void {
 	return realtime.onEvent(listener);
 }
 
+/** Fora do ar, tenta já ("Tentar agora" da faixa). */
+export function retryRealtimeNow(): void {
+	realtime.retryNow();
+}
+
+/** Quando é a próxima tentativa de voltar, ou `null` fora da espera. */
+export function useRealtimeRetryAt(): number | null {
+	return useSyncExternalStore(realtime.onStatus, realtime.nextRetryAt);
+}
+
 export function useRealtimeStatus(): RealtimeStatus {
 	return useSyncExternalStore(realtime.onStatus, realtime.status);
 }

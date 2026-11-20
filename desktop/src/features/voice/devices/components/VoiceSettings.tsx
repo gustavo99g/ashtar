@@ -8,10 +8,15 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
+import { ShareDefaultsSection } from "@/features/screen-share";
 import { useSettingsStore } from "@/features/settings";
+import { cn } from "@/lib/utils";
 import { CameraOptions } from "../../camera/components/CameraOptions";
-import { setSuppression, useNoiseChoice } from "../../noise/stores/noiseStore";
+import {
+	setInputChoice,
+	setSuppression,
+	useInputChoice,
+} from "../../input/stores/inputStore";
 import { useAudioDevices } from "../hooks/useAudioDevices";
 import {
 	type AudioDevice,
@@ -21,14 +26,23 @@ import {
 	knownDevices,
 } from "../model/devices";
 import { chooseDevice, useDeviceChoice } from "../stores/deviceChoiceStore";
+import {
+	setOutputVolume,
+	useOutputVolume,
+} from "../stores/outputVolumeStore";
+import { ConnectionTest } from "./ConnectionTest";
+import { InputModeSection } from "./InputModeSection";
+import { MicTest } from "./MicTest";
+import { SettingSwitch } from "./SettingSwitch";
+import { VolumeSlider } from "./VolumeSlider";
 
 /*
- * Configurações › Voz e vídeo (quadro "Configurações — voz e vídeo"). O bloco Dispositivos (a
- * entrada e a saída) e, desde a 0.2.3, a Supressão de ruído do bloco Processamento de voz. Desde a
- * 0.4, a Câmera (ADR 0025): a prévia, o dispositivo, a qualidade e Espelhar. O resto
- * do quadro (eco, ganho, modo de entrada, tela) fica para a v0.2.5 e a v0.6 (BACKLOG).
+ * Configurações › Voz e vídeo (quadro "Configurações — voz e vídeo", ADR 0029): os dispositivos
+ * com o volume de entrada e de saída e o Testar microfone; o modo de entrada (a detecção de voz com
+ * a sensibilidade, ou o pressionar para falar); o processamento de voz; a câmera; o padrão do
+ * compartilhamento de tela; o Testar conexão; e as perguntas das ligações.
  *
- * A escolha vale na hora, também no meio de uma chamada (`VoiceProvider`). Um dispositivo escolhido
+ * Tudo vale na hora, também no meio de uma chamada (`VoiceProvider`). Um dispositivo escolhido
  * que está desconectado continua escolhido, apagado e com "(desconectado)", e o aviso embaixo diz
  * o que vale enquanto isso: o padrão do Windows, até ele voltar.
  */
@@ -47,6 +61,18 @@ interface Option {
 
 export function VoiceSettings() {
 	const devices = useAudioDevices({ revealNames: true });
+	// O "Ligar para fulano?" (v0.3) e o "Trocar de sala?" (v0.5): o "Não perguntar de novo" do
+	// próprio aviso desliga; aqui liga de volta.
+	const askBeforeCall = useSettingsStore((state) => state.askBeforeCall);
+	const setAskBeforeCall = useSettingsStore((state) => state.setAskBeforeCall);
+	const askBeforeSwitchRoom = useSettingsStore(
+		(state) => state.askBeforeSwitchRoom,
+	);
+	const setAskBeforeSwitchRoom = useSettingsStore(
+		(state) => state.setAskBeforeSwitchRoom,
+	);
+	const choice = useInputChoice();
+	const outputVolume = useOutputVolume((state) => state.volume);
 
 	return (
 		<div className="@container flex w-full flex-col gap-9 py-20 pr-28 pl-32">
@@ -55,108 +81,95 @@ export function VoiceSettings() {
 			</h1>
 			<Section title="Dispositivos">
 				<div className="grid gap-5 @xl:grid-cols-2">
-					<DevicePicker kind="input" label="Entrada" devices={devices} />
-					<DevicePicker kind="output" label="Saída" devices={devices} />
+					<DevicePicker kind="input" label="Entrada" devices={devices}>
+						<VolumeSlider
+							label="Volume de entrada"
+							value={choice.volume}
+							onChange={(volume) => setInputChoice({ volume })}
+						/>
+					</DevicePicker>
+					<DevicePicker kind="output" label="Saída" devices={devices}>
+						<VolumeSlider
+							label="Volume de saída"
+							value={outputVolume}
+							onChange={setOutputVolume}
+						/>
+					</DevicePicker>
 				</div>
+				<MicTest />
+			</Section>
+			<Section title="Modo de entrada">
+				<InputModeSection />
+			</Section>
+			<Section title="Processamento de voz" gap="gap-1">
+				<SettingSwitch
+					title="Supressão de ruído"
+					description="Reduz sons de fundo como teclado e ventilador."
+					checked={choice.suppression}
+					onCheckedChange={setSuppression}
+				/>
+				<SettingSwitch
+					title="Cancelamento de eco"
+					description="Evita que o som dos alto-falantes volte pelo microfone."
+					checked={choice.echoCancellation}
+					onCheckedChange={(echoCancellation) =>
+						setInputChoice({ echoCancellation })
+					}
+				/>
+				<SettingSwitch
+					title="Controle automático de ganho"
+					description="Mantém o volume da sua voz estável."
+					checked={choice.autoGainControl}
+					onCheckedChange={(autoGainControl) =>
+						setInputChoice({ autoGainControl })
+					}
+				/>
+				<SettingSwitch
+					title="Avisar quando falo mutado"
+					description="Mostra “Você está mutado” no painel de voz quando você fala com o microfone desligado."
+					checked={choice.warnWhenMuted}
+					onCheckedChange={(warnWhenMuted) => setInputChoice({ warnWhenMuted })}
+				/>
+			</Section>
+			<Section title="Conexão" gap="gap-3">
+				<ConnectionTest />
 			</Section>
 			<Section title="Câmera">
 				<CameraOptions className="max-w-[420px]" />
 			</Section>
-			<Section title="Processamento de voz">
-				<NoiseSwitch />
+			<Section title="Compartilhamento de tela">
+				<ShareDefaultsSection />
 			</Section>
-			<Section title="Ligações">
-				<AskBeforeCallSwitch />
-				<AskBeforeSwitchRoomSwitch />
+			<Section title="Ligações" gap="gap-1">
+				<SettingSwitch
+					title="Perguntar antes de ligar estando numa sala"
+					description="A ligação tira você da sala quando a outra pessoa atende."
+					checked={askBeforeCall}
+					onCheckedChange={setAskBeforeCall}
+				/>
+				<SettingSwitch
+					title="Perguntar antes de trocar de sala transmitindo"
+					description="Trocar de sala encerra a sua transmissão e desliga a câmera."
+					checked={askBeforeSwitchRoom}
+					onCheckedChange={setAskBeforeSwitchRoom}
+				/>
 			</Section>
 		</div>
 	);
 }
 
-/**
- * O "Ligar para fulano?" de quem está numa sala (Etapa 20 da v0.3). O "Não perguntar de novo" do
- * próprio aviso desliga; aqui liga de volta. O aviso de quem está transmitindo aparece sempre.
- */
-function AskBeforeCallSwitch() {
-	const labelId = useId();
-	const ask = useSettingsStore((state) => state.askBeforeCall);
-	const setAsk = useSettingsStore((state) => state.setAskBeforeCall);
-	return (
-		<div className="flex items-center justify-between gap-6 border-b border-border py-3">
-			<span className="flex flex-col gap-[3px]">
-				<span id={labelId} className="text-sm font-medium text-foreground">
-					Perguntar antes de ligar estando numa sala
-				</span>
-				<span className="text-xs text-muted-foreground">
-					A ligação tira você da sala quando a outra pessoa atende.
-				</span>
-			</span>
-			<Switch
-				checked={ask}
-				onCheckedChange={setAsk}
-				aria-labelledby={labelId}
-				variant={"blue"}
-			/>
-		</div>
-	);
-}
-
-/**
- * O "Trocar de sala?" de quem está transmitindo ou com a câmera ligada (v0.5): a troca encerra as
- * duas. O "Não perguntar de novo" do próprio aviso desliga; aqui liga de volta.
- */
-function AskBeforeSwitchRoomSwitch() {
-	const labelId = useId();
-	const ask = useSettingsStore((state) => state.askBeforeSwitchRoom);
-	const setAsk = useSettingsStore((state) => state.setAskBeforeSwitchRoom);
-	return (
-		<div className="flex items-center justify-between gap-6 border-b border-border py-3">
-			<span className="flex flex-col gap-[3px]">
-				<span id={labelId} className="text-sm font-medium text-foreground">
-					Perguntar antes de trocar de sala transmitindo
-				</span>
-				<span className="text-xs text-muted-foreground">
-					Trocar de sala encerra a sua transmissão e desliga a câmera.
-				</span>
-			</span>
-			<Switch
-				checked={ask}
-				onCheckedChange={setAsk}
-				aria-labelledby={labelId}
-				variant={"blue"}
-			/>
-		</div>
-	);
-}
-
-/** Ligada: o RNNoise. Desligada: a supressão do navegador, como antes. Vale na hora. */
-function NoiseSwitch() {
-	const labelId = useId();
-	const suppression = useNoiseChoice((state) => state.suppression);
-	return (
-		<div className="flex items-center justify-between gap-6 border-b border-border py-3">
-			<span className="flex flex-col gap-[3px]">
-				<span id={labelId} className="text-sm font-medium text-foreground">
-					Supressão de ruído
-				</span>
-				<span className="text-xs text-muted-foreground">
-					Reduz sons de fundo como teclado e ventilador.
-				</span>
-			</span>
-			<Switch
-				checked={suppression}
-				onCheckedChange={setSuppression}
-				aria-labelledby={labelId}
-				variant={"blue"}
-			/>
-		</div>
-	);
-}
-
-function Section({ title, children }: { title: string; children: ReactNode }) {
+function Section({
+	title,
+	gap = "gap-4",
+	children,
+}: {
+	title: string;
+	gap?: string;
+	children: ReactNode;
+}) {
 	const id = useId();
 	return (
-		<section aria-labelledby={id} className="flex flex-col gap-4">
+		<section aria-labelledby={id} className={cn("flex flex-col", gap)}>
 			<h2
 				id={id}
 				className="text-xs leading-tight font-bold tracking-[0.06em] text-muted-foreground uppercase"
@@ -177,10 +190,12 @@ function DevicePicker({
 	kind,
 	label,
 	devices,
+	children,
 }: {
 	kind: DeviceKind;
 	label: string;
 	devices: AudioDevices | null;
+	children?: ReactNode;
 }) {
 	const hintId = useId();
 	const chosen = useDeviceChoice((state) => state[kind]);
@@ -268,6 +283,7 @@ function DevicePicker({
 					</span>
 				</p>
 			)}
+			{children}
 		</div>
 	);
 }

@@ -24,10 +24,14 @@ export const paths = {
 		root: "/settings",
 		profile: "/settings/profile",
 		voice: "/settings/voice",
+		shortcuts: "/settings/shortcuts",
 		notifications: "/settings/notifications",
 		app: "/settings/app",
 		invites: "/settings/invites",
 		members: "/settings/members",
+		/** Painel › Logs e Servidor: só do dono (v0.6). */
+		logs: "/settings/logs",
+		server: "/settings/server",
 		/** Servidor › Arquivados: só no menu de quem gerencia os canais. */
 		archived: "/settings/archived",
 	},

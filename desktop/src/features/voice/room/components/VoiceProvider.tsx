@@ -21,15 +21,21 @@
  * Entra sem assinar nada sozinho (`autoSubscribe: false`): a voz de todo mundo é assinada aqui, e a
  * tela transmitida só enquanto aparece, no Foco ou na miniatura (`subscriptions.ts`).
  *
- * O microfone sai com a supressão de ruído do RNNoise (`noise/rnnoise.ts`) quando a opção de
- * Configurações › Voz e vídeo está ligada: ele entra na trilha assim que o microfone é publicado, e
- * entra ou sai na hora quando a opção muda.
+ * O microfone sai pela cadeia do microfone (`input/chain.ts`, ADR 0029): o volume de entrada, o
+ * RNNoise (se ligado) e o portão da detecção de voz e do pressionar para falar. Ela entra na trilha
+ * assim que o microfone é publicado, e muda na hora quando uma opção de Voz e vídeo muda.
  *
  * Entra com o microfone e a saída de Configurações › Voz e vídeo (`deviceChoiceStore.ts`) e troca na hora
  * quando a escolha muda, ou quando o escolhido some e volta (`roomDevices.ts`).
  *
  * A câmera (ADR 0025) sai pela mesma conexão, sempre começando desligada: quem cuida dela é o
  * `useLocalCamera`, e o botão Câmera liga e desliga.
+ *
+ * A voz volta sozinha (ADR 0030): uma queda que a pessoa não pediu (`shouldReconnect`) não limpa a
+ * sala; o estado fica `reconnecting` e o app entra de novo, com um token novo, pelo mesmo caminho do
+ * "tentar de novo" (`attempt`), esperando cada vez mais (`reconnect.ts`). Depois de 5 minutos,
+ * desiste e fica o erro. O mute e o surdo voltam como estavam; a câmera não. O Windows voltando da
+ * suspensão conta como queda: entra de novo na hora.
  */
 import { RoomContext } from "@livekit/components-react";
 import {
@@ -69,8 +75,8 @@ import {
 	switchDevice,
 } from "../../devices/model/roomDevices";
 import { useDeviceChoice } from "../../devices/stores/deviceChoiceStore";
-import { switchNoiseSuppression } from "../../noise/rnnoise";
-import { useNoiseChoice } from "../../noise/stores/noiseStore";
+import { applyInputChain, type ChainOptions } from "../../input/chain";
+import { useInputChoice } from "../../input/stores/inputStore";
 import {
 	type SubscriptionView,
 	syncSubscription,
@@ -82,9 +88,22 @@ import {
 	VOICE_STATE_TOPIC,
 	withDeafened,
 } from "../model/voiceState";
+import { useVoiceStatsBroadcast } from "../hooks/useVoiceStatsBroadcast";
 import { useWatchSync } from "../hooks/useWatchSync";
+import { parseVoiceStats } from "../model/voiceStats";
+import {
+	clearVoiceStats,
+	forgetVoiceStats,
+	setVoiceStats,
+} from "../stores/voiceStatsStore";
 import { fallbackRoomName } from "../model/channel";
+import {
+	nextAttempt,
+	type Recovery,
+	shouldReconnect,
+} from "../model/reconnect";
 import { checkSession, requestVoiceToken } from "../queries";
+import { onSystemResumed } from "@/lib/tauri/commands";
 import { clearVoiceOrder, useVoiceOrder } from "../stores/voiceOrderStore";
 import { RoomAudio } from "./RoomAudio";
 
@@ -179,6 +198,8 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 	const voiceChannelId = target?.channelId ?? null;
 	const voiceKind = target?.kind ?? null;
 	const voiceTitle = target?.title ?? null;
+	const targetRef = useRef(target);
+	targetRef.current = target;
 
 	const [room, setRoom] = useState<Room | null>(null);
 	const [connectedAt, setConnectedAt] = useState<number | null>(null);
@@ -191,6 +212,58 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 	const [isMuted, setIsMuted] = useState(false);
 	const [isDeafened, setIsDeafened] = useState(false);
 	const [deafenedIds, setDeafenedIds] = useState(NOBODY);
+
+	/**
+	 * A queda de agora, enquanto o app tenta voltar sozinho (`null` fora disso), e a próxima
+	 * tentativa agendada.
+	 */
+	const recovery = useRef<Recovery | null>(null);
+	/**
+	 * A transmissão da sala de agora. Vive enquanto a pessoa fica na mesma sala, e não por conexão:
+	 * a `:screen` é uma conexão à parte (ADR 0017), e uma queda da voz não derruba a tela.
+	 */
+	const shareController = useRef<NativeScreenShare | null>(null);
+	const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+	const reconnect = useRef({
+		/** Agenda a próxima tentativa, ou desiste depois de 5 minutos. */
+		schedule(now = Date.now()) {
+			recovery.current ??= { startedAt: now, tries: 0 };
+			const delay = nextAttempt(recovery.current, now);
+			reconnect.current.cancel();
+			if (delay === null) {
+				recovery.current = null;
+				void shareController.current?.stop();
+				setConnectionState("error");
+				setError({
+					kind: "connection",
+					message: "A conexão com a sala caiu e não voltou.",
+				});
+				return;
+			}
+			recovery.current.tries += 1;
+			setConnectionState("reconnecting");
+			retryTimer.current = setTimeout(() => {
+				retryTimer.current = null;
+				reconnect.current.now();
+			}, delay);
+		},
+		/** Entra de novo já, com um token novo (a sala de agora sai pelo cleanup do efeito). */
+		now() {
+			setTarget((current) =>
+				current ? { ...current, attempt: current.attempt + 1 } : current,
+			);
+		},
+		cancel() {
+			if (retryTimer.current !== null) clearTimeout(retryTimer.current);
+			retryTimer.current = null;
+		},
+		/** A pessoa entrou, saiu ou trocou de sala: a queda anterior não conta mais. */
+		reset() {
+			reconnect.current.cancel();
+			recovery.current = null;
+		},
+	});
+	useEffect(() => () => reconnect.current.cancel(), []);
 
 	/** Se o microfone já estava mutado quando o deafen começou. */
 	const mutedBeforeDeafen = useRef(false);
@@ -211,29 +284,84 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 	/** Os dispositivos de agora, para a conexão ler ao criar a sala. */
 	const deviceIds = useRef<DeviceIds>({ input: inputId, output: outputId });
 	deviceIds.current = { input: inputId, output: outputId };
-	const suppression = useNoiseChoice((state) => state.suppression);
-	/** A opção de agora, para os eventos da sala lerem sem recriar a sala. */
-	const noise = useRef(suppression);
-	noise.current = suppression;
+	/** Não há nenhum microfone (com uma lista que serve para dizer): entra mutado, sem tentar. */
+	const noMicrophone = useRef(false);
+	noMicrophone.current = knownDevices(devices, "input")?.length === 0;
+	const inputChoice = useInputChoice();
+	const chainOptions = useMemo<ChainOptions>(
+		() => ({
+			suppression: inputChoice.suppression,
+			echoCancellation: inputChoice.echoCancellation,
+			autoGainControl: inputChoice.autoGainControl,
+			volume: inputChoice.volume,
+			mode: inputChoice.mode,
+			autoSensitivity: inputChoice.autoSensitivity,
+			thresholdDb: inputChoice.thresholdDb,
+		}),
+		[
+			inputChoice.suppression,
+			inputChoice.echoCancellation,
+			inputChoice.autoGainControl,
+			inputChoice.volume,
+			inputChoice.mode,
+			inputChoice.autoSensitivity,
+			inputChoice.thresholdDb,
+		],
+	);
+	/** As opções de agora, para os eventos da sala lerem sem recriar a sala. */
+	const chain = useRef(chainOptions);
+	chain.current = chainOptions;
 
 	// Sem sessão não há chamada: saiu do grupo, o token da API já não vale.
 	const sessionConnected = useSession().status === "connected";
 	useEffect(() => {
-		if (!sessionConnected) setTarget(null);
+		if (!sessionConnected) {
+			reconnect.current.reset();
+			setTarget(null);
+		}
 	}, [sessionConnected]);
 
+	// O Windows voltou da suspensão: a conexão de antes morreu, mesmo que o LiveKit ainda não saiba.
+	useEffect(
+		() =>
+			onSystemResumed(() => {
+				if (!targetRef.current) return;
+				recovery.current ??= { startedAt: Date.now(), tries: 0 };
+				reconnect.current.cancel();
+				setConnectionState("reconnecting");
+				reconnect.current.now();
+			}),
+		[],
+	);
+
+	// Antes do efeito da conexão, para ele já encontrar a transmissão desta sala.
+	const shareChannel = target?.channelId ?? null;
 	useEffect(() => {
-		if (!target) {
+		if (shareChannel === null) return;
+		const controller = new NativeScreenShare(shareChannel);
+		shareController.current = controller;
+		return () => {
+			if (shareController.current === controller) shareController.current = null;
+			void controller.dispose();
+		};
+	}, [shareChannel]);
+
+	useEffect(() => {
+		const controller = shareController.current;
+		if (!target || !controller) {
 			return;
 		}
 
 		const { channelId } = target;
 		let cancelled = false;
 		const nextRoom = new Room(roomOptions(deviceIds.current));
-		const controller = new NativeScreenShare(channelId);
 
 		nextRoom.on(RoomEvent.ConnectionStateChanged, (state) => {
-			setConnectionState(toVoiceState(state));
+			// Voltando de uma queda, o "conectando" e o "desconectado" no meio são o "reconectando".
+			const next = toVoiceState(state);
+			setConnectionState(
+				recovery.current && next !== "connected" ? "reconnecting" : next,
+			);
 		});
 
 		nextRoom.on(
@@ -245,13 +373,18 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 					setDeafenedIds((current) =>
 						withDeafened(current, participant.identity, state.deafened),
 					);
+					return;
 				}
+				// Os números da conexão de quem mandou (`voiceStats.ts`), a cada 5 segundos.
+				const stats = parseVoiceStats(payload);
+				if (stats) setVoiceStats(participant.identity, stats);
 			},
 		);
 		nextRoom.on(RoomEvent.ParticipantDisconnected, (participant) => {
 			setDeafenedIds((current) =>
 				withDeafened(current, participant.identity, false),
 			);
+			forgetVoiceStats(participant.identity);
 		});
 		// Quem entra depois não recebeu o aviso: repete só para essa pessoa.
 		nextRoom.on(RoomEvent.ParticipantConnected, (participant) => {
@@ -267,12 +400,12 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 				);
 		});
 		// Trilha nova de alguém: a voz é assinada; a tela, só se a transmissão dessa pessoa aparece.
-		// O microfone publicado (ao entrar, ou ao voltar depois de a trilha ser refeita): põe o RNNoise
-		// nele, se a opção está ligada. Não dá para passar o processador nas opções da sala: o LiveKit o
-		// aplica antes de a trilha ter o `AudioContext` e recusa.
+		// O microfone publicado (ao entrar, ou ao voltar depois de a trilha ser refeita): põe a cadeia
+		// do microfone nele (volume, RNNoise e portão, ADR 0029). Não dá para passar o processador nas
+		// opções da sala: o LiveKit o aplica antes de a trilha ter o `AudioContext` e recusa.
 		nextRoom.on(RoomEvent.LocalTrackPublished, (publication) => {
 			if (publication.source === Track.Source.Microphone) {
-				void switchNoiseSuppression(nextRoom, noise.current);
+				void applyInputChain(nextRoom, chain.current);
 			}
 		});
 		nextRoom.on(RoomEvent.TrackPublished, (publication, participant) => {
@@ -286,7 +419,6 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 
 		// Só dispara quando a sala cai sozinha: no cleanup as escutas saem antes do disconnect.
 		nextRoom.on(RoomEvent.Disconnected, (reason) => {
-			void controller.dispose();
 			setRoom(null);
 			setScreenShare(null);
 			// A sala foi arquivada (a API apaga a sala no LiveKit, ADR 0026): não há para onde voltar.
@@ -304,11 +436,20 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 			if (reason === DisconnectReason.PARTICIPANT_REMOVED) {
 				void checkSession();
 			}
+			// Caiu sem ninguém pedir: tenta voltar sozinha. Tirada ou com a sala fechada, não volta.
+			if (shouldReconnect(reason)) {
+				console.warn("A voz caiu; tentando voltar:", reason);
+				reconnect.current.schedule();
+			} else {
+				// A transmissão continua numa queda que volta; aqui a pessoa não volta mais.
+				void controller.stop();
+				reconnect.current.reset();
+			}
 		});
 
 		async function connect() {
 			try {
-				setConnectionState("connecting");
+				setConnectionState(recovery.current ? "reconnecting" : "connecting");
 				setError(null);
 
 				const { url, token } = await requestVoiceToken(channelId);
@@ -325,7 +466,9 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 				let microphoneProblem: string | null = null;
 				const { isMuted: wasMuted, isDeafened: wasDeafened } =
 					audioFlags.current;
-				if (!wasMuted && !wasDeafened) {
+				if (!wasMuted && !wasDeafened && noMicrophone.current) {
+					microphoneProblem = "Nenhum microfone encontrado.";
+				} else if (!wasMuted && !wasDeafened) {
 					try {
 						await nextRoom.localParticipant.setMicrophoneEnabled(true);
 					} catch (microphoneError) {
@@ -333,11 +476,15 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 							"Não foi possível ativar o microfone:",
 							microphoneError,
 						);
-						microphoneProblem = errorMessage(microphoneError);
+						microphoneProblem = `Não foi possível usar o microfone: ${errorMessage(microphoneError)}`;
 					}
 				}
 				if (cancelled) return;
 
+				if (recovery.current) {
+					console.info("A voz voltou depois de", recovery.current.tries, "tentativas");
+				}
+				recovery.current = null;
 				setRoom(nextRoom);
 				setConnectedAt(Date.now());
 				setScreenShare(controller);
@@ -347,10 +494,16 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 						? null
 						: {
 								kind: "microphone",
-								message: `Não foi possível usar o microfone: ${microphoneProblem}`,
+								message: microphoneProblem,
 							},
 				);
 			} catch (connectError) {
+				// Voltando de uma queda, a tentativa que falhou (a API ou o LiveKit fora) agenda a próxima.
+				if (!cancelled && recovery.current) {
+					console.warn("A tentativa de voltar para a voz falhou:", connectError);
+					reconnect.current.schedule();
+					return;
+				}
 				if (!cancelled) {
 					console.error("Erro ao conectar na voz:", connectError);
 					setError({ kind: "connection", message: errorMessage(connectError) });
@@ -365,15 +518,17 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 			cancelled = true;
 			nextRoom.removeAllListeners();
 
-			// Para o compartilhamento (e a captura no Rust) antes de sair da sala.
-			void controller.dispose().finally(() => nextRoom.disconnect());
+			// A transmissão não para aqui: entre uma tentativa e outra, ela continua (e sai com a sala,
+			// pelo efeito dela).
+			void nextRoom.disconnect();
 
 			setRoom(null);
 			setConnectedAt(null);
 			setScreenShare(null);
-			setConnectionState("disconnected");
+			setConnectionState(recovery.current ? "reconnecting" : "disconnected");
 			setError(null);
 			setDeafenedIds(NOBODY);
+			clearVoiceStats();
 		};
 	}, [target]);
 
@@ -387,6 +542,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 		if (target?.kind !== "room") return;
 		if (order.kind === "move") {
 			if (order.channelId === target.channelId) return;
+			reconnect.current.reset();
 			stopWatching();
 			setTarget((current) => ({
 				channelId: order.channelId,
@@ -404,6 +560,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 				description: `Agora você está na ${name}.`,
 			});
 		} else {
+			reconnect.current.reset();
 			stopWatching();
 			setTarget(null);
 			toast.add(
@@ -445,6 +602,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 	// Quem assiste o quê (ADR 0024): as transmissões à vista, para a sala, e os avisos dos outros.
 	const shownOwners = useMemo(() => Object.keys(shown).sort(), [shown]);
 	useWatchSync(room, shownOwners);
+	useVoiceStatsBroadcast(room);
 	useLocalCamera(room);
 
 	// No meio da chamada, a escolha nova vale na hora, e o escolhido que some ou volta também.
@@ -456,8 +614,8 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 	}, [room, outputId]);
 
 	useEffect(() => {
-		if (room) void switchNoiseSuppression(room, suppression);
-	}, [room, suppression]);
+		if (room) void applyInputChain(room, chainOptions);
+	}, [room, chainOptions]);
 
 	const value = useMemo<VoiceContextValue>(() => {
 		async function setMicrophone(enabled: boolean) {
@@ -526,6 +684,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 				if (voiceChannelId !== null && channelId !== voiceChannelId) {
 					stopWatching();
 				}
+				reconnect.current.reset();
 				setTarget((current) => ({
 					channelId,
 					attempt: (current?.attempt ?? 0) + 1,
@@ -537,7 +696,10 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 				setError(null);
 			},
 			// O cleanup do efeito cuida do resto quando a sala vira null.
-			leave: () => setTarget(null),
+			leave: () => {
+				reconnect.current.reset();
+				setTarget(null);
+			},
 		};
 	}, [
 		voiceChannelId,

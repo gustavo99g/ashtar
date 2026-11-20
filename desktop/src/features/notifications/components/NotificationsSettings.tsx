@@ -7,6 +7,7 @@
 import { BellRingIcon, PlayIcon } from "lucide-react";
 import { type ReactNode, useId, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { useMe, useMyStatus } from "@/features/identity";
 import {
@@ -55,6 +56,7 @@ const ROOM_SOUND_ROWS: { id: RoomSoundId; title: string }[] = [
 	{ id: "undeafen", title: "Você ligou o áudio" },
 	{ id: "shareStart", title: "Alguém começou a transmitir" },
 	{ id: "shareStop", title: "Alguém parou de transmitir" },
+	{ id: "ptt", title: "Som do pressionar para falar" },
 ];
 
 function Row({
@@ -139,6 +141,8 @@ export function NotificationsSettings() {
 	const setNotification = useSettingsStore((state) => state.setNotification);
 	const roomSounds = useSettingsStore((state) => state.roomSounds);
 	const setRoomSound = useSettingsStore((state) => state.setRoomSound);
+	const volume = useSettingsStore((state) => state.soundVolume);
+	const setVolume = useSettingsStore((state) => state.setSoundVolume);
 	const busy = useMyStatus() === "busy";
 	const user = useMe().data?.user;
 	const [test, setTest] = useState<TestState>("idle");
@@ -170,6 +174,27 @@ export function NotificationsSettings() {
 					lidas e os sons da sala continuam.
 				</p>
 			)}
+
+			<Section title="Volume dos sons">
+				<div className="flex flex-col gap-1.5">
+					<div className="flex items-center justify-between text-xs text-muted-foreground">
+						<span>
+							Mensagens, menções, o toque da ligação e os sons da sala. A voz das
+							pessoas não muda.
+						</span>
+						<span className="shrink-0 pl-4 tabular-nums">{volume}%</span>
+					</div>
+					<Slider
+						aria-label="Volume dos sons"
+						min={0}
+						max={100}
+						step={1}
+						value={volume}
+						onValueChange={(next) => setVolume(next as number)}
+						onValueCommitted={() => playRoomSound("join", { force: true })}
+					/>
+				</div>
+			</Section>
 
 			<Section title="Avisos">
 				{ROWS.map((row) => (

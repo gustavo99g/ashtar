@@ -109,7 +109,7 @@ export function ScreenStage({
 			) : (
 				<Spinner className="size-6 text-primary" />
 			)}
-			{ready && share.publication.isMuted && <PausedCover />}
+			{ready && <PausedCover share={share} />}
 			<div className="absolute top-3.5 left-3.5 flex items-center gap-2">
 				<LiveBadge size="md" />
 			</div>
@@ -246,7 +246,7 @@ export function SmallShare({
 			) : (
 				<Spinner className="size-4 text-primary" />
 			)}
-			{ready && share.publication.isMuted && <PausedCover compact />}
+			{ready && <PausedCover share={share} compact />}
 			<LiveBadge className="absolute top-1.5 left-1.5" />
 			<span className="absolute inset-x-1.5 bottom-1.5 truncate text-left text-[11px] font-semibold text-foreground [text-shadow:0_1px_2px_rgb(0_0_0/0.8)]">
 				{sharer.name}

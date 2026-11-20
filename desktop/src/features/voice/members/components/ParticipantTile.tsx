@@ -18,6 +18,8 @@ import {
 } from "../../camera/components/CameraVideo";
 import { useCameraChoice } from "../../camera/stores/cameraChoiceStore";
 import type { ChannelMember } from "../model/members";
+import { ConnectionMark } from "./ConnectionMark";
+import { ConnectionSection } from "./ConnectionSection";
 import { UserVolume, UserVolumeMark } from "./UserVolume";
 
 /*
@@ -137,6 +139,10 @@ export function ParticipantTile({
 				className="w-[260px] gap-2 border-border-strong bg-card px-3.5 py-3"
 			>
 				<UserVolume userId={member.id} name={member.name} />
+				<ConnectionSection
+					userId={member.id}
+					connection={member.connection}
+				/>
 			</PopoverContent>
 		</Popover>
 	);
@@ -151,6 +157,7 @@ function MemberIcons({
 }) {
 	return (
 		<>
+			<ConnectionMark connection={member.connection} className={size} />
 			{member.sharing && (
 				<ScreenShareIcon
 					aria-label="transmitindo a tela"

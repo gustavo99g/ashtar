@@ -1,3 +1,4 @@
+export { ShareDefaultsSection } from "./components/ShareDefaultsSection";
 export { ShareQuickSettings } from "./components/ShareQuickSettings";
 export { SourcePickerHost } from "./components/SourcePickerHost";
 export { useScreenShareState } from "./hooks/useScreenShareState";

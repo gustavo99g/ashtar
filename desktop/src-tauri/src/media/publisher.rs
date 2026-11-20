@@ -11,13 +11,16 @@
 //! - **Áudio:** o WASAPI entrega f32; aqui passa pelo [`Leveler`] (se a chave estiver ligada) e vira
 //!   i16 em pedaços de 10 ms para o `NativeAudioSource`.
 //! - **Pausa:** a trilha de vídeo é silenciada (`mute`); quem assiste vê "Transmissão pausada".
+//! - **Queda (v0.6, ADR 0030):** a conexão cai, e [`Publisher::reconnect`] entra de novo com um
+//!   token novo e republica a tela com o mesmo encoder, sem parar a captura: o pipeline continua
+//!   mandando quadros para o mesmo [`LiveKitVideoSink`], que descarta enquanto não há trilha.
 //!
 //! Tudo que é assíncrono roda no runtime do Tauri. As funções daqui bloqueiam: chamar só dentro
 //! de `spawn_blocking` (ou de uma thread de captura).
 
 use std::borrow::Cow;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, OnceLock};
+use std::sync::{Arc, PoisonError, RwLock};
 use std::thread::JoinHandle;
 use std::time::Duration;
 
@@ -74,9 +77,16 @@ fn publish_error(what: &str) -> impl FnOnce(RoomError) -> AppError + '_ {
 }
 
 /// Onde o destino do vídeo encontra a fonte da trilha. Fica vazio entre o começo do pipeline e a
-/// publicação: o tipo da fonte depende do encoder que o pipeline conseguiu abrir.
+/// publicação (o tipo da fonte depende do encoder que o pipeline conseguiu abrir) e enquanto a
+/// conexão volta de uma queda.
 #[derive(Clone, Default)]
-struct VideoSlot(Arc<OnceLock<NativeVideoSource>>);
+struct VideoSlot(Arc<RwLock<Option<NativeVideoSource>>>);
+
+impl VideoSlot {
+    fn set(&self, source: Option<NativeVideoSource>) {
+        *self.0.write().unwrap_or_else(PoisonError::into_inner) = source;
+    }
+}
 
 /// O destino do vídeo na LiveKit. Antes da publicação, descarta.
 pub struct LiveKitVideoSink {
@@ -85,7 +95,8 @@ pub struct LiveKitVideoSink {
 
 impl PacketSink for LiveKitVideoSink {
     fn push(&mut self, packet: &VideoPacket) -> SinkStatus {
-        let Some(source) = self.slot.0.get() else {
+        let slot = self.slot.0.read().unwrap_or_else(PoisonError::into_inner);
+        let Some(source) = slot.as_ref() else {
             return SinkStatus::Continue;
         };
         match packet {
@@ -229,6 +240,15 @@ impl Drop for Requests {
     }
 }
 
+/// O que a tela publicada precisa para ser publicada de novo depois de uma queda.
+#[derive(Clone)]
+struct PublishedVideo {
+    encoder: EncoderKind,
+    size: (u32, u32),
+    format: VideoFormat,
+    control: VideoControl,
+}
+
 pub struct Publisher {
     room: Room,
     track_name: String,
@@ -238,6 +258,8 @@ pub struct Publisher {
     /// A chave do nivelador, dividida com o áudio publicado: vale na hora, sem republicar.
     leveler: Arc<AtomicBool>,
     _requests: Option<Requests>,
+    published: Option<PublishedVideo>,
+    paused: bool,
 }
 
 impl Publisher {
@@ -251,26 +273,7 @@ impl Publisher {
         target: &ShareTarget,
         on_lost: impl FnOnce(String) + Send + 'static,
     ) -> Result<Self, AppError> {
-        let mut options = RoomOptions::default();
-        options.auto_subscribe = false;
-        let (room, mut events) =
-            async_runtime::block_on(Room::connect(&target.url, &target.token, options))
-                .map_err(publish_error("não deu para entrar na sala"))?;
-        info!(target: "media", sala = %room.name(), "a :screen entrou na sala");
-
-        async_runtime::spawn(async move {
-            while let Some(event) = events.recv().await {
-                if let RoomEvent::Disconnected { reason } = event {
-                    // `ClientInitiated` é o nosso `close`: não é queda.
-                    if reason != livekit::DisconnectReason::ClientInitiated {
-                        warn!(target: "media", ?reason, "a :screen caiu da sala");
-                        on_lost(format!("a conexão da transmissão caiu ({reason:?})"));
-                    }
-                    return;
-                }
-            }
-        });
-
+        let room = join(target, on_lost)?;
         Ok(Self {
             room,
             track_name: target.track_name.clone(),
@@ -279,9 +282,94 @@ impl Publisher {
             audio: None,
             leveler: Arc::new(AtomicBool::new(true)),
             _requests: None,
+            published: None,
+            paused: false,
         })
     }
 
+    /// Entra de novo depois de uma queda, com o token novo de `target`, e republica a tela como
+    /// estava (o mesmo encoder, a mesma pausa). O áudio fica de fora: quem chama começa a captura de
+    /// novo com [`Publisher::publish_audio`]. `on_lost` vale para a conexão nova.
+    ///
+    /// # Bloqueia
+    ///
+    /// Até entrar e publicar (ou falhar). Falhando, a conexão de antes continua caída e dá para
+    /// tentar de novo.
+    pub fn reconnect(
+        &mut self,
+        target: &ShareTarget,
+        on_lost: impl FnOnce(String) + Send + 'static,
+    ) -> Result<(), AppError> {
+        let published = self
+            .published
+            .clone()
+            .ok_or_else(|| AppError::Internal("a tela nunca foi publicada".into()))?;
+        // A trilha de antes foi junto com a sala: o pipeline descarta até a nova.
+        self.slot.set(None);
+        self._requests = None;
+        self.video = None;
+        self.audio = None;
+        let room = join(target, on_lost)?;
+        let old = std::mem::replace(&mut self.room, room);
+        // A sala de antes já caiu; sair dela só solta o que sobrou.
+        if let Err(error) = async_runtime::block_on(old.close()) {
+            warn!(target: "media", %error, "a :screen antiga não saiu direito");
+        }
+        self.track_name = target.track_name.clone();
+        let result = self.publish_video(
+            &published.encoder,
+            published.size,
+            published.format,
+            published.control,
+        );
+        if let Err(error) = result {
+            // Sem a tela, a conexão nova não serve: a próxima tentativa entra de novo.
+            if let Err(error) = async_runtime::block_on(self.room.close()) {
+                warn!(target: "media", %error, "a :screen nova não saiu direito");
+            }
+            return Err(error);
+        }
+        if self.paused {
+            self.set_paused(true);
+        }
+        info!(target: "media", "a :screen voltou para a sala");
+        Ok(())
+    }
+}
+
+/// Entra na sala como `:screen` e vigia a queda (`on_lost`, uma vez; o nosso `close` não conta).
+///
+/// # Bloqueia
+///
+/// Até entrar na sala (ou falhar).
+fn join(
+    target: &ShareTarget,
+    on_lost: impl FnOnce(String) + Send + 'static,
+) -> Result<Room, AppError> {
+    let mut options = RoomOptions::default();
+    options.auto_subscribe = false;
+    let (room, mut events) =
+        async_runtime::block_on(Room::connect(&target.url, &target.token, options))
+            .map_err(publish_error("não deu para entrar na sala"))?;
+    info!(target: "media", sala = %room.name(), "a :screen entrou na sala");
+
+    async_runtime::spawn(async move {
+        while let Some(event) = events.recv().await {
+            if let RoomEvent::Disconnected { reason } = event {
+                // `ClientInitiated` é o nosso `close`: não é queda.
+                if reason != livekit::DisconnectReason::ClientInitiated {
+                    warn!(target: "media", ?reason, "a :screen caiu da sala");
+                    on_lost(format!("a conexão da transmissão caiu ({reason:?})"));
+                }
+                return;
+            }
+        }
+    });
+
+    Ok(room)
+}
+
+impl Publisher {
     /// O destino que o pipeline recebe. Descarta até o [`Publisher::publish_video`].
     pub fn video_sink(&self) -> LiveKitVideoSink {
         LiveKitVideoSink {
@@ -350,7 +438,13 @@ impl Publisher {
         if hardware {
             self._requests = Some(Requests::start(source.clone(), control.clone())?);
         }
-        let _ = self.slot.0.set(source);
+        self.slot.set(Some(source));
+        self.published = Some(PublishedVideo {
+            encoder: encoder.clone(),
+            size,
+            format,
+            control: control.clone(),
+        });
         // O primeiro keyframe pode ter saído antes da publicação (e sido descartado).
         control.send(VideoCommand::Keyframe);
         self.video = Some(track);
@@ -430,7 +524,8 @@ impl Publisher {
     ///
     /// O `mute` da crate fala com a sala e precisa do reator do Tokio, que só o runtime do Tauri
     /// tem: por isso passa pelo `block_on`, e funciona de qualquer thread.
-    pub fn set_paused(&self, paused: bool) {
+    pub fn set_paused(&mut self, paused: bool) {
+        self.paused = paused;
         let Some(track) = &self.video else {
             return;
         };

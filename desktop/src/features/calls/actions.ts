@@ -34,6 +34,17 @@ export async function cancelCalling(): Promise<void> {
 	await hangUpCall(call.channel_id, "cancel");
 }
 
+/**
+ * O atalho Recusar ou desligar (v0.6): tocando, recusa; chamando, desiste; na ligação, desliga.
+ * Sem ligação, não faz nada.
+ */
+export async function declineOrHangUp(): Promise<void> {
+	const { phase } = useCallStore.getState();
+	if (phase === "ringing") return declineRinging();
+	if (phase === "calling") return cancelCalling();
+	if (phase === "connecting" || phase === "in_call") return hangUp();
+}
+
 /** Desliga a ligação (ou, tocando, recusa ou desiste, conforme o lado). */
 export async function hangUp(): Promise<void> {
 	const { call } = useCallStore.getState();

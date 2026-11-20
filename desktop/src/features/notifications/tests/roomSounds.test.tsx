@@ -5,14 +5,20 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useSettingsStore } from "@/features/settings";
 import { useMaybeVoice } from "@/features/voice";
 import { RoomSounds } from "../components/RoomSounds";
-import { playRoomSound, resetRoomSounds } from "../model/roomSounds";
+import {
+	playPttSound,
+	playRoomSound,
+	resetRoomSounds,
+} from "../model/roomSounds";
 
 vi.mock("@/features/voice", () => ({ useMaybeVoice: vi.fn() }));
 
 const played: string[] = [];
+const audios: { volume: number }[] = [];
 
 beforeEach(() => {
 	played.length = 0;
+	audios.length = 0;
 	resetRoomSounds();
 	useSettingsStore.setState({
 		roomSounds: {
@@ -24,13 +30,18 @@ beforeEach(() => {
 			undeafen: true,
 			shareStart: true,
 			shareStop: true,
+			ptt: false,
 		},
+		soundVolume: 100,
 	});
+	localStorage.clear();
 	vi.stubGlobal(
 		"Audio",
 		class {
+			volume = 1;
 			constructor(src: string) {
 				played.push(src.split("/").pop() ?? src);
+				audios.push(this);
 			}
 			play() {
 				return Promise.resolve();
@@ -119,5 +130,29 @@ describe("os sons da sala", () => {
 		rerender(<RoomSounds />);
 		await flush();
 		expect(names()).toEqual(["join", "leave"]);
+	});
+});
+
+describe("o pressionar para falar e o volume dos sons", () => {
+	it("o clique só toca com a chave ligada, ao abrir e ao fechar, sem intervalo", () => {
+		playPttSound(true);
+		expect(played).toEqual([]);
+
+		useSettingsStore.setState((state) => ({
+			roomSounds: { ...state.roomSounds, ptt: true },
+		}));
+		playPttSound(true);
+		playPttSound(false);
+		playPttSound(true);
+
+		expect(played).toEqual(["ptt-on.wav", "ptt-off.wav", "ptt-on.wav"]);
+	});
+
+	it("todo som sai no volume da régua de Notificações", () => {
+		useSettingsStore.getState().setSoundVolume(40);
+
+		playRoomSound("join", { now: 1 });
+
+		expect(audios[0].volume).toBeCloseTo(0.4);
 	});
 });

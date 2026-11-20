@@ -7,6 +7,7 @@ import {
 	toggleUserMuted,
 	useUserVolumes,
 } from "../../members/stores/userVolumeStore";
+import { useOutputVolume } from "../../devices/stores/outputVolumeStore";
 import { RoomAudio } from "../components/RoomAudio";
 import { followOutput } from "../model/boost";
 
@@ -65,6 +66,7 @@ function voice(identity: string) {
 beforeEach(() => {
 	localStorage.clear();
 	useUserVolumes.setState({ volumes: {} });
+	useOutputVolume.setState({ volume: 100 });
 });
 
 const SALA = [
@@ -119,6 +121,19 @@ describe("o som da sala", () => {
 		act(() => toggleUserMuted("marcao"));
 		expect(marcao.audio.setVolume).toHaveBeenLastCalledWith(0);
 		expect(juju.audio.setVolume).toHaveBeenLastCalledWith(0.6);
+	});
+
+	it("o volume de saída multiplica por cima do volume de cada pessoa", () => {
+		const juju = voice("juju");
+		setUserVolume("juju", 60);
+		tracks = [juju.ref];
+		render(<RoomAudio room={null} deafened={false} />);
+
+		act(() => useOutputVolume.setState({ volume: 50 }));
+		expect(juju.audio.setVolume).toHaveBeenLastCalledWith(0.3);
+
+		act(() => useOutputVolume.setState({ volume: 150 }));
+		expect(juju.audio.setVolume).toHaveBeenLastCalledWith(0.9);
 	});
 
 	it("o deafen manda: cala a voz sem apagar o volume guardado", () => {

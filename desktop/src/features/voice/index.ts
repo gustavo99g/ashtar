@@ -12,6 +12,8 @@ export {
 	useCanMoveMembers,
 	useMoveTargets,
 } from "./members/components/RoomModeration";
+export { ConnectionMark } from "./members/components/ConnectionMark";
+export { ConnectionSection } from "./members/components/ConnectionSection";
 export { UserVolume } from "./members/components/UserVolume";
 export { useLiveMembers } from "./members/hooks/useLiveMembers";
 export {
@@ -40,3 +42,5 @@ export { useVoice } from "./room/hooks/useVoice";
 export { useVoiceChannelId } from "./room/hooks/useVoiceChannelId";
 export { DEFAULT_ROOM_ID } from "./room/model/channel";
 export { useConnectedRoomName, useRoomName } from "./room/hooks/useRoomName";
+export { setPushToTalkHeld } from "./input/chain";
+export { useInputChoice } from "./input/stores/inputStore";

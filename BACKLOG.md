@@ -34,9 +34,6 @@ Bugs que saem assim que ficarem prontos, pelo auto-update, sem esperar a entrega
 - [ ] Os textos dos presets (`presets.ts`) prometem mais fluidez do que o medido em jogo: o Equilibrado ("sem
       perder fluidez") ficou em 25–34 fps e o Nitidez em 18–25 fps, abaixo dos 30 do próprio nome (ADR 0009). **Adiado para a UI nova (v0.2.2).**
 
-- [ ] Botão "Abrir pasta de logs" e interruptor "receber versões beta", adiados da v0.2.0. Até lá, o canal
-      vem de `ASHTAR_UPDATE_CHANNEL=beta`.
-
 - [ ] Rotas de administração na API e tela de administração na UI, no lugar do `admin` temporário da v0.2.1:
       criar, listar e revogar convite, remover membro, desvincular dispositivo, marcar o beta e ver as
       permissões. Ficam sobre as funções de `identity/`, que já recebem o `actor`. Depois, tirar do `admin` o
@@ -53,18 +50,6 @@ Bugs que saem assim que ficarem prontos, pelo auto-update, sem esperar a entrega
 
 - [x] No cartão do usuário (ADR 0020), "Mover para outra sala": entrou com as várias salas de voz (ADR 0026), junto do
       "Desconectar da voz" e do arrastar entre salas.
-
-## v0.6 — Voz e vídeo
-
-- [ ] A aba "Voz e vídeo" das configurações saiu na v0.2.2 só com os dispositivos, Entrada e Saída (Etapa
-      5b). O resto do quadro dela fica guardado para a v0.6: as outras opções da supressão de ruído (na
-      v0.2.3 só entra o interruptor liga/desliga do RNNoise), os volumes de entrada e de saída, o teste de microfone, a detecção de voz com a
-      sensibilidade, o pressionar para falar com o atalho, os atalhos globais e os padrões do
-      compartilhamento de tela (qualidade e áudio) na v0.6. O
-      pressionar para falar com um jogo em foco pede um gancho de teclado em Rust: o atalho global comum do
-      Windows prende a tecla, e o jogo deixaria de recebê-la.
-- [ ] "Reconectando" no painel "Voz conectada" e o aviso "Conexão perdida" do compartilhamento ficaram
-      apagados no canvas na v0.2.2; entram com a reconexão da v0.6.
 
 ## v0.8 — Moderação
 

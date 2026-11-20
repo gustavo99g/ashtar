@@ -145,3 +145,25 @@ export function onScreenShareStats(
 		callback(event.payload),
 	);
 }
+
+/** A conexão `:screen` caiu (`screen-share-link-lost`): a captura segue, esperando a volta. */
+export interface ScreenShareLinkLost {
+	sessionId: number;
+}
+
+/** Escuta a queda da conexão da transmissão. Responda com `screenShareReconnect`. */
+export function onScreenShareLinkLost(
+	callback: (event: ScreenShareLinkLost) => void,
+): Promise<UnlistenFn> {
+	return listen<ScreenShareLinkLost>("screen-share-link-lost", (event) =>
+		callback(event.payload),
+	);
+}
+
+/**
+ * Volta a transmissão para a sala com um token novo, sem parar a captura. Falhando, dá para tentar
+ * de novo; sem voltar em 2 minutos, a transmissão acaba (`screen-share-ended`).
+ */
+export function screenShareReconnect(sessionId: number, target: ShareTarget) {
+	return call<void>("screen_share_reconnect", { sessionId, target });
+}

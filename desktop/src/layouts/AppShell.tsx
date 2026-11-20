@@ -2,11 +2,13 @@ import { Outlet } from "react-router-dom";
 import { CallBridge } from "@/features/calls";
 import { ChannelDialogs } from "@/features/channels";
 import { DmDock, showDm } from "@/features/dms";
+import { LogsNotices } from "@/features/admin";
 import { JoinNotices } from "@/features/members";
 import { NotificationsBridge, RoomSounds } from "@/features/notifications";
 import { ChannelNav, ServerMenu } from "@/features/server";
 import { SideDock } from "@/features/side-panel";
 import { MiniShare, VoiceDock } from "@/features/voice";
+import { ConnectionBanner } from "./ConnectionBanner";
 /*
  * A moldura de quem já entrou: a coluna do servidor à esquerda, a rota no meio e a lateral
  * (membros e conversas) à direita. As
@@ -24,10 +26,22 @@ import { MiniShare, VoiceDock } from "@/features/voice";
  * `VoiceDock`). A lateral vem da `features/side-panel` (`SideDock`): fica fora da célula do
  * `main`, então a área do canal, e com ela a camada da miniatura, encolhe quando a lateral abre. É
  * assim que os encaixes da miniatura contam com a lateral sem saber dela.
+ *
+ * A faixa "Sem conexão com o servidor" (`ConnectionBanner`) fica em cima de tudo, fora da parte
+ * posicionada: as configurações abertas não a cobrem.
  */
 export function AppShell() {
 	return (
-		<div className="relative flex h-full">
+		<div className="flex h-full flex-col">
+			<ConnectionBanner />
+			<AppFrame />
+		</div>
+	);
+}
+
+function AppFrame() {
+	return (
+		<div className="relative flex min-h-0 flex-1">
 			<aside
 				aria-label="Servidor"
 				className="flex w-[304px] shrink-0 flex-col bg-card"
@@ -40,6 +54,7 @@ export function AppShell() {
 				<main className="col-start-1 row-start-1 flex min-h-0 min-w-0 flex-col">
 					{/* O aviso de quem entrou (só para quem vê o Painel): vive enquanto a moldura vive. */}
 					<JoinNotices />
+					<LogsNotices />
 					<Outlet />
 				</main>
 				{/* A transmissão assistida, em miniatura, quando a pessoa sai da sala. A camada tem o

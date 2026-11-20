@@ -56,3 +56,8 @@ export function autostartEnabled() {
 export function setAutostart(enabled: boolean) {
 	return call<void>("set_autostart", { enabled });
 }
+
+/** Os logs dos últimos 2 dias e o `info.txt` num `.zip` ("Enviar logs"), em bytes. */
+export function logsBundle() {
+	return call<ArrayBuffer>("logs_bundle");
+}

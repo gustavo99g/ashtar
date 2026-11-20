@@ -16,7 +16,7 @@ import type { RemoteAudioTrack, Room } from "livekit-client";
 const boosted = new WeakSet<RemoteAudioTrack>();
 let boostContext: AudioContext | null = null;
 
-/** Põe a trilha no volume `heard` (0 a 200), ligando ou desligando o reforço conforme o caso. */
+/** Põe a trilha no volume `heard` (0 a 400: o da pessoa vezes o de saída), ligando ou desligando o reforço conforme o caso. */
 export function applyTrackVolume(
 	track: RemoteAudioTrack,
 	heard: number,

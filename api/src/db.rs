@@ -121,6 +121,7 @@ mod tests {
                 "devices",
                 "invite_uses",
                 "invites",
+                "log_reports",
                 "mentions",
                 "messages",
                 "sessions",

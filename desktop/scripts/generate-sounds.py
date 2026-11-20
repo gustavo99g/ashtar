@@ -6,6 +6,8 @@ queda suave. Uso, em desktop/: python3 scripts/generate-sounds.py src/assets/sou
   com eles: room-join.wav e room-leave.wav (alguém entrou ou saiu), room-mute.wav e room-unmute.wav,
   room-deafen.wav e room-undeafen.wav (o seu microfone e o seu áudio), room-share-start.wav e
   room-share-stop.wav (alguém começou ou parou de transmitir na sua sala).
+- O pressionar para falar (v0.6, ADR 0029): ptt-on.wav e ptt-off.wav, um clique curto ao abrir e ao
+  fechar o microfone pelo atalho. Bem curtos e baixos: tocam a cada frase.
 """
 import math, struct, sys, wave
 
@@ -66,3 +68,7 @@ render([note(587.33, 0.0, 0.12, 0.8, 14), note(739.99, 0.07, 0.12, 0.85, 14),
         note(880.0, 0.14, 0.3, 1.0, 10)], 0.44, f"{out}/room-share-start.wav")
 render([note(880.0, 0.0, 0.12, 0.8, 14), note(739.99, 0.07, 0.12, 0.85, 14),
         note(587.33, 0.14, 0.3, 1.0, 10)], 0.44, f"{out}/room-share-stop.wav")
+
+# Pressionar para falar: um clique só, agudo ao abrir (Ré6) e mais grave ao fechar (Lá5).
+render([note(1174.66, 0.0, 0.06, 1.0, 45)], 0.07, f"{out}/ptt-on.wav")
+render([note(880.0, 0.0, 0.06, 1.0, 45)], 0.07, f"{out}/ptt-off.wav")

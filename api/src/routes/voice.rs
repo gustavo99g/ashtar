@@ -24,7 +24,7 @@ use crate::identity::{User, users};
 use crate::realtime::{DisconnectReason, ServerEvent};
 use crate::voice::{
     self, ParticipantView, RoomParticipant, join_participants, list_room, livekit_env,
-    screen_identity,
+    screen_identity, test_room,
 };
 
 /// A resposta do `voice/token`.
@@ -126,6 +126,37 @@ pub async fn screen_token(
     )
     .map_err(ApiError::Config)?;
     Ok(Json(JoinVoiceResponse { token, url }))
+}
+
+/// Quanto tempo o token do Testar conexão vale: o teste leva uns 10 segundos.
+const TEST_TOKEN_TTL: Duration = Duration::from_secs(60);
+
+/// `POST /api/voice/test-token`: o token de 1 minuto para a sala `teste:{user_id}` do Testar conexão
+/// (v0.6, decisão 20). A sala é só da pessoa: ninguém mais recebe token para ela.
+pub async fn test_token(
+    CurrentUser(user): CurrentUser,
+) -> Result<Json<JoinVoiceResponse>, ApiError> {
+    let (api_key, api_secret, url) = livekit_env().map_err(ApiError::Config)?;
+    let token = create_test_token(&api_key, &api_secret, &user.id).map_err(ApiError::Config)?;
+    Ok(Json(JoinVoiceResponse { token, url }))
+}
+
+fn create_test_token(api_key: &str, api_secret: &str, user_id: &str) -> Result<String, String> {
+    AccessToken::with_api_key(api_key, api_secret)
+        .with_identity(user_id)
+        .with_ttl(TEST_TOKEN_TTL)
+        .with_grants(VideoGrants {
+            room_join: true,
+            room: test_room(user_id),
+            can_publish: Some(true),
+            can_subscribe: Some(true),
+            can_publish_data: Some(false),
+            can_publish_sources: vec!["microphone".into()],
+            can_update_own_metadata: Some(false),
+            ..Default::default()
+        })
+        .to_jwt()
+        .map_err(|error| error.to_string())
 }
 
 /// Se `user` pode entrar na sala `channel_id`: uma sala de voz aberta, ou a
@@ -516,5 +547,20 @@ mod tests {
         assert_eq!(claims.metadata, r#"{"nick":"kid"}"#);
         assert_eq!(claims.video.room, "geral");
         assert_eq!(claims.video.can_update_own_metadata, Some(false));
+    }
+
+    #[test]
+    fn o_token_do_teste_e_so_da_sala_da_pessoa_e_vale_um_minuto() {
+        let token = create_test_token("chave", "segredo-de-teste-comprido", "id-1").unwrap();
+        let claims = TokenVerifier::with_api_key("chave", "segredo-de-teste-comprido")
+            .verify(&token)
+            .unwrap();
+        assert_eq!(claims.sub, "id-1");
+        assert_eq!(claims.video.room, "teste:id-1");
+        assert_eq!(
+            claims.video.can_publish_sources,
+            vec!["microphone".to_string()]
+        );
+        assert!(claims.exp - claims.nbf <= 60);
     }
 }

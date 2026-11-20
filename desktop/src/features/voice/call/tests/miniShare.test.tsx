@@ -23,7 +23,10 @@ vi.mock("../../members/hooks/useLiveMembers", () => ({
 vi.mock("@/features/screen-share", () => ({ useScreenShares: vi.fn() }));
 vi.mock("@livekit/components-react", () => ({
 	VideoTrack: () => <video aria-label="vídeo" />,
+	useConnectionQualityIndicator: () => ({ quality: quality.current }),
 }));
+/** A qualidade da conexão de quem transmite, como a LiveKit dá. */
+const quality = vi.hoisted(() => ({ current: "excellent" }));
 vi.mock("@/features/screen-share", () => ({
 	useScreenShares: vi.fn(),
 	shareOwner: (identity: string) => identity.replace(/:screen$/, ""),
@@ -80,6 +83,20 @@ afterEach(() => {
 });
 
 describe("a miniatura da transmissão", () => {
+	it("a conexão de quem transmite caída mostra que ela está voltando", () => {
+		quality.current = "lost";
+		vi.mocked(useScreenShares).mockReturnValue([
+			{ track: share, ownerId: "juju", isOwn: false },
+		]);
+		act(() => watchShare("juju"));
+		renderAt(paths.channel("geral"));
+
+		expect(
+			screen.getByText("Reconectando a transmissão…"),
+		).toBeInTheDocument();
+		quality.current = "excellent";
+	});
+
 	it("a transmissão pausada (a trilha silenciada) mostra o aviso", () => {
 		const paused = {
 			...share,

@@ -5,7 +5,7 @@
  * e o codec (`media/quality.rs`). Daqui saem só os textos do seletor, do painel e de quem assiste.
  * Mudou lá, muda aqui.
  */
-import type { Quality } from "@/lib/tauri/commands";
+import type { AudioMode, Quality } from "@/lib/tauri/commands";
 
 export interface QualityPreset {
 	label: string;
@@ -59,3 +59,19 @@ export const DEFAULT_QUALITY: Quality = "1080p60";
 export function networkLimited(quality: Quality, targetKbps: number): boolean {
 	return targetKbps < QUALITY_PRESETS[quality].bitrateKbps * 0.7;
 }
+
+/** As opções de áudio da transmissão, no seletor e no padrão de Configurações › Voz e vídeo. */
+export const SHARE_AUDIO_OPTIONS: Record<
+	AudioMode["mode"],
+	{ label: string; hint: string }
+> = {
+	off: { label: "Sem áudio", hint: "O compartilhamento vai sem som." },
+	application: {
+		label: "Só do aplicativo",
+		hint: "Apenas o som da janela escolhida.",
+	},
+	system: {
+		label: "Todo o sistema",
+		hint: "Tudo que toca no computador, menos as vozes da chamada.",
+	},
+};

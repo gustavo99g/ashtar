@@ -72,7 +72,8 @@ enum Command {
         #[arg(long)]
         conversa: bool,
     },
-    /// Copia o banco para a pasta, com data no nome, e apaga as cópias mais antigas.
+    /// Copia o banco para a pasta, com data no nome, e apaga as cópias mais antigas (e os logs
+    /// enviados de mais de 30 dias).
     Backup {
         pasta: PathBuf,
         /// Quantas cópias manter na pasta (pelo menos 1).
@@ -220,6 +221,12 @@ async fn run(db: &SqlitePool, command: Command) -> Result<(), ApiError> {
         Command::Backup { pasta, manter } => {
             let file = backup(db, &pasta, manter).await?;
             println!("Backup em {}", file.display());
+            // Os logs enviados de mais de 30 dias saem junto (v0.6).
+            let data_dir = api::logs::data_dir_from_env();
+            let pruned = api::logs::prune(db, &data_dir, api::db::now()).await?;
+            if pruned > 0 {
+                println!("Logs apagados (mais de 30 dias): {pruned}");
+            }
         }
     }
     Ok(())

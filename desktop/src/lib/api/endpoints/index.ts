@@ -1,4 +1,10 @@
 export {
+	downloadLogReport,
+	getServerStatus,
+	listLogReports,
+	sendLogs,
+} from "./admin";
+export {
 	archiveCategory,
 	archiveChannel,
 	createCategory,
@@ -35,6 +41,7 @@ export { createRealtimeTicket } from "./realtime";
 
 export {
 	createScreenToken,
+	createTestToken,
 	disconnectMember,
 	moveMember,
 	createVoiceToken,

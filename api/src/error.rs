@@ -38,6 +38,8 @@ pub enum ErrorKind {
     ClientOutdated,
     /// A sala já tem o máximo de transmissões ao mesmo tempo (`MAX_SHARES_PER_ROOM`, ADR 0024).
     ShareLimit,
+    /// O pedido passou do tempo limite (`timeout.rs`). O app usa o mesmo texto para o seu.
+    Timeout,
 }
 
 /// O corpo de toda resposta de erro.
@@ -94,6 +96,8 @@ pub enum ApiError {
     /// O LiveKit não respondeu ou recusou o pedido. O detalhe vai só para o log.
     #[error("Não foi possível consultar a sala de voz agora.")]
     LiveKit(String),
+    #[error("O servidor demorou demais para responder. Tente de novo em instantes.")]
+    Timeout,
 }
 
 impl ApiError {
@@ -122,6 +126,7 @@ impl ApiError {
             Self::TooManyAttempts => (StatusCode::TOO_MANY_REQUESTS, ErrorKind::TooManyAttempts),
             Self::TooManyMessages => (StatusCode::TOO_MANY_REQUESTS, ErrorKind::TooManyMessages),
             Self::ShareLimit(_) => (StatusCode::CONFLICT, ErrorKind::ShareLimit),
+            Self::Timeout => (StatusCode::GATEWAY_TIMEOUT, ErrorKind::Timeout),
             Self::Internal(_) | Self::Config(_) | Self::LiveKit(_) => {
                 (StatusCode::INTERNAL_SERVER_ERROR, ErrorKind::Internal)
             }

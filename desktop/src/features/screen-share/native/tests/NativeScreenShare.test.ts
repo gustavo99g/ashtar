@@ -1,18 +1,24 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createScreenToken } from "@/lib/api";
 import {
 	type CaptureSource,
 	onScreenShareAudioEnded,
 	onScreenShareEnded,
+	onScreenShareLinkLost,
 	onScreenShareStats,
 	type ScreenShareEnded,
+	type ScreenShareLinkLost,
 	type ShareStats,
+	screenShareReconnect,
 	screenShareStart,
 	screenShareStop,
 	screenShareUpdate,
 } from "@/lib/tauri/commands";
 import type { ShareRequest } from "../../model/controller";
-import { NativeScreenShare } from "../../native/NativeScreenShare";
+import {
+	NativeScreenShare,
+	RETRY_DELAYS_MS,
+} from "../../native/NativeScreenShare";
 
 vi.mock("@/lib/api", () => ({ createScreenToken: vi.fn() }));
 vi.mock("@/lib/tauri/commands", () => ({
@@ -22,6 +28,8 @@ vi.mock("@/lib/tauri/commands", () => ({
 	onScreenShareEnded: vi.fn(),
 	onScreenShareAudioEnded: vi.fn(),
 	onScreenShareStats: vi.fn(),
+	onScreenShareLinkLost: vi.fn(),
+	screenShareReconnect: vi.fn(),
 	screenShareStart: vi.fn(),
 	screenShareUpdate: vi.fn(),
 	screenShareStop: vi.fn(),
@@ -47,6 +55,7 @@ const rust: {
 	ended?: (event: ScreenShareEnded) => void;
 	audioEnded?: (event: ScreenShareEnded) => void;
 	stats?: (stats: ShareStats) => void;
+	linkLost?: (event: ScreenShareLinkLost) => void;
 	unlistened: number;
 } = { unlistened: 0 };
 
@@ -68,6 +77,11 @@ beforeEach(() => {
 		rust.stats = callback;
 		return unlisten;
 	});
+	vi.mocked(onScreenShareLinkLost).mockImplementation(async (callback) => {
+		rust.linkLost = callback;
+		return unlisten;
+	});
+	vi.mocked(screenShareReconnect).mockResolvedValue();
 	vi.mocked(createScreenToken).mockResolvedValue({
 		url: "wss://sala",
 		token: "tk",
@@ -131,7 +145,7 @@ describe("NativeScreenShare", () => {
 			kind: "Conflict",
 			message: "Entre na sala de voz antes de transmitir.",
 		});
-		expect(rust.unlistened).toBe(3);
+		expect(rust.unlistened).toBe(4);
 	});
 
 	it("o fim que chega antes do id ainda encerra a sessão", async () => {
@@ -251,5 +265,98 @@ describe("NativeScreenShare", () => {
 		const share = new NativeScreenShare("jogatina");
 		await Promise.all([share.start(request), share.start(request)]);
 		expect(screenShareStart).toHaveBeenCalledOnce();
+	});
+
+	describe("a conexão que cai", () => {
+		beforeEach(() => {
+			vi.useFakeTimers();
+		});
+		afterEach(() => {
+			vi.useRealTimers();
+		});
+
+		async function lost() {
+			const share = new NativeScreenShare("jogatina");
+			await share.start(request);
+			const trackName =
+				vi.mocked(screenShareStart).mock.calls[0][0].target.trackName;
+			vi.mocked(createScreenToken).mockClear();
+			rust.linkLost?.({ sessionId: 7 });
+			return { share, trackName };
+		}
+
+		it("avisa, pede um token novo e volta com a mesma trilha", async () => {
+			const { share, trackName } = await lost();
+			expect(share.getState()).toMatchObject({ status: "active", link: "lost" });
+
+			vi.mocked(createScreenToken).mockResolvedValueOnce({
+				url: "wss://sala",
+				token: "novo",
+			});
+			await vi.advanceTimersByTimeAsync(RETRY_DELAYS_MS[0]);
+
+			expect(createScreenToken).toHaveBeenCalledWith("jogatina");
+			expect(screenShareReconnect).toHaveBeenCalledWith(7, {
+				url: "wss://sala",
+				token: "novo",
+				trackName,
+			});
+			expect(share.getState()).toMatchObject({ status: "active", link: "ok" });
+		});
+
+		it("falhando, tenta de novo esperando cada vez mais", async () => {
+			const { share } = await lost();
+			vi.mocked(createScreenToken).mockRejectedValueOnce(new Error("sem rede"));
+			vi.mocked(screenShareReconnect).mockRejectedValueOnce({
+				kind: "Publish",
+				message: "ainda não",
+			});
+
+			await vi.advanceTimersByTimeAsync(RETRY_DELAYS_MS[0]);
+			expect(createScreenToken).toHaveBeenCalledTimes(1);
+			await vi.advanceTimersByTimeAsync(RETRY_DELAYS_MS[1] - 1);
+			expect(createScreenToken).toHaveBeenCalledTimes(1);
+			await vi.advanceTimersByTimeAsync(1);
+			expect(screenShareReconnect).toHaveBeenCalledTimes(1);
+			expect(share.getState()).toMatchObject({ link: "lost" });
+
+			await vi.advanceTimersByTimeAsync(RETRY_DELAYS_MS[2]);
+			expect(screenShareReconnect).toHaveBeenCalledTimes(2);
+			expect(share.getState()).toMatchObject({ link: "ok" });
+		});
+
+		it("uma queda repetida no meio da volta não começa outra", async () => {
+			await lost();
+			rust.linkLost?.({ sessionId: 7 });
+			rust.linkLost?.({ sessionId: 99 });
+
+			await vi.advanceTimersByTimeAsync(RETRY_DELAYS_MS[0]);
+			expect(screenShareReconnect).toHaveBeenCalledTimes(1);
+		});
+
+		it("parar no meio cancela as tentativas", async () => {
+			const { share } = await lost();
+			await share.stop();
+
+			await vi.advanceTimersByTimeAsync(60_000);
+			expect(createScreenToken).not.toHaveBeenCalled();
+			expect(screenShareReconnect).not.toHaveBeenCalled();
+		});
+
+		it("o Rust desistindo encerra como sempre", async () => {
+			const { share } = await lost();
+			vi.mocked(createScreenToken).mockRejectedValue(new Error("sem rede"));
+			await vi.advanceTimersByTimeAsync(RETRY_DELAYS_MS[0]);
+
+			rust.ended?.({
+				sessionId: 7,
+				reason: "error",
+				message: "a conexão da transmissão caiu e não voltou",
+			});
+			await vi.advanceTimersByTimeAsync(60_000);
+
+			expect(share.getState()).toMatchObject({ status: "error" });
+			expect(createScreenToken).toHaveBeenCalledTimes(1);
+		});
 	});
 });

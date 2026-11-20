@@ -26,6 +26,7 @@ const active: ScreenShareState = {
 	cursor: true,
 	leveler: true,
 	paused: false,
+	link: "ok",
 	audio: "on",
 };
 const numbers: ShareStats = {

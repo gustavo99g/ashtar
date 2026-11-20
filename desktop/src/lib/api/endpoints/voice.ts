@@ -47,6 +47,14 @@ export function createScreenToken(
  * `POST /api/voice/move`: põe alguém em outra sala de voz (ADR 0026), com "Mover membros". O app
  * da pessoa troca de sala sozinho, pelo `voice.moved`.
  */
+/** O token de 1 minuto da sala só sua do Testar conexão (`teste:{id}`). */
+export function createTestToken(): Promise<JoinVoiceResponse> {
+	return apiJson<JoinVoiceResponse>(
+		"/api/voice/test-token",
+		jsonRequest("POST", {}),
+	);
+}
+
 export async function moveMember(
 	userId: string,
 	channelId: string,

@@ -31,6 +31,7 @@ export const ROOM_SOUND_IDS = [
 	"undeafen",
 	"shareStart",
 	"shareStop",
+	"ptt",
 ] as const;
 
 export type RoomSoundId = (typeof ROOM_SOUND_IDS)[number];
@@ -46,7 +47,31 @@ export const DEFAULT_ROOM_SOUNDS: RoomSoundPrefs = {
 	undeafen: true,
 	shareStart: true,
 	shareStop: true,
+	// O clique do pressionar para falar (v0.6, ADR 0029): só quem aperta ouve, e começa desligado.
+	ptt: false,
 };
+
+/** O volume dos sons do Ashtar (v0.6): de 0 a 100%, para todos os sons do app. */
+export const DEFAULT_SOUND_VOLUME = 100;
+
+function readSoundVolume(value: unknown): number {
+	return typeof value === "number" && Number.isFinite(value)
+		? Math.min(100, Math.max(0, value))
+		: DEFAULT_SOUND_VOLUME;
+}
+
+/**
+ * O volume dos sons, de 0 a 1, lido do `localStorage`: a janela dos avisos tem o seu próprio store,
+ * e a régua muda na janela principal. Lendo do disco, o próximo som já sai no volume novo.
+ */
+export function soundVolume(): number {
+	try {
+		const saved = JSON.parse(localStorage.getItem("ashtar-settings") ?? "null");
+		return readSoundVolume(saved?.state?.soundVolume) / 100;
+	} catch {
+		return DEFAULT_SOUND_VOLUME / 100;
+	}
+}
 
 function readRoomSounds(value: unknown): RoomSoundPrefs {
 	const saved = (typeof value === "object" && value !== null ? value : {}) as Record<
@@ -74,6 +99,9 @@ interface SettingsState {
 	 */
 	askBeforeSwitchRoom: boolean;
 	roomSounds: RoomSoundPrefs;
+	/** O volume dos sons do Ashtar, de 0 a 100 (%). */
+	soundVolume: number;
+	setSoundVolume: (volume: number) => void;
 	setTheme: (theme: ThemeId) => void;
 	setRoomSound: (id: RoomSoundId, enabled: boolean) => void;
 	setNotification: (key: keyof NotificationPrefs, enabled: boolean) => void;
@@ -109,6 +137,8 @@ export const useSettingsStore = create<SettingsState>()(
 			askBeforeCall: true,
 			askBeforeSwitchRoom: true,
 			roomSounds: DEFAULT_ROOM_SOUNDS,
+			soundVolume: DEFAULT_SOUND_VOLUME,
+			setSoundVolume: (volume) => set({ soundVolume: readSoundVolume(volume) }),
 			setTheme: (theme) => set({ theme }),
 			setRoomSound: (id, enabled) =>
 				set((state) => ({
@@ -131,6 +161,7 @@ export const useSettingsStore = create<SettingsState>()(
 				askBeforeCall: state.askBeforeCall,
 				askBeforeSwitchRoom: state.askBeforeSwitchRoom,
 				roomSounds: state.roomSounds,
+				soundVolume: state.soundVolume,
 			}),
 			// Um tema que saiu do app (ou um valor estranho no disco) volta para o padrão. Quem vem
 			// de antes da 0.3.10 não tem as chaves de notificação: entram ligadas. O "perguntar antes de
@@ -143,6 +174,7 @@ export const useSettingsStore = create<SettingsState>()(
 							askBeforeCall?: unknown;
 							askBeforeSwitchRoom?: unknown;
 							roomSounds?: unknown;
+							soundVolume?: unknown;
 					  }
 					| undefined;
 				return {
@@ -158,6 +190,7 @@ export const useSettingsStore = create<SettingsState>()(
 							? saved.askBeforeSwitchRoom
 							: true,
 					roomSounds: readRoomSounds(saved?.roomSounds),
+					soundVolume: readSoundVolume(saved?.soundVolume),
 				};
 			},
 		},

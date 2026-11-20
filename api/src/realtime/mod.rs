@@ -21,6 +21,7 @@ use crate::chat::messages::Message;
 use crate::chat::read::{ChannelHead, ReadState};
 use crate::identity::status::{Shown, Status};
 use crate::identity::users::Person;
+use crate::logs::LogReportView;
 use crate::secret;
 use crate::voice::ParticipantView;
 
@@ -110,6 +111,9 @@ pub enum ServerEvent {
     /// Alguém foi removido: sai da coluna de membros.
     #[serde(rename = "member.left")]
     MemberLeft { user_id: String },
+    /// Chegaram logs de alguém (v0.6): só para o dono, que vê o aviso no canto.
+    #[serde(rename = "logs.received")]
+    LogsReceived { report: LogReportView },
     /// A lista de canais mudou (criar, editar, arquivar, reordenar): o app
     /// recarrega o `GET /api/channels`.
     #[serde(rename = "channels.changed")]
@@ -162,6 +166,7 @@ impl ServerEvent {
             | Self::VoiceDisconnected { .. }
             | Self::MemberJoined { .. }
             | Self::MemberLeft { .. }
+            | Self::LogsReceived { .. }
             | Self::ChannelsChanged { .. } => false,
         }
     }

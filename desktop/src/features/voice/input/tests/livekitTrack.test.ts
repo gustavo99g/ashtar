@@ -1,10 +1,8 @@
 import { LocalAudioTrack } from "livekit-client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-	BROWSER_CONSTRAINTS,
-	createRnnoiseProcessor,
-	type NoiseAudio,
-} from "../rnnoise";
+import { captureConstraints, createInputProcessor } from "../chain";
+import { DEFAULT_INPUT } from "../stores/inputStore";
+import { fakeAudio } from "./fakeAudio";
 
 /**
  * Uma MediaStreamTrack de mentira, com o que o `LocalAudioTrack` do LiveKit toca nela. Como num
@@ -29,27 +27,6 @@ function fakeMediaTrack(
 	} as unknown as MediaStreamTrack;
 }
 
-function fakeAudio(processed: MediaStreamTrack): NoiseAudio {
-	const node = { connect: vi.fn((next) => next), disconnect: vi.fn() };
-	const context = {
-		state: "running",
-		createMediaStreamSource: () => ({
-			connect: () => node,
-			disconnect: vi.fn(),
-		}),
-		createMediaStreamDestination: () => ({
-			stream: { getAudioTracks: () => [processed] },
-		}),
-		close: vi.fn(async () => {}),
-	};
-	return {
-		createContext: () => context as unknown as AudioContext,
-		loadWasm: async () => new ArrayBuffer(8),
-		addWorklet: async () => {},
-		createNode: async () => node as unknown as AudioWorkletNode,
-	};
-}
-
 beforeEach(() => {
 	vi.stubGlobal(
 		"MediaStream",
@@ -63,27 +40,30 @@ afterEach(() => {
 	vi.unstubAllGlobals();
 });
 
-// O contrato do LiveKit que a supressão de ruído respeita: o processador só entra numa trilha que já
+// O contrato do LiveKit que a cadeia do microfone respeita: o processador só entra numa trilha que já
 // tem o `AudioContext`, e a trilha recém-criada (`createLocalTracks`) não tem. Por isso o RNNoise
 // entra depois de o microfone ser publicado, e não pelas opções da sala.
-describe("o RNNoise na trilha de verdade do LiveKit", () => {
+describe("a cadeia na trilha de verdade do LiveKit", () => {
 	it("a trilha sem AudioContext recusa o processador", async () => {
 		const track = new LocalAudioTrack(fakeMediaTrack("mic"), undefined, false);
-		const processor = createRnnoiseProcessor(fakeAudio(fakeMediaTrack("saida")));
+		const processor = createInputProcessor(
+			DEFAULT_INPUT,
+			fakeAudio(fakeMediaTrack("saida")).audio,
+		);
 
 		await expect(track.setProcessor(processor)).rejects.toThrow(
 			"Audio context needs to be set on LocalAudioTrack",
 		);
 	});
 
-	it("com o AudioContext (depois de publicada), aceita, e a trilha passa a ser a que sai do RNNoise", async () => {
+	it("com o AudioContext (depois de publicada), aceita, e a trilha passa a ser a que sai da cadeia", async () => {
 		// O microfone como o `createLocalTracks` o cria: com as restrições padrão do LiveKit.
-		const created = { deviceId: "mic-usb", ...BROWSER_CONSTRAINTS };
+		const created = { deviceId: "mic-usb", ...captureConstraints(DEFAULT_INPUT, false) };
 		const raw = fakeMediaTrack("mic", created);
 		const out = fakeMediaTrack("saida");
 		const track = new LocalAudioTrack(raw, created, false);
 		track.setAudioContext({} as AudioContext);
-		const processor = createRnnoiseProcessor(fakeAudio(out));
+		const processor = createInputProcessor(DEFAULT_INPUT, fakeAudio(out).audio);
 
 		await track.setProcessor(processor);
 
