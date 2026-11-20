@@ -277,6 +277,9 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 	/** Os dispositivos de agora, para a conexão ler ao criar a sala. */
 	const deviceIds = useRef<DeviceIds>({ input: inputId, output: outputId });
 	deviceIds.current = { input: inputId, output: outputId };
+	/** Não há nenhum microfone (com uma lista que serve para dizer): entra mutado, sem tentar. */
+	const noMicrophone = useRef(false);
+	noMicrophone.current = knownDevices(devices, "input")?.length === 0;
 	const inputChoice = useInputChoice();
 	const chainOptions = useMemo<ChainOptions>(
 		() => ({
@@ -451,7 +454,9 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 				let microphoneProblem: string | null = null;
 				const { isMuted: wasMuted, isDeafened: wasDeafened } =
 					audioFlags.current;
-				if (!wasMuted && !wasDeafened) {
+				if (!wasMuted && !wasDeafened && noMicrophone.current) {
+					microphoneProblem = "Nenhum microfone encontrado.";
+				} else if (!wasMuted && !wasDeafened) {
 					try {
 						await nextRoom.localParticipant.setMicrophoneEnabled(true);
 					} catch (microphoneError) {
@@ -459,7 +464,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 							"Não foi possível ativar o microfone:",
 							microphoneError,
 						);
-						microphoneProblem = errorMessage(microphoneError);
+						microphoneProblem = `Não foi possível usar o microfone: ${errorMessage(microphoneError)}`;
 					}
 				}
 				if (cancelled) return;
@@ -477,7 +482,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 						? null
 						: {
 								kind: "microphone",
-								message: `Não foi possível usar o microfone: ${microphoneProblem}`,
+								message: microphoneProblem,
 							},
 				);
 			} catch (connectError) {

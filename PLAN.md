@@ -60,7 +60,7 @@ Levantado na `dev` (`196cb41`), para o plano não refazer:
 | 4 | 1 | App: a aba Atalhos, o pressionar para falar e o aviso de mutado | Feita |
 | 5 | 2 | App: a voz volta sozinha | Feita |
 | 6 | 2 | Rust e app: a transmissão nativa volta sozinha | Feita |
-| 7 | 2 | App: microfone e saída desconectados | Pendente |
+| 7 | 2 | App: microfone e saída desconectados | Feita |
 | 8 | 2 | API e app: "Sem conexão com o servidor" | Pendente |
 | 9 | 2 | API e app: a qualidade da conexão e o Testar conexão | Pendente |
 | 10 | 2 | API, Rust e app: "Enviar logs" e o estado do servidor | Pendente |
@@ -352,6 +352,12 @@ e a desistência; o caso no `share_e2e.rs` fica para rodar no Windows.
 
 **Pronto quando:** tirar o fone USB no meio da sala passa a voz para o microfone do notebook com o aviso, e devolver
 o fone volta para ele.
+
+**Como ficou:** o `DeviceNotices` (no painel de voz) compara a situação dos dispositivos a cada leitura
+(`deviceNotices.ts`): o escolhido que some avisa com o nome do padrão do Windows, e o aviso fecha quando ele volta. A
+troca em si já era do `switchDevice`, e o LiveKit refaz o processador (a cadeia do microfone) na trilha nova. Sem
+nenhum microfone, a entrada nem tenta abrir: fica mutada com "Microfone indisponível", e o primeiro que aparece
+oferece Ativar microfone.
 
 ## Etapa 8: API e app, "Sem conexão com o servidor"
 

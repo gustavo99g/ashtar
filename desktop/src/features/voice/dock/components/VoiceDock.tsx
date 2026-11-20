@@ -4,6 +4,7 @@ import { ShareStartNotices } from "../../call/components/ShareStartNotices";
 import { WatchJanitor } from "../../call/components/WatchJanitor";
 import { useVoice } from "../../room/hooks/useVoice";
 import { useConnectedRoomName } from "../../room/hooks/useRoomName";
+import { DeviceNotices } from "./DeviceNotices";
 import { MutedWarning } from "./MutedWarning";
 import { ShareHost } from "./ShareHost";
 import { TrayShare } from "./TrayShare";
@@ -40,6 +41,7 @@ export function VoiceDock() {
 			{screenShare && <TrayShare controller={screenShare} />}
 			{room && <WatchJanitor />}
 			{room && <ShareStartNotices />}
+			{room && <DeviceNotices />}
 		</div>
 	);
 }
