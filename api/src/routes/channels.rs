@@ -16,7 +16,7 @@ use super::auth::CurrentUser;
 use super::extract::ApiJson;
 use crate::AppState;
 use crate::chat::categories;
-use crate::chat::channels::{self, ChannelEdit, ChannelKind, ChannelView};
+use crate::chat::channels::{self, ChannelAccess, ChannelEdit, ChannelKind, ChannelView};
 use crate::chat::layout::{self, Archived, Layout, LayoutRequest};
 use crate::db::now;
 use crate::error::ApiError;
@@ -34,9 +34,9 @@ fn changed(state: &AppState, version: Option<i64>) {
 /// `GET /api/channels`.
 pub async fn list(
     State(state): State<AppState>,
-    CurrentUser(_user): CurrentUser,
+    CurrentUser(user): CurrentUser,
 ) -> Result<Json<Layout>, ApiError> {
-    Ok(Json(layout::read(&state.db).await?))
+    Ok(Json(layout::read(&state.db, &user).await?))
 }
 
 /// `GET /api/channels/archived`: só de quem gerencia.
@@ -62,6 +62,24 @@ pub struct CreateChannelRequest {
     #[serde(default)]
     #[ts(optional)]
     pub topic: Option<String>,
+    /// Restrito a `member_ids` (ADR 0028). Ausente é de todos.
+    #[serde(default)]
+    #[ts(optional)]
+    pub restricted: Option<bool>,
+    #[serde(default)]
+    #[ts(optional)]
+    pub member_ids: Option<Vec<String>>,
+}
+
+/// A restrição de um pedido: só quando ele fala dela.
+fn access_of<'a>(
+    restricted: Option<bool>,
+    member_ids: &'a Option<Vec<String>>,
+) -> Option<ChannelAccess<'a>> {
+    restricted.map(|restricted| ChannelAccess {
+        restricted,
+        member_ids: member_ids.as_deref().unwrap_or_default(),
+    })
 }
 
 /// `POST /api/channels`: um canal de texto ou uma sala de voz nova.
@@ -77,6 +95,7 @@ pub async fn create(
         &request.name,
         request.category_id.as_deref(),
         request.topic.as_deref(),
+        access_of(request.restricted, &request.member_ids),
         now(),
     )
     .await?;
@@ -94,9 +113,17 @@ pub struct UpdateChannelRequest {
     #[serde(default)]
     #[ts(optional)]
     pub topic: Option<String>,
+    /// Com `member_ids`, a lista inteira como deve ficar. Ausente deixa como está.
+    #[serde(default)]
+    #[ts(optional)]
+    pub restricted: Option<bool>,
+    #[serde(default)]
+    #[ts(optional)]
+    pub member_ids: Option<Vec<String>>,
 }
 
-/// `PATCH /api/channels/{id}`: nome e tópico.
+/// `PATCH /api/channels/{id}`: nome, tópico e quem tem acesso. Quem perdeu o
+/// acesso a uma sala com ele dentro sai dela na hora, com o aviso (ADR 0028).
 pub async fn update(
     State(state): State<AppState>,
     CurrentUser(user): CurrentUser,
@@ -106,9 +133,13 @@ pub async fn update(
     let edit = ChannelEdit {
         name: request.name.as_deref(),
         topic: request.topic.as_deref(),
+        access: access_of(request.restricted, &request.member_ids),
     };
     let (channel, version) = channels::update(&state.db, &user, &id, edit).await?;
     changed(&state, version);
+    if version.is_some() && channel.kind == ChannelKind::Voice {
+        super::voice::remove_without_access(&state, &channel, &user).await?;
+    }
     Ok(Json(channel.into()))
 }
 
@@ -165,7 +196,10 @@ pub async fn create_category(
 ) -> Result<(StatusCode, Json<Layout>), ApiError> {
     let (_, version) = categories::create(&state.db, &user, &request.name, now()).await?;
     changed(&state, Some(version));
-    Ok((StatusCode::CREATED, Json(layout::read(&state.db).await?)))
+    Ok((
+        StatusCode::CREATED,
+        Json(layout::read(&state.db, &user).await?),
+    ))
 }
 
 /// `PATCH /api/categories/{id}`: o nome.

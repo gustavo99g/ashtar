@@ -73,7 +73,7 @@ impl From<HeadRow> for ChannelHead {
 /// O `100` é o [`UNREAD_CAP`]. As minhas mensagens não contam como não lidas,
 /// e dos registros de ligação (ADR 0023) só conta o da chamada perdida.
 macro_rules! select_head {
-    ($rest:literal) => {
+    ($($rest:expr),+) => {
         concat!(
             "SELECT c.id AS channel_id,
                     (SELECT MAX(m.id) FROM messages m WHERE m.channel_id = c.id) AS last_message_id,
@@ -90,15 +90,31 @@ macro_rules! select_head {
                     COALESCE(s.muted, 0) AS muted
              FROM channels c
              LEFT JOIN channel_state s ON s.channel_id = c.id AND s.user_id = ?1 ",
-            $rest
+            $($rest),+
         )
     };
 }
 
-/// Os canais de texto abertos, em ordem de id, com o estado de `user_id`.
+/// A condição de `c` ser um canal que a pessoa `?1` acessa (ADR 0028): sem
+/// restrição, na lista dele, ou ela é o dono ou gerencia os canais. É a mesma
+/// regra do `access::can_access`, em SQL.
+macro_rules! accessible {
+    () => {
+        "(c.restricted = 0
+          OR EXISTS (SELECT 1 FROM channel_members a WHERE a.channel_id = c.id AND a.user_id = ?1)
+          OR EXISTS (SELECT 1 FROM users o WHERE o.id = ?1 AND o.is_owner = 1)
+          OR EXISTS (SELECT 1 FROM user_permissions p
+                     WHERE p.user_id = ?1 AND p.permission = 'canais.gerenciar'))"
+    };
+}
+
+/// Os canais de texto abertos que `user_id` acessa, em ordem de id, com o
+/// estado dele.
 pub async fn heads(db: &SqlitePool, user_id: &str) -> Result<Vec<ChannelHead>, ApiError> {
     let rows: Vec<HeadRow> = sqlx::query_as(select_head!(
-        "WHERE c.kind = 'text' AND c.archived_at IS NULL ORDER BY c.id"
+        "WHERE c.kind = 'text' AND c.archived_at IS NULL AND ",
+        accessible!(),
+        " ORDER BY c.id"
     ))
     .bind(user_id)
     .fetch_all(db)
@@ -181,14 +197,16 @@ pub(super) async fn advance(
     Ok(done.rows_affected() > 0)
 }
 
-/// Leva o ponteiro de `user_id` até o fim de todo canal de texto aberto e de
-/// toda conversa dele. Devolve os canais em que o ponteiro andou.
+/// Leva o ponteiro de `user_id` até o fim de todo canal de texto aberto que ele
+/// acessa e de toda conversa dele. Devolve os canais em que o ponteiro andou.
 pub async fn mark_all_read(db: &SqlitePool, user_id: &str) -> Result<Vec<String>, ApiError> {
-    Ok(sqlx::query_scalar(
+    Ok(sqlx::query_scalar(concat!(
         "INSERT INTO channel_state (user_id, channel_id, last_read_id)
          SELECT ?1, c.id, (SELECT MAX(m.id) FROM messages m WHERE m.channel_id = c.id)
          FROM channels c
-         WHERE ((c.kind = 'text' AND c.archived_at IS NULL)
+         WHERE ((c.kind = 'text' AND c.archived_at IS NULL AND ",
+        accessible!(),
+        ")
              OR (c.kind = 'dm' AND EXISTS (SELECT 1 FROM channel_members cm
                                            WHERE cm.channel_id = c.id AND cm.user_id = ?1)))
            AND EXISTS (SELECT 1 FROM messages m WHERE m.channel_id = c.id)
@@ -196,7 +214,7 @@ pub async fn mark_all_read(db: &SqlitePool, user_id: &str) -> Result<Vec<String>
          WHERE channel_state.last_read_id IS NULL
             OR excluded.last_read_id > channel_state.last_read_id
          RETURNING channel_id",
-    )
+    ))
     .bind(user_id)
     .fetch_all(db)
     .await?)

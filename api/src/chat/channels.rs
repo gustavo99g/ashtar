@@ -42,6 +42,9 @@ pub struct Channel {
     pub position: i64,
     pub created_at: i64,
     pub archived_at: Option<i64>,
+    /// Só quem está na lista (`channel_members`), o dono e quem gerencia os
+    /// canais o veem (ADR 0028).
+    pub restricted: bool,
 }
 
 /// Um canal como a lista do app mostra.
@@ -56,6 +59,13 @@ pub struct ChannelView {
     pub category_id: Option<String>,
     /// Só na lista de arquivados.
     pub archived_at: Option<i64>,
+    /// Restrito a uma lista de pessoas (ADR 0028).
+    pub restricted: bool,
+    /// Quem está na lista de um canal restrito. Só vai para quem gerencia os
+    /// canais, que é quem edita a lista.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub member_ids: Option<Vec<String>>,
 }
 
 impl From<Channel> for ChannelView {
@@ -67,6 +77,8 @@ impl From<Channel> for ChannelView {
             topic: channel.topic,
             category_id: channel.category_id,
             archived_at: channel.archived_at,
+            restricted: channel.restricted,
+            member_ids: None,
         }
     }
 }
@@ -81,7 +93,8 @@ pub const TOPIC_MAX: usize = 120;
 macro_rules! select_channel {
     ($rest:literal) => {
         concat!(
-            "SELECT id, kind, name, topic, category_id, position, created_at, archived_at
+            "SELECT id, kind, name, topic, category_id, position, created_at, archived_at,
+                    restricted
              FROM channels ",
             $rest
         )
@@ -182,9 +195,82 @@ pub fn normalize_topic(input: &str) -> Result<Option<String>, ApiError> {
     Ok(Some(topic.to_owned()))
 }
 
+/// Quem acessa um canal (ADR 0028): todos, ou só a lista `member_ids` (mais o
+/// dono e quem gerencia os canais, que não precisam estar nela).
+#[derive(Debug, Clone, Copy)]
+pub struct ChannelAccess<'a> {
+    pub restricted: bool,
+    pub member_ids: &'a [String],
+}
+
+/// Os membros ativos de `ids`, sem repetir e em ordem; `InvalidRequest` se
+/// algum não existe ou foi removido.
+async fn validate_members(
+    conn: &mut SqliteConnection,
+    ids: &[String],
+) -> Result<Vec<String>, ApiError> {
+    let mut unique: Vec<String> = ids.to_vec();
+    unique.sort();
+    unique.dedup();
+    for id in &unique {
+        let found: Option<i64> =
+            sqlx::query_scalar("SELECT 1 FROM users WHERE id = ? AND removed_at IS NULL")
+                .bind(id)
+                .fetch_optional(&mut *conn)
+                .await?;
+        if found.is_none() {
+            return Err(ApiError::InvalidRequest(
+                "Alguém da lista de acesso não é membro do grupo.".into(),
+            ));
+        }
+    }
+    Ok(unique)
+}
+
+/// Os ids na lista do canal `id`, em ordem.
+async fn members_of(conn: &mut SqliteConnection, id: &str) -> Result<Vec<String>, ApiError> {
+    Ok(sqlx::query_scalar(
+        "SELECT user_id FROM channel_members WHERE channel_id = ? ORDER BY user_id",
+    )
+    .bind(id)
+    .fetch_all(conn)
+    .await?)
+}
+
+/// Grava a restrição e a lista. Sem restrição, a lista é apagada: ela só quer
+/// dizer alguma coisa num canal restrito.
+async fn write_access(
+    conn: &mut SqliteConnection,
+    id: &str,
+    restricted: bool,
+    members: &[String],
+) -> Result<(), ApiError> {
+    sqlx::query("UPDATE channels SET restricted = ? WHERE id = ?")
+        .bind(restricted)
+        .bind(id)
+        .execute(&mut *conn)
+        .await?;
+    sqlx::query("DELETE FROM channel_members WHERE channel_id = ?")
+        .bind(id)
+        .execute(&mut *conn)
+        .await?;
+    if restricted {
+        for user_id in members {
+            sqlx::query("INSERT INTO channel_members (channel_id, user_id) VALUES (?, ?)")
+                .bind(id)
+                .bind(user_id)
+                .execute(&mut *conn)
+                .await?;
+        }
+    }
+    Ok(())
+}
+
 /// Cria um canal no fim da categoria (ou do topo, sem categoria): um canal de
 /// texto, com o nome `#nome` e o tópico opcional, ou uma sala de voz (v0.5), com
-/// o nome livre e sem tópico. Devolve o canal e a versão nova.
+/// o nome livre e sem tópico. Com `access`, já nasce restrito. Devolve o canal e
+/// a versão nova.
+#[allow(clippy::too_many_arguments)]
 pub async fn create(
     db: &SqlitePool,
     actor: &User,
@@ -192,6 +278,7 @@ pub async fn create(
     name: &str,
     category_id: Option<&str>,
     topic: Option<&str>,
+    access: Option<ChannelAccess<'_>>,
     now: i64,
 ) -> Result<(Channel, i64), ApiError> {
     require_permission(db, actor, Permission::ManageChannels).await?;
@@ -228,6 +315,10 @@ pub async fn create(
     .bind(now)
     .execute(&mut *tx)
     .await?;
+    if let Some(access) = access.filter(|access| access.restricted) {
+        let members = validate_members(&mut tx, access.member_ids).await?;
+        write_access(&mut tx, &id, true, &members).await?;
+    }
     let version = layout::bump(&mut tx).await?;
     let channel = get(&mut tx, &id).await?;
     tx.commit().await?;
@@ -239,9 +330,11 @@ pub async fn create(
 pub struct ChannelEdit<'a> {
     pub name: Option<&'a str>,
     pub topic: Option<&'a str>,
+    /// A restrição e a lista inteira, como devem ficar.
+    pub access: Option<ChannelAccess<'a>>,
 }
 
-/// Renomeia ou troca o tópico de um canal aberto. O nome segue a regra do tipo:
+/// Renomeia, troca o tópico ou a lista de acesso de um canal aberto. O nome segue a regra do tipo:
 /// `#nome` no de texto, livre na sala de voz. Devolve o canal e a versão nova,
 /// ou `None` na versão se nada mudou (o mesmo nome e tópico, ou um pedido vazio):
 /// aí ninguém precisa recarregar a lista.
@@ -273,7 +366,16 @@ pub async fn update(
         }
         (Some(topic), _) => normalize_topic(topic)?,
     };
-    if name == channel.name && topic == channel.topic {
+    let before = members_of(&mut tx, id).await?;
+    let (restricted, members) = match edit.access {
+        None => (channel.restricted, before.clone()),
+        Some(access) if access.restricted => {
+            (true, validate_members(&mut tx, access.member_ids).await?)
+        }
+        Some(_) => (false, Vec::new()),
+    };
+    let access_changed = restricted != channel.restricted || members != before;
+    if name == channel.name && topic == channel.topic && !access_changed {
         return Ok((channel, None));
     }
     sqlx::query("UPDATE channels SET name = ?, topic = ? WHERE id = ?")
@@ -282,6 +384,9 @@ pub async fn update(
         .bind(id)
         .execute(&mut *tx)
         .await?;
+    if access_changed {
+        write_access(&mut tx, id, restricted, &members).await?;
+    }
     let version = layout::bump(&mut tx).await?;
     let channel = get(&mut tx, id).await?;
     tx.commit().await?;

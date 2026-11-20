@@ -88,10 +88,15 @@ pub enum ServerEvent {
         /// O nome de quem moveu, para o aviso.
         by_name: String,
     },
-    /// Alguém com "Mover membros" tirou a pessoa da voz. Só vai para as conexões
-    /// dela: o app sai da sala com o aviso e não tenta voltar.
+    /// A pessoa foi tirada da voz: por alguém com "Mover membros", ou porque
+    /// perdeu o acesso à sala restrita (ADR 0028). Só vai para as conexões dela:
+    /// o app sai da sala com o aviso e não tenta voltar.
     #[serde(rename = "voice.disconnected")]
-    VoiceDisconnected { by: String, by_name: String },
+    VoiceDisconnected {
+        by: String,
+        by_name: String,
+        reason: DisconnectReason,
+    },
     #[serde(rename = "member.joined")]
     MemberJoined { person: Person },
     /// Alguém foi removido: sai da coluna de membros.
@@ -126,6 +131,42 @@ pub enum ServerEvent {
         outcome: CallOutcome,
         duration: Option<i64>,
     },
+}
+
+impl ServerEvent {
+    /// Se o evento é de um canal de texto ou de uma sala de voz, e por isso só
+    /// pode sair para quem acessa o canal (ADR 0028). O `match` não tem `_`: um
+    /// evento novo não compila sem dizer se é de canal.
+    pub fn of_channel(&self) -> bool {
+        match self {
+            Self::MessageCreated { .. }
+            | Self::VoiceParticipants { .. }
+            | Self::ChannelState { .. }
+            | Self::VoiceMoved { .. }
+            | Self::CallRinging { .. }
+            | Self::CallAccepted { .. }
+            | Self::CallEnded { .. } => true,
+            Self::Ready { .. }
+            | Self::Pong
+            | Self::PresenceChanged { .. }
+            | Self::StatusChanged { .. }
+            | Self::VoiceDisconnected { .. }
+            | Self::MemberJoined { .. }
+            | Self::MemberLeft { .. }
+            | Self::ChannelsChanged { .. } => false,
+        }
+    }
+}
+
+/// Por que a pessoa saiu da voz sem pedir.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export, export_to = "index.ts")]
+pub enum DisconnectReason {
+    /// Alguém com "Mover membros" desconectou.
+    Moderator,
+    /// Saiu da lista da sala restrita, ou a sala ficou restrita sem ela.
+    NoAccess,
 }
 
 /// Quem recebe um evento.
@@ -229,9 +270,20 @@ impl Hub {
     }
 
     /// Manda o evento para todas as conexões. Sem ninguém conectado, não faz
-    /// nada.
+    /// nada. Um evento de um canal não passa por aqui: ele vai pelo
+    /// [`Hub::publish_in`], com quem acessa o canal ([`ServerEvent::of_channel`]).
     pub fn publish(&self, event: &ServerEvent) {
+        debug_assert!(
+            !event.of_channel(),
+            "evento de canal publicado para todos: use o publish_in"
+        );
         self.send(event, Audience::Everyone);
+    }
+
+    /// Manda um evento de um canal para quem o acessa, pela
+    /// `chat::access::audience` (ADR 0028).
+    pub fn publish_in(&self, event: &ServerEvent, to: Audience) {
+        self.send(event, to);
     }
 
     /// Manda o evento só para as conexões de `user_ids`. O evento passa pelo
@@ -378,9 +430,15 @@ impl Hub {
         *n
     }
 
-    /// Publica a lista de quem está na sala `room` e guarda quem é, para saber
-    /// em que sala cada pessoa está ([`Hub::room_of`]).
-    pub fn publish_voice_participants(&self, room: String, participants: Vec<ParticipantView>) {
+    /// Publica a lista de quem está na sala `room` para `to` (quem acessa a sala)
+    /// e guarda quem é, para saber em que sala cada pessoa está
+    /// ([`Hub::room_of`]).
+    pub fn publish_voice_participants(
+        &self,
+        room: String,
+        participants: Vec<ParticipantView>,
+        to: Audience,
+    ) {
         let ids: Vec<String> = participants.iter().map(|p| p.user_id.clone()).collect();
         {
             let mut inner = self.lock();
@@ -390,10 +448,13 @@ impl Hub {
                 inner.voice_rooms.insert(room.clone(), ids);
             }
         }
-        self.publish(&ServerEvent::VoiceParticipants {
-            channel_id: room,
-            participants,
-        });
+        self.publish_in(
+            &ServerEvent::VoiceParticipants {
+                channel_id: room,
+                participants,
+            },
+            to,
+        );
     }
 
     /// A sala de voz em que `user_id` está, pela última lista de cada sala.
@@ -622,21 +683,29 @@ mod tests {
     fn o_hub_sabe_em_que_sala_cada_um_esta() {
         let hub = Hub::default();
         let mut rx = hub.subscribe();
-        hub.publish_voice_participants("sala".into(), vec![person("u1"), person("u2")]);
-        hub.publish_voice_participants("squad".into(), vec![person("u3")]);
+        hub.publish_voice_participants(
+            "sala".into(),
+            vec![person("u1"), person("u2")],
+            Audience::Everyone,
+        );
+        hub.publish_voice_participants("squad".into(), vec![person("u3")], Audience::Everyone);
         assert_eq!(next_event(&mut rx)["type"], "voice.participants");
         assert_eq!(hub.room_of("u2").as_deref(), Some("sala"));
         assert_eq!(hub.room_of("u3").as_deref(), Some("squad"));
         assert_eq!(hub.room_of("u4"), None);
 
         // Trocou de sala: sai de uma lista e entra na outra.
-        hub.publish_voice_participants("sala".into(), vec![person("u1")]);
-        hub.publish_voice_participants("squad".into(), vec![person("u3"), person("u2")]);
+        hub.publish_voice_participants("sala".into(), vec![person("u1")], Audience::Everyone);
+        hub.publish_voice_participants(
+            "squad".into(),
+            vec![person("u3"), person("u2")],
+            Audience::Everyone,
+        );
         assert_eq!(hub.room_of("u2").as_deref(), Some("squad"));
         assert_eq!(hub.people_in("squad"), ["u3", "u2"]);
 
         // A sala vazia some.
-        hub.publish_voice_participants("squad".into(), vec![]);
+        hub.publish_voice_participants("squad".into(), vec![], Audience::Everyone);
         assert_eq!(hub.room_of("u3"), None);
         assert!(hub.people_in("squad").is_empty());
     }

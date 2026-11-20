@@ -412,6 +412,15 @@ pub async fn remove(
         .bind(&target.id)
         .execute(&mut *tx)
         .await?;
+    // Sai da lista de todo canal restrito (ADR 0028). As conversas privadas
+    // ficam: o histórico continua da outra pessoa.
+    sqlx::query(
+        "DELETE FROM channel_members WHERE user_id = ?
+           AND channel_id IN (SELECT id FROM channels WHERE kind IN ('text', 'voice'))",
+    )
+    .bind(&target.id)
+    .execute(&mut *tx)
+    .await?;
     sqlx::query(
         "UPDATE invites SET revoked_at = ?
          WHERE target_user_id = ? AND revoked_at IS NULL

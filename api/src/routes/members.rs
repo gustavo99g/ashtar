@@ -15,6 +15,7 @@ use super::auth::CurrentUser;
 use super::extract::ApiJson;
 use super::invites::CreatedInviteView;
 use crate::AppState;
+use crate::chat::layout;
 use crate::db::now;
 use crate::error::ApiError;
 use crate::identity::devices;
@@ -175,6 +176,11 @@ pub async fn set_permission(
         now(),
     )
     .await?;
+    // Quem gerencia os canais vê os restritos: a lista dele muda.
+    if permission == Permission::ManageChannels {
+        let version = layout::touch(&state.db).await?;
+        state.hub.publish(&ServerEvent::ChannelsChanged { version });
+    }
     Ok(StatusCode::NO_CONTENT)
 }
 

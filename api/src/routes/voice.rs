@@ -16,11 +16,12 @@ use super::auth::CurrentUser;
 use super::extract::ApiJson;
 use crate::AppState;
 use crate::calls;
-use crate::chat::{channels, dms};
+use crate::chat::channels::Channel;
+use crate::chat::{access, channels, dms};
 use crate::error::ApiError;
 use crate::identity::permissions::{Permission, require_permission};
 use crate::identity::{User, users};
-use crate::realtime::ServerEvent;
+use crate::realtime::{DisconnectReason, ServerEvent};
 use crate::voice::{
     self, ParticipantView, RoomParticipant, join_participants, list_room, livekit_env,
     screen_identity,
@@ -141,7 +142,7 @@ async fn check_room(state: &AppState, user: &User, channel_id: &str) -> Result<(
             ))
         };
     }
-    channels::get_open_voice(&state.db, channel_id).await?;
+    access::joinable(&state.db, user, channel_id).await?;
     Ok(())
 }
 
@@ -200,13 +201,13 @@ fn create_screen_token(
 /// `[]`. O app pergunta a cada 5 segundos enquanto a tela do servidor está aberta.
 pub async fn participants(
     State(state): State<AppState>,
-    CurrentUser(_user): CurrentUser,
+    CurrentUser(user): CurrentUser,
     query: Result<Query<ParticipantsQuery>, QueryRejection>,
 ) -> Result<Json<Vec<ParticipantView>>, ApiError> {
     let Query(query) = query
         .map_err(|_| ApiError::InvalidRequest("O pedido não está no formato esperado.".into()))?;
     validate_channel_id(&query.channel_id)?;
-    channels::get_open_voice(&state.db, &query.channel_id).await?;
+    access::joinable(&state.db, &user, &query.channel_id).await?;
     let room = list_room(&query.channel_id).await?;
     Ok(Json(join_participants(&state.db, room).await?))
 }
@@ -257,8 +258,9 @@ async fn active_member(state: &AppState, user_id: &str) -> Result<User, ApiError
 /// clique. Se ela continuar na sala antiga depois de [`MOVE_GRACE`] (um app que
 /// não conhece o evento), a API a tira de lá.
 ///
-/// 409 para quem não está numa sala de voz (nem numa ligação conta) e para quem
-/// já está na sala de destino.
+/// 409 para quem não está numa sala de voz (nem numa ligação conta), para quem
+/// já está na sala de destino e para quem não acessa a sala restrita. Uma sala
+/// restrita que quem move não acessa dá o 404 de uma que não existe.
 pub async fn move_member(
     State(state): State<AppState>,
     CurrentUser(user): CurrentUser,
@@ -267,7 +269,12 @@ pub async fn move_member(
     require_permission(&state.db, &user, Permission::MoveMembers).await?;
     let target = active_member(&state, &request.user_id).await?;
     validate_channel_id(&request.channel_id)?;
-    let destination = channels::get_open_voice(&state.db, &request.channel_id).await?;
+    let destination = access::joinable(&state.db, &user, &request.channel_id).await?;
+    if !access::can_access(&state.db, &target, &destination).await? {
+        return Err(ApiError::Conflict(
+            "Essa pessoa não tem acesso a essa sala.".into(),
+        ));
+    }
     let Some(from) = voice_room_of(&state, &target.id).await? else {
         return Err(ApiError::Conflict(
             "Essa pessoa não está numa sala de voz.".into(),
@@ -315,10 +322,39 @@ pub async fn disconnect_member(
         &ServerEvent::VoiceDisconnected {
             by: user.id.clone(),
             by_name: user.shown_name().to_owned(),
+            reason: DisconnectReason::Moderator,
         },
     );
     voice::remove_from_room_in_background(from, target.id);
     Ok(axum::http::StatusCode::NO_CONTENT)
+}
+
+/// Tira da sala `room` quem está nela e perdeu o acesso (ADR 0028), depois de
+/// `by` mudar a lista: o `voice.disconnected` com `no_access` e, em seguida, as
+/// conexões. Quem está na sala vem da lista que o hub guarda.
+pub(crate) async fn remove_without_access(
+    state: &AppState,
+    room: &Channel,
+    by: &User,
+) -> Result<(), ApiError> {
+    for user_id in state.hub.people_in(&room.id) {
+        let Some(person) = users::find_by_id(&state.db, &user_id).await? else {
+            continue;
+        };
+        if access::can_access(&state.db, &person, room).await? {
+            continue;
+        }
+        state.hub.publish_to(
+            &[&person.id],
+            &ServerEvent::VoiceDisconnected {
+                by: by.id.clone(),
+                by_name: by.shown_name().to_owned(),
+                reason: DisconnectReason::NoAccess,
+            },
+        );
+        voice::remove_from_room_in_background(room.id.clone(), person.id);
+    }
+    Ok(())
 }
 
 /// Tamanho máximo do id de canal (e, portanto, do nome da sala no LiveKit).

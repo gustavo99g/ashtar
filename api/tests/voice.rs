@@ -152,8 +152,11 @@ async fn mover_manda_o_evento_so_para_quem_foi_movido() {
     let ana = join(&ctx, "Ana", 2, false).await;
     let ana_id = member_id(&ctx, &ana).await;
     let owner_id = ctx.owner.id.clone();
-    ctx.hub
-        .publish_voice_participants("sala".into(), vec![person(&ana_id), person(&owner_id)]);
+    ctx.hub.publish_voice_participants(
+        "sala".into(),
+        vec![person(&ana_id), person(&owner_id)],
+        Audience::Everyone,
+    );
     let mut rx = ctx.hub.subscribe();
 
     let (status, body) = call(
@@ -206,7 +209,7 @@ async fn mover_confere_a_permissao_a_sala_e_onde_a_pessoa_esta() {
     );
 
     ctx.hub
-        .publish_voice_participants("sala".into(), vec![person(&ana_id)]);
+        .publish_voice_participants("sala".into(), vec![person(&ana_id)], Audience::Everyone);
     // Sem "Mover membros": 403.
     assert_eq!(
         move_to(beto.clone(), ana_id.clone(), squad.clone()).await,
@@ -277,7 +280,7 @@ async fn desconectar_avisa_a_pessoa_de_quem_tirou() {
     );
 
     ctx.hub
-        .publish_voice_participants("sala".into(), vec![person(&ana_id)]);
+        .publish_voice_participants("sala".into(), vec![person(&ana_id)], Audience::Everyone);
     assert_eq!(disconnect(ana.clone()).await, StatusCode::FORBIDDEN);
     let mut rx = ctx.hub.subscribe();
     assert_eq!(
@@ -289,7 +292,7 @@ async fn desconectar_avisa_a_pessoa_de_quem_tirou() {
     let (event, to) = &events[0];
     assert_eq!(
         *event,
-        json!({ "type": "voice.disconnected", "by": ctx.owner.id, "by_name": "Kid" })
+        json!({ "type": "voice.disconnected", "by": ctx.owner.id, "by_name": "Kid", "reason": "moderator" })
     );
     assert!(to.includes(&ana_id) && !to.includes(&ctx.owner.id));
 }
