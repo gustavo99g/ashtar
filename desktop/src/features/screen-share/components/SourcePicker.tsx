@@ -37,8 +37,8 @@ import { useThumbnails } from "../hooks/useThumbnails";
 import type { ScreenShareController } from "../model/controller";
 import { layoutMonitors } from "../model/monitorLayout";
 import {
-	DEFAULT_QUALITY,
 	QUALITY_ORDER,
+	SHARE_AUDIO_OPTIONS,
 	QUALITY_PRESETS,
 } from "../model/presets";
 import {
@@ -46,6 +46,10 @@ import {
 	type PickerMode,
 	startShare,
 } from "../stores/pickerStore";
+import {
+	initialShareAudio,
+	useShareDefaults,
+} from "../stores/shareDefaultsStore";
 
 type Tab = "windows" | "screens";
 type AudioChoice = AudioMode["mode"];
@@ -67,17 +71,6 @@ interface SourcePickerProps {
 /** A área de dentro da moldura das telas: 800 do diálogo, menos o respiro e a borda. */
 const MONITOR_AREA = { width: 748, height: 298 };
 
-const AUDIO_OPTIONS: Record<AudioChoice, { label: string; hint: string }> = {
-	off: { label: "Sem áudio", hint: "O compartilhamento vai sem som." },
-	application: {
-		label: "Só do aplicativo",
-		hint: "Apenas o som da janela escolhida.",
-	},
-	system: {
-		label: "Todo o sistema",
-		hint: "Tudo que toca no computador, menos as vozes da chamada.",
-	},
-};
 
 function sourceKey(source: CaptureSource) {
 	return `${source.source.kind}:${source.source.id}`;
@@ -135,8 +128,10 @@ function PickerBody({
 	const [loaded, setLoaded] = useState<Loaded>({ status: "loading" });
 	const [tab, setTab] = useState<Tab>("windows");
 	const [selectedKey, setSelectedKey] = useState<string | null>(null);
-	const [quality, setQuality] = useState<Quality>(DEFAULT_QUALITY);
-	const [audio, setAudio] = useState<AudioChoice>("application");
+	// Abre com o padrão de Configurações › Voz e vídeo; mudar aqui vale só para esta transmissão.
+	const defaults = useShareDefaults.getState();
+	const [quality, setQuality] = useState<Quality>(defaults.quality);
+	const [audio, setAudio] = useState<AudioChoice>(defaults.audio);
 	const [cursor, setCursor] = useState(true);
 	const [failure, setFailure] = useState<string | null>(null);
 	const visible = useVisibleCards();
@@ -210,7 +205,7 @@ function PickerBody({
 	function changeTab(next: Tab) {
 		setTab(next);
 		setSelectedKey(null);
-		setAudio(next === "windows" ? "application" : "system");
+		setAudio(initialShareAudio(useShareDefaults.getState().audio, next));
 	}
 
 	async function share() {
@@ -389,10 +384,10 @@ function PickerBody({
 									/>
 									<span className="flex flex-col gap-0.5">
 										<span className="text-sm font-medium text-foreground">
-											{AUDIO_OPTIONS[choice].label}
+											{SHARE_AUDIO_OPTIONS[choice].label}
 										</span>
 										<span className="text-xs leading-[1.45] text-muted-foreground">
-											{AUDIO_OPTIONS[choice].hint}
+											{SHARE_AUDIO_OPTIONS[choice].hint}
 										</span>
 									</span>
 								</label>

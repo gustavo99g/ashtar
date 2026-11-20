@@ -54,8 +54,8 @@ Levantado na `dev` (`196cb41`), para o plano não refazer:
 | Etapa | Parte | Descrição | Status |
 |---|---|---|---|
 | 0 | — | Decisões: ADRs 0029 e 0030, roadmap, BACKLOG, canvas | Feita |
-| 1 | 1 | App: a cadeia do microfone (volume de entrada, portão e RNNoise) | Pendente |
-| 2 | 1 | App: a aba Voz e vídeo completa | Pendente |
+| 1 | 1 | App: a cadeia do microfone (volume de entrada, portão e RNNoise) | Feita |
+| 2 | 1 | App: a aba Voz e vídeo completa | Feita |
 | 3 | 1 | Rust: o gancho de teclado e mouse | Pendente |
 | 4 | 1 | App: a aba Atalhos, o pressionar para falar e o aviso de mutado | Pendente |
 | 5 | 2 | App: a voz volta sozinha | Pendente |
