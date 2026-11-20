@@ -23,6 +23,7 @@ vi.mock("@/lib/tauri/commands", () => ({
 	setUnreadBadge: vi.fn(() => Promise.resolve()),
 	onNotificationOpen: vi.fn(() => Promise.resolve(() => {})),
 	onNotificationAnswer: vi.fn(() => Promise.resolve(() => {})),
+	onSystemResumed: vi.fn(() => () => {}),
 	notificationRing: vi.fn(() => Promise.resolve()),
 	login: vi.fn(),
 	accountMarker: vi.fn(),
