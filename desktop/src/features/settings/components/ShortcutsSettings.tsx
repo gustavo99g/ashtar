@@ -90,8 +90,8 @@ function ShortcutRow({ id, recorder }: { id: ShortcutId; recorder: Recorder }) {
 				<span className="text-sm font-semibold text-foreground">{name}</span>
 				{recording && recorder.conflict ? (
 					<span role="alert" className="text-xs text-warning-text">
-						Já é o atalho de {SHORTCUT_NAMES[recorder.conflict]}. Aperte outra
-						combinação.
+						Já é o atalho de {SHORTCUT_NAMES[recorder.conflict]}. Escolha
+						outra tecla.
 					</span>
 				) : (
 					description && (
@@ -135,7 +135,7 @@ export function RecorderControls({
 					role="status"
 					className="animate-pulse rounded-[5px] border border-ring px-2.5 py-[3px] text-xs text-foreground"
 				>
-					Aperte a combinação…
+					Aperte a tecla ou as teclas…
 				</span>
 				<Button
 					variant="outline"
@@ -209,8 +209,8 @@ export function PushToTalkShortcut({ active }: { active: boolean }) {
 			</div>
 			{recorder.conflict && (
 				<span role="alert" className="text-xs text-warning-text">
-					Já é o atalho de {SHORTCUT_NAMES[recorder.conflict]}. Aperte outra
-					combinação.
+					Já é o atalho de {SHORTCUT_NAMES[recorder.conflict]}. Escolha
+					outra tecla.
 				</span>
 			)}
 			{active && !shortcut && recorder.recording !== "ptt" && (

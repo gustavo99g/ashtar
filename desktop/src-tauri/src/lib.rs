@@ -128,7 +128,8 @@ pub fn run(log_file: logging::LateFile) {
             commands::identity::account_marker,
             commands::presence::idle_seconds,
             commands::shortcuts::shortcuts_set,
-            commands::shortcuts::shortcuts_record
+            commands::shortcuts::shortcuts_record,
+            commands::shortcuts::shortcuts_input
         ])
         .build(tauri::generate_context!())
         .expect("error while running tauri application");

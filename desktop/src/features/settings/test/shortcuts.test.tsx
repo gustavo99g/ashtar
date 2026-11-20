@@ -92,7 +92,7 @@ describe("Configurações › Atalhos", () => {
 			}),
 		);
 		expect(recordShortcuts).toHaveBeenLastCalledWith(true);
-		expect(screen.getByText("Aperte a combinação…")).toBeInTheDocument();
+		expect(screen.getByText("Aperte a tecla ou as teclas…")).toBeInTheDocument();
 
 		press({ combo: MOUSE_4, label: "Mouse 4" });
 
@@ -139,7 +139,7 @@ describe("Configurações › Atalhos", () => {
 
 		expect(closed).not.toHaveBeenCalled();
 		expect(useShortcuts.getState().mute).toEqual(DEFAULT_SHORTCUTS.mute);
-		expect(screen.queryByText("Aperte a combinação…")).not.toBeInTheDocument();
+		expect(screen.queryByText("Aperte a tecla ou as teclas…")).not.toBeInTheDocument();
 		window.removeEventListener("keydown", closed);
 	});
 

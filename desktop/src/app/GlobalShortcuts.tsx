@@ -11,7 +11,8 @@ import {
 	useShortcuts,
 } from "@/features/settings";
 import { setPushToTalkHeld, useInputChoice, useVoice } from "@/features/voice";
-import { onShortcut, setShortcuts } from "@/lib/tauri/commands";
+import { onShortcut, setShortcuts, shortcutInput } from "@/lib/tauri/commands";
+import { keyInput, mouseInput } from "./windowInput";
 
 /**
  * Os atalhos globais (ADR 0029, decisão 8), uma vez para o app inteiro: manda a lista para o Rust
@@ -22,6 +23,9 @@ import { onShortcut, setShortcuts } from "@/lib/tauri/commands";
  * - Pressionar para falar: abre o portão enquanto está apertado (só vale no modo Pressionar para
  *   falar), com o clique, se ligado em Notificações.
  * - Atender e Recusar ou desligar: só fazem algo com uma ligação tocando, chamando ou no ar.
+ *
+ * Com o Ashtar em foco, o gancho do Windows não recebe as teclas: a janela manda para o Rust cada
+ * tecla e botão que vê, e o Rust trata como as do gancho (também na gravação de um atalho).
  */
 export function GlobalShortcuts() {
 	const shortcuts = useShortcuts();
@@ -52,6 +56,30 @@ export function GlobalShortcuts() {
 			alive = false;
 			unlisten?.();
 			setPushToTalkHeld(false);
+		};
+	}, []);
+
+	useEffect(() => {
+		const send = (input: ReturnType<typeof keyInput>, down: boolean) => {
+			if (!input) return;
+			shortcutInput(input, down).catch(() => {});
+		};
+		const onKey = (event: KeyboardEvent) => {
+			if (event.repeat) return;
+			send(keyInput(event), event.type === "keydown");
+		};
+		const onMouse = (event: MouseEvent) =>
+			send(mouseInput(event.button), event.type === "mousedown");
+		const options = { capture: true };
+		window.addEventListener("keydown", onKey, options);
+		window.addEventListener("keyup", onKey, options);
+		window.addEventListener("mousedown", onMouse, options);
+		window.addEventListener("mouseup", onMouse, options);
+		return () => {
+			window.removeEventListener("keydown", onKey, options);
+			window.removeEventListener("keyup", onKey, options);
+			window.removeEventListener("mousedown", onMouse, options);
+			window.removeEventListener("mouseup", onMouse, options);
 		};
 	}, []);
 

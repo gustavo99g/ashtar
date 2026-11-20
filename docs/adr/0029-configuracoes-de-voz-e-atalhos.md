@@ -34,8 +34,8 @@ Rust compara as teclas apertadas com a lista de atalhos que o app mandou e avisa
 do atalho; nenhuma tecla vai para o app nem para o log fora do modo de gravar.
 
 **Atalhos de agora:** Desativar microfone, Desativar áudio, Pressionar para falar, Atender ligação e Recusar ou
-desligar. Uma combinação é até três modificadores e uma tecla, ou um botão do mouse (do meio e laterais), com ou sem
-modificadores. A mesma combinação não pode estar em duas ações. Os atalhos e o modo de entrada ficam no computador,
+desligar. Um atalho é qualquer tecla sozinha (até o Ctrl, o Shift ou o Alt) ou um botão do mouse (do meio e
+laterais); apertando mais de uma, vira combinação: os modificadores e uma tecla. A gravação fecha ao soltar. A mesma combinação não pode estar em duas ações. Os atalhos e o modo de entrada ficam no computador,
 no `settingsStore`.
 
 **"Você está mutado"** aparece no painel de voz quando a pessoa fala mutada, lido de um clone da trilha do microfone

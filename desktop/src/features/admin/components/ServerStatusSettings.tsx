@@ -28,7 +28,7 @@ export function ServerStatusSettings() {
 	const status = useServerStatus();
 	const now = Math.floor(Date.now() / 1000);
 	return (
-		<div className="flex w-full max-w-[860px] flex-col gap-5 py-20 pr-28 pl-32">
+		<div className="@container flex w-full flex-col gap-5 py-20 pr-28 pl-32">
 			<div className="flex min-h-9 items-center justify-between gap-4">
 				<h1 className="text-[22px] leading-tight font-bold text-foreground">
 					Servidor
@@ -50,7 +50,7 @@ export function ServerStatusSettings() {
 			) : status.isError ? (
 				<ErrorState className="py-16" onRetry={() => void status.refetch()} />
 			) : (
-				<div className="grid grid-cols-2 gap-3">
+				<div className="grid grid-cols-1 gap-3 @xl:grid-cols-2 @5xl:grid-cols-4">
 					<Card
 						icon={ServerIcon}
 						title="API"

@@ -5,7 +5,8 @@
  *   sair da voz toca o de sair. Trocar não toca a saída de ninguém da sala velha;
  * - alguém entrando ou saindo da sua sala, pelos eventos da conexão. A conexão `:screen` de uma
  *   transmissão (ADR 0017) é o começar e o parar de transmitir, menos a sua;
- * - mutar, desmutar, ficar surdo e voltar. Ficar surdo também muta: toca só o do surdo.
+ * - mutar, desmutar, ficar surdo e voltar. Ficar surdo também muta: toca só o do surdo. Fora da voz
+ *   também toca (o botão e o atalho valem lá, v0.6); numa ligação, não.
  */
 import { RoomEvent, type RemoteParticipant } from "livekit-client";
 import { useEffect, useRef } from "react";
@@ -22,6 +23,7 @@ export function RoomSounds() {
 	const room = inRoom ? voice.room : null;
 	const isMuted = voice?.isMuted ?? false;
 	const isDeafened = voice?.isDeafened ?? false;
+	const outOfVoice = (voice?.voiceChannelId ?? null) === null;
 
 	// Entrar, trocar e sair.
 	const joined = useRef<string | null>(null);
@@ -59,18 +61,19 @@ export function RoomSounds() {
 		};
 	}, [room]);
 
-	// O próprio microfone e o próprio áudio, só com a sala conectada.
+	// O próprio microfone e o próprio áudio: fora da voz, ou com a sala conectada.
 	const before = useRef({ isMuted, isDeafened });
 	useEffect(() => {
 		const was = before.current;
 		before.current = { isMuted, isDeafened };
-		if (channelId === null || state !== "connected") return;
+		const inConnectedRoom = channelId !== null && state === "connected";
+		if (!outOfVoice && !inConnectedRoom) return;
 		if (was.isDeafened !== isDeafened) {
-			playRoomSound(isDeafened ? "deafen" : "undeafen");
+			playRoomSound(isDeafened ? "deafen" : "undeafen", { gap: false });
 		} else if (was.isMuted !== isMuted) {
-			playRoomSound(isMuted ? "mute" : "unmute");
+			playRoomSound(isMuted ? "mute" : "unmute", { gap: false });
 		}
-	}, [isMuted, isDeafened, channelId, state]);
+	}, [isMuted, isDeafened, channelId, state, outOfVoice]);
 
 	return null;
 }

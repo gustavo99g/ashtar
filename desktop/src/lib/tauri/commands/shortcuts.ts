@@ -44,6 +44,23 @@ export async function recordShortcuts(recording: boolean): Promise<void> {
 	await call<void>("shortcuts_record", { recording });
 }
 
+/** O que a janela viu em foco: uma tecla (código virtual do Windows) ou um botão do mouse. */
+export type WindowInput =
+	| { key: number; mouse: null }
+	| { key: null; mouse: "middle" | "x1" | "x2" };
+
+/**
+ * Com o Ashtar em foco, o gancho do Windows não recebe as teclas: a janela manda as que vê, e o
+ * Rust trata como as do gancho (atalhos e gravação).
+ */
+export async function shortcutInput(
+	input: WindowInput,
+	down: boolean,
+): Promise<void> {
+	if (!isTauri()) return;
+	await call<void>("shortcuts_input", { ...input, down });
+}
+
 export function onShortcut(
 	callback: (event: ShortcutEvent) => void,
 ): Promise<UnlistenFn> {
