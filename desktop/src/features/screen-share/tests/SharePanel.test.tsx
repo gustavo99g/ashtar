@@ -32,6 +32,7 @@ const active: ScreenShareState = {
 	cursor: true,
 	leveler: true,
 	paused: false,
+	link: "ok",
 	audio: "on",
 };
 

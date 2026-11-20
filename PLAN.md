@@ -59,7 +59,7 @@ Levantado na `dev` (`196cb41`), para o plano não refazer:
 | 3 | 1 | Rust: o gancho de teclado e mouse | Feita |
 | 4 | 1 | App: a aba Atalhos, o pressionar para falar e o aviso de mutado | Feita |
 | 5 | 2 | App: a voz volta sozinha | Feita |
-| 6 | 2 | Rust e app: a transmissão nativa volta sozinha | Pendente |
+| 6 | 2 | Rust e app: a transmissão nativa volta sozinha | Feita |
 | 7 | 2 | App: microfone e saída desconectados | Pendente |
 | 8 | 2 | API e app: "Sem conexão com o servidor" | Pendente |
 | 9 | 2 | API e app: a qualidade da conexão e o Testar conexão | Pendente |
@@ -332,6 +332,13 @@ mute, sem clicar em nada.
 
 **Pronto quando:** derrubar a conexão de quem transmite por 10 segundos e devolver traz a transmissão de volta para
 quem assistia, sem ninguém clicar.
+
+**Como ficou:** o `ShareManager` avisa `screen-share-link-lost` e para só o áudio; o `NativeScreenShare` pede o token
+e chama `screen_share_reconnect` (esperas de 1, 2, 5, 10, 20 e 30 s), com o mesmo nome de trilha. O `Publisher` entra
+de novo e republica o vídeo com o mesmo encoder e a mesma pausa; o áudio recomeça pelo manager. A transmissão vive
+enquanto a pessoa fica na mesma sala, e não por conexão da voz: uma queda da voz não a derruba. Quem assiste vê
+"Reconectando a transmissão…" pela qualidade `lost` da LiveKit. Os testes do manager cobrem a queda, a volta, a falha
+e a desistência; o caso no `share_e2e.rs` fica para rodar no Windows.
 
 ## Etapa 7: app, microfone e saída desconectados
 

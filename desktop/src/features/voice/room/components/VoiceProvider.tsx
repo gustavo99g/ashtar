@@ -211,6 +211,11 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 	 * tentativa agendada.
 	 */
 	const recovery = useRef<Recovery | null>(null);
+	/**
+	 * A transmissão da sala de agora. Vive enquanto a pessoa fica na mesma sala, e não por conexão:
+	 * a `:screen` é uma conexão à parte (ADR 0017), e uma queda da voz não derruba a tela.
+	 */
+	const shareController = useRef<NativeScreenShare | null>(null);
 	const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const reconnect = useRef({
 		/** Agenda a próxima tentativa, ou desiste depois de 5 minutos. */
@@ -220,6 +225,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 			reconnect.current.cancel();
 			if (delay === null) {
 				recovery.current = null;
+				void shareController.current?.stop();
 				setConnectionState("error");
 				setError({
 					kind: "connection",
@@ -318,15 +324,27 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 		[],
 	);
 
+	// Antes do efeito da conexão, para ele já encontrar a transmissão desta sala.
+	const shareChannel = target?.channelId ?? null;
 	useEffect(() => {
-		if (!target) {
+		if (shareChannel === null) return;
+		const controller = new NativeScreenShare(shareChannel);
+		shareController.current = controller;
+		return () => {
+			if (shareController.current === controller) shareController.current = null;
+			void controller.dispose();
+		};
+	}, [shareChannel]);
+
+	useEffect(() => {
+		const controller = shareController.current;
+		if (!target || !controller) {
 			return;
 		}
 
 		const { channelId } = target;
 		let cancelled = false;
 		const nextRoom = new Room(roomOptions(deviceIds.current));
-		const controller = new NativeScreenShare(channelId);
 
 		nextRoom.on(RoomEvent.ConnectionStateChanged, (state) => {
 			// Voltando de uma queda, o "conectando" e o "desconectado" no meio são o "reconectando".
@@ -386,7 +404,6 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 
 		// Só dispara quando a sala cai sozinha: no cleanup as escutas saem antes do disconnect.
 		nextRoom.on(RoomEvent.Disconnected, (reason) => {
-			void controller.dispose();
 			setRoom(null);
 			setScreenShare(null);
 			// A sala foi arquivada (a API apaga a sala no LiveKit, ADR 0026): não há para onde voltar.
@@ -409,6 +426,8 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 				console.warn("A voz caiu; tentando voltar:", reason);
 				reconnect.current.schedule();
 			} else {
+				// A transmissão continua numa queda que volta; aqui a pessoa não volta mais.
+				void controller.stop();
 				reconnect.current.reset();
 			}
 		});
@@ -482,8 +501,9 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 			cancelled = true;
 			nextRoom.removeAllListeners();
 
-			// Para o compartilhamento (e a captura no Rust) antes de sair da sala.
-			void controller.dispose().finally(() => nextRoom.disconnect());
+			// A transmissão não para aqui: entre uma tentativa e outra, ela continua (e sai com a sala,
+			// pelo efeito dela).
+			void nextRoom.disconnect();
 
 			setRoom(null);
 			setConnectedAt(null);

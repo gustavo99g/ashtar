@@ -8,6 +8,9 @@
  * - O início nunca é interrompido no meio: `stop` e `dispose` esperam ele terminar, e os fins que
  *   chegam durante ele são guardados e tratados no final.
  * - As escutas dos eventos começam antes do `screenShareStart`, para não perder um fim precoce.
+ * - A conexão caiu (v0.6, ADR 0030): a captura segue no Rust, e daqui se pede um token novo e se
+ *   volta, esperando cada vez mais entre as tentativas ([`RETRY_DELAYS_MS`]). Quem desiste é o Rust,
+ *   depois de 2 minutos, com o fim de sempre.
  */
 import { ApiError, createScreenToken } from "@/lib/api";
 import {
@@ -15,10 +18,13 @@ import {
 	listCaptureSources,
 	onScreenShareAudioEnded,
 	onScreenShareEnded,
+	onScreenShareLinkLost,
 	onScreenShareStats,
 	type ScreenShareEnded,
+	type ScreenShareLinkLost,
 	type ShareStats,
 	type ShareUpdate,
+	screenShareReconnect,
 	screenShareStart,
 	screenShareStop,
 	screenShareUpdate,
@@ -31,13 +37,26 @@ import type {
 } from "../model/controller";
 import { shareTrackName } from "../model/shareInfo";
 
+/** A espera antes de cada tentativa de voltar a conexão; a última se repete. */
+export const RETRY_DELAYS_MS = [1000, 2000, 5000, 10_000, 20_000, 30_000];
+
 interface Session {
 	/** `null` até o `screenShareStart` responder. */
 	id: number | null;
+	/** O nome da trilha, o mesmo na volta: quem assiste continua vendo a mesma transmissão. */
+	trackName: string;
 	unlisten: (() => void)[];
-	/** Fins que chegaram antes do id. */
-	early: { ended: ScreenShareEnded[]; audioEnded: ScreenShareEnded[] };
+	/** Fins (e quedas) que chegaram antes do id. */
+	early: {
+		ended: ScreenShareEnded[];
+		audioEnded: ScreenShareEnded[];
+		linkLost: ScreenShareLinkLost[];
+	};
 	closed: boolean;
+	/** A volta em andamento, para não começar outra. */
+	reconnecting: boolean;
+	/** A espera da próxima tentativa, para o fim da sessão cancelar. */
+	retryTimer: ReturnType<typeof setTimeout> | null;
 }
 
 type ActiveState = Extract<ScreenShareState, { status: "active" }>;
@@ -104,9 +123,18 @@ export class NativeScreenShare implements ScreenShareController {
 		if (this.disposed || this.session !== null) return;
 		const session: Session = {
 			id: null,
+			// Quando começou, a qualidade e o título: a ordem das transmissões e quem assiste leem
+			// daqui (`shareInfo.ts`).
+			trackName: shareTrackName({
+				startedAt: Date.now(),
+				quality: request.quality,
+				title: request.source.title,
+			}),
 			unlisten: [],
-			early: { ended: [], audioEnded: [] },
+			early: { ended: [], audioEnded: [], linkLost: [] },
 			closed: false,
+			reconnecting: false,
+			retryTimer: null,
 		};
 		this.session = session;
 		this.setState({ status: "starting" });
@@ -126,6 +154,11 @@ export class NativeScreenShare implements ScreenShareController {
 				),
 			);
 			session.unlisten.push(
+				await onScreenShareLinkLost((event) =>
+					this.handleLinkLost(session, event),
+				),
+			);
+			session.unlisten.push(
 				await onScreenShareStats((stats) => {
 					if (stats.sessionId === session.id && !session.closed) {
 						this.setStats(stats);
@@ -140,17 +173,7 @@ export class NativeScreenShare implements ScreenShareController {
 				audio: request.audio,
 				cursor: request.cursor,
 				leveler: request.leveler ?? true,
-				target: {
-					url,
-					token,
-					// Quando começou, a qualidade e o título: a ordem das transmissões e quem assiste
-					// leem daqui (`shareInfo.ts`).
-					trackName: shareTrackName({
-						startedAt: Date.now(),
-						quality: request.quality,
-						title: request.source.title,
-					}),
-				},
+				target: { url, token, trackName: session.trackName },
 			});
 		} catch (error) {
 			this.close(session);
@@ -170,6 +193,7 @@ export class NativeScreenShare implements ScreenShareController {
 			leveler: request.leveler ?? true,
 			paused: false,
 			audio: audioOn ? "on" : "off",
+			link: "ok",
 		});
 
 		// O que chegou antes do id.
@@ -181,6 +205,8 @@ export class NativeScreenShare implements ScreenShareController {
 		if (session.early.audioEnded.some((e) => e.sessionId === session.id)) {
 			this.markAudioLost();
 		}
+		const lost = session.early.linkLost.find((e) => e.sessionId === session.id);
+		if (lost) this.handleLinkLost(session, lost);
 	}
 
 	// -----------------------------------------------------------------------
@@ -200,6 +226,67 @@ export class NativeScreenShare implements ScreenShareController {
 			session.early.audioEnded.push(event);
 		} else if (event.sessionId === session.id) {
 			this.markAudioLost();
+		}
+	}
+
+	private handleLinkLost(session: Session, event: ScreenShareLinkLost) {
+		if (session.id === null) {
+			session.early.linkLost.push(event);
+			return;
+		}
+		if (event.sessionId !== session.id || session.closed) return;
+		this.setLink(session.id, "lost");
+		if (!session.reconnecting) {
+			session.reconnecting = true;
+			this.retry(session, 0);
+		}
+	}
+
+	/** Espera e tenta voltar a conexão; falhando, agenda a próxima, até a sessão acabar. */
+	private retry(session: Session, attempt: number) {
+		const delay =
+			RETRY_DELAYS_MS[Math.min(attempt, RETRY_DELAYS_MS.length - 1)];
+		session.retryTimer = setTimeout(() => {
+			session.retryTimer = null;
+			void this.reconnect(session).then((back) => {
+				if (session.closed) return;
+				if (back) {
+					session.reconnecting = false;
+				} else {
+					this.retry(session, attempt + 1);
+				}
+			});
+		}, delay);
+	}
+
+	/** Uma tentativa: um token novo e a volta. Devolve se voltou (ou se nem precisa mais). */
+	private async reconnect(session: Session): Promise<boolean> {
+		const id = session.id;
+		if (session.closed || id === null) return true;
+		try {
+			const { url, token } = await createScreenToken(this.channelId);
+			if (session.closed) return true;
+			await screenShareReconnect(id, {
+				url,
+				token,
+				trackName: session.trackName,
+			});
+		} catch (error) {
+			console.warn("A transmissão ainda não voltou:", error);
+			return false;
+		}
+		if (!session.closed) this.setLink(id, "ok");
+		return true;
+	}
+
+	private setLink(sessionId: number, link: "ok" | "lost") {
+		const state = this.state;
+		if (
+			state.status === "active" &&
+			state.sessionId === sessionId &&
+			state.link !== link
+		) {
+			this.setState({ ...state, link });
 		}
 	}
 
@@ -272,6 +359,8 @@ export class NativeScreenShare implements ScreenShareController {
 	private close(session: Session) {
 		if (session.closed) return;
 		session.closed = true;
+		if (session.retryTimer !== null) clearTimeout(session.retryTimer);
+		session.retryTimer = null;
 		for (const unlisten of session.unlisten) unlisten();
 		if (this.session === session) this.session = null;
 		this.setStats(null);

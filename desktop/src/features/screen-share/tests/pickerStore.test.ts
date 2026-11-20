@@ -31,6 +31,7 @@ describe("restartShare", () => {
 			cursor: true,
 			leveler: true,
 			paused: false,
+			link: "ok",
 			audio: "lost",
 		});
 		await startShare(controller, request);

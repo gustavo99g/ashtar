@@ -25,6 +25,7 @@ const active = (
 	cursor: true,
 	leveler: true,
 	paused: false,
+	link: "ok",
 });
 
 describe("shareNotice", () => {
@@ -45,6 +46,13 @@ describe("shareNotice", () => {
 		});
 		expect(shareNotice(active("on", 1), active("lost", 2))).toBeNull();
 		expect(shareNotice(active("lost"), active("lost"))).toBeNull();
+	});
+
+	it("avisa a queda e a volta da conexão", () => {
+		const lost = { ...active("on"), link: "lost" } as ScreenShareState;
+		expect(shareNotice(active("on"), lost)).toEqual({ kind: "linkLost" });
+		expect(shareNotice(lost, active("on"))).toEqual({ kind: "linkBack" });
+		expect(shareNotice(lost, lost)).toBeNull();
 	});
 
 	it("avisa a falha uma vez", () => {

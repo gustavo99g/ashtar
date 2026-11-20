@@ -1,7 +1,9 @@
 import {
+	ScreenShareIcon,
 	ScreenShareOffIcon,
 	TriangleAlertIcon,
 	VolumeXIcon,
+	WifiOffIcon,
 } from "lucide-react";
 import { useEffect } from "react";
 import { toast } from "@/components/ui/toast";
@@ -15,8 +17,8 @@ import {
 import { NoticeIcon } from "./NoticeIcon";
 
 /**
- * Os avisos do compartilhamento no canto: terminou (a fonte sumiu), o áudio parou e não deu para
- * compartilhar. Escuta o controller direto, para não perder uma mudança no meio de outra. Um aviso
+ * Os avisos do compartilhamento no canto: terminou (a fonte sumiu), o áudio parou, a conexão caiu
+ * (e voltou) e não deu para compartilhar. Escuta o controller direto, para não perder uma mudança no meio de outra. Um aviso
  * novo, ou uma transmissão começando, fecha o anterior. Não desenha nada.
  */
 export function ShareNotices({
@@ -94,6 +96,30 @@ function showNotice(
 			});
 			return id;
 		}
+		case "linkLost":
+			return toast.add({
+				title: "A transmissão perdeu a conexão",
+				description:
+					"Quem assiste vê a tela parada. Tentando voltar sozinha.",
+				data: {
+					media: (
+						<NoticeIcon tone="warning">
+							<WifiOffIcon />
+						</NoticeIcon>
+					),
+				},
+			});
+		case "linkBack":
+			return toast.add({
+				title: "A transmissão voltou",
+				data: {
+					media: (
+						<NoticeIcon tone="info">
+							<ScreenShareIcon />
+						</NoticeIcon>
+					),
+				},
+			});
 		case "failed": {
 			// Janela minimizada ou fechada entre a lista e o clique: o Rust não acha a fonte.
 			const id = toast.add({

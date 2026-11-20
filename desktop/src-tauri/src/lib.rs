@@ -101,6 +101,7 @@ pub fn run(log_file: logging::LateFile) {
             commands::screen_share::screen_share_start,
             commands::screen_share::screen_share_update,
             commands::screen_share::screen_share_stop,
+            commands::screen_share::screen_share_reconnect,
             commands::thumbnails::thumbnails_start,
             commands::thumbnails::thumbnails_update,
             commands::thumbnails::thumbnails_stop,

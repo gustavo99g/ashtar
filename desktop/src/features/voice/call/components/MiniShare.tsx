@@ -291,7 +291,7 @@ function MiniShareFrame({
 				) : (
 					<Spinner className="size-5 text-primary" />
 				)}
-				{ready && share.publication.isMuted && <PausedCover compact />}
+				{ready && <PausedCover share={share} compact />}
 				<LiveBadge className="absolute top-2 left-2" />
 				{drag ? (
 					<span className="pointer-events-none absolute inset-x-0 bottom-2 text-center text-xs font-semibold text-foreground">

@@ -11,6 +11,10 @@ export type ShareNotice =
 	| { kind: "ended"; source: CaptureSource }
 	/** Só o áudio caiu; o vídeo continua (decisão 7). */
 	| { kind: "audioLost"; source: CaptureSource }
+	/** A conexão da transmissão caiu; a captura segue, e o app tenta voltar (v0.6). */
+	| { kind: "linkLost" }
+	/** A conexão voltou. */
+	| { kind: "linkBack" }
 	/** Não deu para começar, ou a captura falhou no meio. */
 	| { kind: "failed"; errorKind: string; message: string };
 
@@ -33,6 +37,14 @@ export function shareNotice(
 		next.audio === "lost"
 	) {
 		return { kind: "audioLost", source: next.source };
+	}
+	if (
+		previous.status === "active" &&
+		next.status === "active" &&
+		previous.sessionId === next.sessionId &&
+		previous.link !== next.link
+	) {
+		return { kind: next.link === "lost" ? "linkLost" : "linkBack" };
 	}
 	if (next.status === "error" && previous.status !== "error") {
 		return { kind: "failed", errorKind: next.kind, message: next.message };
