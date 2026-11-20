@@ -123,10 +123,11 @@ As decisões de arquitetura vão para as ADRs, que são a fonte:
    `RegisterHotKey` (e o plugin de atalhos do Tauri) segura a tecla, e por isso não serve (BACKLOG da v0.2.2).
 6. **Atalhos de agora:** Desativar microfone, Desativar áudio, Pressionar para falar, Atender ligação e Recusar ou
    desligar, como no quadro. Os padrões são os do quadro (`Ctrl+Shift+M`, `Ctrl+Shift+D`, nenhum, `Ctrl+Shift+A` e
-   `Ctrl+Shift+E`). Uma combinação é até três modificadores e uma tecla, ou um botão do mouse (os laterais, `X1` e
-   `X2`, e o do meio), sozinho ou com modificadores. O clique esquerdo e o direito não podem.
-7. **Gravar um atalho** é como no quadro "Configurações — atalhos (gravando)": Trocar põe a linha gravando, a próxima
-   combinação apertada vira o atalho, Esc ou Cancelar desiste. Enquanto grava, os atalhos não disparam. A mesma
+   `Ctrl+Shift+E`). Um atalho é qualquer tecla sozinha, até um modificador (o Ctrl, o Shift), ou um botão do mouse (os
+   laterais, `X1` e `X2`, e o do meio); apertando mais de uma, vira combinação (os modificadores e uma tecla). O
+   clique esquerdo e o direito não podem. (Mudou no teste de 20/11: antes, um modificador sozinho não valia.)
+7. **Gravar um atalho** é como no quadro "Configurações — atalhos (gravando)": Trocar põe a linha gravando, o que a pessoa
+   apertar vira o atalho quando ela solta a primeira tecla, Esc ou Cancelar desiste. Enquanto grava, os atalhos não disparam. A mesma
    combinação em duas linhas não pode: a nova mostra quem já usa ("Já é o atalho de Desativar microfone").
 8. **Os atalhos e o modo de entrada ficam no computador**, no `settingsStore` (como os dispositivos), e o app manda a
    lista para o Rust ao abrir e a cada mudança. O Rust só avisa "apertou" e "soltou" com o nome do atalho; quem decide

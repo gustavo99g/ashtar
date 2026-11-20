@@ -100,6 +100,7 @@ fn worker(app: &AppHandle, receiver: Receiver<Message>) {
             Message::Record(recording) => matcher.set_recording(recording),
         };
         for event in events {
+            tracing::info!(?event, "atalho");
             let result = match &event {
                 Event::Pressed(id) => app.emit(SHORTCUT, ShortcutPayload { id, pressed: true }),
                 Event::Released(id) => app.emit(SHORTCUT, ShortcutPayload { id, pressed: false }),

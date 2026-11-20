@@ -45,8 +45,9 @@ impl Modifiers {
     }
 }
 
-/// Uma combinação: até quatro modificadores e uma tecla ou um botão do mouse. No app (JSON), o
-/// mesmo formato: `{ ctrl, shift, alt, win, key: 77 | null, mouse: "x1" | null }`.
+/// Uma combinação: até quatro modificadores e uma tecla ou um botão do mouse. A tecla pode ser
+/// um modificador: o Ctrl sozinho é atalho, e `Ctrl+Shift` é o Ctrl mais a tecla Shift. No app
+/// (JSON), o mesmo formato: `{ ctrl, shift, alt, win, key: 77 | null, mouse: "x1" | null }`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Combo {
     #[serde(flatten)]
@@ -58,7 +59,7 @@ pub struct Combo {
 impl Combo {
     pub fn input(&self) -> Option<Input> {
         match (self.key, self.mouse) {
-            (Some(key), None) if !is_modifier(key) => Some(Input::Key(key)),
+            (Some(key), None) => Some(Input::Key(key)),
             (None, Some(button)) => Some(Input::Mouse(button)),
             _ => None,
         }
@@ -131,8 +132,10 @@ pub fn is_modifier(vk: u16) -> bool {
 ///   Um atalho sem modificador (o `V` do pressionar para falar, um botão lateral) dispara com
 ///   qualquer modificador apertado: no jogo, a pessoa corre com o Shift e fala ao mesmo tempo.
 /// - Soltar qualquer tecla da combinação solta o atalho.
-/// - Gravando, nenhum atalho dispara: a primeira tecla que não é modificador (ou botão do mouse)
-///   fecha a combinação com os modificadores apertados.
+/// - Gravando, nenhum atalho dispara: a pessoa aperta o que quiser e a gravação fecha quando ela
+///   solta a primeira tecla. Uma tecla sozinha (até o Ctrl) é o atalho; com mais de uma, os
+///   modificadores ficam como modificadores e a última tecla comum (ou o último modificador, se só
+///   houver modificadores) é a tecla.
 #[derive(Debug, Default)]
 pub struct Matcher {
     held: HashSet<Input>,
@@ -140,6 +143,9 @@ pub struct Matcher {
     /// Os atalhos apertados agora.
     active: Vec<Binding>,
     recording: bool,
+    /// Gravando: a última tecla comum ou botão apertado, e o último modificador.
+    record_main: Option<Input>,
+    record_modifier: Option<u16>,
 }
 
 impl Matcher {
@@ -153,6 +159,8 @@ impl Matcher {
     /// Liga ou desliga a gravação. Ligar solta o que estava apertado.
     pub fn set_recording(&mut self, recording: bool) -> Vec<Event> {
         self.recording = recording;
+        self.record_main = None;
+        self.record_modifier = None;
         if recording {
             self.release_where(|_| true)
         } else {
@@ -181,7 +189,18 @@ impl Matcher {
     }
 
     fn modifiers(&self) -> Modifiers {
-        let has = |keys: &[u16]| keys.iter().any(|key| self.held.contains(&Input::Key(*key)));
+        self.modifiers_except(None)
+    }
+
+    /// Os modificadores apertados, sem contar `input` (a tecla do próprio atalho, quando ela é um
+    /// modificador: o Ctrl sozinho não é "Ctrl com Ctrl").
+    fn modifiers_except(&self, input: Option<Input>) -> Modifiers {
+        let has = |keys: &[u16]| {
+            keys.iter().any(|key| {
+                let key = Input::Key(*key);
+                Some(key) != input && self.held.contains(&key)
+            })
+        };
         Modifiers {
             ctrl: has(&[VK_CONTROL, VK_LCONTROL, VK_RCONTROL]),
             shift: has(&[VK_SHIFT, VK_LSHIFT, VK_RSHIFT]),
@@ -195,18 +214,32 @@ impl Matcher {
         if !self.held.insert(input) {
             return Vec::new();
         }
-        if matches!(input, Input::Key(key) if is_modifier(key)) {
+        if self.recording {
+            match input {
+                Input::Key(key) if is_modifier(key) => self.record_modifier = Some(key),
+                _ => self.record_main = Some(input),
+            }
             return Vec::new();
         }
-        let modifiers = self.modifiers();
-        if self.recording {
-            return vec![Event::Recorded(Combo::of(modifiers, input))];
-        }
+        // O atalho que a tecla completa: a tecla dele é esta, ou ela é um dos modificadores dele
+        // (o `Ctrl+Shift` dispara no Shift ou no Ctrl, o que vier por último).
         let exact: Vec<Binding> = self
             .bindings
             .iter()
             .filter(|binding| {
-                binding.combo.input() == Some(input) && binding.combo.modifiers == modifiers
+                let Some(own) = binding.combo.input() else {
+                    return false;
+                };
+                let completes = own == input || {
+                    let Input::Key(key) = input else {
+                        return false;
+                    };
+                    let Input::Key(own_key) = own else {
+                        return false;
+                    };
+                    is_modifier(own_key) && is_modifier(key) && self.held.contains(&own)
+                };
+                completes && binding.combo.modifiers == self.modifiers_except(Some(own))
             })
             .cloned()
             .collect();
@@ -232,6 +265,20 @@ impl Matcher {
     }
 
     fn up(&mut self, input: Input) -> Vec<Event> {
+        if self.recording && self.held.contains(&input) {
+            let combo = match (self.record_main, self.record_modifier) {
+                (Some(main), _) => Some(Combo::of(self.modifiers(), main)),
+                (None, Some(key)) => Some(Combo::of(
+                    self.modifiers_except(Some(Input::Key(key))),
+                    Input::Key(key),
+                )),
+                (None, None) => None,
+            };
+            self.held.remove(&input);
+            self.record_main = None;
+            self.record_modifier = None;
+            return combo.map(Event::Recorded).into_iter().collect();
+        }
         if !self.held.remove(&input) {
             return Vec::new();
         }
@@ -384,7 +431,7 @@ mod tests {
     }
 
     #[test]
-    fn gravando_nenhum_atalho_dispara_e_a_combinacao_sai_inteira() {
+    fn gravando_nenhum_atalho_dispara_e_a_combinacao_sai_ao_soltar() {
         let mut m = matcher();
         m.set_recording(true);
         let events = press(
@@ -395,13 +442,14 @@ mod tests {
                 Input::Key(V),
             ],
         );
+        assert!(events.is_empty());
         assert_eq!(
-            events,
+            m.event(Input::Key(V), false),
             vec![Event::Recorded(combo(true, true, Input::Key(V)))]
         );
+        // Soltar o resto não grava de novo.
+        assert!(m.event(Input::Key(VK_LCONTROL), false).is_empty());
         m.set_recording(false);
-        m.event(Input::Key(V), false);
-        m.event(Input::Key(VK_LCONTROL), false);
         m.event(Input::Key(VK_LSHIFT), false);
         assert_eq!(
             press(&mut m, &[Input::Key(V)]),
@@ -441,12 +489,72 @@ mod tests {
     }
 
     #[test]
-    fn um_modificador_sozinho_nao_e_atalho() {
-        let combo = Combo {
-            modifiers: Modifiers::default(),
-            key: Some(VK_LCONTROL),
-            mouse: None,
-        };
-        assert_eq!(combo.input(), None);
+    fn gravando_uma_tecla_sozinha_e_o_atalho() {
+        let mut m = matcher();
+        m.set_recording(true);
+        press(&mut m, &[Input::Key(VK_LCONTROL)]);
+        assert_eq!(
+            m.event(Input::Key(VK_LCONTROL), false),
+            vec![Event::Recorded(combo(
+                false,
+                false,
+                Input::Key(VK_LCONTROL)
+            ))]
+        );
+        press(&mut m, &[Input::Key(V)]);
+        assert_eq!(
+            m.event(Input::Key(V), false),
+            vec![Event::Recorded(combo(false, false, Input::Key(V)))]
+        );
+    }
+
+    #[test]
+    fn gravando_so_modificadores() {
+        let mut m = matcher();
+        m.set_recording(true);
+        press(&mut m, &[Input::Key(VK_LCONTROL), Input::Key(VK_LSHIFT)]);
+        assert_eq!(
+            m.event(Input::Key(VK_LCONTROL), false),
+            vec![Event::Recorded(combo(true, false, Input::Key(VK_LSHIFT)))]
+        );
+    }
+
+    #[test]
+    fn um_modificador_sozinho_e_atalho() {
+        let mut m = Matcher::default();
+        m.set_bindings(vec![Binding {
+            id: "ptt".into(),
+            combo: combo(false, false, Input::Key(VK_LCONTROL)),
+        }]);
+        assert_eq!(
+            press(&mut m, &[Input::Key(VK_LCONTROL)]),
+            vec![Event::Pressed("ptt".into())]
+        );
+        assert_eq!(
+            m.event(Input::Key(VK_LCONTROL), false),
+            vec![Event::Released("ptt".into())]
+        );
+        // Com o Shift apertado antes, também.
+        assert_eq!(
+            press(&mut m, &[Input::Key(VK_LSHIFT), Input::Key(VK_LCONTROL)]),
+            vec![Event::Pressed("ptt".into())]
+        );
+    }
+
+    #[test]
+    fn so_modificadores_em_qualquer_ordem() {
+        let mut m = Matcher::default();
+        m.set_bindings(vec![Binding {
+            id: "mute".into(),
+            combo: combo(true, false, Input::Key(VK_LSHIFT)),
+        }]);
+        assert_eq!(
+            press(&mut m, &[Input::Key(VK_LSHIFT), Input::Key(VK_LCONTROL)]),
+            vec![Event::Pressed("mute".into())]
+        );
+        assert_eq!(
+            m.event(Input::Key(VK_LCONTROL), false),
+            vec![Event::Released("mute".into())]
+        );
     }
 }
