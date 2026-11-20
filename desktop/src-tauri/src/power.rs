@@ -60,7 +60,10 @@ mod platform {
             )
         };
         if result != 0 {
-            tracing::warn!(codigo = result, "não foi possível ouvir a volta da suspensão");
+            tracing::warn!(
+                codigo = result,
+                "não foi possível ouvir a volta da suspensão"
+            );
         }
     }
 }
