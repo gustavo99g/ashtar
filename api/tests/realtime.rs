@@ -768,3 +768,156 @@ async fn sala_fechada_manda_a_lista_vazia() {
         json!({ "type": "voice.participants", "channel_id": "sala", "participants": [] })
     );
 }
+
+/// Manda um evento do app pelo socket.
+async fn say(socket: &mut Socket, event: Value) {
+    socket.send(Message::text(event.to_string())).await.unwrap();
+}
+
+#[tokio::test]
+async fn ocioso_aparece_ausente_e_volta_no_primeiro_toque() {
+    let ctx = setup().await;
+    let ana = join(&ctx, "Ana", 2, false).await;
+    let (mut kid_socket, _) = connect(&ctx, &ctx.owner_token).await;
+    let (mut ana_socket, ana_ready) = connect(&ctx, &ana).await;
+    let ana_id = user_id(&ana_ready);
+    next_of(&mut kid_socket, "presence.changed").await;
+
+    say(&mut ana_socket, json!({ "type": "idle", "idle": true })).await;
+    let away = next_of(&mut kid_socket, "presence.changed").await;
+    assert_eq!(
+        away,
+        json!({ "type": "presence.changed", "user_id": ana_id, "online": true, "status": "away" })
+    );
+    assert_eq!(
+        person(&ctx, &ctx.owner_token, &ana_id).await["status"],
+        "away"
+    );
+    // Quem conecta agora recebe a Ana no `away` do `ready`.
+    let (_, ready) = connect(&ctx, &ctx.owner_token).await;
+    assert_eq!(ready["away"], json!([ana_id]));
+
+    // Uma segunda conexão da Ana, ativa, já a deixa Disponível.
+    let (mut ana_other, _) = connect(&ctx, &ana).await;
+    let back = next_of(&mut kid_socket, "presence.changed").await;
+    assert_eq!(back["status"], "available");
+    say(&mut ana_other, json!({ "type": "idle", "idle": true })).await;
+    assert_eq!(
+        next_of(&mut kid_socket, "presence.changed").await["status"],
+        "away"
+    );
+    say(&mut ana_socket, json!({ "type": "idle", "idle": false })).await;
+    assert_eq!(
+        next_of(&mut kid_socket, "presence.changed").await["status"],
+        "available"
+    );
+}
+
+#[tokio::test]
+async fn ocupado_ocioso_continua_ocupado_e_o_ausente_manual_fica() {
+    let ctx = setup().await;
+    let ana = join(&ctx, "Ana", 2, false).await;
+    let (mut kid_socket, _) = connect(&ctx, &ctx.owner_token).await;
+    let (mut ana_socket, ana_ready) = connect(&ctx, &ana).await;
+    let ana_id = user_id(&ana_ready);
+    next_of(&mut kid_socket, "presence.changed").await;
+
+    set_status(&ctx, &ana, "busy").await;
+    assert_eq!(
+        next_of(&mut kid_socket, "presence.changed").await["status"],
+        "busy"
+    );
+    say(&mut ana_socket, json!({ "type": "idle", "idle": true })).await;
+    assert!(
+        until_pong(&mut kid_socket)
+            .await
+            .iter()
+            .all(|e| e["type"] != "presence.changed"),
+        "Ocupado não vira Ausente"
+    );
+
+    set_status(&ctx, &ana, "away").await;
+    assert_eq!(
+        next_of(&mut kid_socket, "presence.changed").await["status"],
+        "away"
+    );
+    say(&mut ana_socket, json!({ "type": "idle", "idle": false })).await;
+    assert!(
+        until_pong(&mut kid_socket)
+            .await
+            .iter()
+            .all(|e| e["type"] != "presence.changed"),
+        "o Ausente manual não volta sozinho"
+    );
+    assert_eq!(
+        person(&ctx, &ctx.owner_token, &ana_id).await["status"],
+        "away"
+    );
+}
+
+#[tokio::test]
+async fn digitando_chega_a_quem_le_menos_a_propria_pessoa() {
+    let ctx = setup().await;
+    let ana = join(&ctx, "Ana", 2, false).await;
+    let bia = join(&ctx, "Bia", 3, false).await;
+    let (mut kid_socket, kid_ready) = connect(&ctx, &ctx.owner_token).await;
+    let (mut ana_socket, ana_ready) = connect(&ctx, &ana).await;
+    let (mut bia_socket, _) = connect(&ctx, &bia).await;
+    let ana_id = user_id(&ana_ready);
+    let kid_id = user_id(&kid_ready);
+    for socket in [&mut kid_socket, &mut ana_socket, &mut bia_socket] {
+        until_pong(socket).await;
+    }
+
+    // No #geral, todos menos a Ana.
+    say(
+        &mut ana_socket,
+        json!({ "type": "typing", "channel_id": "geral" }),
+    )
+    .await;
+    let typing = next_of(&mut kid_socket, "typing").await;
+    assert_eq!(
+        typing,
+        json!({ "type": "typing", "channel_id": "geral", "user_id": ana_id })
+    );
+    next_of(&mut bia_socket, "typing").await;
+    assert!(
+        until_pong(&mut ana_socket)
+            .await
+            .iter()
+            .all(|e| e["type"] != "typing")
+    );
+
+    // Na conversa da Ana com o Kid, a Bia não recebe nada.
+    let dm = open_dm(&ctx, &ana, &kid_id).await;
+    say(
+        &mut ana_socket,
+        json!({ "type": "typing", "channel_id": dm }),
+    )
+    .await;
+    assert_eq!(
+        next_of(&mut kid_socket, "typing").await["channel_id"],
+        dm.as_str()
+    );
+    assert!(
+        until_pong(&mut bia_socket)
+            .await
+            .iter()
+            .all(|e| e["type"] != "typing")
+    );
+
+    // Um canal que não existe é ignorado, e o Invisível não manda nada.
+    say(
+        &mut ana_socket,
+        json!({ "type": "typing", "channel_id": "nao-existe" }),
+    )
+    .await;
+    set_status(&ctx, &bia, "invisible").await;
+    say(
+        &mut bia_socket,
+        json!({ "type": "typing", "channel_id": "geral" }),
+    )
+    .await;
+    let events = until_pong(&mut kid_socket).await;
+    assert!(events.iter().all(|e| e["type"] != "typing"), "{events:?}");
+}

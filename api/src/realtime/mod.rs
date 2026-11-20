@@ -41,7 +41,8 @@ const CAPACITY: usize = 256;
 #[ts(export, export_to = "index.ts")]
 pub enum ServerEvent {
     /// O primeiro evento de toda conexão, só para ela: quem é, o status dela,
-    /// quem está online agora (sem os invisíveis) e quem desses está ocupado, e
+    /// quem está online agora (sem os invisíveis) e quem desses está ocupado ou
+    /// ausente, e
     /// cada canal de texto e conversa privada dela com a mensagem mais
     /// nova e o estado de leitura. Se a pessoa está numa ligação (tocando ou
     /// atendida), ela vem no `call`: é o que acerta quem reconecta no meio.
@@ -51,6 +52,7 @@ pub enum ServerEvent {
         status: Status,
         online: Vec<String>,
         busy: Vec<String>,
+        away: Vec<String>,
         channels: Vec<ChannelHead>,
         dms: Vec<ChannelHead>,
         call: Option<CallView>,
@@ -60,7 +62,8 @@ pub enum ServerEvent {
     Pong,
     #[serde(rename = "message.created")]
     MessageCreated { message: Message },
-    /// Alguém ficou online ou offline, ou trocou entre disponível e ocupado.
+    /// Alguém ficou online ou offline, ou trocou entre disponível, ausente e
+    /// ocupado.
     /// Ficar invisível sai daqui como ficar offline. O `status` só quer dizer
     /// alguma coisa com `online`.
     #[serde(rename = "presence.changed")]
@@ -97,6 +100,11 @@ pub enum ServerEvent {
         by_name: String,
         reason: DisconnectReason,
     },
+    /// Alguém está escrevendo no canal ou na conversa (ADR 0027). Vai para quem
+    /// pode ler, menos a própria pessoa; o app esquece depois de 6 segundos sem
+    /// outro.
+    #[serde(rename = "typing")]
+    Typing { channel_id: String, user_id: String },
     #[serde(rename = "member.joined")]
     MemberJoined { person: Person },
     /// Alguém foi removido: sai da coluna de membros.
@@ -141,6 +149,7 @@ impl ServerEvent {
         match self {
             Self::MessageCreated { .. }
             | Self::VoiceParticipants { .. }
+            | Self::Typing { .. }
             | Self::ChannelState { .. }
             | Self::VoiceMoved { .. }
             | Self::CallRinging { .. }
@@ -175,6 +184,9 @@ pub enum Audience {
     Everyone,
     /// Só as conexões destas pessoas (ids de usuário).
     Only(Arc<[String]>),
+    /// Todos, menos estas pessoas (quem está digitando não recebe o próprio
+    /// aviso).
+    Except(Arc<[String]>),
 }
 
 impl Audience {
@@ -182,6 +194,23 @@ impl Audience {
         match self {
             Self::Everyone => true,
             Self::Only(ids) => ids.iter().any(|id| id == user_id),
+            Self::Except(ids) => !ids.iter().any(|id| id == user_id),
+        }
+    }
+
+    /// O mesmo público, sem `user_id`.
+    pub fn without(self, user_id: &str) -> Self {
+        match self {
+            Self::Everyone => Self::Except(Arc::from([user_id.to_owned()])),
+            Self::Only(ids) => {
+                Self::Only(ids.iter().filter(|id| *id != user_id).cloned().collect())
+            }
+            Self::Except(ids) => Self::Except(
+                ids.iter()
+                    .cloned()
+                    .chain(std::iter::once(user_id.to_owned()))
+                    .collect(),
+            ),
         }
     }
 }
@@ -204,11 +233,26 @@ struct Ticket {
 /// muda a cada conexão nova e cancela o "offline" que estava esperando. O
 /// `status` fica aqui para o `ready` e o `presence.changed` não irem ao banco:
 /// quem está no mapa com `Invisible` está conectado, mas não online para os
-/// outros.
+/// outros. `idle` conta as conexões cujo app avisou que ninguém mexe no
+/// computador (ADR 0027).
 struct Presence {
     connections: usize,
+    idle: usize,
     epoch: u64,
     status: Status,
+}
+
+impl Presence {
+    /// O que os outros veem: o status escolhido, e Disponível vira Ausente
+    /// quando todas as conexões estão ociosas.
+    fn shown(&self) -> Option<Shown> {
+        match self.status.shown()? {
+            Shown::Available if self.connections > 0 && self.idle == self.connections => {
+                Some(Shown::Away)
+            }
+            shown => Some(shown),
+        }
+    }
 }
 
 #[derive(Default)]
@@ -319,28 +363,41 @@ impl Hub {
             .entry(user_id.to_owned())
             .or_insert(Presence {
                 connections: 0,
+                idle: 0,
                 epoch: 0,
                 status,
             });
-        let came_online = presence.connections == 0 && presence.epoch == 0;
+        let before = (presence.epoch > 0).then(|| presence.shown()).flatten();
         presence.connections += 1;
         presence.epoch += 1;
+        let after = presence.shown();
         drop(inner);
-        if came_online && status.shown().is_some() {
-            self.presence_changed(user_id, status.shown());
+        if before != after {
+            self.presence_changed(user_id, after);
         }
     }
 
-    /// Uma conexão de `user_id` caiu. Se era a última, ele fica offline depois
-    /// de [`OFFLINE_DELAY`], a não ser que volte antes. O invisível sai sem
-    /// aviso: para os outros, ele já estava offline.
-    pub fn disconnect(self: &Arc<Self>, user_id: &str) {
+    /// Uma conexão de `user_id` caiu (`idle`: se ela estava ociosa). Se era a
+    /// última, ele fica offline depois de [`OFFLINE_DELAY`], a não ser que
+    /// volte antes. O invisível sai sem aviso: para os outros, ele já estava
+    /// offline. Se sobrou conexão, a que caiu pode ter sido a única que
+    /// segurava o Disponível.
+    pub fn disconnect(self: &Arc<Self>, user_id: &str, idle: bool) {
         let mut inner = self.lock();
         let Some(presence) = inner.presence.get_mut(user_id) else {
             return;
         };
+        let before = presence.shown();
         presence.connections = presence.connections.saturating_sub(1);
+        if idle {
+            presence.idle = presence.idle.saturating_sub(1);
+        }
         if presence.connections > 0 {
+            let after = presence.shown();
+            drop(inner);
+            if before != after {
+                self.presence_changed(user_id, after);
+            }
             return;
         }
         let epoch = presence.epoch;
@@ -361,7 +418,7 @@ impl Hub {
             let was_shown = inner
                 .presence
                 .remove(&user_id)
-                .is_some_and(|p| p.status.shown().is_some());
+                .is_some_and(|p| p.shown().is_some());
             drop(inner);
             if was_shown {
                 hub.presence_changed(&user_id, None);
@@ -375,18 +432,38 @@ impl Hub {
     /// Para as conexões dela vai o status de verdade.
     pub fn set_status(&self, user_id: &str, status: Status) {
         let mut inner = self.lock();
-        let before = inner.presence.get_mut(user_id).map(|presence| {
-            let before = presence.status;
+        let change = inner.presence.get_mut(user_id).map(|presence| {
+            let before = presence.shown();
             presence.status = status;
-            before
+            (before, presence.shown())
         });
         drop(inner);
-        if let Some(before) = before
-            && before.shown() != status.shown()
+        if let Some((before, after)) = change
+            && before != after
         {
-            self.presence_changed(user_id, status.shown());
+            self.presence_changed(user_id, after);
         }
         self.publish_to(&[user_id], &ServerEvent::StatusChanged { status });
+    }
+
+    /// Uma conexão de `user_id` ficou ociosa (`idle`) ou voltou (ADR 0027).
+    /// Quem chama guarda o estado da própria conexão e só avisa quando muda.
+    pub fn set_idle(&self, user_id: &str, idle: bool) {
+        let mut inner = self.lock();
+        let Some(presence) = inner.presence.get_mut(user_id) else {
+            return;
+        };
+        let before = presence.shown();
+        if idle {
+            presence.idle = (presence.idle + 1).min(presence.connections);
+        } else {
+            presence.idle = presence.idle.saturating_sub(1);
+        }
+        let after = presence.shown();
+        drop(inner);
+        if before != after {
+            self.presence_changed(user_id, after);
+        }
     }
 
     /// Quem está online para os outros agora, em ordem de id, com o que eles
@@ -396,7 +473,7 @@ impl Hub {
             .lock()
             .presence
             .iter()
-            .filter_map(|(id, presence)| Some((id.clone(), presence.status.shown()?)))
+            .filter_map(|(id, presence)| Some((id.clone(), presence.shown()?)))
             .collect();
         online.sort_by(|a, b| a.0.cmp(&b.0));
         online
@@ -404,7 +481,12 @@ impl Hub {
 
     /// O que os outros veem de `user_id`: `None` se está offline ou invisível.
     pub fn shown(&self, user_id: &str) -> Option<Shown> {
-        self.lock().presence.get(user_id)?.status.shown()
+        self.lock().presence.get(user_id)?.shown()
+    }
+
+    /// O status que `user_id` escolheu, se está conectado.
+    pub fn status(&self, user_id: &str) -> Option<Status> {
+        Some(self.lock().presence.get(user_id)?.status)
     }
 
     /// Se `user_id` tem conexão (ou caiu há menos que o atraso), em qualquer
@@ -569,8 +651,8 @@ mod tests {
         hub.connect("u1", Status::Available);
         assert!(rx.try_recv().is_err());
 
-        hub.disconnect("u1");
-        hub.disconnect("u1");
+        hub.disconnect("u1", false);
+        hub.disconnect("u1", false);
         assert!(hub.is_connected("u1"), "ainda dentro do atraso");
         tokio::time::sleep(Duration::from_millis(100)).await;
         assert!(!hub.is_connected("u1"));
@@ -583,7 +665,7 @@ mod tests {
         hub.connect("u1", Status::Available);
         let mut rx = hub.subscribe();
 
-        hub.disconnect("u1");
+        hub.disconnect("u1", false);
         hub.connect("u1", Status::Available);
         tokio::time::sleep(Duration::from_millis(100)).await;
         assert!(hub.is_connected("u1"));
@@ -607,7 +689,7 @@ mod tests {
         assert!(hub.is_connected("u1"));
         assert_eq!(hub.shown("u1"), None);
         assert_eq!(hub.online(), []);
-        hub.disconnect("u1");
+        hub.disconnect("u1", false);
         tokio::time::sleep(Duration::from_millis(60)).await;
         assert!(!hub.is_connected("u1"));
         assert!(rx.try_recv().is_err(), "nenhum aviso de presença");
