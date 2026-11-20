@@ -130,6 +130,17 @@ fn room_client() -> Result<&'static RoomClient, ApiError> {
     Ok(ROOM_CLIENT.get_or_init(|| client))
 }
 
+/// Quanto o LiveKit leva para responder uma consulta pequena (a lista de uma sala que não existe),
+/// para o estado do servidor no Painel. `Err` se ele não responde.
+pub async fn livekit_latency() -> Result<Duration, ApiError> {
+    let started = std::time::Instant::now();
+    room_client()?
+        .list_rooms(vec!["ashtar-status".into()])
+        .await
+        .map_err(|error| ApiError::LiveKit(error.to_string()))?;
+    Ok(started.elapsed())
+}
+
 /// Pergunta ao LiveKit quem está na sala `channel_id`.
 pub async fn list_room(channel_id: &str) -> Result<Vec<RoomParticipant>, ApiError> {
     match room_client()?.list_participants(channel_id).await {

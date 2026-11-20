@@ -1,9 +1,11 @@
+pub mod admin;
 pub mod auth;
 pub mod calls;
 pub mod channels;
 pub mod dms;
 pub mod extract;
 pub mod invites;
+pub mod logs;
 pub mod members;
 pub mod messages;
 pub mod pages;

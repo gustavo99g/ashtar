@@ -10,6 +10,7 @@ pub mod download;
 pub mod error;
 pub mod identity;
 pub mod limiter;
+pub mod logs;
 pub mod realtime;
 pub mod routes;
 pub mod secret;
@@ -58,6 +59,11 @@ pub struct AppState {
     /// Quanto quem foi movido tem para trocar de sala sozinho
     /// ([`routes::voice::MOVE_GRACE`]; os testes usam menos).
     pub move_grace: std::time::Duration,
+    /// A pasta dos dados: os logs enviados e os backups ([`logs::data_dir_from_env`]; os testes
+    /// usam uma temporária).
+    pub data_dir: Arc<std::path::Path>,
+    /// Quando a API subiu, para o "no ar há" do Painel.
+    pub started_at: i64,
 }
 
 impl AppState {
@@ -74,6 +80,8 @@ impl AppState {
             download: Arc::new(DownloadLink::default()),
             ring_timeout: calls::RING_TIMEOUT,
             move_grace: routes::voice::MOVE_GRACE,
+            data_dir: logs::data_dir_from_env().into(),
+            started_at: db::now(),
         }
     }
 
@@ -176,10 +184,22 @@ pub fn app(state: AppState, policy: Arc<ClientPolicy>) -> Router {
             post(routes::channels::unarchive_category),
         )
         .route("/realtime/ticket", post(routes::realtime::ticket))
+        .route("/logs", get(routes::logs::list))
+        .route("/logs/{id}", get(routes::logs::download))
+        .route("/admin/status", get(routes::admin::status))
         .layer(middleware::from_fn_with_state(
             timeout::REQUEST_TIMEOUT,
             timeout::limit,
         ))
+        // O envio dos logs sobe um arquivo: tem mais tempo.
+        .merge(
+            Router::new()
+                .route("/logs", post(routes::logs::upload))
+                .layer(middleware::from_fn_with_state(
+                    timeout::UPLOAD_TIMEOUT,
+                    timeout::limit,
+                )),
+        )
         .layer(middleware::from_fn_with_state(
             policy,
             client_policy::enforce,
