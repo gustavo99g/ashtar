@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ConnectingState } from "@/components/ui/states";
+import { ShortcutKeys, useShortcuts } from "@/features/settings";
 import { paths } from "@/lib/paths";
 import { cn } from "@/lib/utils";
 import { useConnectedRoomName } from "../../room/hooks/useRoomName";
@@ -17,6 +18,7 @@ import { pingQuality } from "../model/ping";
 import { stopWatching } from "../../call/stores/roomViewStore";
 import { usePing } from "../hooks/usePing";
 import { useVoice } from "../../room/hooks/useVoice";
+import { useInputChoice } from "../../input/stores/inputStore";
 import { DockButton } from "../../call/components/buttons";
 import { ShareButton } from "../../call/components/ShareButton";
 
@@ -136,8 +138,29 @@ function Connected({ call, place }: { call: boolean; place: string }) {
 						</>
 					)}
 				</span>
+				<PushToTalkHint />
 			</div>
 		</div>
+	);
+}
+
+/** No modo Pressionar para falar, a tecla embaixo do nome da sala (quadro "Voz — você está mutado"). */
+function PushToTalkHint() {
+	const pushToTalk = useInputChoice((state) => state.mode === "ptt");
+	const shortcut = useShortcuts((state) => state.ptt);
+	if (!pushToTalk) return null;
+	return (
+		<span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+			Pressionar para falar:
+			{shortcut ? (
+				<ShortcutKeys
+					label={shortcut.label}
+					className="[&_kbd]:px-[5px] [&_kbd]:py-0 [&_kbd]:text-[11px]"
+				/>
+			) : (
+				<span className="text-warning-text">sem atalho</span>
+			)}
+		</span>
 	);
 }
 

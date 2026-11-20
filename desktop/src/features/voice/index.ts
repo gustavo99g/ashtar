@@ -40,3 +40,5 @@ export { useVoice } from "./room/hooks/useVoice";
 export { useVoiceChannelId } from "./room/hooks/useVoiceChannelId";
 export { DEFAULT_ROOM_ID } from "./room/model/channel";
 export { useConnectedRoomName, useRoomName } from "./room/hooks/useRoomName";
+export { setPushToTalkHeld } from "./input/chain";
+export { useInputChoice } from "./input/stores/inputStore";

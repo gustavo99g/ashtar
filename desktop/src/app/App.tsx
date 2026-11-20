@@ -25,6 +25,7 @@ import { useVoice, VoiceProvider } from "@/features/voice";
 import { paths } from "@/lib/paths";
 import { queryClient } from "@/lib/query";
 import { IdleReporter } from "@/features/presence";
+import { GlobalShortcuts } from "./GlobalShortcuts";
 import { RealtimeBridge } from "./RealtimeBridge";
 import { router } from "./router";
 
@@ -53,6 +54,7 @@ export function App() {
 				<SessionWatcher onLeftGroup={goToLeftGroup} />
 				<RealtimeBridge />
 				<IdleReporter />
+				<GlobalShortcuts />
 				<TooltipProvider>
 					<AppToaster>
 						<RouterProvider router={router} />

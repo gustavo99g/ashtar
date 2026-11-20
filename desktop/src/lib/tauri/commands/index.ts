@@ -9,5 +9,6 @@ export * from "./identity";
 export * from "./notifications";
 export * from "./presence";
 export * from "./screen-share";
+export * from "./shortcuts";
 export * from "./thumbnails";
 export * from "./updater";

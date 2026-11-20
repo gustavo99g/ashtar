@@ -256,6 +256,8 @@ export type InputProcessor = TrackProcessor<
 	update: (options: ChainOptions) => void;
 	/** Reenvia as opções de agora (o atalho mudou). */
 	refresh: () => void;
+	/** Um clone ligado do microfone de verdade, que o mute não cala (o aviso de mutado). */
+	cloneRaw: () => MediaStreamTrack | null;
 };
 
 /** Um processador novo por trilha: ele guarda o grafo de áudio e o microfone que recebeu. */
@@ -291,6 +293,12 @@ export function createInputProcessor(
 			graph?.update(latest);
 		},
 
+		cloneRaw() {
+			const clone = raw?.clone() ?? null;
+			if (clone) clone.enabled = true;
+			return clone;
+		},
+
 		async init({ track }) {
 			raw = track;
 			try {
@@ -324,6 +332,22 @@ export function createInputProcessor(
 	};
 
 	return processor;
+}
+
+/**
+ * Um clone ligado do microfone publicado em `room`, para medir a voz com ele mutado (o aviso "Você
+ * está mutado", ADR 0029): o mute do LiveKit desliga a trilha, e o clone não. Quem recebe para o
+ * clone. Sem microfone publicado, `null`.
+ */
+export function cloneMicrophone(room: Room): MediaStreamTrack | null {
+	const fromChain = active?.cloneRaw() ?? null;
+	if (fromChain) return fromChain;
+	const track = room.localParticipant.getTrackPublication(
+		Track.Source.Microphone,
+	)?.track;
+	const clone = track?.mediaStreamTrack.clone() ?? null;
+	if (clone) clone.enabled = true;
+	return clone;
 }
 
 /** O que cada sala ainda está trocando: uma troca só começa quando a anterior termina. */

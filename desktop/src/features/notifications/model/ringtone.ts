@@ -5,6 +5,7 @@
  */
 import ringSound from "@/assets/sounds/ring.wav";
 import { RING_VOLUME, RING_VOLUME_IN_ROOM } from "./ring";
+import { soundVolume } from "@/features/settings";
 import { chosenOutput } from "./sound";
 
 /** Começa o toque e devolve quem o para. Falhar (sem saída, sem permissão) é silêncio. */
@@ -13,7 +14,7 @@ export function startRingtone(inRoom: boolean): () => void {
 		setSinkId?: (id: string) => Promise<void>;
 	};
 	audio.loop = true;
-	audio.volume = inRoom ? RING_VOLUME_IN_ROOM : RING_VOLUME;
+	audio.volume = (inRoom ? RING_VOLUME_IN_ROOM : RING_VOLUME) * soundVolume();
 	let stopped = false;
 	const output = chosenOutput();
 	const ready =

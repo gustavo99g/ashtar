@@ -8,6 +8,7 @@
  */
 import dmSound from "@/assets/sounds/dm.wav";
 import mentionSound from "@/assets/sounds/mention.wav";
+import { soundVolume } from "@/features/settings";
 import type { SoundId } from "./decide";
 
 export const SOUND_GAP_MS = 3000;
@@ -42,6 +43,7 @@ export function playSound(id: SoundId, now = Date.now()): void {
 	const audio = new Audio(SOUNDS[id]) as HTMLAudioElement & {
 		setSinkId?: (id: string) => Promise<void>;
 	};
+	audio.volume = soundVolume();
 	const output = chosenOutput();
 	const ready =
 		output && audio.setSinkId

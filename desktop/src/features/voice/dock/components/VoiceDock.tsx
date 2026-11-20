@@ -4,6 +4,7 @@ import { ShareStartNotices } from "../../call/components/ShareStartNotices";
 import { WatchJanitor } from "../../call/components/WatchJanitor";
 import { useVoice } from "../../room/hooks/useVoice";
 import { useConnectedRoomName } from "../../room/hooks/useRoomName";
+import { MutedWarning } from "./MutedWarning";
 import { ShareHost } from "./ShareHost";
 import { TrayShare } from "./TrayShare";
 import { UserPanel } from "./UserPanel";
@@ -21,6 +22,7 @@ export function VoiceDock() {
 	return (
 		<div className="shrink-0 px-2 pb-2">
 			<div className="flex flex-col rounded-xl border border-border bg-secondary">
+				{room && <MutedWarning />}
 				{voiceChannelId && <VoiceConnection />}
 				<UserPanel />
 			</div>

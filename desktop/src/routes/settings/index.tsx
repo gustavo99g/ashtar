@@ -1,5 +1,6 @@
 import { ArchivedSettings } from "@/features/channels";
 import { ProfileSettings } from "@/features/identity";
+import { ShortcutsSettings } from "@/features/settings";
 import { InvitesSettings } from "@/features/invites";
 import { MembersSettings } from "@/features/members";
 import { NotificationsSettings } from "@/features/notifications";
@@ -20,6 +21,10 @@ export function ProfileSettingsRoute() {
 
 export function VoiceSettingsRoute() {
 	return <VoiceSettings />;
+}
+
+export function ShortcutsSettingsRoute() {
+	return <ShortcutsSettings />;
 }
 
 export function NotificationsSettingsRoute() {

@@ -123,6 +123,12 @@ export function VoiceSettings() {
 						setInputChoice({ autoGainControl })
 					}
 				/>
+				<SettingSwitch
+					title="Avisar quando falo mutado"
+					description="Mostra “Você está mutado” no painel de voz quando você fala com o microfone desligado."
+					checked={choice.warnWhenMuted}
+					onCheckedChange={(warnWhenMuted) => setInputChoice({ warnWhenMuted })}
+				/>
 			</Section>
 			<Section title="Câmera">
 				<CameraOptions className="max-w-[420px]" />

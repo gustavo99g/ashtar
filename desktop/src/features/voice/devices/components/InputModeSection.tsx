@@ -1,7 +1,8 @@
 import { Radio } from "@base-ui/react/radio";
 import { RadioGroup } from "@base-ui/react/radio-group";
-import { type ReactNode, useId } from "react";
+import { useId } from "react";
 import { Switch } from "@/components/ui/switch";
+import { PushToTalkShortcut } from "@/features/settings";
 import { useInputLevel } from "../../input/hooks/useInputLevel";
 import type { InputMode } from "../../input/model/gate";
 import { setInputChoice, useInputChoice } from "../../input/stores/inputStore";
@@ -9,9 +10,9 @@ import { SensitivityBar } from "./SensitivityBar";
 
 /**
  * O modo de entrada (quadro "Configurações — voz e vídeo"): os dois cartões, e o bloco da
- * sensibilidade na detecção de voz. O atalho do pressionar para falar entra aqui na Etapa 4.
+ * sensibilidade na detecção de voz, e o atalho do pressionar para falar (o mesmo de Atalhos).
  */
-export function InputModeSection({ children }: { children?: ReactNode }) {
+export function InputModeSection() {
 	const mode = useInputChoice((state) => state.mode);
 	return (
 		<>
@@ -32,7 +33,7 @@ export function InputModeSection({ children }: { children?: ReactNode }) {
 					description="Só transmite enquanto o atalho estiver pressionado."
 				/>
 			</RadioGroup>
-			{children}
+			<PushToTalkShortcut active={mode === "ptt"} />
 			{mode === "voice" && <Sensitivity />}
 		</>
 	);
