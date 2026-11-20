@@ -1,8 +1,11 @@
 """Gera os sons originais do Ashtar (src/assets/sounds): notas senoidais com um pouco de harmônico e
 queda suave. Uso, em desktop/: python3 scripts/generate-sounds.py src/assets/sounds
 
-- dm.wav: mensagem privada. mention.wav: menção. ring.wav: o toque da ligação privada (Etapa 18, ainda sem
-  uso no app).
+- dm.wav: mensagem privada. mention.wav: menção. ring.wav: o toque da ligação privada.
+- Os sons da sala (v0.5, ADR 0027), mais graves e mais curtos que os de mensagem, para não se confundirem
+  com eles: room-join.wav e room-leave.wav (alguém entrou ou saiu), room-mute.wav e room-unmute.wav,
+  room-deafen.wav e room-undeafen.wav (o seu microfone e o seu áudio), room-share-start.wav e
+  room-share-stop.wav (alguém começou ou parou de transmitir na sua sala).
 """
 import math, struct, sys, wave
 
@@ -45,3 +48,21 @@ ring = []
 for cycle_start in (0.0, 0.6):
     ring += [note(783.99, cycle_start, 0.16, 1.0, 9), note(587.33, cycle_start + 0.16, 0.24, 0.95, 8)]
 render(ring, 2.4, f"{out}/ring.wav")
+
+# Os sons da sala. Subir é chegar ou ligar; descer é sair ou desligar.
+# Entrou: Dó5 e Sol5. Saiu: o mesmo par, descendo.
+render([note(523.25, 0.0, 0.14, 0.9, 16), note(783.99, 0.08, 0.24, 1.0, 12)], 0.34, f"{out}/room-join.wav")
+render([note(783.99, 0.0, 0.14, 0.9, 16), note(523.25, 0.08, 0.26, 1.0, 12)], 0.36, f"{out}/room-leave.wav")
+# Mutou: uma nota curta e grave (Lá4) que cai para Mi4. Desmutou: Mi4 subindo para Lá4.
+render([note(440.0, 0.0, 0.08, 0.9, 22), note(329.63, 0.05, 0.14, 1.0, 20)], 0.2, f"{out}/room-mute.wav")
+render([note(329.63, 0.0, 0.08, 0.9, 22), note(440.0, 0.05, 0.14, 1.0, 20)], 0.2, f"{out}/room-unmute.wav")
+# Surdo: três notas descendo (Mi5, Si4, Mi4). Voltou: as três subindo.
+render([note(659.25, 0.0, 0.1, 0.85, 20), note(493.88, 0.06, 0.1, 0.9, 20),
+        note(329.63, 0.12, 0.2, 1.0, 16)], 0.32, f"{out}/room-deafen.wav")
+render([note(329.63, 0.0, 0.1, 0.85, 20), note(493.88, 0.06, 0.1, 0.9, 20),
+        note(659.25, 0.12, 0.2, 1.0, 16)], 0.32, f"{out}/room-undeafen.wav")
+# Transmissão: o acorde de Ré maior aberto (Ré5, Fá#5, Lá5), subindo ao começar e descendo ao acabar.
+render([note(587.33, 0.0, 0.12, 0.8, 14), note(739.99, 0.07, 0.12, 0.85, 14),
+        note(880.0, 0.14, 0.3, 1.0, 10)], 0.44, f"{out}/room-share-start.wav")
+render([note(880.0, 0.0, 0.12, 0.8, 14), note(739.99, 0.07, 0.12, 0.85, 14),
+        note(587.33, 0.14, 0.3, 1.0, 10)], 0.44, f"{out}/room-share-stop.wav")

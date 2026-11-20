@@ -3,7 +3,7 @@ import { CallBridge } from "@/features/calls";
 import { ChannelDialogs } from "@/features/channels";
 import { DmDock, showDm } from "@/features/dms";
 import { JoinNotices } from "@/features/members";
-import { NotificationsBridge } from "@/features/notifications";
+import { NotificationsBridge, RoomSounds } from "@/features/notifications";
 import { ChannelNav, ServerMenu } from "@/features/server";
 import { SideDock } from "@/features/side-panel";
 import { MiniShare, VoiceDock } from "@/features/voice";
@@ -58,6 +58,7 @@ export function AppShell() {
 			<ChannelDialogs />
 			{/* Os avisos: a regra, o ponto de não lido e o clique num cartão. Não desenha nada. */}
 			<NotificationsBridge />
+			<RoomSounds />
 			{/* As ligações: a voz segue a ligação, e o cartão dela vai para a janela dos avisos. */}
 			<CallBridge showConversation={showDm} />
 		</div>
