@@ -131,6 +131,38 @@ describe("os sons da sala", () => {
 		await flush();
 		expect(names()).toEqual(["join", "leave"]);
 	});
+
+	it("mutar e ficar surdo fora da voz também tocam, e numa ligação não", async () => {
+		let voice = {
+			voiceKind: null as string | null,
+			voiceChannelId: null as string | null,
+			connectionState: "disconnected",
+			room: null,
+			isMuted: false,
+			isDeafened: false,
+		};
+		vi.mocked(useMaybeVoice).mockImplementation(() => voice as never);
+		const { rerender } = render(<RoomSounds />);
+		voice = { ...voice, isMuted: true };
+		rerender(<RoomSounds />);
+		voice = { ...voice, isDeafened: true };
+		rerender(<RoomSounds />);
+		await flush();
+		expect(names()).toEqual(["mute", "deafen"]);
+
+		played.length = 0;
+		voice = {
+			...voice,
+			voiceKind: "call",
+			voiceChannelId: "dm",
+			connectionState: "connected",
+		};
+		rerender(<RoomSounds />);
+		voice = { ...voice, isDeafened: false };
+		rerender(<RoomSounds />);
+		await flush();
+		expect(names()).toEqual([]);
+	});
 });
 
 describe("o pressionar para falar e o volume dos sons", () => {
