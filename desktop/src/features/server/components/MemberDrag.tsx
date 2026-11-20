@@ -16,7 +16,8 @@ import {
 	useSensors,
 } from "@dnd-kit/core";
 import type { ReactNode } from "react";
-import { requestMove, useCanMoveMembers } from "@/features/voice";
+import { requestMove, roomAllows, useCanMoveMembers } from "@/features/voice";
+import type { ChannelView } from "@/lib/api";
 
 interface DraggedMember {
 	userId: string;
@@ -27,6 +28,14 @@ interface DraggedMember {
 interface RoomTarget {
 	roomId: string;
 	name: string;
+	/** Só na sala restrita: quem pode estar nela. */
+	restricted: boolean;
+	member_ids?: string[];
+}
+
+/** Se dá para soltar `member` em `room`: outra sala, que aceita a pessoa. */
+function accepts(room: RoomTarget, member: DraggedMember): boolean {
+	return room.roomId !== member.roomId && roomAllows(room, member.userId);
 }
 
 export function MemberDragArea({ children }: { children: ReactNode }) {
@@ -37,7 +46,7 @@ export function MemberDragArea({ children }: { children: ReactNode }) {
 	function onDragEnd({ active, over }: DragEndEvent) {
 		const member = active.data.current as DraggedMember | undefined;
 		const room = over?.data.current as RoomTarget | undefined;
-		if (!member || !room || room.roomId === member.roomId) return;
+		if (!member || !room || !accepts(room, member)) return;
 		requestMove(member.userId, member.name, {
 			id: room.roomId,
 			name: room.name,
@@ -62,16 +71,19 @@ export function useMemberDrag(member: DraggedMember, self: boolean) {
 	return { ...drag, enabled: canMove && !self };
 }
 
-/** A sala que recebe: em destaque com alguém de outra sala por cima. */
-export function useRoomDrop(roomId: string, name: string) {
-	const drop = useDroppable({
-		id: `room:${roomId}`,
-		data: { roomId, name } satisfies RoomTarget,
-	});
-	const from = (drop.active?.data.current as DraggedMember | undefined)
-		?.roomId;
+/** A sala que recebe: em destaque com alguém de outra sala por cima, se ela aceita a pessoa. */
+export function useRoomDrop(channel: ChannelView) {
+	const room: RoomTarget = {
+		roomId: channel.id,
+		name: channel.name,
+		restricted: channel.restricted,
+		member_ids: channel.member_ids,
+	};
+	const drop = useDroppable({ id: `room:${channel.id}`, data: room });
+	const member = drop.active?.data.current as DraggedMember | undefined;
 	return {
 		setNodeRef: drop.setNodeRef,
-		highlighted: drop.isOver && from !== undefined && from !== roomId,
+		highlighted:
+			drop.isOver && member !== undefined && accepts(room, member),
 	};
 }

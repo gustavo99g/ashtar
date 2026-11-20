@@ -7,6 +7,7 @@ export { VoiceSettings } from "./devices/components/VoiceSettings";
 export { VoiceDock } from "./dock/components/VoiceDock";
 export {
 	requestMove,
+	roomAllows,
 	RoomModeration,
 	useCanMoveMembers,
 	useMoveTargets,

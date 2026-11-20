@@ -1,9 +1,10 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { useChannelDialog } from "@/features/channels";
+import { toast } from "@/components/ui/toast";
+import { channelsKeys, useChannelDialog } from "@/features/channels";
 import { identityKeys, useSessionStore } from "@/features/identity";
 import {
 	ApiError,
@@ -52,6 +53,7 @@ const layout: Layout = {
 					topic: "Conversa geral do grupo",
 					category_id: "texto",
 					archived_at: null,
+					restricted: false,
 				},
 			],
 		},
@@ -93,6 +95,7 @@ function renderChat(channelId = "geral", { manage = false } = {}) {
 			</MemoryRouter>
 		</QueryClientProvider>,
 	);
+	return client;
 }
 
 beforeEach(() => {
@@ -272,5 +275,60 @@ describe("ChatView", () => {
 		expect(
 			screen.getByRole("button", { name: "Ir para o #geral" }),
 		).toBeInTheDocument();
+	});
+});
+
+describe("perder o acesso ao canal aberto", () => {
+	it("volta para o primeiro canal, com o aviso, e esquece o rascunho", async () => {
+		const staff = {
+			...layout.categories[0].channels[0],
+			id: "staff",
+			name: "staff",
+			topic: null,
+			restricted: true,
+			member_ids: ["u1"],
+		};
+		const withStaff: Layout = {
+			...layout,
+			categories: [
+				{
+					...layout.categories[0],
+					channels: [...layout.categories[0].channels, staff],
+				},
+			],
+		};
+		vi.mocked(getChannelLayout).mockResolvedValue(withStaff);
+		useDrafts.setState({ drafts: { staff: "meio escrito" } });
+		const add = vi.spyOn(toast, "add");
+		const client = new QueryClient({
+			defaultOptions: { queries: { retry: false } },
+		});
+		render(
+			<QueryClientProvider client={client}>
+				<MemoryRouter initialEntries={["/channels/staff"]}>
+					<Routes>
+						<Route
+							path="/channels/staff"
+							element={<ChatView channelId="staff" />}
+						/>
+						<Route path="*" element={<p>outra tela</p>} />
+					</Routes>
+				</MemoryRouter>
+			</QueryClientProvider>,
+		);
+		expect(
+			await screen.findByRole("heading", { name: "staff" }),
+		).toBeInTheDocument();
+
+		client.setQueryData(channelsKeys.layout(), { ...layout, version: 2 });
+		await vi.waitFor(() =>
+			expect(add).toHaveBeenCalledWith(
+				expect.objectContaining({
+					title: "Você não tem mais acesso a #staff",
+				}),
+			),
+		);
+		expect(useDrafts.getState().drafts.staff).toBeUndefined();
+		add.mockRestore();
 	});
 });

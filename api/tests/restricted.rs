@@ -247,10 +247,16 @@ async fn quem_esta_fora_nao_acha_o_canal_nem_a_sala() {
         .unwrap()
         .clone();
     assert_eq!(staff_view["member_ids"], json!([ana_id]));
-    // Quem não gerencia não recebe a lista.
+    // Quem está na lista também a recebe; o canal aberto não tem lista.
     let (_, layout) = visible(&ctx, &ana).await;
-    let seen = layout.to_string();
-    assert!(!seen.contains("member_ids"));
+    assert!(
+        layout
+            .to_string()
+            .contains(&format!("\"member_ids\":[\"{ana_id}\"]"))
+    );
+    let geral = &layout["categories"][0]["channels"][0];
+    assert_eq!(geral["id"], "geral");
+    assert!(geral.get("member_ids").is_none());
 
     // O Beto não lê, não escreve, não marca como lido e não entra na sala: 404.
     let uri = format!("/api/channels/{staff}/messages");

@@ -11,8 +11,9 @@ um canal e uma sala só para parte dele.
 
 ## Decisão
 
-**Qualquer canal de texto ou sala de voz pode ser restrito** a uma lista de pessoas (`channel_members`, com
-`channels.restricted`). Sem restrição, é de todos. Quem tem "Gerenciar canais" liga a restrição e escolhe as
+**Qualquer canal de texto ou sala de voz pode ser restrito** a uma lista de pessoas (`channel_members`, a tabela
+das conversas privadas, com `channels.restricted`). A lista vai junto do canal para quem o vê, e o app a usa na
+sugestão do @ e no "Mover para". Sem restrição, é de todos. Quem tem "Gerenciar canais" liga a restrição e escolhe as
 pessoas no diálogo de criar e de editar ("Quem tem acesso").
 
 **Para quem está fora, o canal não existe.** A API devolve o mesmo `NotFound` de um id que não existe, e não manda
@@ -24,7 +25,9 @@ nada dele: nem na lista de canais, nem as mensagens, as não lidas, as menções
 **A trava é da API.** A regra de leitura (`chat/access.rs`) ganha o terceiro caso: o canal restrito só é lido por
 quem está na lista ou gerencia os canais. O `POST /api/voice/token`, o mover e a lista de quem está em cada sala
 passam pela mesma regra (`can_access`), e cada evento de um canal restrito sai só para as conexões de quem tem
-acesso, como as mensagens privadas. Vale também para um app antigo.
+acesso, como as mensagens privadas. Quem recebe é calculado no banco a cada evento (`access::audience`), sem cache: o grupo é
+pequeno, e um cache desatualizado vazaria. O `ServerEvent::of_channel` marca os eventos de canal, e o `publish` para
+todos recusa um deles nos testes. Vale também para um app antigo.
 
 **Perder o acesso tira a pessoa na hora.** O canal some da lista dela (um `channels.changed`); se estava com ele
 aberto, o app volta ao primeiro canal; se estava na sala, a API a tira com o aviso "Você não tem mais acesso a esta

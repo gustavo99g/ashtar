@@ -406,10 +406,17 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 		} else {
 			stopWatching();
 			setTarget(null);
-			toast.add({
-				title: "Você foi desconectado da voz",
-				description: `Quem desconectou foi ${order.byName}.`,
-			});
+			toast.add(
+				order.noAccess
+					? {
+							title: "Você não tem mais acesso a esta sala",
+							description: `${order.byName} mudou quem tem acesso.`,
+						}
+					: {
+							title: "Você foi desconectado da voz",
+							description: `Quem desconectou foi ${order.byName}.`,
+						},
+			);
 		}
 	}, [order, target, layout]);
 

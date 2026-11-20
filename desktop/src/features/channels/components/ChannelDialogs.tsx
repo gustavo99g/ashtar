@@ -29,6 +29,11 @@ import {
 	useChannelDialog,
 } from "../stores/dialogStore";
 import { DEFAULT_CHANNEL_ID } from "../stores/lastChannelStore";
+import {
+	type AccessValue,
+	accessRequest,
+	ChannelAccess,
+} from "./ChannelAccess";
 
 /** Os limites da API (Etapa 4). */
 const NAME_MAX = 32;
@@ -126,6 +131,10 @@ function CreateChannel({ categoryId }: { categoryId: string | null }) {
 	const [kind, setKind] = useState<ChannelKind>("text");
 	const [name, setName] = useState("");
 	const [topic, setTopic] = useState("");
+	const [access, setAccess] = useState<AccessValue>({
+		restricted: false,
+		memberIds: [],
+	});
 	const text = kind === "text";
 
 	function onSubmit(event: FormEvent) {
@@ -136,6 +145,7 @@ function CreateChannel({ categoryId }: { categoryId: string | null }) {
 				name,
 				category_id: categoryId ?? undefined,
 				topic: text && topic ? topic : undefined,
+				...(access.restricted ? accessRequest(access) : {}),
 			},
 			{
 				onSuccess: (channel) => {
@@ -193,6 +203,7 @@ function CreateChannel({ categoryId }: { categoryId: string | null }) {
 					onChange={(event) => setTopic(event.target.value)}
 				/>
 			)}
+			<ChannelAccess value={access} onChange={setAccess} room={!text} />
 			<Footer
 				pending={create.isPending}
 				submit={text ? "Criar canal" : "Criar sala"}
@@ -211,12 +222,27 @@ function EditChannel({
 	const update = useUpdateChannel();
 	const [name, setName] = useState(channel.name);
 	const [topic, setTopic] = useState(channel.topic ?? "");
+	const initialAccess: AccessValue = {
+		restricted: channel.restricted,
+		memberIds: channel.member_ids ?? [],
+	};
+	const [access, setAccess] = useState(initialAccess);
 	const text = channel.kind === "text";
+	const accessChanged =
+		access.restricted !== initialAccess.restricted ||
+		(access.restricted &&
+			[...access.memberIds].sort().join() !==
+				[...initialAccess.memberIds].sort().join());
 
 	function onSubmit(event: FormEvent) {
 		event.preventDefault();
 		update.mutate(
-			{ id: channel.id, name, ...(text ? { topic } : {}) },
+			{
+				id: channel.id,
+				name,
+				...(text ? { topic } : {}),
+				...(accessChanged ? accessRequest(access) : {}),
+			},
 			{ onSuccess: closeChannelDialog },
 		);
 	}
@@ -249,6 +275,7 @@ function EditChannel({
 					description="Aparece no cabeçalho do canal. Em branco, some."
 				/>
 			)}
+			<ChannelAccess value={access} onChange={setAccess} room={!text} />
 			<Footer pending={update.isPending} submit="Salvar" />
 		</form>
 	);

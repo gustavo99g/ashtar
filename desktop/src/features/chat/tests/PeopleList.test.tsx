@@ -82,6 +82,7 @@ beforeEach(() => {
 						topic: null,
 						category_id: "voz",
 						archived_at: null,
+						restricted: false,
 					},
 					{
 						id: "squad",
@@ -90,6 +91,7 @@ beforeEach(() => {
 						topic: null,
 						category_id: "voz",
 						archived_at: null,
+						restricted: false,
 					},
 				],
 			},

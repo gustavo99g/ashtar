@@ -38,6 +38,7 @@ const room = (id: string, name: string) => ({
 	topic: null,
 	category_id: "voz",
 	archived_at: null,
+	restricted: false,
 });
 
 function renderModeration(onDone = vi.fn()) {
@@ -102,6 +103,35 @@ describe("mover e desconectar pelo cartão", () => {
 		await user.click(screen.getByRole("menuitem", { name: "Squad" }));
 		expect(moveMember).toHaveBeenCalledWith("juju", "squad");
 		expect(onDone).toHaveBeenCalled();
+	});
+
+	it("Mover para não oferece a sala restrita de que a pessoa está fora", async () => {
+		vi.mocked(getMe).mockResolvedValue(me(true));
+		vi.mocked(getChannelLayout).mockResolvedValue({
+			version: 1,
+			top: [],
+			categories: [
+				{
+					id: "voz",
+					name: "Voz",
+					channels: [
+						room("sala", "Sala"),
+						room("squad", "Squad"),
+						{ ...room("vip", "VIP"), restricted: true, member_ids: ["kid"] },
+						{ ...room("time", "Time"), restricted: true, member_ids: ["juju"] },
+					],
+				},
+			],
+		});
+		const user = userEvent.setup();
+		renderModeration();
+		const trigger = await screen.findByRole("button", { name: "Mover para" });
+		await vi.waitFor(() => expect(trigger).toBeEnabled());
+		await user.click(trigger);
+		const menu = await screen.findByRole("menu", { name: "Mover para" });
+		expect(menu).toHaveTextContent("Squad");
+		expect(menu).toHaveTextContent("Time");
+		expect(menu).not.toHaveTextContent("VIP");
 	});
 
 	it("Desconectar da voz pede à API e fecha o cartão", async () => {

@@ -17,6 +17,7 @@ function text(id: string, category_id: string | null = null): ChannelView {
 		topic: null,
 		category_id,
 		archived_at: null,
+		restricted: false,
 	};
 }
 

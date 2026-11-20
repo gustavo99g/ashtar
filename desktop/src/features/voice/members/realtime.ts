@@ -29,7 +29,11 @@ export function handleVoiceRealtime(
 			});
 			break;
 		case "voice.disconnected":
-			setVoiceOrder({ kind: "disconnect", byName: event.by_name });
+			setVoiceOrder({
+				kind: "disconnect",
+				byName: event.by_name,
+				noAccess: event.reason === "no_access",
+			});
 			break;
 		case "ready":
 			// O que mudou enquanto o socket estava fora não veio por evento. No primeiro `ready`,

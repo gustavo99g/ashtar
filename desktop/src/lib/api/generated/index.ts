@@ -96,7 +96,17 @@ category_id: string | null,
 /**
  * Só na lista de arquivados.
  */
-archived_at: number | null, };
+archived_at: number | null, 
+/**
+ * Restrito a uma lista de pessoas (ADR 0028).
+ */
+restricted: boolean, 
+/**
+ * Quem está na lista de um canal restrito (só nele). Vai para quem vê o
+ * canal: quem gerencia edita a lista, e o app usa para a sugestão do @ e
+ * para o "Mover para".
+ */
+member_ids?: Array<string>, };
 
 /**
  * Uma conversa como a lista do app mostra, do ponto de vista de quem pede.
@@ -128,7 +138,11 @@ kind?: ChannelKind, name: string,
 /**
  * Sem categoria, o canal vai para o fim do topo.
  */
-category_id?: string, topic?: string, };
+category_id?: string, topic?: string, 
+/**
+ * Restrito a `member_ids` (ADR 0028). Ausente é de todos.
+ */
+restricted?: boolean, member_ids?: Array<string>, };
 
 export type CreateInviteRequest = { preset: Preset, 
 /**
@@ -152,6 +166,11 @@ preset: Preset | null, };
 export type DeviceView = { linked_at: number, };
 
 export type DisconnectMemberRequest = { user_id: string, };
+
+/**
+ * Por que a pessoa saiu da voz sem pedir.
+ */
+export type DisconnectReason = "moderator" | "no_access";
 
 /**
  * O corpo de toda resposta de erro.
@@ -423,7 +442,7 @@ export type ServerEvent = { "type": "ready", user_id: string, status: Status, on
 /**
  * O nome de quem moveu, para o aviso.
  */
-by_name: string, } | { "type": "voice.disconnected", by: string, by_name: string, } | { "type": "member.joined", person: Person, } | { "type": "member.left", user_id: string, } | { "type": "channels.changed", version: number, } | { "type": "channel.state", channel_id: string, state: ReadState, } | { "type": "call.ringing", call: CallView, } | { "type": "call.accepted", call: CallView, } | { "type": "call.ended", call_id: string, channel_id: string, outcome: CallOutcome, duration: number | null, };
+by_name: string, } | { "type": "voice.disconnected", by: string, by_name: string, reason: DisconnectReason, } | { "type": "member.joined", person: Person, } | { "type": "member.left", user_id: string, } | { "type": "channels.changed", version: number, } | { "type": "channel.state", channel_id: string, state: ReadState, } | { "type": "call.ringing", call: CallView, } | { "type": "call.accepted", call: CallView, } | { "type": "call.ended", call_id: string, channel_id: string, outcome: CallOutcome, duration: number | null, };
 
 /**
  * A resposta do `redeem` e do `login`. No app, quem recebe é o Rust, que a
@@ -459,7 +478,11 @@ export type UpdateChannelRequest = { name?: string,
 /**
  * Texto vazio tira o tópico; ausente deixa como está.
  */
-topic?: string, };
+topic?: string, 
+/**
+ * Com `member_ids`, a lista inteira como deve ficar. Ausente deixa como está.
+ */
+restricted?: boolean, member_ids?: Array<string>, };
 
 export type UpdateMeRequest = { 
 /**

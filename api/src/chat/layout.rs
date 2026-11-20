@@ -136,7 +136,8 @@ pub async fn require_open_category(conn: &mut SqliteConnection, id: &str) -> Res
 /// A lista aberta como `viewer` a vê: o topo e as categorias, cada coisa na sua
 /// ordem. Um canal restrito de que ele não faz parte não aparece, e a categoria
 /// em que ele não vê nenhum dos canais some junto (ADR 0028). Quem gerencia os
-/// canais vê todos, com a lista de cada restrito.
+/// canais vê todos. Cada restrito vem com a lista dele, que quem o vê já pode
+/// saber: é o que a sugestão do @ e o "Mover para" usam.
 ///
 /// As leituras vão numa transação só: no SQLite, ela vê o banco de um
 /// momento só, e a versão devolvida é sempre a da lista devolvida. Sem isso,
@@ -194,9 +195,7 @@ pub async fn read(db: &SqlitePool, viewer: &User) -> Result<Layout, ApiError> {
             continue;
         }
         let mut view = ChannelView::from(channel);
-        if manages {
-            view.member_ids = members;
-        }
+        view.member_ids = members;
         // Um canal numa categoria arquivada (não deveria acontecer: arquivar a
         // categoria leva os canais para o topo) aparece no topo.
         let category = view

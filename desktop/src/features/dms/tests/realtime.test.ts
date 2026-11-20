@@ -15,6 +15,7 @@ const layout: Layout = {
 			topic: null,
 			category_id: null,
 			archived_at: null,
+			restricted: false,
 		},
 	],
 	categories: [],

@@ -39,7 +39,7 @@ function channel(
 	category_id: string | null = null,
 	kind: ChannelView["kind"] = "text",
 ): ChannelView {
-	return { id, kind, name: id, topic: null, category_id, archived_at: null };
+	return { id, kind, name: id, topic: null, category_id, archived_at: null, restricted: false };
 }
 
 /** Topo: geral, Sala. Jogos: lol, cs. Vazia: nada. */

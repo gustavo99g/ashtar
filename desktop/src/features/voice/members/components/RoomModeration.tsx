@@ -23,12 +23,32 @@ export function useCanMoveMembers(): boolean {
 	return useOptionalMe()?.can_move_members === true;
 }
 
-/** As salas de voz para onde dá para mover alguém que está em `roomId`. */
-export function useMoveTargets(roomId: string): { id: string; name: string }[] {
+/**
+ * Se `userId` pode estar na sala: a restrita (ADR 0028) só aceita quem está na lista dela. O dono e
+ * quem gerencia os canais também entram, mas o app não sabe quem gerencia: na dúvida, a sala não é
+ * oferecida, e a API continua sendo quem decide.
+ */
+export function roomAllows(
+	room: { restricted: boolean; member_ids?: string[] },
+	userId: string,
+): boolean {
+	return !room.restricted || (room.member_ids ?? []).includes(userId);
+}
+
+/** As salas de voz para onde dá para mover `userId`, que está em `roomId`. */
+export function useMoveTargets(
+	roomId: string,
+	userId: string,
+): { id: string; name: string }[] {
 	const layout = useOptionalChannelLayout();
 	if (!layout) return [];
 	return allChannels(layout)
-		.filter((channel) => channel.kind === "voice" && channel.id !== roomId)
+		.filter(
+			(channel) =>
+				channel.kind === "voice" &&
+				channel.id !== roomId &&
+				roomAllows(channel, userId),
+		)
 		.map((channel) => ({ id: channel.id, name: channel.name }));
 }
 
@@ -61,7 +81,7 @@ export function RoomModeration({
 	onDone?: () => void;
 }) {
 	const canMove = useCanMoveMembers();
-	const targets = useMoveTargets(roomId);
+	const targets = useMoveTargets(roomId, userId);
 	const [busy, setBusy] = useState(false);
 	if (!canMove) return null;
 

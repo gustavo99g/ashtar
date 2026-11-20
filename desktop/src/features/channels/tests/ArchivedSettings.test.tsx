@@ -31,6 +31,7 @@ const archived: Archived = {
 			topic: null,
 			category_id: null,
 			archived_at: NOW,
+			restricted: false,
 		},
 	],
 	categories: [{ id: "antiga", name: "Antiga", archived_at: NOW - 86_400 }],

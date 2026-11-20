@@ -7,7 +7,7 @@ import { create } from "zustand";
 
 export type VoiceOrder =
 	| { kind: "move"; channelId: string; byName: string }
-	| { kind: "disconnect"; byName: string };
+	| { kind: "disconnect"; byName: string; noAccess: boolean };
 
 interface VoiceOrderState {
 	order: VoiceOrder | null;

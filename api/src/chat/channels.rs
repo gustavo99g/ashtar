@@ -61,8 +61,9 @@ pub struct ChannelView {
     pub archived_at: Option<i64>,
     /// Restrito a uma lista de pessoas (ADR 0028).
     pub restricted: bool,
-    /// Quem está na lista de um canal restrito. Só vai para quem gerencia os
-    /// canais, que é quem edita a lista.
+    /// Quem está na lista de um canal restrito (só nele). Vai para quem vê o
+    /// canal: quem gerencia edita a lista, e o app usa para a sugestão do @ e
+    /// para o "Mover para".
     #[serde(skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub member_ids: Option<Vec<String>>,
