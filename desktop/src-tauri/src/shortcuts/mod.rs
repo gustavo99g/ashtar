@@ -7,7 +7,10 @@
 //!   recebe tudo);
 //! - a thread dos atalhos ([`worker`]), dona do [`Matcher`]: recebe do canal os eventos do gancho e
 //!   os pedidos do app (a lista de atalhos, gravar ou não) e avisa o app;
-//! - os comandos (`commands/shortcuts.rs`), que só põem o pedido no canal.
+//! - os comandos (`commands/shortcuts.rs`), que só põem o pedido no canal. Com o Ashtar em foco, o
+//!   gancho não recebe as teclas (o WebView2 fica com elas), e a janela manda as que ela vê pelo
+//!   `shortcuts_input`, no mesmo canal: o [`Matcher`] ignora o "apertou" repetido e o "soltou" de
+//!   uma tecla que já soltou, então a mesma tecla vinda dos dois lados conta uma vez.
 //!
 //! O Rust só diz "apertou" e "soltou" com o nome do atalho; quem decide o que fazer é o app.
 
@@ -19,8 +22,8 @@ use serde::Serialize;
 use std::sync::mpsc::{self, Receiver, Sender};
 use tauri::{AppHandle, Emitter};
 
-pub use combo::Binding;
-use combo::{Combo, Event, Input, Matcher, MouseButton};
+pub use combo::{Binding, Input, MouseButton};
+use combo::{Combo, Event, Matcher};
 
 /// Evento para o app: um atalho apertado ou solto (`{ id, pressed }`).
 pub const SHORTCUT: &str = "shortcut";
@@ -30,6 +33,9 @@ pub const SHORTCUT_RECORDED: &str = "shortcut-recorded";
 /// O que chega à thread dos atalhos.
 pub enum Message {
     Input(Input, bool),
+    /// A tecla que a janela viu, em foco. Sem a conferência do `GetAsyncKeyState`: em foco, o
+    /// Windows pode não contar a tecla para o gancho.
+    WindowInput(Input, bool),
     Set(Vec<Binding>),
     Record(bool),
 }
@@ -93,6 +99,7 @@ fn worker(app: &AppHandle, receiver: Receiver<Message>) {
                 events.extend(matcher.event(input, down));
                 events
             }
+            Message::WindowInput(input, down) => matcher.event(input, down),
             Message::Set(bindings) => {
                 tracing::info!(atalhos = bindings.len(), "atalhos atualizados");
                 matcher.set_bindings(bindings)

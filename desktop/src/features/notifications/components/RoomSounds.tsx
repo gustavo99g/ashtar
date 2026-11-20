@@ -69,9 +69,9 @@ export function RoomSounds() {
 		const inConnectedRoom = channelId !== null && state === "connected";
 		if (!outOfVoice && !inConnectedRoom) return;
 		if (was.isDeafened !== isDeafened) {
-			playRoomSound(isDeafened ? "deafen" : "undeafen");
+			playRoomSound(isDeafened ? "deafen" : "undeafen", { gap: false });
 		} else if (was.isMuted !== isMuted) {
-			playRoomSound(isMuted ? "mute" : "unmute");
+			playRoomSound(isMuted ? "mute" : "unmute", { gap: false });
 		}
 	}, [isMuted, isDeafened, channelId, state, outOfVoice]);
 

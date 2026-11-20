@@ -58,15 +58,16 @@ function play(url: string): void {
 
 /**
  * Toca o som `id`, se a chave dele está ligada e ele não acabou de tocar. `force` é o botão de
- * testar: toca mesmo com a chave desligada.
+ * testar: toca mesmo com a chave desligada. `gap: false` toca mesmo tendo acabado de tocar: o mute
+ * e o surdo vêm de um clique da própria pessoa, e cada um tem o seu som.
  */
 export function playRoomSound(
 	id: RoomSoundId,
-	{ now = Date.now(), force = false } = {},
+	{ now = Date.now(), force = false, gap = true } = {},
 ): boolean {
 	if (!force && !useSettingsStore.getState().roomSounds[id]) return false;
 	const last = lastPlayed.get(id);
-	if (!force && last !== undefined && now - last < ROOM_SOUND_GAP_MS) {
+	if (!force && gap && last !== undefined && now - last < ROOM_SOUND_GAP_MS) {
 		return false;
 	}
 	lastPlayed.set(id, now);

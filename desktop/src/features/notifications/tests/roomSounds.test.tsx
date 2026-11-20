@@ -150,6 +150,17 @@ describe("os sons da sala", () => {
 		await flush();
 		expect(names()).toEqual(["mute", "deafen"]);
 
+		// Mutar e desmutar rápido toca todas as vezes.
+		played.length = 0;
+		voice = { ...voice, isDeafened: false, isMuted: false };
+		rerender(<RoomSounds />);
+		voice = { ...voice, isMuted: true };
+		rerender(<RoomSounds />);
+		voice = { ...voice, isMuted: false };
+		rerender(<RoomSounds />);
+		await flush();
+		expect(names()).toEqual(["undeafen", "mute", "unmute"]);
+
 		played.length = 0;
 		voice = {
 			...voice,
