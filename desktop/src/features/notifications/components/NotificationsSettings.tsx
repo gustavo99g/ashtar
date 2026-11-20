@@ -4,15 +4,20 @@
  *
  * O status Ocupado cala tudo, por cima destas chaves; o aviso no topo lembra disso.
  */
-import { BellRingIcon } from "lucide-react";
+import { BellRingIcon, PlayIcon } from "lucide-react";
 import { type ReactNode, useId, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { useMe, useMyStatus } from "@/features/identity";
-import { type NotificationPrefs, useSettingsStore } from "@/features/settings";
+import {
+	type NotificationPrefs,
+	type RoomSoundId,
+	useSettingsStore,
+} from "@/features/settings";
 import { notificationShow } from "@/lib/tauri/commands";
 import { cn } from "@/lib/utils";
 import { type CardInput, cardKey } from "../model/cards";
+import { playRoomSound } from "../model/roomSounds";
 
 const cardClass =
 	"flex items-center justify-between gap-6 rounded-xl border border-border bg-card py-4 pr-[18px] pl-5";
@@ -40,16 +45,31 @@ const ROWS: { key: keyof NotificationPrefs; title: string; text: string }[] = [
 	},
 ];
 
+/** Os sons da sala (v0.5): cada um com a sua chave e o botão de ouvir. */
+const ROOM_SOUND_ROWS: { id: RoomSoundId; title: string }[] = [
+	{ id: "join", title: "Alguém entrou na sala" },
+	{ id: "leave", title: "Alguém saiu da sala" },
+	{ id: "mute", title: "Você desligou o microfone" },
+	{ id: "unmute", title: "Você ligou o microfone" },
+	{ id: "deafen", title: "Você desligou o áudio" },
+	{ id: "undeafen", title: "Você ligou o áudio" },
+	{ id: "shareStart", title: "Alguém começou a transmitir" },
+	{ id: "shareStop", title: "Alguém parou de transmitir" },
+];
+
 function Row({
 	title,
 	text,
 	checked,
 	onChange,
+	extra,
 }: {
 	title: string;
-	text: string;
+	text?: string;
 	checked: boolean;
 	onChange: (checked: boolean) => void;
+	/** Algo antes da chave (o botão de ouvir o som). */
+	extra?: ReactNode;
 }) {
 	const labelId = useId();
 	return (
@@ -61,8 +81,13 @@ function Row({
 				>
 					{title}
 				</span>
-				<span className="text-xs leading-normal text-muted-foreground">{text}</span>
+				{text && (
+					<span className="text-xs leading-normal text-muted-foreground">
+						{text}
+					</span>
+				)}
 			</span>
+			{extra && <span className="ml-auto flex shrink-0">{extra}</span>}
 			<Switch
 				variant="blue"
 				aria-labelledby={labelId}
@@ -112,6 +137,8 @@ type TestState = "idle" | "shown" | "quiet";
 export function NotificationsSettings() {
 	const prefs = useSettingsStore((state) => state.notifications);
 	const setNotification = useSettingsStore((state) => state.setNotification);
+	const roomSounds = useSettingsStore((state) => state.roomSounds);
+	const setRoomSound = useSettingsStore((state) => state.setRoomSound);
 	const busy = useMyStatus() === "busy";
 	const user = useMe().data?.user;
 	const [test, setTest] = useState<TestState>("idle");
@@ -140,7 +167,7 @@ export function NotificationsSettings() {
 				>
 					Você está como <strong className="text-foreground">Ocupado</strong>:
 					nenhum aviso aparece e nada toca até você voltar para Disponível. As não
-					lidas continuam contando.
+					lidas e os sons da sala continuam.
 				</p>
 			)}
 
@@ -152,6 +179,30 @@ export function NotificationsSettings() {
 						text={row.text}
 						checked={prefs[row.key]}
 						onChange={(checked) => setNotification(row.key, checked)}
+					/>
+				))}
+			</Section>
+
+			<Section title="Sons da sala">
+				<p className="-mt-2 text-xs leading-normal text-muted-foreground">
+					Só na sala em que você está, e também em Ocupado.
+				</p>
+				{ROOM_SOUND_ROWS.map((row) => (
+					<Row
+						key={row.id}
+						title={row.title}
+						checked={roomSounds[row.id]}
+						onChange={(checked) => setRoomSound(row.id, checked)}
+						extra={
+							<Button
+								variant="ghost"
+								size="icon"
+								aria-label={`Ouvir: ${row.title}`}
+								onClick={() => playRoomSound(row.id, { force: true })}
+							>
+								<PlayIcon aria-hidden="true" className="size-4" />
+							</Button>
+						}
 					/>
 				))}
 			</Section>

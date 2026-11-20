@@ -5,6 +5,13 @@ export { VoiceRoom } from "./call/components/VoiceRoom";
 export { stopWatching, watchShare } from "./call/stores/roomViewStore";
 export { VoiceSettings } from "./devices/components/VoiceSettings";
 export { VoiceDock } from "./dock/components/VoiceDock";
+export {
+	requestMove,
+	roomAllows,
+	RoomModeration,
+	useCanMoveMembers,
+	useMoveTargets,
+} from "./members/components/RoomModeration";
 export { UserVolume } from "./members/components/UserVolume";
 export { useLiveMembers } from "./members/hooks/useLiveMembers";
 export {
@@ -13,6 +20,10 @@ export {
 	peopleNowLabel,
 } from "./members/model/members";
 export { useVoiceParticipants } from "./members/queries";
+export {
+	type RoomPlace,
+	useRoomOccupancy,
+} from "./members/hooks/useRoomOccupancy";
 export { handleVoiceRealtime } from "./members/realtime";
 export {
 	type JoinOptions,
@@ -27,4 +38,5 @@ export { useMaybeVoice } from "./room/hooks/useMaybeVoice";
 export { useShareViewers } from "./room/hooks/useShareViewers";
 export { useVoice } from "./room/hooks/useVoice";
 export { useVoiceChannelId } from "./room/hooks/useVoiceChannelId";
-export { SALA } from "./room/model/channel";
+export { DEFAULT_ROOM_ID } from "./room/model/channel";
+export { useConnectedRoomName, useRoomName } from "./room/hooks/useRoomName";

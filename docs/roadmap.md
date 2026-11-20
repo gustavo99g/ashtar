@@ -749,16 +749,22 @@ CPU, memória e banda da VPS medidas e dentro do plano contratado
 
 # v0.5 — Salas e presença
 
+Sai numa versão só, a `0.5.0`. O plano está em [`docs/plans/`](plans/) quando a fase fechar; as decisões, nas ADRs
+0026, 0027 e 0028.
+
 ## Objetivo
 
 Sair da sala única e mostrar quem está fazendo o quê. Os canais de texto, as menções, o silenciar, o "não
-perturbe" e o volume por pessoa já saíram antes (v0.2.3 e v0.3).
+perturbe", o volume por pessoa e o indicador de quem fala já saíram antes (v0.2.3, v0.3 e v0.4).
 
 ## Canais
 
 * múltiplas salas de voz, criadas como os canais de texto da v0.2.3, nas mesmas categorias;
+* trocar de sala com um clique, sem sair e entrar de novo;
 * conexão de voz independente do canal de texto selecionado (já vale desde a v0.2.3);
-* mover alguém para outra sala, pelo cartão do usuário.
+* mover alguém para outra sala, pelo cartão do usuário ou arrastando na lista de canais, e desconectar alguém da
+  voz, com a permissão "Mover membros";
+* canais de texto e salas de voz restritos a uma lista de pessoas, que somem para quem está fora.
 
 ```text
 Canal de texto:          # development
@@ -767,14 +773,19 @@ Canal de voz conectado:  🔊 General
 
 ## Presença
 
-* status ausente, com ausente automático por inatividade (Disponível, Ocupado e Invisível são da v0.3);
+* status ausente, manual e automático por inatividade (Disponível, Ocupado e Invisível são da v0.3);
 * quem está em cada sala de voz;
 * indicador "digitando...".
 
 ## Voz
 
-* sons de entrada e saída de pessoas na sala;
-* speaking indicator.
+* sons de entrada e saída de pessoas na sala, de mutar e ensurdecer, e de começar e parar de transmitir.
+
+## Fora do escopo
+
+* status com texto livre;
+* chat de texto dentro da sala de voz;
+* limite de pessoas por sala.
 
 ## Critérios de conclusão
 
@@ -783,7 +794,9 @@ criar uma segunda sala de voz
  ↓
 entrar em voz e continuar navegando pelo chat
  ↓
-trocar de sala de voz
+trocar de sala de voz, e mover alguém para a outra
+ ↓
+um canal restrito some para quem está fora
  ↓
 ficar inativo → status muda para ausente
 ```
@@ -909,8 +922,8 @@ do grupo, e entra só o que mantiver a base simples.
 * tela de administração no aplicativo;
 * listar e revogar convites;
 * expulsar usuário e desvincular seus dispositivos;
-* na voz: mutar alguém, tirar da sala e encerrar uma transmissão (operações da API de servidor do
-  LiveKit).
+* na voz: mutar alguém e encerrar uma transmissão (operações da API de servidor do LiveKit). Tirar da sala
+  saiu na v0.5, como "Desconectar da voz".
 
 ## Critério
 

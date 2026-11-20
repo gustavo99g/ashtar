@@ -1,5 +1,5 @@
 import { HashIcon } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import {
@@ -8,7 +8,9 @@ import {
 	LoadingState,
 	OfflineState,
 } from "@/components/ui/states";
+import { toast } from "@/components/ui/toast";
 import {
+	allChannels,
 	DEFAULT_CHANNEL_ID,
 	findChannel,
 	openChannelDialog,
@@ -16,7 +18,9 @@ import {
 	useCanManageChannels,
 	useChannelLayout,
 } from "@/features/channels";
-import { type ChannelView, isApiError } from "@/lib/api";
+import { type ChannelView, isApiError, type Layout } from "@/lib/api";
+import { usePeople } from "../queries";
+import { setDraft } from "../stores/draftStore";
 import { paths } from "@/lib/paths";
 import { ChatConversation } from "./ChatConversation";
 
@@ -32,6 +36,14 @@ export function ChatView({ channelId }: { channelId: string }) {
 	useEffect(() => {
 		if (channel?.kind === "text") setLastChannel(channel.id);
 	}, [channel]);
+	useLostChannel(channelId, channel, layout.data);
+	const people = usePeople().data;
+	// No canal restrito (ADR 0028), o @ só sugere quem está na lista e o dono.
+	const mentionable = useMemo(() => {
+		if (!channel?.restricted || !people) return undefined;
+		const listed = new Set(channel.member_ids ?? []);
+		return people.filter((person) => person.is_owner || listed.has(person.id));
+	}, [channel, people]);
 
 	if (!layout.data) {
 		return layout.isError ? (
@@ -68,6 +80,7 @@ export function ChatView({ channelId }: { channelId: string }) {
 				listLabel={`Mensagens em #${channel.name}`}
 				composerLabel={`Mensagem para #${channel.name}`}
 				start={<ChannelStart channelName={channel.name} />}
+				mentionable={mentionable}
 			/>
 		</section>
 	);
@@ -129,6 +142,34 @@ function ChannelStart({ channelName }: { channelName: string }) {
 			</p>
 		</div>
 	);
+}
+
+/**
+ * O canal aberto sumiu da lista enquanto a pessoa estava nele: foi arquivado, ou ela perdeu o acesso
+ * a ele (ADR 0028). Ela volta para o primeiro canal com o aviso, e o rascunho dele vai embora.
+ */
+function useLostChannel(
+	channelId: string,
+	channel: ChannelView | undefined,
+	layout: Layout | undefined,
+) {
+	const navigate = useNavigate();
+	const seen = useRef<ChannelView | undefined>(undefined);
+	useEffect(() => {
+		const before = seen.current;
+		seen.current = channel;
+		// Só o mesmo canal sumindo: abrir um id que não existe é o "não está mais aqui".
+		if (!layout || channel || before?.id !== channelId) return;
+		setDraft(before.id, "");
+		const first =
+			allChannels(layout).find((c) => c.kind === "text")?.id ??
+			DEFAULT_CHANNEL_ID;
+		toast.add({
+			title: `Você não tem mais acesso a #${before.name}`,
+			description: "Ele foi arquivado ou ficou restrito.",
+		});
+		void navigate(paths.channel(first), { replace: true });
+	}, [channelId, channel, layout, navigate]);
 }
 
 /** O canal foi arquivado (ou nunca existiu): volta para o #geral. */

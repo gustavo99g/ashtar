@@ -67,6 +67,7 @@ export function VoiceSettings() {
 			</Section>
 			<Section title="Ligações">
 				<AskBeforeCallSwitch />
+				<AskBeforeSwitchRoomSwitch />
 			</Section>
 		</div>
 	);
@@ -88,6 +89,34 @@ function AskBeforeCallSwitch() {
 				</span>
 				<span className="text-xs text-muted-foreground">
 					A ligação tira você da sala quando a outra pessoa atende.
+				</span>
+			</span>
+			<Switch
+				checked={ask}
+				onCheckedChange={setAsk}
+				aria-labelledby={labelId}
+				variant={"blue"}
+			/>
+		</div>
+	);
+}
+
+/**
+ * O "Trocar de sala?" de quem está transmitindo ou com a câmera ligada (v0.5): a troca encerra as
+ * duas. O "Não perguntar de novo" do próprio aviso desliga; aqui liga de volta.
+ */
+function AskBeforeSwitchRoomSwitch() {
+	const labelId = useId();
+	const ask = useSettingsStore((state) => state.askBeforeSwitchRoom);
+	const setAsk = useSettingsStore((state) => state.setAskBeforeSwitchRoom);
+	return (
+		<div className="flex items-center justify-between gap-6 border-b border-border py-3">
+			<span className="flex flex-col gap-[3px]">
+				<span id={labelId} className="text-sm font-medium text-foreground">
+					Perguntar antes de trocar de sala transmitindo
+				</span>
+				<span className="text-xs text-muted-foreground">
+					Trocar de sala encerra a sua transmissão e desliga a câmera.
 				</span>
 			</span>
 			<Switch

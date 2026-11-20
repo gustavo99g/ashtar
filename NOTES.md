@@ -1,132 +1,93 @@
-# NOTES — pendências da v0.3 (conversas privadas)
+# NOTES — pendências da v0.5 (salas e presença)
 
-Lista de verificação da fase descrita no [`PLAN.md`](PLAN.md). Cada item deve ser resolvido ou conscientemente
-adiado (marcar como tal) antes de fechar a entrega em que ele está. A lista da fase anterior está arquivada em
-[`docs/plans/v0.2.4-notes.md`](docs/plans/v0.2.4-notes.md).
+Lista de verificação da fase descrita no [`PLAN.md`](PLAN.md). Cada item deve
+ser resolvido ou conscientemente adiado (marcar como tal) antes de fechar a entrega em que ele está.
 
 ## Antes de começar
 
-- [ ] **Pendências da v0.2.4** (os `[ ]` de `docs/plans/v0.2.4-notes.md`): a medição em NVIDIA e Intel, tela cheia exclusiva, HDR e
-      notebook com duas GPUs. Decidir se seguem como correções `0.2.4x` em paralelo ou fecham antes.
-- [ ] **A v0.2.5 (VPS)** segue em paralelo. Só a Etapa 23 depende dela.
+- [x] **A v0.4 na `dev`.** O PR #20 entrou na `dev` (`f98f84a`), e a fase começou dela. O `PLAN.md` e o `NOTES.md`
+      da v0.3 e o plano da v0.4 foram para `docs/plans/`; os `[ ]` que sobraram ficam resolvidos ou adiados lá.
+- [ ] **O canvas:** conferir se o quadro "Criar canal" tem a escolha Texto/Voz e se existe desenho para o Ausente,
+      o "digitando…" e o arrastar entre salas. O que faltar segue o estilo dos quadros vizinhos.
 
-## Vindos do BACKLOG
+## Parte 1 — salas
 
-- [ ] **Tempo limite no `requestVoiceToken`:** com a API fora do ar, o app fica em "conectando" (Etapa 5).
-- [ ] **`MIN_CLIENT_VERSION=0.2.20`** no `.env` de produção (Etapa 5). É só configuração.
-- [ ] **Volume por usuário**, que o roadmap tinha na v0.5: adiantado para a Etapa 4.
-- [ ] **A trava de uma transmissão por vez** só existe no app. Com as ligações ela precisa valer por sala
-      (Etapa 21).
+### API
 
-## v0.3.0 — base visual
-
-- [ ] **Quem vê o menu do servidor:** o Convidar hoje é só do dono. Conferir o que aparece para quem gerencia
-      canais e não é dono (sem Convidar) e para quem não é nenhum dos dois (sem menu).
-- **Submenu nos testes:** o base-ui deixa os itens do submenu com `pointer-events: none` no jsdom. Use o
-  `userEvent` com `pointerEventsCheck: 0` e `fireEvent.click` no item.
-- [ ] **"Criar canal de voz"** aparece no quadro e fica de fora: criar sala de voz é da v0.5.
-- [x] **Sair do modo Organizar com mudanças:** não há por onde sair sem querer. A coluna fica em todas as
-      telas, e o modo dura até o Concluir ou o Desfazer. Fechar o app descarta a cópia. Sem pergunta de
-      confirmação.
-- [x] **409 no Concluir:** busca a árvore, recomeça o modo a partir dela e avisa. A arrumação feita se perde.
-- **Cartão do usuário:** sem botão de fechar (como o canvas) e com o nick no cabeçalho (como a ADR 0020). As
-  seções são filhos do `UserCard`; quem abre decide quais passa.
-- [ ] **Volume individual e o "ficar sem áudio":** o deafen cala as vozes sem apagar o volume de cada um.
-- [ ] **O caminho com ganho (acima de 100%) com várias vozes:** hoje serve a uma trilha, a da transmissão.
-      Conferir o custo e a troca da saída de áudio com cinco pessoas acima de 100%.
-- [ ] **O volume guardado é por pessoa, no computador:** conferir que sobrevive a reinstalar e ao auto-update.
-- **A troca de saída com reforço** não era seguida nem na transmissão (v0.2.4): o contexto só olhava a saída
-  ao ligar. O `RoomAudio` agora escuta o `ActiveDeviceChanged`.
-
-## v0.3.1 — todo o chat
-
-### Experimento (Etapa 6)
-
-- [ ] **A notificação do Windows aparece com o app só na bandeja**, instalado (e não só em desenvolvimento)?
-- [ ] **Clicar nela abre a conversa certa?** Se o clique não chegar ao app, vale o plano B (aviso próprio).
-- [ ] **Ponto de não lido** no ícone da bandeja e na barra de tarefas.
-- [ ] **Iniciar com o Windows direto na bandeja**, sem piscar a janela, e convivendo com o auto-update.
-- [ ] **Modo de foco do Windows e jogo em tela cheia:** a notificação some? É o comportamento esperado.
-
-### Banco e API
-
-- [ ] **A migração `0004` refaz a tabela `channels`**, que as mensagens referenciam. Rodar numa cópia do banco
-      de produção e conferir as contagens antes e depois; backup feito antes de aplicar.
-- [ ] **O ponteiro de lido nasce na última mensagem de cada canal**, para todos os membros, na própria
-      migração: ninguém abre a `0.3.10` com tudo como não lido. Conferir também quem entra no grupo depois.
-- [ ] **Toda consulta de canais filtra o tipo** (`kind IN ('text', 'voice')`): a `dm` tem `name` e
-      `position` nulos, e uma consulta esquecida quebra ao ler a linha. Revisar `channels.rs`, `layout.rs`,
-      `categories.rs` e o `admin`.
-- [ ] **Nenhuma rota vaza uma conversa:** o `GET /api/channels`, o layout, os arquivados, o `ready`, o
-      `?after=` da reconexão e o `admin`. Revisar uma a uma, além dos testes.
-- [ ] **O `admin semear` e o `admin membros`** continuam funcionando com o tipo novo.
-- [ ] **App antigo com a API nova:** a `0.3.0` e a `0.2.4x` ignoram os eventos e campos novos? Se não, subir o
-      `MIN_CLIENT_VERSION` junto com a `0.3.10`.
-- [ ] **Conexão atrasada no `broadcast`** (fechamento 4000): a volta pelo `?after=` também traz as conversas.
-- [ ] **Remover alguém do grupo:** as conversas dela ficam só para leitura para quem ficou.
-- [ ] **Menção a quem não lê o canal:** numa conversa privada, `@nick` de um terceiro não notifica ninguém.
-- [ ] **Nick dentro de palavra ou de link** (`email@nick.com`): não vira menção.
-- [ ] **Invisível não pode vazar:** a pessoa invisível some do `ready`, do `GET /api/people` e do
-      `presence.changed` dos outros, mas aparece na sala de voz se entrar nela. Avisar isso no menu.
+- [ ] **Arquivar uma sala com gente dentro** tira também as conexões `:screen`, não só as de voz.
+- [ ] **Mover quem está saindo da sala** no mesmo instante: o 409 de "em nenhuma sala" não pode virar erro na tela
+      de quem moveu.
+- [ ] **A remoção dos 10 segundos** é cancelada quando a pessoa sai da sala antiga sozinha, e não tira ela da sala
+      nova se as duas tiverem o mesmo id de conexão.
+- [x] **`membros.mover` no Painel** e no `admin permissoes`, e no `README.md` do `deploy/server/`. O Painel e o `admin permissoes` listam todas as permissões sozinhos; o `README.md` do `deploy/server/` não lista nenhuma.
 
 ### App
 
-- [ ] **A lateral na casca do app:** conferir o espaço na sala de voz, no Foco e com a miniatura da
-      transmissão, que hoje encaixa nos cantos.
-- [ ] **A janela da conversa por cima da transmissão:** não pode cobrir os controles da sala.
-- [ ] **Marcar como lido com a janela sem foco:** não marcar. Com o app na bandeja, também não.
-- [ ] **"Marcar tudo como lido"** limpa os canais e as conversas, inclusive as menções, e os números somem
-      na hora na bandeja e na barra de tarefas.
-- [ ] **A linha "novas mensagens"** some depois de lida e não pula com mensagem chegando.
-- [ ] **Duas notificações para a mesma mensagem** (aviso no canto e Windows): só uma.
-- [ ] **Muitas mensagens seguidas** da mesma pessoa: juntar numa notificação.
-- [ ] **Os sons** (mensagem, menção e, na v0.3.2, o toque): próprios ou de licença livre, com a origem
-      anotada no repositório.
-- [ ] **O som da notificação** sai na saída de áudio escolhida em Voz e vídeo, e não toca em Ocupado.
-- [ ] **"Começou a transmitir"** não avisa quem já está na sala nem quem transmite.
-- [ ] **Os textos da aba Notificações e do menu de status**, revisados.
+- [x] **Nenhum `SALA` sobra** fora dos testes, inclusive no `UpdateNotice` (o aviso de atualização que espera a
+      pessoa sair da sala). Feito: o id da sala vem do `VoiceProvider`.
+- [ ] **Trocar de sala rápido**, várias vezes seguidas: a pessoa nunca fica em duas salas, nem em nenhuma.
+- [ ] **Trocar de sala com o token falhando** (API fora): a pessoa fica na sala antiga, com o erro, e não sem sala.
+- [ ] **A transmissão que acaba ao trocar:** quem assistia na sala antiga vê ela acabar normalmente.
+- [ ] **O "Voltar para a sala"** depois de uma ligação volta para a sala de onde a pessoa saiu, e some se ela foi
+      arquivada no meio.
+- [ ] **Ser movido no meio de uma pergunta** (o diálogo de trocar transmitindo aberto): o `voice.moved` ganha.
+- [x] **Ser movido estando numa ligação privada:** a API recusa (409), e o cartão nem mostra "Mover para". `tests/voice.rs` (409), e o "Mover para" só aparece no cartão de quem está numa sala.
+- [ ] **A reconexão automática** não traz de volta quem foi desconectado.
+- [ ] **O arrastar não briga** com o clique no avatar (que abre o cartão) nem com o modo Organizar.
+- [ ] **A categoria recolhida** com gente na sala (o `AvatarStrip`): dá para arrastar dali também? Decidir.
+- [ ] **Os textos** de criar sala, do aviso de trocar transmitindo, de "Mover para", "Desconectar da voz", "fulano
+      moveu você", "Você foi desconectado" e "A sala foi arquivada", revisados.
 
-### A decidir durante a entrega
+### Canais e salas restritos
 
-- [ ] **A lateral começa minimizada na sala de voz?** O plano diz que sim, para a transmissão não perder
-      espaço. Conferir no uso.
-- [ ] **`@todos`:** fica de fora por enquanto. Reavaliar depois de uma semana de uso.
-- [ ] **Silenciar com prazo** (1 hora, até amanhã) ou só ligado e desligado. Começa só ligado e desligado.
-- [ ] **Ocupado some sozinho?** Ao reiniciar o app ou no dia seguinte. Começa ficando até a pessoa trocar.
-- [ ] **Fechar uma conversa da lista** (esconder sem apagar): hoje a lista mostra todas.
+- [x] **Nenhum vazamento por evento:** passar todos os tipos do `ServerEvent` pelo filtro, com um teste que falha
+      quando entra um tipo novo com `channel_id` sem passar por ele. O `ServerEvent::of_channel` não tem `_`, e o `publish` para todos recusa um evento de canal.
+- [x] **O "começou a transmitir"** de uma sala restrita não chega a quem está fora. Vem do `voice.participants`, que só sai para quem acessa a sala.
+- [ ] **A busca de mensagens da v0.7** já nasce passando pela `can_access` (anotar na ADR 0028).
+- [x] **Quem gerencia vê tudo** (decisão 16): confirmado em 19/11. O dono tem todas as permissões e faz todas as
+      ações, em tudo.
+- [ ] **Um canal restrito e arquivado:** continua escondido nos Canais arquivados para quem está fora.
+- [x] **Quem saiu do grupo** sai de todas as listas. `tests/restricted.rs`.
+- [ ] **O "Voltar para a sala"** depois de uma ligação, se a pessoa perdeu o acesso no meio: some.
+- [ ] **O modo Organizar** de quem gerencia mostra os restritos com o cadeado, e a ordem gravada não muda a dos
+      outros.
+- [ ] **A lista com muita gente** no diálogo: rola e tem busca.
 
-## v0.3.2 — ligações privadas
+## Parte 2 — presença e sons
 
-### Experimento (Etapa 18)
+### Ausente
 
-- [ ] **Botões na notificação do Windows** (Atender e Recusar): o plugin do Tauri dá suporte? Se não, a janela
-      pequena sempre no topo.
-- [ ] **A janela de ligação não pode roubar o foco** de um jogo em tela cheia.
-- [ ] **O toque com a janela escondida:** o WebView escondido toca som? Se não, tocar pelo Rust.
+- [ ] **O `GetLastInputInfo`** conta o mouse e o teclado de qualquer janela, inclusive de um jogo em tela cheia
+      exclusiva. O controle não conta, e por isso a regra da sala (decisão 11).
+- [ ] **Computador bloqueado ou dormindo:** a conexão cai e a pessoa fica offline, não Ausente. Conferir que, ao
+      voltar, não fica presa em Ausente.
+- [x] **Duas conexões da mesma pessoa** (reconexão no meio): o hub não deixa uma conexão velha ociosa travar o
+      Ausente. `tests/realtime.rs`: só fica Ausente com todas as conexões ociosas.
+- [ ] **O app antigo** (`0.4.x`) não manda `idle`: aparece sempre Disponível. Aceito durante o beta.
+- [ ] **A bolinha amarela** em todos os lugares em que a de status aparece, com o contraste conferido.
 
-### API e app
+### Digitando
 
-- [ ] **O webhook do LiveKit de uma sala privada** não pode sair no `voice.participants` de todos.
-- [ ] **A ligação fica presa** se o app de um dos dois cair: o `room_finished` e um tempo limite fecham o
-      registro.
-- [ ] **Ligar para quem está offline:** o botão fica apagado. Quem está Invisível aparece offline, então
-      também não recebe ligação: conferir se é o que se quer, ou se o Invisível deve tocar mesmo assim.
-- [ ] **Quando quem liga sai da sala:** o plano diz que só ao ser atendido, para não sair à toa numa chamada
-      perdida. Conferir com o quadro "Conversas — aviso antes de ligar".
-- [ ] **Ligar para quem já está em outra ligação privada:** toca normalmente, e atender desliga a outra.
-- [ ] **Os dois ligando ao mesmo tempo:** viram uma ligação só.
-- [ ] **A `:screen` da sala** é derrubada quando a pessoa sai da sala para atender (o kick da ADR 0017).
-- [ ] **A miniatura da transmissão** de quem estava assistindo na sala e atendeu uma ligação: fecha.
-- [ ] **Atualização pendente durante a ligação:** pergunta antes de reiniciar, como na sala.
-- [ ] **Cota do LiveKit**, se a v0.2.5 atrasar: a entrega espera.
+- [ ] **Quem perde a permissão do canal** no meio para de receber o `typing` dele.
+- [x] **O Invisível** não manda nada, nem nas conversas privadas. O app e a API descartam.
+- [ ] **Colar um texto grande** conta como digitar, uma vez.
+- [x] **A linha reservada** embaixo da caixa não pula a conversa quando aparece e some.
+
+### Sons
+
+- [ ] **Os sons gerados** no mesmo volume dos de hoje (`dm.wav`, `mention.wav`, `ring.wav`), conferidos no fone e na
+      caixa de som.
+- [x] **Entrar numa sala cheia** toca um som só, e não um por pessoa que já estava.
+- [x] **Trocar de sala** não toca a saída de todo mundo da sala velha.
+- [x] **Os sons tocam na saída escolhida** em Voz e vídeo, como os da voz.
+- [x] **Ocupado** não cala os sons da sala, mas continua calando os de mensagem e menção.
 
 ## Riscos e cuidados
 
-- [ ] **Privacidade é o risco principal da fase.** Qualquer rota ou evento novo tem de passar pela regra de
-      leitura; os testes de vazamento rodam no pipeline e não podem ser pulados.
-- [ ] **A v0.3.1 é grande** (onze etapas). Se apertar, o corte é publicar as conversas com as não lidas
-      (Etapas 7, 8, 11, 12 e 13, mais o ponteiro da 9) e deixar menções, silenciar e status numa `0.3.11`.
-- [ ] **O tempo real com destinatário muda o caminho de todos os eventos.** Um erro ali derruba o chat
-      inteiro: a Etapa 8 sobe sozinha na API e roda uns dias com o app atual antes do resto.
-- [ ] **As notificações dependem do Windows de cada um** (modo de foco, notificações desligadas para o app).
-      O aviso do canto e as não lidas não podem depender delas.
+- [ ] **A troca de sala é a parte mais delicada da fase.** Hoje entrar e sair são caminhos separados, com a
+      ligação no meio; a troca junta os dois sem passar pela tela vazia, e precisa da mesma limpeza (transmissão,
+      câmera, `watching`, miniatura). Os testes do `VoiceProvider` cobrem a troca antes do resto.
+- [ ] **Mover é poder sobre os outros.** Só quem tem a permissão, nunca para dentro de uma ligação privada, e a
+      pessoa sempre fica sabendo quem moveu ou desconectou.
+- [ ] **A presença não pode contar o que a pessoa faz.** O Ausente diz só que ela parou de mexer, nunca o que estava
+      aberto, e o Invisível não aparece em nada novo (nem digitando, nem ausente).

@@ -18,9 +18,8 @@ use livekit_protocol::WebhookEvent;
 use super::calls::announce_ended;
 use crate::AppState;
 use crate::calls;
-use crate::chat::dms;
+use crate::chat::{access, dms};
 use crate::db::now;
-use crate::realtime::ServerEvent;
 use crate::voice;
 
 /// Os eventos que mudam a lista de quem está numa sala.
@@ -121,10 +120,13 @@ pub async fn livekit(
     match room_update(&event) {
         Some(RoomUpdate::Empty(room)) => {
             state.hub.start_voice_read(&room);
-            state.hub.publish(&ServerEvent::VoiceParticipants {
-                channel_id: room,
-                participants: Vec::new(),
-            });
+            match access::audience(&state.db, &room).await {
+                Ok(to) => state.hub.publish_voice_participants(room, Vec::new(), to),
+                Err(error) => {
+                    eprintln!("webhook: não deu para ler quem acessa a sala {room}: {error}");
+                    return StatusCode::INTERNAL_SERVER_ERROR;
+                }
+            }
         }
         // Relê à parte: o LiveKit espera a resposta, e a consulta leva até 5 s.
         Some(RoomUpdate::Reread(room)) => {
@@ -143,12 +145,15 @@ async fn reread(state: AppState, room: String) {
         Ok(listed) => voice::join_participants(&state.db, listed).await,
         Err(error) => Err(error),
     };
-    match participants {
-        Ok(participants) if state.hub.is_latest_voice_read(&room, n) => {
-            state.hub.publish(&ServerEvent::VoiceParticipants {
-                channel_id: room,
-                participants,
-            });
+    let read = match participants {
+        Ok(participants) => access::audience(&state.db, &room)
+            .await
+            .map(|to| (participants, to)),
+        Err(error) => Err(error),
+    };
+    match read {
+        Ok((participants, to)) if state.hub.is_latest_voice_read(&room, n) => {
+            state.hub.publish_voice_participants(room, participants, to);
         }
         Ok(_) => {}
         Err(error) => eprintln!("livekit: não deu para reler a sala {room}: {error}"),

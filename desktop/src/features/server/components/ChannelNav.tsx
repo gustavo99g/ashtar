@@ -6,6 +6,7 @@ import {
 	useSetLayout,
 } from "@/features/channels";
 import { CategoryRow } from "./CategoryRow";
+import { MemberDragArea } from "./MemberDrag";
 import { type ChannelManage, ChannelRow } from "./ChannelRow";
 import { OrganizeList } from "./OrganizeList";
 
@@ -22,7 +23,9 @@ import { OrganizeList } from "./OrganizeList";
  * direito. Criar canal e categoria, organizar e os arquivados ficam no menu do servidor
  * (`ServerMenu`).
  *
- * No modo Organizar, a coluna troca esta lista pela `OrganizeList`: é só lá que se arrasta.
+ * No modo Organizar, a coluna troca esta lista pela `OrganizeList`: é lá que se arrastam os canais.
+ * Fora dele, só as pessoas das salas se arrastam, de uma sala para outra, por quem tem "Mover
+ * membros" (`MemberDragArea`, ADR 0026).
  */
 export function ChannelNav() {
 	const { data: layout } = useChannelLayout();
@@ -47,6 +50,7 @@ export function ChannelNav() {
 		: null;
 
 	return (
+		<MemberDragArea>
 		<nav
 			aria-label="Canais"
 			className="flex min-h-0 flex-1 flex-col overflow-y-auto pt-2 pb-2"
@@ -68,5 +72,6 @@ export function ChannelNav() {
 				<CategoryRow key={category.id} category={category} manage={manage} />
 			))}
 		</nav>
+		</MemberDragArea>
 	);
 }

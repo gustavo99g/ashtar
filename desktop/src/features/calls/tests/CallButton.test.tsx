@@ -11,7 +11,7 @@ import { applyCall, applyReady, resetCalls } from "../stores/callStore";
 import { ana, callView, kid } from "./fixtures";
 
 vi.mock("@/features/voice", () => ({
-	SALA: { id: "sala", name: "Sala" },
+	useConnectedRoomName: () => "Sala",
 	useMaybeVoice: vi.fn(),
 	useShareViewers: vi.fn(() => new Map([["bia", 1], ["caio", 2]])),
 }));

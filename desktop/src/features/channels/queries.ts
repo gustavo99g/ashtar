@@ -26,6 +26,7 @@ import {
 	unarchiveChannel,
 	updateChannel,
 } from "@/lib/api";
+import { useOptionalQueryClient } from "@/lib/query";
 import { layoutRequest } from "./model/tree";
 import {
 	organizeChanged,
@@ -48,6 +49,23 @@ export function useChannelLayout() {
 		queryFn: getChannelLayout,
 		enabled: connected,
 	});
+}
+
+/**
+ * A lista de canais para quem só precisa de um nome (a sala em que a pessoa está, ADR 0026): a mesma
+ * consulta do `useChannelLayout`, mas sem quebrar fora do `QueryClientProvider`.
+ */
+export function useOptionalChannelLayout(): Layout | undefined {
+	const connected = useSession().status === "connected";
+	const { client, present } = useOptionalQueryClient();
+	return useQuery(
+		{
+			queryKey: channelsKeys.layout(),
+			queryFn: getChannelLayout,
+			enabled: connected && present,
+		},
+		client,
+	).data;
 }
 
 /** Se quem usa pode criar, editar, arquivar e arrastar (`can_manage_channels`). */

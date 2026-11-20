@@ -29,7 +29,7 @@ describe("handleVoiceRealtime", () => {
 			call: null,
 			user_id: "u1",
 			online: [],
-			busy: [],
+			busy: [], away: [],
 			status: "available",
 			channels: [],
 			dms: [],

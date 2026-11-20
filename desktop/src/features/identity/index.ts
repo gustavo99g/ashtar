@@ -20,6 +20,7 @@ export {
 	identityKeys,
 	useInvitePreview,
 	useMe,
+	useOptionalMe,
 	useMyStatus,
 	useRedeemInvite,
 	useSetStatus,

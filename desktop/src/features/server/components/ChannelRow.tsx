@@ -1,4 +1,4 @@
-import { HashIcon, Volume2Icon } from "lucide-react";
+import { HashIcon, LockIcon, Volume2Icon } from "lucide-react";
 import { type MouseEvent, type ReactNode, useState } from "react";
 import { useMatch, useNavigate } from "react-router-dom";
 import { shownWhenCollapsed } from "@/features/channels";
@@ -16,6 +16,7 @@ import type { CategoryView, ChannelView } from "@/lib/api";
 import { paths } from "@/lib/paths";
 import { cn } from "@/lib/utils";
 import { ChannelMenu } from "./ChannelMenu";
+import { useRoomDrop } from "./MemberDrag";
 import { AvatarStrip, RoomMembers } from "./RoomMembers";
 
 /*
@@ -151,6 +152,7 @@ function TextChannel({ channel, collapsed, manage }: RowProps) {
 					)}
 					<HashIcon aria-hidden="true" className="size-[18px] shrink-0" />
 					<span className="truncate">{channel.name}</span>
+					<RestrictedMark channel={channel} />
 					{fresh && <span className="sr-only">, com mensagens novas</span>}
 					{muted && <span className="sr-only">, silenciado</span>}
 					<CountBadge
@@ -206,6 +208,7 @@ function VoiceChannelRow({
 	const { join } = useVoice();
 	const { guard, dialog } = useGuardedJoin();
 	const navigate = useNavigate();
+	const drop = useRoomDrop(channel);
 	const onRoom = useMatch(paths.voiceRoom) !== null;
 	// A sala fica marcada só na tela da chamada: a do servidor agora é o canal de texto.
 	const selected = inCall && onRoom;
@@ -231,7 +234,10 @@ function VoiceChannelRow({
 	}
 
 	return (
-		<li>
+		<li
+			ref={drop.setNodeRef}
+			className={cn(drop.highlighted && "rounded-md bg-selected/40")}
+		>
 			<RowFrame channel={channel} manage={manage}>
 				<button
 					type="button"
@@ -244,6 +250,7 @@ function VoiceChannelRow({
 				>
 					<Volume2Icon aria-hidden="true" className="size-[18px] shrink-0" />
 					<span className="truncate">{channel.name}</span>
+					<RestrictedMark channel={channel} />
 					{collapsed ? (
 						<AvatarStrip members={members} />
 					) : (
@@ -260,10 +267,25 @@ function VoiceChannelRow({
 				<RoomMembers
 					members={members}
 					myId={myId}
+					roomId={channel.id}
 					roomName={channel.name}
 					inCall={inCall}
 				/>
 			)}
 		</li>
+	);
+}
+
+/** O cadeado do canal restrito (ADR 0028): só quem está na lista e quem gerencia o veem. */
+function RestrictedMark({ channel }: { channel: ChannelView }) {
+	if (!channel.restricted) return null;
+	return (
+		<>
+			<LockIcon
+				aria-hidden="true"
+				className="size-3 shrink-0 text-muted-foreground"
+			/>
+			<span className="sr-only">, restrito</span>
+		</>
 	);
 }

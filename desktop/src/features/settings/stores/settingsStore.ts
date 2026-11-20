@@ -21,6 +21,45 @@ export const DEFAULT_NOTIFICATIONS: NotificationPrefs = {
 	sounds: true,
 };
 
+/** Os sons da sala (v0.5, ADR 0027): um por acontecimento, todos ligados por padrão. */
+export const ROOM_SOUND_IDS = [
+	"join",
+	"leave",
+	"mute",
+	"unmute",
+	"deafen",
+	"undeafen",
+	"shareStart",
+	"shareStop",
+] as const;
+
+export type RoomSoundId = (typeof ROOM_SOUND_IDS)[number];
+
+export type RoomSoundPrefs = Record<RoomSoundId, boolean>;
+
+export const DEFAULT_ROOM_SOUNDS: RoomSoundPrefs = {
+	join: true,
+	leave: true,
+	mute: true,
+	unmute: true,
+	deafen: true,
+	undeafen: true,
+	shareStart: true,
+	shareStop: true,
+};
+
+function readRoomSounds(value: unknown): RoomSoundPrefs {
+	const saved = (typeof value === "object" && value !== null ? value : {}) as Record<
+		string,
+		unknown
+	>;
+	const prefs = { ...DEFAULT_ROOM_SOUNDS };
+	for (const id of ROOM_SOUND_IDS) {
+		if (typeof saved[id] === "boolean") prefs[id] = saved[id];
+	}
+	return prefs;
+}
+
 interface SettingsState {
 	theme: ThemeId;
 	notifications: NotificationPrefs;
@@ -29,9 +68,17 @@ interface SettingsState {
 	 * "Não perguntar de novo" desliga; Configurações › Voz e vídeo liga de volta.
 	 */
 	askBeforeCall: boolean;
+	/**
+	 * Perguntar antes de trocar de sala transmitindo ou com a câmera ligada (v0.5, ADR 0026): as duas
+	 * acabam na troca. O "Não perguntar de novo" desliga; Configurações › Voz e vídeo liga de volta.
+	 */
+	askBeforeSwitchRoom: boolean;
+	roomSounds: RoomSoundPrefs;
 	setTheme: (theme: ThemeId) => void;
+	setRoomSound: (id: RoomSoundId, enabled: boolean) => void;
 	setNotification: (key: keyof NotificationPrefs, enabled: boolean) => void;
 	setAskBeforeCall: (ask: boolean) => void;
+	setAskBeforeSwitchRoom: (ask: boolean) => void;
 }
 
 /** As chaves salvas, com o padrão no lugar de qualquer valor estranho. */
@@ -60,8 +107,16 @@ export const useSettingsStore = create<SettingsState>()(
 			theme: DEFAULT_THEME,
 			notifications: DEFAULT_NOTIFICATIONS,
 			askBeforeCall: true,
+			askBeforeSwitchRoom: true,
+			roomSounds: DEFAULT_ROOM_SOUNDS,
 			setTheme: (theme) => set({ theme }),
+			setRoomSound: (id, enabled) =>
+				set((state) => ({
+					roomSounds: { ...state.roomSounds, [id]: enabled },
+				})),
 			setAskBeforeCall: (askBeforeCall) => set({ askBeforeCall }),
+			setAskBeforeSwitchRoom: (askBeforeSwitchRoom) =>
+				set({ askBeforeSwitchRoom }),
 			setNotification: (key, enabled) =>
 				set((state) => ({
 					notifications: { ...state.notifications, [key]: enabled },
@@ -74,13 +129,21 @@ export const useSettingsStore = create<SettingsState>()(
 				theme: state.theme,
 				notifications: state.notifications,
 				askBeforeCall: state.askBeforeCall,
+				askBeforeSwitchRoom: state.askBeforeSwitchRoom,
+				roomSounds: state.roomSounds,
 			}),
 			// Um tema que saiu do app (ou um valor estranho no disco) volta para o padrão. Quem vem
 			// de antes da 0.3.10 não tem as chaves de notificação: entram ligadas. O "perguntar antes de
 			// ligar" é da 0.3.20 e também começa ligado.
 			merge: (persisted, current) => {
 				const saved = persisted as
-					| { theme?: unknown; notifications?: unknown; askBeforeCall?: unknown }
+					| {
+							theme?: unknown;
+							notifications?: unknown;
+							askBeforeCall?: unknown;
+							askBeforeSwitchRoom?: unknown;
+							roomSounds?: unknown;
+					  }
 					| undefined;
 				return {
 					...current,
@@ -90,6 +153,11 @@ export const useSettingsStore = create<SettingsState>()(
 						typeof saved?.askBeforeCall === "boolean"
 							? saved.askBeforeCall
 							: true,
+					askBeforeSwitchRoom:
+						typeof saved?.askBeforeSwitchRoom === "boolean"
+							? saved.askBeforeSwitchRoom
+							: true,
+					roomSounds: readRoomSounds(saved?.roomSounds),
 				};
 			},
 		},

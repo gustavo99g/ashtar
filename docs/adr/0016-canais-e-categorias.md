@@ -2,6 +2,7 @@
 
 - **Status:** aceita; o "No app" (o arrasto e os menus) foi revisto pela 0020 (v0.3)
 - **Data:** 2026-10
+- **Atualizada por:** 0026 (sala de voz criada como os canais de texto) e 0028 (canais e salas restritos)
 
 ## Contexto
 

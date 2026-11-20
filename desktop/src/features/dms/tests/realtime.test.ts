@@ -15,6 +15,7 @@ const layout: Layout = {
 			topic: null,
 			category_id: null,
 			archived_at: null,
+			restricted: false,
 		},
 	],
 	categories: [],
@@ -84,7 +85,7 @@ describe("handleDmsRealtime", () => {
 			user_id: "eu",
 			status: "available",
 			online: [],
-			busy: [],
+			busy: [], away: [],
 			channels: [],
 			dms: [],
 		};

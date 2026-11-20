@@ -68,7 +68,9 @@ export function DmWindow({
 							? "Saiu do grupo"
 							: presence === "busy"
 								? "Ocupado"
-								: presence
+								: presence === "away"
+									? "Ausente"
+									: presence
 									? "Online"
 									: "Offline"}
 					</span>

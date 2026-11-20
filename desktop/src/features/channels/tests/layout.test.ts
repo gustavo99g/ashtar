@@ -7,7 +7,7 @@ function channel(
 	kind: ChannelView["kind"] = "text",
 	category_id: string | null = null,
 ): ChannelView {
-	return { id, kind, name: id, topic: null, category_id, archived_at: null };
+	return { id, kind, name: id, topic: null, category_id, archived_at: null, restricted: false };
 }
 
 const layout: Layout = {

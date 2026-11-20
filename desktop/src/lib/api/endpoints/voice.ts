@@ -1,9 +1,11 @@
 /**
  * A sala de voz: quem está nela e o token para entrar.
  */
-import { apiJson, jsonRequest } from "../client";
+import { apiFetch, apiJson, jsonRequest } from "../client";
 import type {
+	DisconnectMemberRequest,
 	JoinVoiceResponse,
+	MoveMemberRequest,
 	ParticipantView,
 	VoiceTokenRequest,
 } from "../generated";
@@ -39,4 +41,22 @@ export function createScreenToken(
 		"/api/voice/screen-token",
 		jsonRequest("POST", request),
 	);
+}
+
+/**
+ * `POST /api/voice/move`: põe alguém em outra sala de voz (ADR 0026), com "Mover membros". O app
+ * da pessoa troca de sala sozinho, pelo `voice.moved`.
+ */
+export async function moveMember(
+	userId: string,
+	channelId: string,
+): Promise<void> {
+	const request: MoveMemberRequest = { user_id: userId, channel_id: channelId };
+	await apiFetch("/api/voice/move", jsonRequest("POST", request));
+}
+
+/** `POST /api/voice/disconnect`: tira alguém da voz (ADR 0026), com "Mover membros". */
+export async function disconnectMember(userId: string): Promise<void> {
+	const request: DisconnectMemberRequest = { user_id: userId };
+	await apiFetch("/api/voice/disconnect", jsonRequest("POST", request));
 }

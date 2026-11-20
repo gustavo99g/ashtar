@@ -115,7 +115,7 @@ describe("handleChatRealtime", () => {
 			call: null,
 			user_id: "u1",
 			online: ["ana", "bia"],
-			busy: ["ana"],
+			busy: ["ana"], away: [],
 			status: "available" as const,
 			channels: [
 				{

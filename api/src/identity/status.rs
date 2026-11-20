@@ -1,4 +1,6 @@
-//! O status de cada pessoa (ADR 0022): Disponível, Ocupado ou Invisível.
+//! O status de cada pessoa (ADR 0022 e 0027): Disponível, Ausente, Ocupado ou
+//! Invisível. O Ausente também chega sozinho, por inatividade, mas esse não é
+//! gravado: é das conexões, e quem decide é o hub.
 //!
 //! São dois tipos de propósito. O [`Status`] é o de verdade: só a própria
 //! pessoa o vê (`GET /api/me`, o `ready` dela, o `status.changed`). O [`Shown`]
@@ -19,6 +21,8 @@ use crate::error::ApiError;
 #[ts(export, export_to = "index.ts")]
 pub enum Status {
     Available,
+    /// Ausente escolhido à mão. Não cala nada: só os outros veem a lua.
+    Away,
     /// Não perturbe: o app dela cala avisos, sons e o toque. Os outros veem.
     Busy,
     /// Para os outros, offline. Ela continua recebendo tudo.
@@ -31,6 +35,8 @@ pub enum Status {
 #[ts(export, export_to = "index.ts")]
 pub enum Shown {
     Available,
+    /// Escolhido, ou Disponível sem mexer no computador há 10 minutos.
+    Away,
     Busy,
 }
 
@@ -38,6 +44,7 @@ impl Status {
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Available => "available",
+            Self::Away => "away",
             Self::Busy => "busy",
             Self::Invisible => "invisible",
         }
@@ -46,6 +53,7 @@ impl Status {
     fn parse(text: &str) -> Option<Self> {
         match text {
             "available" => Some(Self::Available),
+            "away" => Some(Self::Away),
             "busy" => Some(Self::Busy),
             "invisible" => Some(Self::Invisible),
             _ => None,
@@ -57,6 +65,7 @@ impl Status {
     pub fn shown(self) -> Option<Shown> {
         match self {
             Self::Available => Some(Shown::Available),
+            Self::Away => Some(Shown::Away),
             Self::Busy => Some(Shown::Busy),
             Self::Invisible => None,
         }
@@ -88,7 +97,12 @@ mod tests {
 
     #[test]
     fn o_texto_do_banco_e_o_do_json_sao_o_mesmo() {
-        for status in [Status::Available, Status::Busy, Status::Invisible] {
+        for status in [
+            Status::Available,
+            Status::Away,
+            Status::Busy,
+            Status::Invisible,
+        ] {
             assert_eq!(Status::parse(status.as_str()), Some(status));
             assert_eq!(
                 serde_json::to_value(status).unwrap(),

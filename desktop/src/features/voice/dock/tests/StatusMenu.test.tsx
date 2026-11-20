@@ -26,6 +26,7 @@ function me(status: MeResponse["status"]): MeResponse {
 		can_create_invite: true,
 		can_view_panel: true,
 		can_manage_channels: true,
+		can_move_members: true,
 	};
 }
 
@@ -60,7 +61,7 @@ beforeEach(() => {
 });
 
 describe("o menu de status", () => {
-	it("o painel mostra o status, e o avatar e o nome abrem o menu com os três", async () => {
+	it("o painel mostra o status, e o avatar e o nome abrem o menu com os quatro", async () => {
 		const user = userEvent.setup();
 		renderPanel();
 		const trigger = screen.getByRole("button", { name: "Seu status" });
@@ -72,6 +73,7 @@ describe("o menu de status", () => {
 		const options = within(menu).getAllByRole("menuitemradio");
 		expect(options.map((o) => o.textContent)).toEqual([
 			expect.stringContaining("DisponívelTudo normal."),
+			expect.stringContaining("AusenteOs outros veem que você saiu."),
 			expect.stringContaining("OcupadoSem notificações nem toque de ligação."),
 			expect.stringContaining("InvisívelVocê aparece offline"),
 		]);

@@ -59,7 +59,7 @@ beforeEach(() => {
 		user_id: "kid",
 		status: "available",
 		online: [],
-		busy: [],
+		busy: [], away: [],
 		channels: [
 			{
 				channel_id: "geral",
@@ -88,7 +88,7 @@ describe("as não lidas", () => {
 			user_id: "kid",
 			status: "available",
 			online: [],
-			busy: [],
+			busy: [], away: [],
 			channels: [],
 			dms: [{ channel_id: "d-ana", last_message_id: null, state: state() }],
 		});

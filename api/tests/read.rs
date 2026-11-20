@@ -549,10 +549,11 @@ async fn a_migracao_deixa_todo_mundo_com_zero_nao_lidas() {
         ]
     );
     // As consultas de hoje precisam das migrações seguintes (o tipo da
-    // mensagem é da 0007).
+    // mensagem é da 0007, e o canal restrito, da 0008).
     for sql in [
         include_str!("../migrations/0006_status.sql"),
         include_str!("../migrations/0007_ligacoes.sql"),
+        include_str!("../migrations/0008_canais_restritos.sql"),
     ] {
         let mut tx = db.begin().await.unwrap();
         sqlx::raw_sql(sql).execute(&mut *tx).await.unwrap();

@@ -8,7 +8,11 @@
 import { Volume2Icon, XIcon } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { SALA, useMaybeVoice, useVoiceParticipants } from "@/features/voice";
+import {
+	useMaybeVoice,
+	useRoomName,
+	useVoiceParticipants,
+} from "@/features/voice";
 import { paths } from "@/lib/paths";
 import { dismissEnded, useCallStore } from "../stores/callStore";
 
@@ -19,18 +23,19 @@ export function ReturnToRoom({ channelId }: { channelId: string }) {
 	const me = useCallStore((state) => state.me);
 	const voice = useMaybeVoice();
 	const navigate = useNavigate();
-	const { data: inRoom } = useVoiceParticipants(SALA.id, {
+	const { data: inRoom } = useVoiceParticipants(room ?? "", {
 		enabled: room !== null,
 	});
+	const roomName = useRoomName(room);
 	if (!room || !voice) return null;
 
 	const others = (inRoom ?? []).filter((p) => p.user_id !== me).length;
 	const label =
 		others === 0
-			? `A ${SALA.name} está vazia agora`
+			? `A ${roomName} está vazia agora`
 			: others === 1
-				? `1 pessoa continua na ${SALA.name}`
-				: `${others} pessoas continuam na ${SALA.name}`;
+				? `1 pessoa continua na ${roomName}`
+				: `${others} pessoas continuam na ${roomName}`;
 
 	return (
 		<div

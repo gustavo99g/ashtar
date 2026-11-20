@@ -6,7 +6,7 @@
 
 use sqlx::SqlitePool;
 
-use super::access::Readable;
+use super::access::{self, Readable};
 use crate::error::ApiError;
 use crate::identity::User;
 
@@ -97,8 +97,8 @@ fn starts_mention(chars: &[char], at: usize) -> bool {
 }
 
 /// Quem `author` menciona com `body` em `channel`: só quem está ativo, lê o
-/// canal e não é ele mesmo. Num canal de texto, todo membro ativo; numa
-/// conversa privada, a outra pessoa. O `@nick` de um terceiro numa conversa
+/// canal e não é ele mesmo. Num canal de texto, todo membro ativo (num restrito,
+/// só quem o acessa, ADR 0028); numa conversa privada, a outra pessoa. O `@nick` de um terceiro numa conversa
 /// não menciona ninguém.
 pub async fn resolve(
     db: &SqlitePool,
@@ -110,11 +110,19 @@ pub async fn resolve(
         return Ok(Vec::new());
     }
     let candidates: Vec<Candidate> = match channel {
-        Readable::Text(_) => {
-            sqlx::query_as("SELECT id, nick FROM users WHERE removed_at IS NULL AND id <> ?")
-                .bind(&author.id)
-                .fetch_all(db)
-                .await?
+        Readable::Text(text) => {
+            let everyone: Vec<Candidate> =
+                sqlx::query_as("SELECT id, nick FROM users WHERE removed_at IS NULL AND id <> ?")
+                    .bind(&author.id)
+                    .fetch_all(db)
+                    .await?;
+            match access::allowed(db, &text.id).await? {
+                None => everyone,
+                Some(allowed) => everyone
+                    .into_iter()
+                    .filter(|c| allowed.contains(&c.id))
+                    .collect(),
+            }
         }
         Readable::Dm(dm) => {
             sqlx::query_as("SELECT id, nick FROM users WHERE removed_at IS NULL AND id = ?")

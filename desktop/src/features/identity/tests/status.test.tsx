@@ -25,6 +25,7 @@ function me(status: MeResponse["status"]): MeResponse {
 		can_create_invite: true,
 		can_view_panel: true,
 		can_manage_channels: true,
+		can_move_members: true,
 	};
 }
 
@@ -92,7 +93,7 @@ describe("o status de quem usa", () => {
 				user_id: "kid",
 				status: "invisible",
 				online: [],
-				busy: [],
+				busy: [], away: [],
 				channels: [],
 				dms: [],
 			},

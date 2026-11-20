@@ -22,8 +22,8 @@ vi.mock("@/lib/tauri/commands", () => ({
 const layout: Layout = {
 	version: 1,
 	top: [
-		{ id: "geral", kind: "text", name: "geral", topic: null, category_id: null, archived_at: null },
-		{ id: "sala", kind: "voice", name: "Sala", topic: null, category_id: null, archived_at: null },
+		{ id: "geral", kind: "text", name: "geral", topic: null, category_id: null, archived_at: null, restricted: false },
+		{ id: "sala", kind: "voice", name: "Sala", topic: null, category_id: null, archived_at: null, restricted: false },
 	],
 	categories: [],
 };

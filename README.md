@@ -303,12 +303,10 @@ máquina tiver problema, os dois se perdem juntos.
 
 ## Status
 
-Em desenvolvimento, na **v0.3**, entregue em três partes (veja o [`docs/roadmap.md`](docs/roadmap.md)). A v0.2
-está pronta, com o servidor próprio na VPS (a voz, as transmissões e a API). A v0.3.0 (a base visual: a lista
-de canais sem ferramentas fixas, o modo Organizar, o cartão do usuário e o volume por pessoa), a v0.3.1 (as
-conversas privadas, as não lidas, as menções, o silenciar, as notificações e o status) e a v0.3.2 (as ligações
-privadas) saem juntas, na versão `0.3.20`. O plano da fase está no [`PLAN.md`](PLAN.md), e a
-estrutura do código em [`ARCHITECTURE.md`](ARCHITECTURE.md).
+Em desenvolvimento, na **v0.5** (veja o [`docs/roadmap.md`](docs/roadmap.md)): várias salas de voz, trocar de
+sala, mover e desconectar alguém, canais e salas restritos, o Ausente, o "digitando…" e os sons da sala, numa
+versão só, a `0.5.0`. O plano da fase está no [`PLAN.md`](PLAN.md), e a estrutura do código em
+[`ARCHITECTURE.md`](ARCHITECTURE.md).
 
 ## Licença
 

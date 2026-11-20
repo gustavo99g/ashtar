@@ -24,6 +24,7 @@ import { UpdateNotice, WhatsNewDialog } from "@/features/updater";
 import { useVoice, VoiceProvider } from "@/features/voice";
 import { paths } from "@/lib/paths";
 import { queryClient } from "@/lib/query";
+import { IdleReporter } from "@/features/presence";
 import { RealtimeBridge } from "./RealtimeBridge";
 import { router } from "./router";
 
@@ -51,6 +52,7 @@ export function App() {
 			<VoiceProvider>
 				<SessionWatcher onLeftGroup={goToLeftGroup} />
 				<RealtimeBridge />
+				<IdleReporter />
 				<TooltipProvider>
 					<AppToaster>
 						<RouterProvider router={router} />

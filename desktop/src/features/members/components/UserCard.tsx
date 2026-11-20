@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { PopoverContent } from "@/components/ui/popover";
 import { Avatar, nickColor, StatusDot } from "@/features/identity";
+import type { Shown } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 /*
@@ -17,15 +18,15 @@ export interface UserCardPerson {
 	/** O nome visível, ou o nick de quem não tem um. */
 	name: string;
 	online: boolean;
-	/** Online e Ocupado (a bolinha vermelha). */
-	busy?: boolean;
+	/** O que os outros veem de quem está online: Ocupado (a bolinha vermelha) ou Ausente (a lua). */
+	status?: Shown;
 	/** A sala de voz em que a pessoa está, e se transmite nela. `null` fora de sala. */
 	room: { name: string; sharing: boolean } | null;
 }
 
-/** "Na Sala", "Na Sala · transmitindo", "Online", "Ocupado" ou "Offline". */
+/** "Na Sala", "Na Sala · transmitindo", "Online", "Ausente", "Ocupado" ou "Offline". */
 export function whereLabel(
-	person: Pick<UserCardPerson, "online" | "busy" | "room">,
+	person: Pick<UserCardPerson, "online" | "status" | "room">,
 ) {
 	if (person.room) {
 		return person.room.sharing
@@ -33,7 +34,8 @@ export function whereLabel(
 			: `Na ${person.room.name}`;
 	}
 	if (!person.online) return "Offline";
-	return person.busy ? "Ocupado" : "Online";
+	if (person.status === "busy") return "Ocupado";
+	return person.status === "away" ? "Ausente" : "Online";
 }
 
 export function UserCard({
@@ -63,7 +65,7 @@ export function UserCard({
 					badge={
 						person.online && (
 							<StatusDot
-								status={person.busy ? "busy" : "available"}
+								status={person.status ?? "available"}
 								className="size-4 border-[3px]"
 							/>
 						)

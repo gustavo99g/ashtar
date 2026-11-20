@@ -19,6 +19,7 @@ export {
 	channelsKeys,
 	useCanManageChannels,
 	useChannelLayout,
+	useOptionalChannelLayout,
 	useFinishOrganizing,
 	useSetLayout,
 } from "./queries";

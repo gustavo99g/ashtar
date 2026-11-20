@@ -20,7 +20,7 @@ vi.mock("@/features/identity", () => ({ useMe: () => ({ data: undefined }) }));
 
 let connectionState: VoiceConnectionState = "disconnected";
 vi.mock("@/features/voice", () => ({
-	SALA: { id: "sala", name: "Sala" },
+	useConnectedRoomName: () => "Sala",
 	useInCall: () =>
 		connectionState !== "disconnected" && connectionState !== "error",
 }));

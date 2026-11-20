@@ -2,6 +2,7 @@
 
 - **Status:** aceita
 - **Data:** 2026-11
+- **Atualizada por:** 0026 (arrastar uma pessoa para outra sala, fora do modo Organizar)
 
 ## Contexto
 

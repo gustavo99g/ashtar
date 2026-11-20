@@ -2,6 +2,7 @@
 
 - **Status:** aceita
 - **Data:** 2026-11
+- **Atualizada por:** 0028 (a regra de leitura ganha o canal restrito)
 
 ## Contexto
 

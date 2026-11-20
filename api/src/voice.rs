@@ -200,6 +200,56 @@ pub fn kick_in_background(identity: String) {
     });
 }
 
+/// Tira `identity` e a tela dela da sala `room`, à parte, como o
+/// [`kick_in_background`], mas só nessa sala (ADR 0026: desconectar e mover).
+/// Quem já saiu não é erro, e sem as chaves do LiveKit não há o que tirar.
+pub fn remove_from_room_in_background(room: String, identity: String) {
+    tokio::spawn(async move {
+        let client = match room_client() {
+            Ok(client) => client,
+            Err(ApiError::Config(_)) => return,
+            Err(error) => {
+                eprintln!("livekit: não deu para tirar {identity} da sala {room}: {error}");
+                return;
+            }
+        };
+        let screen = screen_identity(&identity);
+        for who in [identity.as_str(), screen.as_str()] {
+            match client.remove_participant(&room, who).await {
+                Ok(()) => {}
+                Err(error) if is_not_found(&error) => {}
+                Err(error) => {
+                    eprintln!("livekit: não deu para tirar {who} da sala {room}: {error}");
+                }
+            }
+        }
+    });
+}
+
+/// A sala do LiveKit em que `user_id` está pela voz, perguntando a todas. É o
+/// plano B do [`crate::realtime::Hub::room_of`], que só sabe das salas que
+/// mudaram desde que a API subiu. Sem as chaves do LiveKit, nenhuma.
+pub async fn find_room_of(user_id: &str) -> Result<Option<String>, ApiError> {
+    let client = match room_client() {
+        Ok(client) => client,
+        Err(ApiError::Config(_)) => return Ok(None),
+        Err(error) => return Err(error),
+    };
+    let names = VoiceRooms::names(client)
+        .await
+        .map_err(|error| ApiError::LiveKit(error.to_string()))?;
+    for room in names {
+        if list_room(&room)
+            .await?
+            .iter()
+            .any(|p| p.identity == user_id)
+        {
+            return Ok(Some(room));
+        }
+    }
+    Ok(None)
+}
+
 pub(crate) fn livekit_env() -> Result<(String, String, String), String> {
     let get = |name: &str| env::var(name).map_err(|error| format!("{name}: {error}"));
     Ok((

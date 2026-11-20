@@ -12,7 +12,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { ConnectingState } from "@/components/ui/states";
 import { paths } from "@/lib/paths";
 import { cn } from "@/lib/utils";
-import { SALA } from "../../room/model/channel";
+import { useConnectedRoomName } from "../../room/hooks/useRoomName";
 import { pingQuality } from "../model/ping";
 import { stopWatching } from "../../call/stores/roomViewStore";
 import { usePing } from "../hooks/usePing";
@@ -31,8 +31,9 @@ import { ShareButton } from "../../call/components/ShareButton";
 export function VoiceConnection() {
 	const { room, connectionState, screenShare, leave, voiceKind, voiceTitle } =
 		useVoice();
+	const roomName = useConnectedRoomName();
 	const place =
-		voiceKind === "call" ? `Ligação com ${voiceTitle ?? ""}` : SALA.name;
+		voiceKind === "call" ? `Ligação com ${voiceTitle ?? ""}` : roomName;
 	const navigate = useNavigate();
 	const { pathname } = useLocation();
 

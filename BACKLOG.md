@@ -51,7 +51,8 @@ Bugs que saem assim que ficarem prontos, pelo auto-update, sem esperar a entrega
 
 ## v0.5 — Salas e presença
 
-- [ ] No cartão do usuário (ADR 0020), "Mover para outra sala": entra com as várias salas de voz.
+- [x] No cartão do usuário (ADR 0020), "Mover para outra sala": entrou com as várias salas de voz (ADR 0026), junto do
+      "Desconectar da voz" e do arrastar entre salas.
 
 ## v0.6 — Voz e vídeo
 

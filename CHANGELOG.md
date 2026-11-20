@@ -1,5 +1,16 @@
 # O que há de novo no Ashtar
 
+## 0.5.0
+
+- Várias salas de voz: quem gerencia os canais cria uma sala pelo mesmo "Criar canal", escolhendo Voz, e pode renomear e arquivar. A Sala de sempre continua lá e não pode ser arquivada.
+- Para trocar de sala, é só clicar em outra. Se você estiver transmitindo ou com a câmera ligada, o Ashtar pergunta antes.
+- Quem tem a nova permissão "Mover membros" (o dono sempre tem) pode levar alguém para outra sala, pelo "Mover para" no cartão da pessoa ou arrastando o nome dela de uma sala para outra. No mesmo cartão, "Desconectar da voz" tira a pessoa da sala. Quem foi movido ou desconectado vê um aviso dizendo quem fez.
+- Canais e salas restritos: ao criar ou editar um canal ou uma sala, ligue Restrito e marque quem tem acesso. Quem está fora da lista nem vê o canal, e não recebe mensagens, menções nem avisos dele. O dono e quem gerencia os canais veem todos. Os restritos mostram um cadeado na lista.
+- Quem perde o acesso a um canal aberto volta para o primeiro canal, com um aviso, e quem perde o acesso a uma sala sai dela.
+- Status Ausente, com a lua amarela: escolha no seu avatar, no pé da coluna. Ele também liga sozinho depois de 10 minutos sem mexer no computador, e desliga quando você volta. Numa sala ou numa ligação, ninguém fica ausente sozinho.
+- "Digitando…": aparece embaixo do campo de mensagem quando alguém está escrevendo no canal ou na conversa, e na aba Conversas. Em Invisível, ninguém vê que você está digitando.
+- Sons da sala: tocam quando alguém entra ou sai da sua sala, quando você muta, desmuta, fica surdo ou volta, e quando alguém começa ou para de transmitir. Cada um tem a sua chave em Configurações › Notificações, com um botão para ouvir.
+
 ## 0.4.0
 
 - Várias pessoas podem transmitir a tela ao mesmo tempo na sala, até 6. Clique em Assistir em cada transmissão que quiser ver: duas ficam lado a lado, três ou quatro dividem a tela, e com mais elas vão para uma fileira embaixo.

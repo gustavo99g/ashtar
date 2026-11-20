@@ -26,15 +26,22 @@ pub enum Permission {
     BetaUpdates,
     /// Cria, renomeia, arquiva e reordena canais e categorias (ADR 0016).
     ManageChannels,
+    /// Move alguém para outra sala de voz e desconecta da voz (ADR 0026).
+    MoveMembers,
 }
 
 impl Permission {
-    pub const ALL: [Permission; 2] = [Permission::BetaUpdates, Permission::ManageChannels];
+    pub const ALL: [Permission; 3] = [
+        Permission::BetaUpdates,
+        Permission::ManageChannels,
+        Permission::MoveMembers,
+    ];
 
     pub fn key(self) -> &'static str {
         match self {
             Self::BetaUpdates => "atualizacoes.beta",
             Self::ManageChannels => "canais.gerenciar",
+            Self::MoveMembers => "membros.mover",
         }
     }
 
@@ -43,6 +50,7 @@ impl Permission {
         match self {
             Self::BetaUpdates => "Receber o beta",
             Self::ManageChannels => "Gerenciar canais",
+            Self::MoveMembers => "Mover membros",
         }
     }
 

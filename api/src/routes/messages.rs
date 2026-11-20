@@ -105,13 +105,16 @@ pub async fn send(
     .await?;
     let status = if created {
         // Só a nova vai para o WebSocket: a repetida quem devia já recebeu.
-        // A de um canal de texto vai para todos; a de uma conversa privada, só
-        // para os dois.
+        // A de um canal de texto vai para quem acessa o canal (todos, se ele
+        // não é restrito); a de uma conversa privada, só para os dois.
         let event = ServerEvent::MessageCreated {
             message: message.clone(),
         };
         match &channel {
-            Readable::Text(_) => state.hub.publish(&event),
+            Readable::Text(text) => {
+                let to = access::audience(&state.db, &text.id).await?;
+                state.hub.publish_in(&event, to);
+            }
             Readable::Dm(dm) => state.hub.publish_to(&dm.members, &event),
         }
         StatusCode::CREATED
