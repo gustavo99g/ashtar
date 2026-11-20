@@ -13,6 +13,7 @@ import {
 	markAuthorRemoved,
 } from "./queries";
 import { removePending } from "./stores/outboxStore";
+import { addTyping, clearTyping, resetTyping } from "./stores/typingStore";
 
 function updatePeople(
 	queryClient: QueryClient,
@@ -33,6 +34,11 @@ export function handleChatRealtime(
 			appendMessages(queryClient, event.message.channel_id, [event.message]);
 			// Se foi daqui, a caixa de saída já pode soltar (a resposta do POST pode chegar depois).
 			removePending(event.message.client_id);
+			// Quem mandou parou de digitar.
+			clearTyping(event.message.channel_id, event.message.author.id);
+			break;
+		case "typing":
+			addTyping(event.channel_id, event.user_id);
 			break;
 		case "presence.changed":
 			updatePeople(queryClient, (people) =>
@@ -57,6 +63,8 @@ export function handleChatRealtime(
 			markAuthorRemoved(queryClient, event.user_id);
 			break;
 		case "ready": {
+			// O que se digitava antes de o socket cair já não vale.
+			resetTyping();
 			const online = new Set(event.online);
 			const busy = new Set(event.busy);
 			const away = new Set(event.away);

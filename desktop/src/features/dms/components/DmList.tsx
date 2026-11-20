@@ -5,7 +5,7 @@ import {
 	ErrorState,
 	LoadingState,
 } from "@/components/ui/states";
-import { usePeople } from "@/features/chat";
+import { usePeople, useTyping } from "@/features/chat";
 import { useSession } from "@/features/identity";
 import {
 	CountBadge,
@@ -182,6 +182,8 @@ function ConversationRow({
 	unread: number;
 }) {
 	const last = conversation.last_message;
+	// Na conversa, só a outra pessoa digita (ADR 0027).
+	const typing = useTyping(conversation.id).includes(conversation.person.id);
 	return (
 		<button
 			type="button"
@@ -213,7 +215,11 @@ function ConversationRow({
 								: "text-muted-foreground",
 						)}
 					>
-						{preview(conversation, myId)}
+						{typing ? (
+							<span className="italic">digitando…</span>
+						) : (
+							preview(conversation, myId)
+						)}
 					</span>
 					<CountBadge count={unread} className="shrink-0" />
 				</span>

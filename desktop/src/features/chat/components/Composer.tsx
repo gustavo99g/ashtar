@@ -3,6 +3,8 @@ import { cn } from "@/lib/utils";
 import type { Mentionable } from "../model/mentions";
 import { BODY_MAX, COUNTER_FROM, draftProblem } from "../model/messages";
 import { setDraft, useDraft } from "../stores/draftStore";
+import { useTypingSignal } from "../hooks/useTypingSignal";
+import { TypingLine } from "./TypingLine";
 import { MentionPicker, useMentionPicker } from "./MentionPicker";
 
 /** Altura máxima do campo antes de rolar por dentro (umas 10 linhas). */
@@ -15,6 +17,9 @@ const MAX_HEIGHT = 240;
  * aparece a contagem; um texto que a API recusaria nem sai, e o motivo aparece embaixo.
  *
  * Digitar `@` abre a sugestão de nicks (`MentionPicker`) com quem está em `mentionable`.
+ *
+ * Embaixo, no espaço que já fica reservado, a linha do "digitando…" (ADR 0027); escrever avisa os
+ * outros, no máximo de 3 em 3 segundos.
  */
 export function Composer({
 	channelId,
@@ -38,6 +43,7 @@ export function Composer({
 	const [problem, setProblem] = useState<string | null>(null);
 	const ref = useRef<HTMLTextAreaElement>(null);
 	const length = [...draft].length;
+	const signalTyping = useTypingSignal(channelId);
 	const picker = useMentionPicker({
 		field: ref,
 		text: draft,
@@ -73,7 +79,7 @@ export function Composer({
 	}
 
 	return (
-		<div className={cn("shrink-0", compact ? "px-2.5 pb-2.5" : "px-4 pb-[30px]")}>
+		<div className={cn("shrink-0", compact ? "px-2.5" : "px-4")}>
 			<div className="relative flex items-end rounded-[10px] border border-border bg-secondary px-3.5 focus-within:border-primary">
 				<MentionPicker picker={picker} />
 				<textarea
@@ -89,6 +95,7 @@ export function Composer({
 					}
 					onChange={(event) => {
 						setDraft(channelId, event.target.value);
+						if (event.target.value.trim()) signalTyping();
 						picker.track(event.target);
 						if (problem) setProblem(null);
 					}}
@@ -124,6 +131,12 @@ export function Composer({
 					{problem}
 				</p>
 			)}
+			<TypingLine
+				channelId={channelId}
+				people={mentionable}
+				myId={myId}
+				className={compact ? "h-5" : "h-[30px]"}
+			/>
 		</div>
 	);
 }
