@@ -1,7 +1,7 @@
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { useNoiseChoice } from "../../noise/stores/noiseStore";
+import { DEFAULT_INPUT, useInputChoice } from "../../input/stores/inputStore";
 import { VoiceSettings } from "../components/VoiceSettings";
 import type { DeviceInfo } from "../model/devices";
 import { chooseDevice, useDeviceChoice } from "../stores/deviceChoiceStore";
@@ -71,7 +71,7 @@ beforeEach(() => {
 	});
 	localStorage.clear();
 	useDeviceChoice.setState({ input: null, output: null });
-	useNoiseChoice.setState({ suppression: true });
+	useInputChoice.setState(DEFAULT_INPUT);
 });
 
 afterEach(() => {
@@ -126,9 +126,9 @@ describe("Voz e vídeo", () => {
 		expect(toggle).toBeChecked();
 		await user.click(toggle);
 		expect(toggle).not.toBeChecked();
-		expect(useNoiseChoice.getState().suppression).toBe(false);
+		expect(useInputChoice.getState().suppression).toBe(false);
 		expect(
-			JSON.parse(localStorage.getItem("ashtar-noise") ?? "{}"),
+			JSON.parse(localStorage.getItem("ashtar-input") ?? "{}"),
 		).toMatchObject({
 			state: { suppression: false },
 		});

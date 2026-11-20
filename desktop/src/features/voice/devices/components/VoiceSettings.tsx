@@ -11,7 +11,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { useSettingsStore } from "@/features/settings";
 import { CameraOptions } from "../../camera/components/CameraOptions";
-import { setSuppression, useNoiseChoice } from "../../noise/stores/noiseStore";
+import { setSuppression, useInputChoice } from "../../input/stores/inputStore";
 import { useAudioDevices } from "../hooks/useAudioDevices";
 import {
 	type AudioDevice,
@@ -132,7 +132,7 @@ function AskBeforeSwitchRoomSwitch() {
 /** Ligada: o RNNoise. Desligada: a supressão do navegador, como antes. Vale na hora. */
 function NoiseSwitch() {
 	const labelId = useId();
-	const suppression = useNoiseChoice((state) => state.suppression);
+	const suppression = useInputChoice((state) => state.suppression);
 	return (
 		<div className="flex items-center justify-between gap-6 border-b border-border py-3">
 			<span className="flex flex-col gap-[3px]">

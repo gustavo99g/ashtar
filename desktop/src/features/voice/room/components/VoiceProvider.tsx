@@ -21,9 +21,9 @@
  * Entra sem assinar nada sozinho (`autoSubscribe: false`): a voz de todo mundo é assinada aqui, e a
  * tela transmitida só enquanto aparece, no Foco ou na miniatura (`subscriptions.ts`).
  *
- * O microfone sai com a supressão de ruído do RNNoise (`noise/rnnoise.ts`) quando a opção de
- * Configurações › Voz e vídeo está ligada: ele entra na trilha assim que o microfone é publicado, e
- * entra ou sai na hora quando a opção muda.
+ * O microfone sai pela cadeia do microfone (`input/chain.ts`, ADR 0029): o volume de entrada, o
+ * RNNoise (se ligado) e o portão da detecção de voz e do pressionar para falar. Ela entra na trilha
+ * assim que o microfone é publicado, e muda na hora quando uma opção de Voz e vídeo muda.
  *
  * Entra com o microfone e a saída de Configurações › Voz e vídeo (`deviceChoiceStore.ts`) e troca na hora
  * quando a escolha muda, ou quando o escolhido some e volta (`roomDevices.ts`).
@@ -69,8 +69,8 @@ import {
 	switchDevice,
 } from "../../devices/model/roomDevices";
 import { useDeviceChoice } from "../../devices/stores/deviceChoiceStore";
-import { switchNoiseSuppression } from "../../noise/rnnoise";
-import { useNoiseChoice } from "../../noise/stores/noiseStore";
+import { applyInputChain, type ChainOptions } from "../../input/chain";
+import { useInputChoice } from "../../input/stores/inputStore";
 import {
 	type SubscriptionView,
 	syncSubscription,
@@ -211,10 +211,30 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 	/** Os dispositivos de agora, para a conexão ler ao criar a sala. */
 	const deviceIds = useRef<DeviceIds>({ input: inputId, output: outputId });
 	deviceIds.current = { input: inputId, output: outputId };
-	const suppression = useNoiseChoice((state) => state.suppression);
-	/** A opção de agora, para os eventos da sala lerem sem recriar a sala. */
-	const noise = useRef(suppression);
-	noise.current = suppression;
+	const inputChoice = useInputChoice();
+	const chainOptions = useMemo<ChainOptions>(
+		() => ({
+			suppression: inputChoice.suppression,
+			echoCancellation: inputChoice.echoCancellation,
+			autoGainControl: inputChoice.autoGainControl,
+			volume: inputChoice.volume,
+			mode: inputChoice.mode,
+			autoSensitivity: inputChoice.autoSensitivity,
+			thresholdDb: inputChoice.thresholdDb,
+		}),
+		[
+			inputChoice.suppression,
+			inputChoice.echoCancellation,
+			inputChoice.autoGainControl,
+			inputChoice.volume,
+			inputChoice.mode,
+			inputChoice.autoSensitivity,
+			inputChoice.thresholdDb,
+		],
+	);
+	/** As opções de agora, para os eventos da sala lerem sem recriar a sala. */
+	const chain = useRef(chainOptions);
+	chain.current = chainOptions;
 
 	// Sem sessão não há chamada: saiu do grupo, o token da API já não vale.
 	const sessionConnected = useSession().status === "connected";
@@ -267,12 +287,12 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 				);
 		});
 		// Trilha nova de alguém: a voz é assinada; a tela, só se a transmissão dessa pessoa aparece.
-		// O microfone publicado (ao entrar, ou ao voltar depois de a trilha ser refeita): põe o RNNoise
-		// nele, se a opção está ligada. Não dá para passar o processador nas opções da sala: o LiveKit o
-		// aplica antes de a trilha ter o `AudioContext` e recusa.
+		// O microfone publicado (ao entrar, ou ao voltar depois de a trilha ser refeita): põe a cadeia
+		// do microfone nele (volume, RNNoise e portão, ADR 0029). Não dá para passar o processador nas
+		// opções da sala: o LiveKit o aplica antes de a trilha ter o `AudioContext` e recusa.
 		nextRoom.on(RoomEvent.LocalTrackPublished, (publication) => {
 			if (publication.source === Track.Source.Microphone) {
-				void switchNoiseSuppression(nextRoom, noise.current);
+				void applyInputChain(nextRoom, chain.current);
 			}
 		});
 		nextRoom.on(RoomEvent.TrackPublished, (publication, participant) => {
@@ -456,8 +476,8 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 	}, [room, outputId]);
 
 	useEffect(() => {
-		if (room) void switchNoiseSuppression(room, suppression);
-	}, [room, suppression]);
+		if (room) void applyInputChain(room, chainOptions);
+	}, [room, chainOptions]);
 
 	const value = useMemo<VoiceContextValue>(() => {
 		async function setMicrophone(enabled: boolean) {

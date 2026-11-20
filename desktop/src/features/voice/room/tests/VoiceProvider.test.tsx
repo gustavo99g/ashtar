@@ -9,8 +9,8 @@ import {
 	TIMEOUT_MESSAGE,
 	type UserView,
 } from "@/lib/api";
-import { switchNoiseSuppression } from "../../noise/rnnoise";
-import { useNoiseChoice } from "../../noise/stores/noiseStore";
+import { applyInputChain } from "../../input/chain";
+import { DEFAULT_INPUT, useInputChoice } from "../../input/stores/inputStore";
 const SALA = { id: "sala" } as const;
 import { useVoice } from "../hooks/useVoice";
 import { VoiceProvider } from "../components/VoiceProvider";
@@ -21,8 +21,8 @@ vi.mock("@/lib/api", async (importOriginal) => ({
 	getMe: vi.fn(),
 }));
 
-vi.mock("../../noise/rnnoise", () => ({
-	switchNoiseSuppression: vi.fn(() => Promise.resolve()),
+vi.mock("../../input/chain", () => ({
+	applyInputChain: vi.fn(() => Promise.resolve()),
 }));
 
 /** As salas criadas pelo `VoiceProvider`, com as opções que receberam e o que dispara os eventos. */
@@ -90,8 +90,8 @@ afterEach(() => {
 	vi.mocked(createVoiceToken).mockReset();
 	vi.mocked(getMe).mockReset();
 	rooms.length = 0;
-	vi.mocked(switchNoiseSuppression).mockClear();
-	useNoiseChoice.setState({ suppression: true });
+	vi.mocked(applyInputChain).mockClear();
+	useInputChoice.setState(DEFAULT_INPUT);
 	useSessionStore.setState({ session: { status: "entering" } });
 });
 
@@ -122,7 +122,7 @@ describe("VoiceProvider", () => {
 		expect(screen.getByRole("button")).toHaveTextContent("fora disconnected");
 	});
 
-	it("a sala nasce sem processador nas opções; o RNNoise entra quando o microfone é publicado", async () => {
+	it("a sala nasce sem processador nas opções; a cadeia do microfone entra quando ele é publicado", async () => {
 		useSessionStore.setState({ session: { status: "connected", user } });
 		vi.mocked(createVoiceToken).mockReturnValue(new Promise(() => {}));
 		render(
@@ -140,18 +140,21 @@ describe("VoiceProvider", () => {
 		act(() =>
 			room.emit(RoomEvent.LocalTrackPublished, { source: Track.Source.Camera }),
 		);
-		expect(switchNoiseSuppression).not.toHaveBeenCalled();
+		expect(applyInputChain).not.toHaveBeenCalled();
 
 		act(() =>
 			room.emit(RoomEvent.LocalTrackPublished, {
 				source: Track.Source.Microphone,
 			}),
 		);
-		expect(switchNoiseSuppression).toHaveBeenCalledWith(room, true);
+		expect(applyInputChain).toHaveBeenCalledWith(
+			room,
+			expect.objectContaining({ suppression: true, volume: 100, mode: "voice" }),
+		);
 	});
 
-	it("com a opção desligada, o microfone publicado pede a trilha sem o RNNoise", async () => {
-		useNoiseChoice.setState({ suppression: false });
+	it("com a supressão desligada, o microfone publicado pede a cadeia sem o RNNoise", async () => {
+		useInputChoice.setState({ ...DEFAULT_INPUT, suppression: false });
 		useSessionStore.setState({ session: { status: "connected", user } });
 		vi.mocked(createVoiceToken).mockReturnValue(new Promise(() => {}));
 		render(
@@ -168,7 +171,10 @@ describe("VoiceProvider", () => {
 			}),
 		);
 
-		expect(switchNoiseSuppression).toHaveBeenCalledWith(room, false);
+		expect(applyInputChain).toHaveBeenCalledWith(
+			room,
+			expect.objectContaining({ suppression: false }),
+		);
 	});
 
 	it("um erro ao pedir o token fica no estado, e entrar de novo tenta outra vez", async () => {
