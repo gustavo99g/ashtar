@@ -836,7 +836,10 @@ da chamada e a tela "Este computador saiu do grupo" já saíram antes (v0.2.2 a 
 * dispositivos: microfone e saída desconectados, com aviso e volta ao escolhido;
 * **indicador de qualidade da conexão** por participante (ping e perda de pacotes), para saber se um
   picote vem da rede de quem transmite ou de quem assiste;
-* botão "Enviar logs", que manda os logs recentes para a API, e a tela Logs no Painel de controle do dono.
+* botão "Enviar logs", que manda os logs recentes para a API, e a tela Logs no Painel de controle do dono;
+* aviso de "você está mutado" ao falar mutado, e o som opcional do pressionar para falar;
+* Testar conexão (ping e caminho da voz, UDP ou TCP) em Voz e vídeo;
+* o estado do servidor (API, LiveKit, disco e último backup) no Painel do dono.
 
 Estados de interface:
 

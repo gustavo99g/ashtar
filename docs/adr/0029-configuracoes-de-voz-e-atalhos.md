@@ -38,6 +38,10 @@ desligar. Uma combinação é até três modificadores e uma tecla, ou um botão
 modificadores. A mesma combinação não pode estar em duas ações. Os atalhos e o modo de entrada ficam no computador,
 no `settingsStore`.
 
+**"Você está mutado"** aparece no painel de voz quando a pessoa fala mutada, lido de um clone da trilha do microfone
+(o mute do LiveKit desliga a publicada). **O pressionar para falar tem um som** opcional ao abrir e fechar, que só
+quem aperta ouve.
+
 ## Alternativas consideradas
 
 - **`RegisterHotKey` (e o plugin de atalhos globais do Tauri):** o Windows entrega a tecla só para quem registrou, e

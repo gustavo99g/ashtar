@@ -38,6 +38,12 @@ pessoa, numa mensagem de dados da sala a cada 5 segundos (`voice.stats`), e apar
 (`POST /api/logs`, até 10 MB, um a cada 5 minutos por pessoa). A API grava o arquivo ao lado do banco e guarda 30
 dias. Só o dono vê e baixa, numa tela Logs do Painel de controle, e recebe um aviso quando chega um.
 
+**Testar conexão** usa o `ConnectionCheck` do `livekit-client` numa sala só da pessoa (`teste:{user_id}`, token de 1
+minuto), e mostra o ping, se a voz vai por UDP ou pelo TCP de reserva, e se dá para publicar.
+
+**O estado do servidor**, só para o dono no Painel: a versão e o tempo no ar da API, se o LiveKit responde, o disco
+livre e o último backup.
+
 ## Alternativas consideradas
 
 - **Reconectar só pelo `livekit-client`:** ele já tenta por uns 20 segundos e desiste; uma queda de roteador passa

@@ -7,16 +7,16 @@ A v0.6 deixa o Ashtar ajustável e confiável para o uso de todo dia. A aba Voz 
 desde a v0.2.2 (volumes, teste de microfone, detecção de voz com sensibilidade, eco e ganho, os padrões da
 transmissão), e uma aba nova, Atalhos, traz o pressionar para falar e os atalhos globais, que funcionam com um jogo
 em foco. Em volta disso, o app passa a se recuperar sozinho de uma queda curta (voz, transmissão nativa e
-servidor), avisa quando o microfone some, mostra a qualidade da conexão de cada pessoa na sala e manda os logs para
-o dono com um clique.
+servidor), avisa quando o microfone some, mostra a qualidade da conexão de cada pessoa na sala, testa o caminho até o servidor, avisa quem fala
+mutado e manda os logs para o dono com um clique. O dono ganha também o estado do servidor no Painel.
 
 Sai numa versão só, a `0.6.0`, pelo beta antes do estável. O trabalho anda em duas partes, mas nenhuma é publicada
 sozinha:
 
 | Parte | O que é | Mexe em |
 |---|---|---|
-| 1 | Configurações: a aba Voz e vídeo completa, o gancho de teclado e mouse, a aba Atalhos e o pressionar para falar | App e Rust |
-| 2 | Confiabilidade: reconexão da voz e da transmissão, dispositivos, "Sem conexão com o servidor", qualidade da conexão e "Enviar logs" | App, Rust e API |
+| 1 | Configurações: a aba Voz e vídeo completa, o gancho de teclado e mouse, a aba Atalhos, o pressionar para falar com o som dele e o aviso de mutado | App e Rust |
+| 2 | Confiabilidade: reconexão da voz e da transmissão, dispositivos, "Sem conexão com o servidor", qualidade da conexão e Testar conexão, "Enviar logs" e o estado do servidor no Painel | App, Rust e API |
 
 **Objetivo da fase:** uma noite inteira de jogo sem ninguém precisar sair e entrar de novo na sala: o pressionar
 para falar funciona com o jogo em foco, uma queda curta de rede volta sozinha, e quando algo der errado o dono
@@ -57,13 +57,13 @@ Levantado na `dev` (`196cb41`), para o plano não refazer:
 | 1 | 1 | App: a cadeia do microfone (volume de entrada, portão e RNNoise) | Pendente |
 | 2 | 1 | App: a aba Voz e vídeo completa | Pendente |
 | 3 | 1 | Rust: o gancho de teclado e mouse | Pendente |
-| 4 | 1 | App: a aba Atalhos e o pressionar para falar | Pendente |
+| 4 | 1 | App: a aba Atalhos, o pressionar para falar e o aviso de mutado | Pendente |
 | 5 | 2 | App: a voz volta sozinha | Pendente |
 | 6 | 2 | Rust e app: a transmissão nativa volta sozinha | Pendente |
 | 7 | 2 | App: microfone e saída desconectados | Pendente |
 | 8 | 2 | API e app: "Sem conexão com o servidor" | Pendente |
-| 9 | 2 | App: a qualidade da conexão de cada pessoa | Pendente |
-| 10 | 2 | API, Rust e app: "Enviar logs" | Pendente |
+| 9 | 2 | API e app: a qualidade da conexão e o Testar conexão | Pendente |
+| 10 | 2 | API, Rust e app: "Enviar logs" e o estado do servidor | Pendente |
 | 11 | — | Teste com três computadores, sem publicar | Pendente |
 | 12 | — | Lançamento da `0.6.0` | Pendente |
 
@@ -79,9 +79,9 @@ app só é publicado na Etapa 12, que leva a `dev` para o beta e depois para a `
 As decisões de arquitetura vão para as ADRs, que são a fonte:
 
 - `0029-configuracoes-de-voz-e-atalhos.md`: a cadeia do microfone, a detecção de voz, o pressionar para falar e o
-  gancho de teclado e mouse (decisões 1 a 8).
+  gancho de teclado e mouse, o aviso de mutado e o som do pressionar para falar (decisões 1 a 8, 18 e 19).
 - `0030-reconexao-e-estados.md`: a reconexão da voz e da transmissão, os dispositivos, a faixa do servidor, a
-  qualidade da conexão e os logs (decisões 9 a 17).
+  qualidade da conexão, o Testar conexão, os logs e o estado do servidor (decisões 9 a 17, 20 e 21).
 
 ### Combinado (20/11)
 
@@ -95,6 +95,8 @@ As decisões de arquitetura vão para as ADRs, que são a fonte:
   junto, porque usam o mesmo gancho. O atalho do overlay fica fora.
 - **As telas que faltam no canvas** (aviso de dispositivo, faixa do servidor, qualidade da conexão, "Enviar logs" e
   a lista do Painel) são desenhadas na Etapa 0, no estilo dos quadros vizinhos.
+- **Entram mais quatro (20/11):** o aviso de "você está mutado", o som do pressionar para falar, o Testar conexão e
+  o estado do servidor no Painel. A mensagem não enviada guardada ao fechar o app ficou de fora.
 
 ### Decidido neste plano
 
@@ -166,6 +168,22 @@ As decisões de arquitetura vão para as ADRs, que são a fonte:
     Baixar. Só o dono (a permissão é dele, não vira permissão por pessoa). Quando chega um, o dono recebe o aviso no
     canto, como o de quem entrou no grupo.
 
+**Os extras de 20/11**
+
+18. **"Você está mutado"** aparece no painel de voz por 3 segundos quando a pessoa fala com o microfone mutado (não
+    surda). O nível vem de um clone da trilha do microfone, que continua aberto enquanto ela está mutada (o mute do
+    LiveKit desliga a trilha publicada, e o clone não). Não repete enquanto ela continua falando, e não aparece no
+    pressionar para falar com o atalho solto. Uma chave em Voz e vídeo, ligada por padrão.
+19. **O som do pressionar para falar:** um clique curto ao abrir e outro ao fechar o portão pelo atalho, original
+    como os outros sons. Uma chave em Notificações, desligada por padrão. Só quem aperta ouve.
+20. **Testar conexão**, em Voz e vídeo: usa o `ConnectionCheck` do `livekit-client` numa sala só da pessoa
+    (`teste:{user_id}`, com um token de 1 minuto do `POST /api/voice/test-token`) e mostra o ping até o servidor, se
+    a voz vai pelo caminho direto (UDP) ou pelo reserva (TCP, mais lento), e se dá para publicar. Leva uns 10
+    segundos; numa sala, o teste lê os números da conexão que já existe, sem abrir outra.
+21. **O estado do servidor**, numa tela Servidor do Painel de controle, só para o dono: a API (versão e há quanto
+    tempo está no ar), o LiveKit (responde ou não, e em quanto tempo), o disco livre na pasta de dados e o último
+    backup (o arquivo mais novo de `data/backups/`). Atualiza ao abrir e com um botão; sem aviso nem histórico.
+
 ---
 
 ## Etapa 0: ADRs, roadmap, BACKLOG e canvas
@@ -174,14 +192,15 @@ Só documentos e desenho.
 
 - O `PLAN.md` e o `NOTES.md` da v0.5 vão para `docs/plans/`, e a raiz recebe estes. Os `[ ]` da v0.5 que o teste da
   beta `0.5.0` não resolver ficam marcados como adiados lá, e os que pedem código entram no `NOTES.md` da v0.6.
-- ADR **0029** (decisões 1 a 8) e ADR **0030** (decisões 9 a 17). A 0030 atualiza a 0016 (a sala) e a 0017 (o
+- ADR **0029** (decisões 1 a 8, 18 e 19) e ADR **0030** (decisões 9 a 17, 20 e 21). A 0030 atualiza a 0016 (a sala) e a 0017 (o
   publicador nativo, que passa a reconectar).
 - `docs/roadmap.md`: a v0.6 com a versão única, os atalhos de ligação, a lista do que já existia e o "Enviar logs"
   com o Painel.
 - `BACKLOG.md`: saem os dois itens da v0.6 (a aba Voz e vídeo e o "Reconectando"), e o "Abrir pasta de logs" da
   v0.2.2, que já existe.
 - Canvas: os quadros "Aviso — dispositivo desconectado", "Faixa — sem conexão com o servidor", "Voz — qualidade da
-  conexão" (o bloco e o cartão), "Configurações — aplicativo (enviar logs)" e "Painel de controle — logs".
+  conexão" (o bloco e o cartão), "Configurações — aplicativo (enviar logs)" e "Painel de controle — logs"; depois,
+  "Voz — você está mutado", "Configurações — testar conexão" e "Painel de controle — servidor".
 
 **Pronto quando:** as duas ADRs estão em `docs/adr/`, a 0016 e a 0017 apontam para elas, o roadmap tem a v0.6 nova e
 os cinco quadros estão no canvas.
@@ -251,7 +270,7 @@ alta, falar baixo não passa e o ícone de microfone dos outros não muda.
 **Pronto quando:** com o Ashtar minimizado e um jogo em foco, o app recebe "apertou" e "soltou" do atalho, e o jogo
 continua recebendo a tecla.
 
-## Etapa 4: app, a aba Atalhos e o pressionar para falar
+## Etapa 4: app, a aba Atalhos, o pressionar para falar e o aviso de mutado
 
 `features/settings/` ganha a tela Atalhos, seguindo os quadros "Configurações — atalhos" e "(gravando)".
 
@@ -262,7 +281,11 @@ continua recebendo a tecla.
   `toggleMute`, o `toggleDeafen`, o `setHeld` do portão, o atender e o recusar da ligação que está tocando).
 - O modo Pressionar para falar: o portão fica fechado até o atalho, e o painel de voz mostra a tecla embaixo do nome
   da sala ("Pressionar para falar: V").
-- Testes: duas linhas com a mesma combinação; gravar e cancelar; o atalho de atender sem ligação tocando não faz nada.
+- O som do pressionar para falar (decisão 19), com a chave em Notificações.
+- O aviso "Você está mutado" (decisão 18): o clone da trilha, o detector com o mesmo limiar do portão, o aviso no
+  painel de voz e a chave em Voz e vídeo.
+- Testes: duas linhas com a mesma combinação; gravar e cancelar; o atalho de atender sem ligação tocando não faz
+  nada; o aviso de mutado não repete falando sem parar, e não aparece surdo.
 
 **Pronto quando:** dá para jogar com o pressionar para falar no botão lateral do mouse, e mutar pelo teclado, sem
 tirar o foco do jogo.
@@ -331,7 +354,7 @@ o fone volta para ele.
 **Pronto quando:** derrubar a API por 30 segundos mostra a faixa, a sala de voz continua, e quando a API volta a
 faixa some e as mensagens mandadas por outros nesse tempo aparecem.
 
-## Etapa 9: app, a qualidade da conexão de cada pessoa
+## Etapa 9: API e app, a qualidade da conexão e o Testar conexão
 
 `features/voice/room/` e o cartão do usuário.
 
@@ -340,11 +363,14 @@ faixa some e as mensagens mandadas por outros nesse tempo aparecem.
 - A mensagem de dados `voice.stats` (`{ ping, loss }`) a cada 5 segundos, no mesmo tópico do surdo, só para a sala.
   O ping vem do `ping.ts`; a perda, do `getStats` da trilha do microfone.
 - A seção Conexão no cartão da pessoa na sala: ping, perda e o texto (Boa, Instável, Ruim).
+- API: `POST /api/voice/test-token`, um token de 1 minuto para a sala `teste:{user_id}`, que só a própria pessoa
+  acessa e que o webhook ignora (ninguém vê a pessoa "entrar" nela).
+- App: Testar conexão em Voz e vídeo, seguindo o quadro "Configurações — testar conexão" (decisão 20).
 
 **Pronto quando:** limitar a rede de um computador (perda de 10% no `clumsy`) faz o ícone aparecer para os outros, e o
-cartão dele mostra a perda.
+cartão dele mostra a perda; com o UDP bloqueado no firewall, o Testar conexão diz que a voz vai pelo caminho reserva.
 
-## Etapa 10: API, Rust e app, "Enviar logs"
+## Etapa 10: API, Rust e app, "Enviar logs" e o estado do servidor
 
 `api/src/routes/logs.rs` (novo), `desktop/src-tauri/src/logging.rs` e `features/updater/components/AppSettings.tsx`.
 
@@ -356,9 +382,14 @@ cartão dele mostra a perda.
   da GPU) num `.zip` na memória.
 - App: o botão "Enviar logs" em Aplicativo, ao lado de "Abrir pasta", com o campo "O que aconteceu?" e a confirmação
   ("Logs enviados. O dono vai ver."). A tela Logs no Painel de controle, e o aviso no canto para o dono.
-- Testes: o limite de tamanho e de frequência; quem não é dono recebe 404 na lista; a limpeza.
+- O estado do servidor (decisão 21): `GET /api/admin/status` só para o dono, e a tela Servidor no Painel, seguindo o
+  quadro "Painel de controle — servidor". O `compose.yaml` da VPS monta a pasta `data/backups/` na API só para
+  leitura, se ainda não monta.
+- Testes: o limite de tamanho e de frequência; quem não é dono recebe 404 na lista e no estado; a limpeza; o estado
+  com o LiveKit fora.
 
-**Pronto quando:** um membro manda os logs pelo app e o dono baixa o `.zip` pelo Painel.
+**Pronto quando:** um membro manda os logs pelo app e o dono baixa o `.zip` pelo Painel; o Painel mostra o último
+backup e o disco livre da VPS.
 
 ---
 
@@ -371,7 +402,9 @@ Sem publicar. Os cenários:
 - tirar o cabo de rede de quem transmite por 20 segundos; suspender o computador de quem está na sala e voltar;
 - tirar e devolver o fone USB no meio da sala;
 - derrubar a API por um minuto, com a sala aberta;
-- mandar os logs e baixar no Painel.
+- falar mutado, e usar o pressionar para falar com o som ligado;
+- o Testar conexão em casa e numa rede que bloqueia UDP;
+- mandar os logs e baixar no Painel, e conferir o estado do servidor.
 
 ## Etapa 12: lançamento da `0.6.0`
 

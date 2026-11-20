@@ -38,6 +38,12 @@ Cada item deve ser resolvido ou conscientemente adiado (marcar como tal) antes d
       janela.
 - [ ] **Os textos** da aba Atalhos, do aviso de combinação repetida e do "Pressionar para falar: V", revisados.
 
+### Aviso de mutado e som
+
+- [ ] **O clone da trilha** mutada não acende a luz do microfone de novo no Windows nem pesa na CPU.
+- [ ] **O aviso de mutado** não aparece com o barulho de fundo (usa o mesmo limiar do portão).
+- [ ] **O som do pressionar para falar** não vai para a trilha (só quem aperta ouve).
+
 ## Parte 2 — confiabilidade
 
 ### Voz e transmissão
@@ -72,6 +78,12 @@ Cada item deve ser resolvido ou conscientemente adiado (marcar como tal) antes d
 - [ ] **O tamanho do `.zip`** de 2 dias de log, com uma noite de transmissão.
 - [ ] **O disco da VPS:** a pasta `data/logs/` entra no backup? Decidir (sugestão: não, são de 30 dias).
 - [ ] **O texto do botão** diz que só o dono vê, e que os logs têm nicks.
+
+### Testar conexão e estado do servidor
+
+- [ ] **A sala `teste:{user_id}`** não aparece em lista nenhuma, e o webhook não manda `voice.participants` dela.
+- [ ] **O `ConnectionCheck`** no WebView2: os testes de TURN e de publicar passam com o LiveKit da VPS.
+- [ ] **A pasta `data/backups/`** montada na API (o `compose.yaml`), só para leitura.
 
 ## Riscos e cuidados
 
