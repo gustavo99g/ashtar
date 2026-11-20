@@ -1,5 +1,19 @@
 # O que há de novo no Ashtar
 
+## 0.4.0
+
+- Várias pessoas podem transmitir a tela ao mesmo tempo na sala, até 6. Clique em Assistir em cada transmissão que quiser ver: duas ficam lado a lado, três ou quatro dividem a tela, e com mais elas vão para uma fileira embaixo.
+- Focar deixa uma transmissão grande e as outras pequenas embaixo; clique numa pequena para trocar. Clicar de novo em Focar volta a dividir.
+- Cada transmissão tem o seu volume, de 0 a 200%, e a sua qualidade: Automática ou Leve, para quando a internet aperta. As duas ficam guardadas para a próxima vez que a mesma pessoa transmitir.
+- Passe o mouse numa transmissão para ver quem está assistindo.
+- Quando alguém começa a transmitir com você na sala, aparece um aviso no canto, com Assistir.
+- Na transmissão em foco: gire a roda do mouse para ampliar até 4× e arraste para andar pela imagem (duplo clique volta). O ícone de sinal mostra como ela está chegando para você, e o botão de copiar põe a imagem daquele instante na área de transferência, para colar onde quiser.
+- Saindo da sala com várias abertas, a miniatura mostra uma de cada vez, com setas para trocar.
+- Câmera: o botão novo na barra da sala, entre Áudio e Tela. A setinha abre a prévia, que só você vê, com a câmera, a qualidade (480p, 720p ou 1080p) e Espelhar. Os mesmos ajustes estão em Configurações › Voz e vídeo.
+- A câmera aparece no lugar do seu avatar, na sala e na ligação. Transmitindo com ela ligada, ela aparece no canto da sua transmissão. Ela sempre começa desligada.
+- O "O que há de novo" agora mostra todas as versões que você pulou, não só a última.
+- A lista de quem está na sala volta a atualizar na hora para quem está fora dela.
+
 ## 0.3.21
 
 - Ligações privadas: abra uma conversa e clique no telefone, no alto da janela, ou em Ligar, no cartão da pessoa. A ligação é só entre vocês dois, e ninguém mais no servidor fica sabendo. Para quem está offline, o botão fica apagado.
