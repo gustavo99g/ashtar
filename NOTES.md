@@ -19,19 +19,19 @@ ser resolvido ou conscientemente adiado (marcar como tal) antes de fechar a entr
       de quem moveu.
 - [ ] **A remoção dos 10 segundos** é cancelada quando a pessoa sai da sala antiga sozinha, e não tira ela da sala
       nova se as duas tiverem o mesmo id de conexão.
-- [ ] **`membros.mover` no Painel** e no `admin permissoes`, e no `README.md` do `deploy/server/`.
+- [x] **`membros.mover` no Painel** e no `admin permissoes`, e no `README.md` do `deploy/server/`. O Painel e o `admin permissoes` listam todas as permissões sozinhos; o `README.md` do `deploy/server/` não lista nenhuma.
 
 ### App
 
-- [ ] **Nenhum `SALA` sobra** fora dos testes, inclusive no `UpdateNotice` (o aviso de atualização que espera a
-      pessoa sair da sala).
+- [x] **Nenhum `SALA` sobra** fora dos testes, inclusive no `UpdateNotice` (o aviso de atualização que espera a
+      pessoa sair da sala). Feito: o id da sala vem do `VoiceProvider`.
 - [ ] **Trocar de sala rápido**, várias vezes seguidas: a pessoa nunca fica em duas salas, nem em nenhuma.
 - [ ] **Trocar de sala com o token falhando** (API fora): a pessoa fica na sala antiga, com o erro, e não sem sala.
 - [ ] **A transmissão que acaba ao trocar:** quem assistia na sala antiga vê ela acabar normalmente.
 - [ ] **O "Voltar para a sala"** depois de uma ligação volta para a sala de onde a pessoa saiu, e some se ela foi
       arquivada no meio.
 - [ ] **Ser movido no meio de uma pergunta** (o diálogo de trocar transmitindo aberto): o `voice.moved` ganha.
-- [ ] **Ser movido estando numa ligação privada:** a API recusa (409), e o cartão nem mostra "Mover para".
+- [x] **Ser movido estando numa ligação privada:** a API recusa (409), e o cartão nem mostra "Mover para". `tests/voice.rs` (409), e o "Mover para" só aparece no cartão de quem está numa sala.
 - [ ] **A reconexão automática** não traz de volta quem foi desconectado.
 - [ ] **O arrastar não briga** com o clique no avatar (que abre o cartão) nem com o modo Organizar.
 - [ ] **A categoria recolhida** com gente na sala (o `AvatarStrip`): dá para arrastar dali também? Decidir.
@@ -40,14 +40,14 @@ ser resolvido ou conscientemente adiado (marcar como tal) antes de fechar a entr
 
 ### Canais e salas restritos
 
-- [ ] **Nenhum vazamento por evento:** passar todos os tipos do `ServerEvent` pelo filtro, com um teste que falha
-      quando entra um tipo novo com `channel_id` sem passar por ele.
-- [ ] **O "começou a transmitir"** de uma sala restrita não chega a quem está fora.
+- [x] **Nenhum vazamento por evento:** passar todos os tipos do `ServerEvent` pelo filtro, com um teste que falha
+      quando entra um tipo novo com `channel_id` sem passar por ele. O `ServerEvent::of_channel` não tem `_`, e o `publish` para todos recusa um evento de canal.
+- [x] **O "começou a transmitir"** de uma sala restrita não chega a quem está fora. Vem do `voice.participants`, que só sai para quem acessa a sala.
 - [ ] **A busca de mensagens da v0.7** já nasce passando pela `can_access` (anotar na ADR 0028).
 - [x] **Quem gerencia vê tudo** (decisão 16): confirmado em 19/11. O dono tem todas as permissões e faz todas as
       ações, em tudo.
 - [ ] **Um canal restrito e arquivado:** continua escondido nos Canais arquivados para quem está fora.
-- [ ] **Quem saiu do grupo** sai de todas as listas.
+- [x] **Quem saiu do grupo** sai de todas as listas. `tests/restricted.rs`.
 - [ ] **O "Voltar para a sala"** depois de uma ligação, se a pessoa perdeu o acesso no meio: some.
 - [ ] **O modo Organizar** de quem gerencia mostra os restritos com o cadeado, e a ordem gravada não muda a dos
       outros.
@@ -61,26 +61,26 @@ ser resolvido ou conscientemente adiado (marcar como tal) antes de fechar a entr
       exclusiva. O controle não conta, e por isso a regra da sala (decisão 11).
 - [ ] **Computador bloqueado ou dormindo:** a conexão cai e a pessoa fica offline, não Ausente. Conferir que, ao
       voltar, não fica presa em Ausente.
-- [ ] **Duas conexões da mesma pessoa** (reconexão no meio): o hub não deixa uma conexão velha ociosa travar o
-      Ausente.
+- [x] **Duas conexões da mesma pessoa** (reconexão no meio): o hub não deixa uma conexão velha ociosa travar o
+      Ausente. `tests/realtime.rs`: só fica Ausente com todas as conexões ociosas.
 - [ ] **O app antigo** (`0.4.x`) não manda `idle`: aparece sempre Disponível. Aceito durante o beta.
 - [ ] **A bolinha amarela** em todos os lugares em que a de status aparece, com o contraste conferido.
 
 ### Digitando
 
 - [ ] **Quem perde a permissão do canal** no meio para de receber o `typing` dele.
-- [ ] **O Invisível** não manda nada, nem nas conversas privadas.
+- [x] **O Invisível** não manda nada, nem nas conversas privadas. O app e a API descartam.
 - [ ] **Colar um texto grande** conta como digitar, uma vez.
-- [ ] **A linha reservada** embaixo da caixa não pula a conversa quando aparece e some.
+- [x] **A linha reservada** embaixo da caixa não pula a conversa quando aparece e some.
 
 ### Sons
 
 - [ ] **Os sons gerados** no mesmo volume dos de hoje (`dm.wav`, `mention.wav`, `ring.wav`), conferidos no fone e na
       caixa de som.
-- [ ] **Entrar numa sala cheia** toca um som só, e não um por pessoa que já estava.
-- [ ] **Trocar de sala** não toca a saída de todo mundo da sala velha.
-- [ ] **Os sons tocam na saída escolhida** em Voz e vídeo, como os da voz.
-- [ ] **Ocupado** não cala os sons da sala, mas continua calando os de mensagem e menção.
+- [x] **Entrar numa sala cheia** toca um som só, e não um por pessoa que já estava.
+- [x] **Trocar de sala** não toca a saída de todo mundo da sala velha.
+- [x] **Os sons tocam na saída escolhida** em Voz e vídeo, como os da voz.
+- [x] **Ocupado** não cala os sons da sala, mas continua calando os de mensagem e menção.
 
 ## Riscos e cuidados
 

@@ -54,13 +54,13 @@ Levantado na branch da v0.4, para o plano não refazer:
 | 5 | 1 | API: a permissão Mover membros, mover e desconectar | Concluída |
 | 6 | 1 | App: Mover para e Desconectar no cartão | Concluída |
 | 7 | 1 | App: arrastar uma pessoa para outra sala | Concluída |
-| 8 | 1 | API: canais e salas restritos, a lista e a regra de acesso | Pendente |
-| 9 | 1 | API: os eventos, as menções e as não lidas de um canal restrito | Pendente |
-| 10 | 1 | App: canais e salas restritos | Pendente |
-| 11 | 2 | API: o status Ausente | Pendente |
-| 12 | 2 | App: Ausente manual e automático | Pendente |
-| 13 | 2 | API e app: "digitando…" | Pendente |
-| 14 | 2 | App: os sons da sala | Pendente |
+| 8 | 1 | API: canais e salas restritos, a lista e a regra de acesso | Concluída |
+| 9 | 1 | API: os eventos, as menções e as não lidas de um canal restrito | Concluída |
+| 10 | 1 | App: canais e salas restritos | Concluída |
+| 11 | 2 | API: o status Ausente | Concluída |
+| 12 | 2 | App: Ausente manual e automático | Concluída |
+| 13 | 2 | API e app: "digitando…" | Concluída |
+| 14 | 2 | App: os sons da sala | Concluída |
 | 15 | — | Teste com três computadores, sem publicar | Pendente |
 | 16 | — | Lançamento da `0.5.0` | Pendente |
 
@@ -69,7 +69,23 @@ antes do lançamento: o app atual nunca chama as rotas novas. A 6 e a 7 usam a 4
 pelo mesmo caminho) e a 5. A 8 usa a 1 e a 5 (mover para uma sala restrita), a 9 usa a 8, e a 10 usa a 3, a 8 e a 9. Na parte 2, a 11 vem antes da 12; a 13 e a 14 não dependem de nada da parte 1 e podem
 andar em paralelo com ela.
 
-Branch: `claude/project-thread-qf02oy`, saída da `dev`, num pull request só para a `dev`. O app só é publicado na Etapa 16, que leva a
+Branch: `claude/project-thread-qf02oy`, saída da `dev`, num pull request só para a `dev`. As etapas 0 a 14 estão
+nela; a 15 e a 16 são do Kid, com os três computadores.
+
+### Como ficou (o que mudou do plano)
+
+- **A Sala não pode ser arquivada** (decisão 3): continua protegida, como o `#geral`, e pode ser renomeada. Alguma sala
+  de voz existe sempre, e o app antigo entra nela pelo id.
+- **A lista de acesso** é a `channel_members` das conversas privadas, com a coluna `restricted` em `channels`
+  (migração `0008`), e não uma `channel_access` nova. Ela vai junto do canal para quem o vê, não só para quem
+  gerencia: o @ e o "Mover para" usam.
+- **Sem cache da lista** (Etapa 9): quem recebe cada evento de canal é lido no banco na hora (`access::audience`). O
+  `ServerEvent::of_channel` marca os eventos de canal sem `_` no `match`, e o `publish` para todos recusa um deles nos
+  testes.
+- **O cadeado** aparece para todos que veem o canal restrito, não só para quem gerencia.
+- **O Ausente** precisou refazer a tabela `users` (migração `0009`), porque o `CHECK` do status não aceita valor novo.
+  Numa ligação privada, como numa sala, ninguém fica ausente sozinho.
+- **O `idle_seconds`** (`commands/presence.rs`) só compila e roda no Windows: conferir na Etapa 15. O app só é publicado na Etapa 16, que leva a
 branch para a `dev` (beta) e depois para a `main`.
 
 ## Decisões
@@ -200,7 +216,7 @@ v0.5 nova.
 
 # Parte 1: salas
 
-API, banco e app, em `feature/0.5`.
+API, banco e app.
 
 ## Etapa 1: API, criar, editar e arquivar sala de voz
 
@@ -367,11 +383,9 @@ alguém da lista com o canal aberto e com ele na sala tira ele dos dois.
 
 ---
 
-# Parte 2---
-
 # Parte 2: presença e sons
 
-API e app, em `feature/0.5`.
+API e app.
 
 ## Etapa 11: API, o status Ausente
 
