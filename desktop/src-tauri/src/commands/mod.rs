@@ -14,6 +14,7 @@ pub mod identity;
 pub mod notifications;
 pub mod presence;
 pub mod screen_share;
+pub mod shortcuts;
 pub mod thumbnails;
 pub mod updater;
 

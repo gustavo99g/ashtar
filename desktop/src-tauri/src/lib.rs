@@ -18,6 +18,7 @@ pub mod logging;
 mod media;
 mod notifications;
 mod permissions;
+mod shortcuts;
 mod tray;
 mod updater;
 mod webview_process;
@@ -69,6 +70,7 @@ pub fn run(log_file: logging::LateFile) {
             app.manage(commands::screen_share::create_manager(app.handle()));
             app.manage(commands::updater::create_auto_update(app.handle()));
             app.manage(commands::thumbnails::Thumbnails::default());
+            app.manage(shortcuts::start(app.handle()));
 
             updater::spawn_periodic_check(app.handle().clone());
             deep_link::register_schemes(app);
@@ -119,7 +121,9 @@ pub fn run(log_file: logging::LateFile) {
             commands::identity::login,
             commands::identity::redeem,
             commands::identity::account_marker,
-            commands::presence::idle_seconds
+            commands::presence::idle_seconds,
+            commands::shortcuts::shortcuts_set,
+            commands::shortcuts::shortcuts_record
         ])
         .build(tauri::generate_context!())
         .expect("error while running tauri application");

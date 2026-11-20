@@ -42,6 +42,7 @@ windows-sys = { version = "0.61.2", features = [
     "Win32_Graphics_Dwm",
     "Win32_Storage_Xps",
     "Win32_System_Threading",
+    "Win32_System_LibraryLoader",
     "Win32_System_SystemInformation",
     "Win32_System_Diagnostics_ToolHelp",
     "Win32_Security_Credentials"

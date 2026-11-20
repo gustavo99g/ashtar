@@ -56,7 +56,7 @@ Levantado na `dev` (`196cb41`), para o plano não refazer:
 | 0 | — | Decisões: ADRs 0029 e 0030, roadmap, BACKLOG, canvas | Feita |
 | 1 | 1 | App: a cadeia do microfone (volume de entrada, portão e RNNoise) | Feita |
 | 2 | 1 | App: a aba Voz e vídeo completa | Feita |
-| 3 | 1 | Rust: o gancho de teclado e mouse | Pendente |
+| 3 | 1 | Rust: o gancho de teclado e mouse | Feita |
 | 4 | 1 | App: a aba Atalhos, o pressionar para falar e o aviso de mutado | Pendente |
 | 5 | 2 | App: a voz volta sozinha | Pendente |
 | 6 | 2 | Rust e app: a transmissão nativa volta sozinha | Pendente |
