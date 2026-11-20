@@ -2,6 +2,7 @@ import { Outlet } from "react-router-dom";
 import { CallBridge } from "@/features/calls";
 import { ChannelDialogs } from "@/features/channels";
 import { DmDock, showDm } from "@/features/dms";
+import { LogsNotices } from "@/features/admin";
 import { JoinNotices } from "@/features/members";
 import { NotificationsBridge, RoomSounds } from "@/features/notifications";
 import { ChannelNav, ServerMenu } from "@/features/server";
@@ -53,6 +54,7 @@ function AppFrame() {
 				<main className="col-start-1 row-start-1 flex min-h-0 min-w-0 flex-col">
 					{/* O aviso de quem entrou (só para quem vê o Painel): vive enquanto a moldura vive. */}
 					<JoinNotices />
+					<LogsNotices />
 					<Outlet />
 				</main>
 				{/* A transmissão assistida, em miniatura, quando a pessoa sai da sala. A camada tem o

@@ -1,3 +1,4 @@
+import { LogsSettings, ServerStatusSettings } from "@/features/admin";
 import { ArchivedSettings } from "@/features/channels";
 import { ProfileSettings } from "@/features/identity";
 import { ShortcutsSettings } from "@/features/settings";
@@ -44,4 +45,12 @@ export function MembersSettingsRoute() {
 }
 export function ArchivedSettingsRoute() {
 	return <ArchivedSettings />;
+}
+
+export function LogsSettingsRoute() {
+	return <LogsSettings />;
+}
+
+export function ServerSettingsRoute() {
+	return <ServerStatusSettings />;
 }

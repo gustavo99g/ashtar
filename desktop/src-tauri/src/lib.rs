@@ -14,6 +14,7 @@ mod commands;
 mod deep_link;
 mod error;
 mod identity;
+mod log_bundle;
 pub mod logging;
 mod media;
 mod notifications;
@@ -112,6 +113,7 @@ pub fn run(log_file: logging::LateFile) {
             commands::updater::check_for_update_now,
             commands::app::whats_new,
             commands::app::open_log_dir,
+            commands::app::logs_bundle,
             commands::app::tray_share_state,
             commands::app::autostart_enabled,
             commands::app::set_autostart,

@@ -251,6 +251,11 @@ impl VideoStats {
 ///
 /// Nunca amplia, e devolve sempre lados pares: no NV12 (e no I420) cada amostra de cor cobre um
 /// bloco de 2×2 pixels, e os encoders exigem lados pares.
+/// O nome da placa de vídeo, para o `info.txt` do "Enviar logs".
+pub fn gpu_name() -> Option<String> {
+    super::platform::gpu_name()
+}
+
 pub fn fit_in_box(width: u32, height: u32, max_width: u32, max_height: u32) -> (u32, u32) {
     // Em u64, as multiplicações abaixo não têm como estourar.
     let (w, h) = (u64::from(width), u64::from(height));

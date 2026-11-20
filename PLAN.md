@@ -63,7 +63,7 @@ Levantado na `dev` (`196cb41`), para o plano não refazer:
 | 7 | 2 | App: microfone e saída desconectados | Feita |
 | 8 | 2 | API e app: "Sem conexão com o servidor" | Feita |
 | 9 | 2 | API e app: a qualidade da conexão e o Testar conexão | Feita |
-| 10 | 2 | API, Rust e app: "Enviar logs" e o estado do servidor | Pendente |
+| 10 | 2 | API, Rust e app: "Enviar logs" e o estado do servidor | Feita |
 | 11 | — | Teste com três computadores, sem publicar | Pendente |
 | 12 | — | Lançamento da `0.6.0` | Pendente |
 
@@ -422,6 +422,13 @@ caminho (o candidato escolhido: UDP é direto; TCP ou TURN, reserva) e os pacote
 
 **Pronto quando:** um membro manda os logs pelo app e o dono baixa o `.zip` pelo Painel; o Painel mostra o último
 backup e o disco livre da VPS.
+
+**Como ficou:** a pasta dos dados é o `DATA_DIR`, ou a pasta do banco do `DATABASE_URL` (no contêiner, `/data`, que já
+monta os backups: o `compose.yaml` não muda). O "O que aconteceu?" vai na query (`?note=`), e a versão no
+`X-App-Version` de sempre. O limite de 10 MB é lido do corpo cru, e o `.zip` sem a assinatura é recusado. O Rust junta
+os logs com o crate `zip` (o mesmo que o `webrtc-sys-build` já baixa) e devolve os bytes crus (`ipc::Response`); o
+Windows vem do registro e a placa do DXGI. A feature `admin` do app tem o Enviar logs, as telas Logs e Servidor e o
+aviso do dono.
 
 ---
 

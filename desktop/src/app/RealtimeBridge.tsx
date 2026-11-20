@@ -16,6 +16,7 @@
  */
 import { type QueryClient, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
+import { handleAdminRealtime } from "@/features/admin";
 import { handleCallsRealtime } from "@/features/calls";
 import { handleChannelsRealtime } from "@/features/channels";
 import { handleChatRealtime, useOfflineCatchUp } from "@/features/chat";
@@ -57,6 +58,7 @@ const HANDLERS: Handler[] = [
 	handleUnreadRealtime,
 	handleChannelsRealtime,
 	handleCallsRealtime,
+	handleAdminRealtime,
 	// Por último: a regra dos avisos lê o silenciar e a lista de canais já em dia.
 	handleNotificationsRealtime,
 ];

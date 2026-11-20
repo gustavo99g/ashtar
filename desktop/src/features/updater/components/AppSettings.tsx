@@ -20,6 +20,7 @@ import logo from "@/assets/ashtar.svg";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
+import { SendLogs } from "@/features/admin";
 import { useMe } from "@/features/identity";
 import {
 	autostartEnabled,
@@ -325,8 +326,8 @@ export function AppSettings() {
 							Pasta de logs
 						</span>
 						<span className="text-xs leading-normal text-muted-foreground">
-							Se algo der errado, mande os arquivos dessa pasta para o dono.
-							Ficam os últimos 7 dias.
+							Se algo der errado, use Enviar logs: os dos últimos 2 dias vão
+							para o dono. A pasta guarda os últimos 7 dias.
 						</span>
 						<code className="self-start rounded-sm bg-rail px-1.5 py-0.5 font-mono text-[11px] leading-tight text-secondary-foreground">
 							{LOG_DIR}
@@ -338,10 +339,13 @@ export function AppSettings() {
 							</span>
 						)}
 					</span>
-					<Button variant="outline" className={outlineClass} onClick={openLogs}>
-						<FolderOpenIcon aria-hidden="true" className="size-[15px]" />
-						Abrir pasta
-					</Button>
+					<div className="flex shrink-0 flex-col gap-2">
+						<SendLogs className={outlineClass} />
+						<Button variant="outline" className={outlineClass} onClick={openLogs}>
+							<FolderOpenIcon aria-hidden="true" className="size-[15px]" />
+							Abrir pasta
+						</Button>
+					</div>
 				</div>
 			</Section>
 		</div>
