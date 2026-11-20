@@ -19,7 +19,7 @@ import { useLogReports } from "../queries";
 export function LogsSettings() {
 	const reports = useLogReports();
 	return (
-		<div className="flex w-full max-w-[860px] flex-col gap-5 py-20 pr-28 pl-32">
+		<div className="@container flex w-full flex-col gap-5 py-20 pr-28 pl-32">
 			<div className="flex flex-col gap-1.5">
 				<h1 className="text-[22px] leading-tight font-bold text-foreground">
 					Logs
