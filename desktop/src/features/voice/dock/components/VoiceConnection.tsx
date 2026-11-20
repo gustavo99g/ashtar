@@ -24,8 +24,8 @@ import { ShareButton } from "../../call/components/ShareButton";
 
 /*
  * O painel "Voz conectada" no pé da coluna, enquanto há chamada: Conectando ou Conectada (com o
- * ping), desconectar, a Câmera apagada (fora do roadmap da 0.2) e o Tela. Reconectando fica para a
- * 0.6: até lá, a volta da conexão aparece como Conectando.
+ * ping), desconectar, a Câmera apagada (fora do roadmap da 0.2) e o Tela. Desde a 0.6, Reconectando
+ * enquanto a voz volta sozinha de uma queda (ADR 0030).
  *
  * Na ligação privada (ADR 0023), o painel diz "Em ligação", em azul, com quem, e o botão é o
  * Desligar. Desligar daqui é sair da sala da ligação, e a `features/calls` encerra para os dois.
@@ -58,6 +58,11 @@ export function VoiceConnection() {
 					) : connectionState === "error" ||
 						connectionState === "disconnected" ? (
 						<Failed call={voiceKind === "call"} place={place} />
+					) : connectionState === "reconnecting" ? (
+						<ConnectingState
+							title="Reconectando…"
+							description="Conexão perdida, tentando de novo"
+						/>
 					) : (
 						<ConnectingState description={`${place} / Ashtar`} />
 					)}

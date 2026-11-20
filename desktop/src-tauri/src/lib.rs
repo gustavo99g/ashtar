@@ -18,6 +18,7 @@ pub mod logging;
 mod media;
 mod notifications;
 mod permissions;
+mod power;
 mod shortcuts;
 mod tray;
 mod updater;
@@ -71,6 +72,7 @@ pub fn run(log_file: logging::LateFile) {
             app.manage(commands::updater::create_auto_update(app.handle()));
             app.manage(commands::thumbnails::Thumbnails::default());
             app.manage(shortcuts::start(app.handle()));
+            power::watch_resume(app.handle());
 
             updater::spawn_periodic_check(app.handle().clone());
             deep_link::register_schemes(app);

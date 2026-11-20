@@ -1,6 +1,7 @@
 import { act, render, screen } from "@testing-library/react";
 import { DisconnectReason, RoomEvent, Track } from "livekit-client";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { GIVE_UP_MS } from "../model/reconnect";
 import { useSessionStore } from "@/features/identity";
 import {
 	ApiError,
@@ -249,5 +250,123 @@ describe("VoiceProvider", () => {
 			room?.emit(RoomEvent.Disconnected, DisconnectReason.PARTICIPANT_REMOVED),
 		);
 		expect(getMe).toHaveBeenCalledTimes(1);
+	});
+});
+
+describe("a voz volta sozinha", () => {
+	function ErrorProbe() {
+		const { voiceChannelId, connectionState, error, join, leave } = useVoice();
+		return (
+			<>
+				<button type="button" onClick={() => join(SALA.id)}>
+					{voiceChannelId ?? "fora"} {connectionState}: {error?.message}
+				</button>
+				<button type="button" onClick={leave}>
+					sair
+				</button>
+			</>
+		);
+	}
+
+	async function enter() {
+		useSessionStore.setState({ session: { status: "connected", user } });
+		vi.mocked(createVoiceToken).mockResolvedValue({
+			url: "wss://lk.test",
+			token: "t",
+		});
+		render(
+			<VoiceProvider>
+				<ErrorProbe />
+			</VoiceProvider>,
+		);
+		await act(async () => screen.getAllByRole("button")[0].click());
+		return rooms[rooms.length - 1];
+	}
+
+	const state = () => screen.getAllByRole("button")[0];
+
+	afterEach(() => {
+		vi.useRealTimers();
+	});
+
+	it("uma queda que ninguém pediu fica reconectando e entra de novo, com um token novo", async () => {
+		vi.useFakeTimers();
+		const room = await enter();
+		expect(createVoiceToken).toHaveBeenCalledTimes(1);
+
+		act(() =>
+			room.emit(RoomEvent.Disconnected, DisconnectReason.SIGNAL_CLOSE),
+		);
+		expect(state()).toHaveTextContent(`${SALA.id} reconnecting`);
+
+		await act(async () => vi.advanceTimersByTimeAsync(1_000));
+
+		expect(createVoiceToken).toHaveBeenCalledTimes(2);
+		expect(rooms.length).toBe(2);
+		expect(state()).toHaveTextContent(`${SALA.id} reconnecting`);
+	});
+
+	it("uma tentativa que falha agenda a próxima, esperando mais", async () => {
+		vi.useFakeTimers();
+		const room = await enter();
+		vi.mocked(createVoiceToken).mockRejectedValue(new Error("sem rede"));
+
+		act(() =>
+			room.emit(RoomEvent.Disconnected, DisconnectReason.SIGNAL_CLOSE),
+		);
+		await act(async () => vi.advanceTimersByTimeAsync(1_000));
+		expect(createVoiceToken).toHaveBeenCalledTimes(2);
+		expect(state()).toHaveTextContent(`${SALA.id} reconnecting`);
+
+		await act(async () => vi.advanceTimersByTimeAsync(1_999));
+		expect(createVoiceToken).toHaveBeenCalledTimes(2);
+		await act(async () => vi.advanceTimersByTimeAsync(1));
+		expect(createVoiceToken).toHaveBeenCalledTimes(3);
+	});
+
+	it("depois de 5 minutos, desiste e fica o erro", async () => {
+		vi.useFakeTimers();
+		const room = await enter();
+		vi.mocked(createVoiceToken).mockRejectedValue(new Error("sem rede"));
+
+		act(() =>
+			room.emit(RoomEvent.Disconnected, DisconnectReason.SIGNAL_CLOSE),
+		);
+		await act(async () => vi.advanceTimersByTimeAsync(GIVE_UP_MS + 30_000));
+
+		expect(state()).toHaveTextContent(
+			`${SALA.id} error: A conexão com a sala caiu e não voltou.`,
+		);
+		const calls = vi.mocked(createVoiceToken).mock.calls.length;
+		await act(async () => vi.advanceTimersByTimeAsync(60_000));
+		expect(createVoiceToken).toHaveBeenCalledTimes(calls);
+	});
+
+	it("sair no meio da volta cancela as tentativas", async () => {
+		vi.useFakeTimers();
+		const room = await enter();
+		act(() =>
+			room.emit(RoomEvent.Disconnected, DisconnectReason.SIGNAL_CLOSE),
+		);
+
+		await act(async () => screen.getByRole("button", { name: "sair" }).click());
+		await act(async () => vi.advanceTimersByTimeAsync(60_000));
+
+		expect(createVoiceToken).toHaveBeenCalledTimes(1);
+		expect(state()).toHaveTextContent("fora disconnected");
+	});
+
+	it("tirada pela API, não volta", async () => {
+		vi.useFakeTimers();
+		vi.mocked(getMe).mockReturnValue(new Promise(() => {}));
+		const room = await enter();
+
+		act(() =>
+			room.emit(RoomEvent.Disconnected, DisconnectReason.PARTICIPANT_REMOVED),
+		);
+		await act(async () => vi.advanceTimersByTimeAsync(60_000));
+
+		expect(createVoiceToken).toHaveBeenCalledTimes(1);
+		expect(state()).not.toHaveTextContent("reconnecting");
 	});
 });
