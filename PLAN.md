@@ -79,7 +79,7 @@ app só é publicado na Etapa 12, que leva a `dev` para o beta e depois para a `
 As decisões de arquitetura vão para as ADRs, que são a fonte:
 
 - `0029-configuracoes-de-voz-e-atalhos.md`: a cadeia do microfone, a detecção de voz, o pressionar para falar e o
-  gancho de teclado e mouse, o aviso de mutado e o som do pressionar para falar (decisões 1 a 8, 18 e 19).
+  gancho de teclado e mouse, o aviso de mutado, o som do pressionar para falar e o volume dos sons (decisões 1 a 8, 18, 19 e 22).
 - `0030-reconexao-e-estados.md`: a reconexão da voz e da transmissão, os dispositivos, a faixa do servidor, a
   qualidade da conexão, o Testar conexão, os logs e o estado do servidor (decisões 9 a 17, 20 e 21).
 
@@ -97,6 +97,8 @@ As decisões de arquitetura vão para as ADRs, que são a fonte:
   a lista do Painel) são desenhadas na Etapa 0, no estilo dos quadros vizinhos.
 - **Entram mais quatro (20/11):** o aviso de "você está mutado", o som do pressionar para falar, o Testar conexão e
   o estado do servidor no Painel. A mensagem não enviada guardada ao fechar o app ficou de fora.
+- **Entra o volume dos sons do Ashtar (20/11).** Voltar para a sala ao reabrir e oferecer os logs depois de um
+  travamento ficaram de fora.
 
 ### Decidido neste plano
 
@@ -183,6 +185,10 @@ As decisões de arquitetura vão para as ADRs, que são a fonte:
 21. **O estado do servidor**, numa tela Servidor do Painel de controle, só para o dono: a API (versão e há quanto
     tempo está no ar), o LiveKit (responde ou não, e em quanto tempo), o disco livre na pasta de dados e o último
     backup (o arquivo mais novo de `data/backups/`). Atualiza ao abrir e com um botão; sem aviso nem histórico.
+22. **O volume dos sons do Ashtar** é uma régua no alto de Configurações › Notificações, de 0 a 100% (padrão 100%),
+    que vale para todos os sons do app: mensagem, menção, toque da ligação, os sons da sala e o do pressionar para
+    falar. Fica separada da voz e do volume de saída, que continuam sem mexer nos sons. O botão de ouvir de cada som
+    usa a régua.
 
 ---
 
@@ -281,7 +287,8 @@ continua recebendo a tecla.
   `toggleMute`, o `toggleDeafen`, o `setHeld` do portão, o atender e o recusar da ligação que está tocando).
 - O modo Pressionar para falar: o portão fica fechado até o atalho, e o painel de voz mostra a tecla embaixo do nome
   da sala ("Pressionar para falar: V").
-- O som do pressionar para falar (decisão 19), com a chave em Notificações.
+- O som do pressionar para falar (decisão 19), com a chave em Notificações, e a régua do volume dos sons (decisão
+  22), aplicada no `playRoomSound` e nos sons de mensagem, menção e toque.
 - O aviso "Você está mutado" (decisão 18): o clone da trilha, o detector com o mesmo limiar do portão, o aviso no
   painel de voz e a chave em Voz e vídeo.
 - Testes: duas linhas com a mesma combinação; gravar e cancelar; o atalho de atender sem ligação tocando não faz

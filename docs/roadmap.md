@@ -837,7 +837,7 @@ da chamada e a tela "Este computador saiu do grupo" já saíram antes (v0.2.2 a 
 * **indicador de qualidade da conexão** por participante (ping e perda de pacotes), para saber se um
   picote vem da rede de quem transmite ou de quem assiste;
 * botão "Enviar logs", que manda os logs recentes para a API, e a tela Logs no Painel de controle do dono;
-* aviso de "você está mutado" ao falar mutado, e o som opcional do pressionar para falar;
+* aviso de "você está mutado" ao falar mutado, o som opcional do pressionar para falar e o volume dos sons do app;
 * Testar conexão (ping e caminho da voz, UDP ou TCP) em Voz e vídeo;
 * o estado do servidor (API, LiveKit, disco e último backup) no Painel do dono.
 

@@ -40,7 +40,7 @@ no `settingsStore`.
 
 **"Você está mutado"** aparece no painel de voz quando a pessoa fala mutada, lido de um clone da trilha do microfone
 (o mute do LiveKit desliga a publicada). **O pressionar para falar tem um som** opcional ao abrir e fechar, que só
-quem aperta ouve.
+quem aperta ouve. **Os sons do Ashtar ganham um volume próprio**, numa régua em Notificações, separado da voz.
 
 ## Alternativas consideradas
 
