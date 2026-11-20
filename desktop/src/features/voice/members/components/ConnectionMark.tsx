@@ -1,4 +1,4 @@
-import { SignalLowIcon, SignalZeroIcon } from "lucide-react";
+import { SignalLowIcon, SignalMediumIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ConnectionTrouble } from "../model/members";
 
@@ -12,7 +12,7 @@ export function ConnectionMark({
 }) {
 	if (!connection) return null;
 	const unstable = connection === "unstable";
-	const Icon = unstable ? SignalLowIcon : SignalZeroIcon;
+	const Icon = unstable ? SignalMediumIcon : SignalLowIcon;
 	return (
 		<Icon
 			role="img"

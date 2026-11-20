@@ -62,7 +62,7 @@ Levantado na `dev` (`196cb41`), para o plano não refazer:
 | 6 | 2 | Rust e app: a transmissão nativa volta sozinha | Feita |
 | 7 | 2 | App: microfone e saída desconectados | Feita |
 | 8 | 2 | API e app: "Sem conexão com o servidor" | Feita |
-| 9 | 2 | API e app: a qualidade da conexão e o Testar conexão | Pendente |
+| 9 | 2 | API e app: a qualidade da conexão e o Testar conexão | Feita |
 | 10 | 2 | API, Rust e app: "Enviar logs" e o estado do servidor | Pendente |
 | 11 | — | Teste com três computadores, sem publicar | Pendente |
 | 12 | — | Lançamento da `0.6.0` | Pendente |
@@ -394,6 +394,13 @@ moldura (as configurações não a cobrem). A busca do que mudou na volta já ex
 
 **Pronto quando:** limitar a rede de um computador (perda de 10% no `clumsy`) faz o ícone aparecer para os outros, e o
 cartão dele mostra a perda; com o UDP bloqueado no firewall, o Testar conexão diz que a voz vai pelo caminho reserva.
+
+**Como ficou:** a marca (`ConnectionMark`) sai do `connectionQuality` de cada participante (`poor` é Instável, `lost`
+é Ruim), no bloco e na lista da sala. Os números vão no tópico do surdo como `{ stats: { ping, loss } }`, que o app
+antigo ignora, e ficam no `voiceStatsStore`. O Testar conexão não usa o `ConnectionCheck` do LiveKit (o teste de
+publicar dele exige falar no microfone): entra na `teste:{id}`, publica um som mudo por 4 segundos e lê o ping, o
+caminho (o candidato escolhido: UDP é direto; TCP ou TURN, reserva) e os pacotes que saíram. O webhook ignora as salas
+`teste:`.
 
 ## Etapa 10: API, Rust e app, "Enviar logs" e o estado do servidor
 

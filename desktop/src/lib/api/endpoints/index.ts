@@ -35,6 +35,7 @@ export { createRealtimeTicket } from "./realtime";
 
 export {
 	createScreenToken,
+	createTestToken,
 	disconnectMember,
 	moveMember,
 	createVoiceToken,

@@ -100,6 +100,14 @@ pub async fn livekit(
             return StatusCode::UNAUTHORIZED;
         }
     };
+    // A sala do Testar conexão: é só da pessoa, e ninguém a vê.
+    if event
+        .room
+        .as_ref()
+        .is_some_and(|room| room.name.starts_with(voice::TEST_ROOM_PREFIX))
+    {
+        return StatusCode::OK;
+    }
     // A sala de uma ligação privada: nada sai para todos.
     if let Some(room) = event.room.as_ref() {
         match dms::get(&state.db, &room.name).await {

@@ -30,6 +30,7 @@ import {
 	setOutputVolume,
 	useOutputVolume,
 } from "../stores/outputVolumeStore";
+import { ConnectionTest } from "./ConnectionTest";
 import { InputModeSection } from "./InputModeSection";
 import { MicTest } from "./MicTest";
 import { SettingSwitch } from "./SettingSwitch";
@@ -39,7 +40,7 @@ import { VolumeSlider } from "./VolumeSlider";
  * Configurações › Voz e vídeo (quadro "Configurações — voz e vídeo", ADR 0029): os dispositivos
  * com o volume de entrada e de saída e o Testar microfone; o modo de entrada (a detecção de voz com
  * a sensibilidade, ou o pressionar para falar); o processamento de voz; a câmera; o padrão do
- * compartilhamento de tela; e as perguntas das ligações.
+ * compartilhamento de tela; o Testar conexão; e as perguntas das ligações.
  *
  * Tudo vale na hora, também no meio de uma chamada (`VoiceProvider`). Um dispositivo escolhido
  * que está desconectado continua escolhido, apagado e com "(desconectado)", e o aviso embaixo diz
@@ -129,6 +130,9 @@ export function VoiceSettings() {
 					checked={choice.warnWhenMuted}
 					onCheckedChange={(warnWhenMuted) => setInputChoice({ warnWhenMuted })}
 				/>
+			</Section>
+			<Section title="Conexão" gap="gap-3">
+				<ConnectionTest />
 			</Section>
 			<Section title="Câmera">
 				<CameraOptions className="max-w-[420px]" />

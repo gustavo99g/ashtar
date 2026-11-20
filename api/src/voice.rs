@@ -44,6 +44,15 @@ pub struct RoomParticipant {
 /// identidade (ADR 0017).
 pub const SCREEN_SUFFIX: &str = ":screen";
 
+/// O começo do nome da sala do Testar conexão (v0.6, decisão 20): `teste:{user_id}`. Nenhum canal
+/// tem `:` no id, e o webhook ignora essas salas (ninguém vê a pessoa "entrar" nelas).
+pub const TEST_ROOM_PREFIX: &str = "teste:";
+
+/// A sala do Testar conexão de `user_id`.
+pub fn test_room(user_id: &str) -> String {
+    format!("{TEST_ROOM_PREFIX}{user_id}")
+}
+
 /// A identidade da tela de `user_id`.
 pub fn screen_identity(user_id: &str) -> String {
     format!("{user_id}{SCREEN_SUFFIX}")
