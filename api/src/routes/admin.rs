@@ -23,6 +23,9 @@ pub struct ServerStatus {
     pub disk: Option<DiskStatus>,
     /// O backup mais novo de `data/backups/`, ou `None` sem nenhum.
     pub last_backup: Option<BackupStatus>,
+    /// Quanto os arquivos (fotos, anexos, prévias e emojis) ocupam, em bytes (ADR 0031).
+    #[ts(type = "number")]
+    pub files_bytes: i64,
 }
 
 #[derive(Debug, Serialize, TS)]
@@ -99,6 +102,7 @@ pub async fn status(
         livekit,
         disk: disk(&state.data_dir),
         last_backup: last_backup(&state.data_dir.join("backups")),
+        files_bytes: crate::files::total_size(&state.db).await?,
     }))
 }
 

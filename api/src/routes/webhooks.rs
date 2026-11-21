@@ -147,7 +147,7 @@ pub async fn livekit(
 
 /// Pergunta ao LiveKit quem está na sala e publica, a não ser que uma releitura
 /// mais nova da mesma sala tenha sido pedida enquanto esta esperava.
-async fn reread(state: AppState, room: String) {
+pub(crate) async fn reread(state: AppState, room: String) {
     let n = state.hub.start_voice_read(&room);
     let participants = match voice::list_room(&room).await {
         Ok(listed) => voice::join_participants(&state.db, listed).await,

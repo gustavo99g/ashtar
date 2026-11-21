@@ -72,8 +72,13 @@ Baixe o `livekit-server` na [página de releases](https://github.com/livekit/liv
 em modo de desenvolvimento:
 
 ```bash
-livekit-server --dev
+livekit-server --dev --config deploy/dev/livekit.yaml
 ```
+
+O `deploy/dev/livekit.yaml` liga o webhook para a API local (`http://127.0.0.1:3000/webhooks/livekit`):
+é ele que avisa quem está fora da sala de quem entra, sai ou liga a tela. Sem ele, o app ainda conta
+a própria entrada e saída para a API (`/api/voice/state`), mas um app que fecha de repente fica na
+lista até alguém entrar ou sair da sala.
 
 ### 3. API
 

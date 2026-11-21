@@ -9,11 +9,13 @@ import {
 	ApiError,
 	getServerStatus,
 	type LogReportView,
+	listLogEntries,
 	listLogReports,
+	readLogEntry,
 	type ServerStatus,
 	sendLogs,
 } from "@/lib/api";
-import { logsBundle } from "@/lib/tauri/commands";
+import { downloadFile, logsBundle } from "@/lib/tauri/commands";
 import { LogsSettings } from "../components/LogsSettings";
 import { SendLogs } from "../components/SendLogs";
 import { ServerStatusSettings } from "../components/ServerStatusSettings";
@@ -25,9 +27,13 @@ vi.mock("@/lib/api", async (importOriginal) => ({
 	sendLogs: vi.fn(),
 	listLogReports: vi.fn(),
 	getServerStatus: vi.fn(),
-	downloadLogReport: vi.fn(),
+	listLogEntries: vi.fn(),
+	readLogEntry: vi.fn(),
 }));
-vi.mock("@/lib/tauri/commands", () => ({ logsBundle: vi.fn() }));
+vi.mock("@/lib/tauri/commands", () => ({
+	logsBundle: vi.fn(),
+	downloadFile: vi.fn(),
+}));
 vi.mock("@/components/ui/toast", () => ({
 	toast: { add: vi.fn(() => "aviso"), close: vi.fn() },
 }));
@@ -72,7 +78,9 @@ describe("o Enviar logs", () => {
 		);
 		await userEvent.click(screen.getByRole("button", { name: "Enviar" }));
 
-		await waitFor(() => expect(sendLogs).toHaveBeenCalledWith(zip, "a voz caiu"));
+		await waitFor(() =>
+			expect(sendLogs).toHaveBeenCalledWith(zip, "a voz caiu"),
+		);
 		await waitFor(() =>
 			expect(toast.add).toHaveBeenCalledWith(
 				expect.objectContaining({ title: "Logs enviados" }),
@@ -108,6 +116,45 @@ describe("o Painel", () => {
 		).toBeInTheDocument();
 	});
 
+	it("Ver abre os arquivos do .zip ali mesmo; Baixar salva pelo Rust", async () => {
+		vi.mocked(listLogReports).mockResolvedValue([report]);
+		vi.mocked(listLogEntries).mockResolvedValue([
+			{ name: "info.txt", size: 12 },
+			{ name: "logs/app.log", size: 15 },
+		]);
+		vi.mocked(readLogEntry).mockImplementation(async (_id, name) => ({
+			name,
+			text: name === "info.txt" ? "Ashtar 0.7.0" : "linha 1\nlinha 2",
+			truncated: false,
+		}));
+		vi.mocked(downloadFile).mockResolvedValue("C:/Downloads/ana.zip");
+		wrap(<LogsSettings />);
+
+		await userEvent.click(
+			await screen.findByRole("button", { name: "Ver os logs de Ana" }),
+		);
+		expect(await screen.findByText("Ashtar 0.7.0")).toBeInTheDocument();
+		await userEvent.click(screen.getByRole("tab", { name: /logs\/app\.log/ }));
+		expect(await screen.findByText(/linha 2/)).toBeInTheDocument();
+		expect(readLogEntry).toHaveBeenLastCalledWith("r1", "logs/app.log");
+
+		await userEvent.click(
+			screen.getByRole("button", { name: "Baixar os logs de Ana" }),
+		);
+		await waitFor(() =>
+			expect(downloadFile).toHaveBeenCalledWith(
+				"r1",
+				"ashtar-logs-ana-1763600000.zip",
+				undefined,
+				"logs",
+			),
+		);
+		expect(toast.add).toHaveBeenCalledWith({
+			title: "Salvo em Downloads",
+			description: "C:/Downloads/ana.zip",
+		});
+	});
+
 	it("o estado do servidor mostra o LiveKit fora e o último backup", async () => {
 		const status: ServerStatus = {
 			api: { version: "0.6.0", uptime_secs: 3 * 86_400 + 4 * 3600 },
@@ -118,6 +165,7 @@ describe("o Painel", () => {
 				at: Math.floor(Date.now() / 1000) - 3600,
 				size: 2048,
 			},
+			files_bytes: 3 * 1024 ** 3,
 		};
 		vi.mocked(getServerStatus).mockResolvedValue(status);
 		wrap(<ServerStatusSettings />);
@@ -125,6 +173,7 @@ describe("o Painel", () => {
 		expect(screen.getByText("connection refused")).toBeInTheDocument();
 		expect(screen.getByText("No ar há 3 dias e 4 h")).toBeInTheDocument();
 		expect(screen.getByText("20 GB livres")).toBeInTheDocument();
+		expect(screen.getByText(/os arquivos ocupam 3 GB/)).toBeInTheDocument();
 		expect(screen.getByText("há 1 h")).toBeInTheDocument();
 	});
 

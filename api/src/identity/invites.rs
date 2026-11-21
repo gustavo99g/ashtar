@@ -524,7 +524,7 @@ pub async fn redeem(
     let (user, new_member): (User, bool) = match (invite.kind.as_str(), invite.target_user_id) {
         ("recovery", Some(target_id)) => {
             let user: Option<User> = sqlx::query_as(
-                "SELECT id, nick, is_owner, display_name, created_at, removed_at FROM users
+                "SELECT id, nick, is_owner, display_name, created_at, removed_at, avatar_id FROM users
                  WHERE id = ? AND removed_at IS NULL",
             )
             .bind(&target_id)

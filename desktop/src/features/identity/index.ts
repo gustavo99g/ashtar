@@ -26,6 +26,7 @@ export {
 	useSetStatus,
 } from "./queries";
 export { handleIdentityRealtime } from "./realtime";
+export { rememberAvatars } from "./stores/avatarStore";
 export {
 	redeemInvite,
 	type Session,

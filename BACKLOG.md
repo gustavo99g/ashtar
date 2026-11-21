@@ -66,5 +66,10 @@ O aviso de conteúdo protegido está na v0.8 do roadmap (`## Screen Share`); as 
 - [ ] Qualquer funcionalidade nova de voz além do que já existe.
 - [ ] O overlay em jogos, desenhado no canvas e sem versão (a câmera entrou na v0.4).
 - [ ] `@todos`, silenciar com prazo e grupos privados com mais de duas pessoas (fora da v0.3).
+- [ ] Cópia dos arquivos (fotos, anexos, prévias e emojis) fora da VPS: o R2 como segunda implementação do
+      `FileStore` (ADR 0031) ou uma cópia periódica de `data/files`, ou o snapshot do provedor. Adiado pelo Kid em
+      20/11; até lá os arquivos ficam fora do backup.
+- [ ] O cartão "Evento do grupo" do quadro "Canal de texto — paleta Ashtar" (criar evento, confirmar presença,
+      lembrete), "Ouvindo música" e o player de áudio no chat: sem versão.
 - [ ] Um segundo tema (claro, por exemplo). A troca por `data-theme` já existe desde a v0.2.2 (ADR 0012);
       a opção aparece nas configurações quando o tema existir, com o contraste conferido.

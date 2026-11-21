@@ -1,3 +1,5 @@
+import { useId } from "react";
+import { Switch } from "@/components/ui/switch";
 import {
 	Select,
 	SelectContent,
@@ -22,7 +24,8 @@ const AUDIO_ORDER: ShareAudioChoice[] = ["application", "system", "off"];
 
 /** Com o que o seletor de fontes abre: a qualidade e o áudio. Mudar lá vale só para aquela vez. */
 export function ShareDefaultsSection() {
-	const { quality, audio } = useShareDefaults();
+	const { quality, audio, hardwareEncoder } = useShareDefaults();
+	const encoderLabel = useId();
 	const qualities = QUALITY_ORDER.map((value) => ({
 		value,
 		label: `${QUALITY_PRESETS[value].label} · ${QUALITY_PRESETS[value].spec} fps`,
@@ -84,6 +87,28 @@ export function ShareDefaultsSection() {
 						</SelectContent>
 					</Select>
 				</div>
+			</div>
+			<div className="flex items-center justify-between gap-6">
+				<span className="flex min-w-0 flex-col gap-1">
+					<span
+						id={encoderLabel}
+						className="text-sm leading-tight font-semibold text-foreground"
+					>
+						Codificar na placa de vídeo
+					</span>
+					<span className="text-xs leading-normal text-muted-foreground">
+						Desligado, o vídeo da transmissão é codificado pelo processador.
+						Vale na próxima transmissão.
+					</span>
+				</span>
+				<Switch
+					variant="blue"
+					aria-labelledby={encoderLabel}
+					checked={hardwareEncoder}
+					onCheckedChange={(next) =>
+						setShareDefaults({ hardwareEncoder: next })
+					}
+				/>
 			</div>
 			<p className="text-xs text-muted-foreground">
 				Conteúdo protegido, como filmes de serviços de streaming, pode aparecer

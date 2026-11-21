@@ -1,5 +1,5 @@
 //! Comandos sobre o próprio app (versão, novidades, pasta de logs, menu da bandeja, iniciar com o
-//! Windows).
+//! Windows, aceleração de hardware).
 
 use serde::Serialize;
 use tauri::{AppHandle, Manager};
@@ -56,6 +56,44 @@ pub async fn set_autostart(app: AppHandle, enabled: bool) -> Result<(), AppError
     result.map_err(|error| AppError::Internal(format!("iniciar com o Windows: {error}")))?;
     tracing::info!(enabled, "iniciar com o Windows");
     Ok(())
+}
+
+/// Se a janela usa a placa de vídeo (a chave de Configurações › Aplicativo; `gpu.rs`). É o que vale
+/// na próxima abertura, não necessariamente o de agora.
+#[tauri::command]
+pub async fn hardware_acceleration(app: AppHandle) -> Result<bool, AppError> {
+    let dir = app
+        .path()
+        .app_config_dir()
+        .map_err(|error| AppError::Internal(format!("pasta de configuração: {error}")))?;
+    Ok(!crate::gpu::flag_path(&dir).exists())
+}
+
+/// Liga ou desliga a aceleração de hardware da janela. Vale ao reiniciar o app.
+#[tauri::command]
+pub async fn set_hardware_acceleration(app: AppHandle, enabled: bool) -> Result<(), AppError> {
+    let dir = app
+        .path()
+        .app_config_dir()
+        .map_err(|error| AppError::Internal(format!("pasta de configuração: {error}")))?;
+    let path = crate::gpu::flag_path(&dir);
+    let result = if enabled {
+        match std::fs::remove_file(&path) {
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+            other => other,
+        }
+    } else {
+        std::fs::create_dir_all(&dir).and_then(|()| std::fs::write(&path, b""))
+    };
+    result.map_err(|error| AppError::Internal(format!("aceleração de hardware: {error}")))?;
+    tracing::info!(enabled, "aceleração de hardware (vale ao reiniciar)");
+    Ok(())
+}
+
+/// Fecha e abre o app de novo (para a aceleração de hardware valer).
+#[tauri::command]
+pub fn restart_app(app: AppHandle) {
+    app.restart();
 }
 
 /// As seções do `CHANGELOG.md` depois de `last_seen` até a versão em execução (quem pulou

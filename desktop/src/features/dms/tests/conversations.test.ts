@@ -17,6 +17,13 @@ function message(id: string, authorId: string, body = "oi"): Message {
 		mentions: [],
 		created_at: 1,
 		kind: "text",
+		edited_at: null,
+		reply_to: null,
+		reactions: [],
+		pinned_at: null,
+		attachments: [],
+		previews: [],
+		forwarded: null,
 		call: null,
 	};
 }
@@ -107,6 +114,13 @@ describe("a lista de conversas", () => {
 			conversation("d", "ana", {
 				...message("m", author, "Ligação"),
 				kind: "call",
+				edited_at: null,
+				reply_to: null,
+				reactions: [],
+				pinned_at: null,
+				attachments: [],
+				previews: [],
+				forwarded: null,
 				call: { id: "c", outcome, duration: outcome === "answered" ? 60 : null },
 			});
 		expect(preview(call("missed", "ana"), "eu")).toBe("Chamada perdida");

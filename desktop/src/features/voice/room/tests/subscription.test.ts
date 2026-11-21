@@ -167,3 +167,19 @@ describe("o que a sala baixa", () => {
 		);
 	});
 });
+
+describe("a câmera em foco", () => {
+	it("vem em alta; as outras, pequenas na faixa", () => {
+		const view: SubscriptionView = {
+			shown: {},
+			cameras: "small",
+			bigCamera: "ana",
+		};
+		expect(wantedQuality(Track.Source.Camera, "ana", view)).toBe(
+			VideoQuality.HIGH,
+		);
+		expect(wantedQuality(Track.Source.Camera, "bia", view)).toBe(
+			VideoQuality.LOW,
+		);
+	});
+});

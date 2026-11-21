@@ -168,12 +168,7 @@ pub async fn view(db: &SqlitePool, dm: &Dm, viewer: &User) -> Result<Conversatio
     let other = users::get_by_id(db, dm.other(&viewer.id)).await?;
     Ok(Conversation {
         id: dm.id.clone(),
-        person: Author {
-            id: other.id.clone(),
-            nick: other.nick.clone(),
-            display_name: other.display_name.clone(),
-            removed: !other.is_active(),
-        },
+        person: Author::of(&other),
         last_message: messages::last(db, &dm.id).await?,
         state: read::state(db, &viewer.id, &dm.id).await?,
     })

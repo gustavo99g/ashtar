@@ -46,7 +46,7 @@ function me(canViewPanel: boolean): MeResponse {
 		can_create_invite: canViewPanel,
 		can_view_panel: canViewPanel,
 		can_manage_channels: false,
-		can_move_members: false,
+		can_move_members: false, can_manage_emojis: false, can_view_logs: false,
 	};
 }
 

@@ -40,6 +40,10 @@ pub enum ErrorKind {
     ShareLimit,
     /// O pedido passou do tempo limite (`timeout.rs`). O app usa o mesmo texto para o seu.
     Timeout,
+    /// O arquivo passa do tamanho que o tipo aceita (413, ADR 0031).
+    FileTooLarge,
+    /// O disco do servidor tem menos de 1 GB livre (507, ADR 0031).
+    DiskFull,
 }
 
 /// O corpo de toda resposta de erro.
@@ -98,6 +102,14 @@ pub enum ApiError {
     LiveKit(String),
     #[error("O servidor demorou demais para responder. Tente de novo em instantes.")]
     Timeout,
+    /// O arquivo passou do limite; o texto diz qual ("100 MB").
+    #[error("O arquivo passa de {0}.")]
+    FileTooLarge(&'static str),
+    #[error("O servidor está sem espaço. O dono já foi avisado.")]
+    DiskFull,
+    /// Um erro de disco ao gravar ou ler um arquivo. O detalhe vai só para o log.
+    #[error("Erro interno no servidor.")]
+    Io(#[from] std::io::Error),
 }
 
 impl ApiError {
@@ -127,7 +139,9 @@ impl ApiError {
             Self::TooManyMessages => (StatusCode::TOO_MANY_REQUESTS, ErrorKind::TooManyMessages),
             Self::ShareLimit(_) => (StatusCode::CONFLICT, ErrorKind::ShareLimit),
             Self::Timeout => (StatusCode::GATEWAY_TIMEOUT, ErrorKind::Timeout),
-            Self::Internal(_) | Self::Config(_) | Self::LiveKit(_) => {
+            Self::FileTooLarge(_) => (StatusCode::PAYLOAD_TOO_LARGE, ErrorKind::FileTooLarge),
+            Self::DiskFull => (StatusCode::INSUFFICIENT_STORAGE, ErrorKind::DiskFull),
+            Self::Internal(_) | Self::Config(_) | Self::LiveKit(_) | Self::Io(_) => {
                 (StatusCode::INTERNAL_SERVER_ERROR, ErrorKind::Internal)
             }
         }
@@ -150,6 +164,7 @@ impl IntoResponse for ApiError {
             Self::Internal(error) => eprintln!("erro interno: {error}"),
             Self::Config(message) => eprintln!("configuração: {message}"),
             Self::LiveKit(message) => eprintln!("livekit: {message}"),
+            Self::Io(error) => eprintln!("disco: {error}"),
             _ => {}
         }
         let (status, kind) = self.status_and_kind();

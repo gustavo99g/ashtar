@@ -62,4 +62,32 @@ describe("MessageBody", () => {
 		expect(right.defaultPrevented).toBe(true);
 		expect(openLink).toHaveBeenCalledTimes(1);
 	});
+
+	it("desenha o markdown, e a menção dentro de código fica texto", () => {
+		const { container } = render(
+			<MessageBody
+				body={"**forte** _leve_ `@ana`"}
+				mentioned={[{ id: "a", nick: "ana", display_name: "Ana Lima" }]}
+			/>,
+		);
+		expect(container.querySelector("strong")).toHaveTextContent("forte");
+		expect(container.querySelector("em")).toHaveTextContent("leve");
+		expect(container.querySelector("code")).toHaveTextContent("@ana");
+		expect(screen.queryByText("@Ana Lima")).not.toBeInTheDocument();
+	});
+
+	it("o spoiler abre no clique e com o teclado, e o link dentro só depois", () => {
+		render(<MessageBody body={`||o vilão|| e ||${URL}||`} />);
+		const [first, second] = screen.getAllByRole("button", {
+			name: "Spoiler escondido, clique para mostrar",
+		});
+		fireEvent.click(first);
+		expect(screen.getByText("o vilão")).toBeInTheDocument();
+		expect(screen.queryByRole("link")).toBeNull();
+		fireEvent.keyDown(second, { key: "Enter" });
+		expect(screen.getByRole("link", { name: URL })).toBeInTheDocument();
+		expect(
+			screen.queryByRole("button", { name: /Spoiler escondido/ }),
+		).not.toBeInTheDocument();
+	});
 });

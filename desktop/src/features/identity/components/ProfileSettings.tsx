@@ -1,6 +1,10 @@
 /**
- * Configurações › Perfil (quadro "Perfil"): o nome visível, o nick fixo e a prévia do nome no
+ * Configurações › Perfil (quadro "Perfil"): a foto, o nome visível, o nick fixo e a prévia no
  * chat e na sala.
+ *
+ * A foto troca na hora (escolher, recortar, Aplicar), sem esperar o Salvar: ela não é um campo do
+ * formulário. Aceita PNG, JPEG, GIF e WebP; o que vai para a API é sempre o recorte de 256 pixels.
+ * As fotos que a pessoa já usou ficam embaixo (v0.7): clicar volta a uma, o X apaga. Só ela vê.
  *
  * O nome só vai para a API no Salvar da barra de baixo (ou no Enter). Quem decide se ele vale é
  * a API: o `invalid_display_name` aparece no campo, com a mensagem dela. Em branco, o grupo vê o
@@ -8,14 +12,24 @@
  * de quando a pessoa entrou), e uma linha avisa isso. Quem diz se há chamada é a rota (`inCall`):
  * a voz importa a identidade, então a identidade não importa a voz.
  */
-import { InfoIcon, LockIcon } from "lucide-react";
-import { type FormEvent, useId, useState } from "react";
+import { InfoIcon, LockIcon, XIcon } from "lucide-react";
+import { type FormEvent, useId, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { isApiError, type UserView } from "@/lib/api";
 import { cn } from "@/lib/utils";
-import { useMe, useUpdateMe } from "../queries";
+import {
+	useChangeAvatar,
+	useDeleteSavedAvatar,
+	useMe,
+	useReuseAvatar,
+	useSavedAvatars,
+	useUpdateMe,
+} from "../queries";
 import { Avatar } from "./Avatar";
+import { AvatarCropDialog } from "./AvatarCropDialog";
+
+const IMAGE_TYPES = "image/png,image/jpeg,image/gif,image/webp";
 
 /** O limite da API (`DISPLAY_NAME_MAX`), em caracteres. */
 const MAX_LENGTH = 32;
@@ -98,6 +112,150 @@ function Preview({ nick, name }: { nick: string; name: string | null }) {
 	);
 }
 
+/** A foto: a atual, o Trocar (abre o recorte) e o Remover. */
+function PhotoField({ user }: { user: UserView }) {
+	const id = useId();
+	const input = useRef<HTMLInputElement>(null);
+	const [picked, setPicked] = useState<{ file: File; key: number } | null>(
+		null,
+	);
+	const [problem, setProblem] = useState<string | null>(null);
+	const change = useChangeAvatar();
+	const hasPhoto = Boolean(user.avatar);
+
+	function remove() {
+		setProblem(null);
+		change.mutate(null, {
+			onError: () => setProblem("Não deu para remover a foto. Tente de novo."),
+		});
+	}
+
+	return (
+		<section aria-labelledby={id} className="flex flex-col gap-2">
+			<h2 id={id} className={titleClass}>
+				Foto
+			</h2>
+			<div className="flex items-center gap-4">
+				<Avatar
+					nick={user.nick}
+					displayName={user.display_name}
+					avatar={user.avatar ?? null}
+					size={64}
+				/>
+				<div className="flex flex-wrap gap-2">
+					<Button
+						variant="secondary"
+						className="px-3.5 text-sm"
+						disabled={change.isPending}
+						onClick={() => input.current?.click()}
+					>
+						{hasPhoto ? "Trocar foto" : "Escolher foto"}
+					</Button>
+					{hasPhoto && (
+						<Button
+							variant="ghost"
+							className="px-3.5 text-sm"
+							disabled={change.isPending}
+							onClick={remove}
+						>
+							Remover foto
+						</Button>
+					)}
+				</div>
+				<input
+					ref={input}
+					type="file"
+					accept={IMAGE_TYPES}
+					hidden
+					aria-label="Escolher a foto"
+					onChange={(event) => {
+						const file = event.target.files?.[0];
+						event.target.value = "";
+						if (file) {
+							setProblem(null);
+							setPicked({ file, key: Date.now() });
+						}
+					}}
+				/>
+			</div>
+			<p className={cn(helpClass, problem && "text-destructive-text")}>
+				{problem ?? "PNG, JPEG, GIF ou WebP. Sem foto, aparece a sua letra."}
+			</p>
+			<SavedPhotos user={user} />
+			<AvatarCropDialog
+				key={picked?.key ?? 0}
+				file={picked?.file ?? null}
+				onApply={(image) => change.mutateAsync(image)}
+				onClose={() => setPicked(null)}
+			/>
+		</section>
+	);
+}
+
+/** As fotos que a pessoa já usou, menos a de agora: clicar volta a ela, o X apaga. */
+function SavedPhotos({ user }: { user: UserView }) {
+	const { data } = useSavedAvatars();
+	const reuse = useReuseAvatar();
+	const remove = useDeleteSavedAvatar();
+	const [problem, setProblem] = useState<string | null>(null);
+	const saved = (data ?? []).filter((photo) => photo.file_id !== user.avatar);
+	if (saved.length === 0) return null;
+	const busy = reuse.isPending || remove.isPending;
+	return (
+		<div className="flex flex-col gap-2 pt-2">
+			<h3 className={smallTitleClass}>Fotos anteriores</h3>
+			<ul aria-label="Fotos anteriores" className="flex flex-wrap gap-2.5">
+				{saved.map((photo) => (
+					<li key={photo.file_id} className="group/photo relative">
+						<button
+							type="button"
+							aria-label="Usar esta foto"
+							title="Usar esta foto"
+							disabled={busy}
+							onClick={() => {
+								setProblem(null);
+								reuse.mutate(photo.file_id, {
+									onError: () =>
+										setProblem("Não deu para trocar a foto. Tente de novo."),
+								});
+							}}
+							className="block rounded-full outline-offset-2 hover:opacity-80 focus-visible:outline-2 focus-visible:outline-focus disabled:opacity-60"
+						>
+							<Avatar
+								nick={user.nick}
+								displayName={user.display_name}
+								avatar={photo.file_id}
+								size={48}
+							/>
+						</button>
+						<button
+							type="button"
+							aria-label="Apagar esta foto"
+							title="Apagar"
+							disabled={busy}
+							onClick={() => {
+								setProblem(null);
+								remove.mutate(photo.file_id, {
+									onError: () =>
+										setProblem("Não deu para apagar a foto. Tente de novo."),
+								});
+							}}
+							className="absolute -top-1 -right-1 flex size-5 items-center justify-center rounded-full border border-border bg-card text-muted-foreground opacity-0 group-hover/photo:opacity-100 hover:text-foreground focus-visible:opacity-100"
+						>
+							<XIcon className="size-3" />
+						</button>
+					</li>
+				))}
+			</ul>
+			{problem && (
+				<p role="alert" className="text-xs text-destructive-text">
+					{problem}
+				</p>
+			)}
+		</div>
+	);
+}
+
 function ProfileForm({ user, inCall }: { user: UserView; inCall: boolean }) {
 	const nameId = useId();
 	const nickId = useId();
@@ -143,6 +301,7 @@ function ProfileForm({ user, inCall }: { user: UserView; inCall: boolean }) {
 		<form onSubmit={save} className="flex flex-1 flex-col gap-14">
 			<div className="grid items-start gap-14 @2xl:grid-cols-[minmax(0,1fr)_340px]">
 				<div className="flex flex-col gap-8">
+					<PhotoField user={user} />
 					<section className="flex flex-col gap-2">
 						<div className="flex items-baseline justify-between">
 							<label htmlFor={nameId} className={titleClass}>

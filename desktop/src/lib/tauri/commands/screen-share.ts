@@ -87,6 +87,8 @@ export interface ShareOptions {
 	cursor: boolean;
 	/** O nivelador do áudio (`media/leveler.rs`): sobe o som baixo do jogo, sem estourar. */
 	leveler: boolean;
+	/** Codificar na placa de vídeo; `false` manda pela CPU. Ausente, a placa. */
+	hardwareEncoder?: boolean;
 	target: ShareTarget;
 }
 

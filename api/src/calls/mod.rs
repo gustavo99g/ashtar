@@ -176,12 +176,7 @@ pub enum Started {
 }
 
 fn author(user: &User) -> Author {
-    Author {
-        id: user.id.clone(),
-        nick: user.nick.clone(),
-        display_name: user.display_name.clone(),
-        removed: !user.is_active(),
-    }
+    Author::of(user)
 }
 
 /// A ligação como o tempo real leva, com quem liga e quem recebe.

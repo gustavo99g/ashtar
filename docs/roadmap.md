@@ -872,38 +872,51 @@ mandar os logs pelo app → o dono baixa pelo Painel
 
 # v0.7 — Perfil e chat avançado
 
+Sai numa versão só, a `0.7.0`, que leva junto a v0.6 (a `0.6.0` não é publicada sozinha). O plano está em
+[`docs/plans/v0.7-perfil-e-chat-avancado.md`](plans/v0.7-perfil-e-chat-avancado.md); as decisões, nas ADRs 0031 e
+0032.
+
 ## Objetivo
 
 Perfil personalizável e um chat completo para o dia a dia.
 
 ## Perfil e armazenamento de arquivos
 
-* troca de nick e foto de perfil, na mesma tela (dentro da tela de configurações da v0.6);
-* a troca chega a todos em tempo real (evento `user.updated`) e aparece também na sala de voz;
-* armazenamento de arquivos (disco da API ou um storage como o Cloudflare R2), montado uma vez para a
-  foto e para os anexos do chat;
-* redimensionamento das imagens;
-* arquivos incluídos no backup.
+* foto de perfil, com recorte, na tela Perfil das configurações; o nick continua fixo (decidido na v0.2.2) e o nome
+  visível já podia ser trocado;
+* a troca de foto e de nome chega a todos em tempo real (evento `user.updated`), no chat, nos cartões e na sala de voz;
+* armazenamento de arquivos no disco da VPS, montado uma vez para a foto, os anexos, as prévias e os emojis, atrás de
+  uma interface para o R2 entrar depois;
+* imagens redimensionadas no app antes de enviar;
+* os arquivos ficam fora do backup do banco por enquanto (decisão do Kid, 20/11), com aviso ao dono quando o disco
+  passa de 80%.
 
 ## Chat
 
-* editar, excluir e copiar mensagem;
-* responder;
-* reações;
-* anexos básicos, incluindo colar imagem com Ctrl+V;
-* preview de links;
+* editar, excluir e copiar mensagem, pelo menu da mensagem;
+* responder, com "Ir para o presente" ao voltar de uma mensagem antiga;
+* reações, com um seletor de emoji;
+* anexos de até 100 MB, incluindo colar imagem com Ctrl+V e arrastar;
+* vídeo `.mp4` e `.webm` tocando no chat;
+* preview de links, buscado pela API;
 * markdown básico: negrito, itálico, código e spoiler;
+* encaminhar mensagem;
 * mensagens fixadas;
-* busca simples de mensagens (busca de texto do próprio banco).
+* busca de mensagens (FTS5 do próprio banco), com filtros;
+* a mídia do canal, numa caixa pelo cabeçalho;
+* emojis do grupo.
+
+Ficaram de fora: o cartão "Evento do grupo" do canvas, "Sobre mim" e a cor do cartão do perfil, o player de áudio e a
+cópia dos arquivos no R2.
 
 ## Critérios de conclusão
 
 ```text
-trocar nick e foto → todos veem na hora, no chat e na voz
+trocar nome e foto → todos veem na hora, no chat e na voz
  +
-colar um print com Ctrl+V → o outro vê a imagem
+colar um print com Ctrl+V → o outro vê a imagem; um clipe toca no chat
  +
-editar, responder e reagir a mensagens
+editar, responder, reagir, fixar e encaminhar mensagens
  +
 encontrar uma mensagem antiga pela busca
 ```

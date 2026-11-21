@@ -23,6 +23,9 @@ import { usePeople } from "../queries";
 import { setDraft } from "../stores/draftStore";
 import { paths } from "@/lib/paths";
 import { ChatConversation } from "./ChatConversation";
+import { MediaButton } from "./MediaButton";
+import { PinsButton } from "./PinsBar";
+import { SearchBox } from "./SearchBox";
 
 /**
  * A tela de um canal de texto: o cabeçalho com o nome e o tópico, a conversa e o campo de
@@ -31,6 +34,7 @@ import { ChatConversation } from "./ChatConversation";
  */
 export function ChatView({ channelId }: { channelId: string }) {
 	const layout = useChannelLayout();
+	const canManage = useCanManageChannels();
 	const channel = layout.data ? findChannel(layout.data, channelId) : undefined;
 
 	useEffect(() => {
@@ -74,6 +78,11 @@ export function ChatView({ channelId }: { channelId: string }) {
 					{channel.name}
 				</h1>
 				<ChannelTopic channel={channel} />
+				<div className="ml-auto flex shrink-0 items-center gap-1 pl-2">
+					<PinsButton channelId={channel.id} canPin={canManage} />
+					<MediaButton channelId={channel.id} />
+					<SearchBox channelId={channel.id} />
+				</div>
 			</header>
 			<ChatConversation
 				channelId={channel.id}

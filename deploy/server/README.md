@@ -168,6 +168,17 @@ usado.
 **Restauração, testada uma vez:** baixe um backup do R2, ponha no lugar do `data/ashtar.db` (com a API parada,
 `docker compose stop api`, e sem os `-wal`/`-shm` antigos), `docker compose up -d api` e confira no app.
 
+### Arquivos (v0.7)
+
+As fotos de perfil, os anexos do chat, as imagens das prévias de link e os emojis do grupo ficam em
+`data/files/` (a variável `FILES_DIR` troca a pasta). **Eles não entram no backup**: se o disco da VPS se perder,
+os arquivos vão junto, e as mensagens ficam (ADR 0031). A cópia no R2 está no BACKLOG.
+
+A API apaga sozinha, de hora em hora, o que foi enviado e não usado em 24 horas. Com menos de 1 GB livre ela
+recusa envios, e o dono recebe um aviso no app quando o disco passa de 80% (no máximo um por dia). O Painel ›
+Servidor mostra quanto os arquivos ocupam. O Caddy não limita o tamanho do corpo: os anexos de até 100 MB passam
+direto para a API, que corta no limite.
+
 ### Alerta
 
 No UptimeRobot, um monitor HTTP(S) para `https://api.ashtar.app.br/health` a cada 5 minutos, com aviso pelo app

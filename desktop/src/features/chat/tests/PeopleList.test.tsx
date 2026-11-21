@@ -105,6 +105,9 @@ beforeEach(() => {
 						nick: "kid",
 						display_name: "Kid",
 						screen_sharing: false,
+						mic_off: false,
+						deafened: false,
+						camera: false,
 					},
 				]
 			: [
@@ -113,6 +116,9 @@ beforeEach(() => {
 						nick: "ana",
 						display_name: null,
 						screen_sharing: true,
+						mic_off: false,
+						deafened: false,
+						camera: false,
 					},
 				],
 	);

@@ -43,3 +43,8 @@ dist-ssr
 
 # O cache do tsc
 *.tsbuildinfo
+
+# Os arquivos que a API local guarda (anexos, fotos, emojis, prévias), ao lado do banco. Só
+# estes caminhos: um `files/` solto pegaria também o código em `api/src/files/`.
+/files/
+/api/files/

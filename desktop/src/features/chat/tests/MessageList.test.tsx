@@ -53,6 +53,13 @@ function message(id: string): Message {
 		mentions: [],
 		created_at: Math.floor(Date.now() / 1000),
 		kind: "text",
+		edited_at: null,
+		reply_to: null,
+		reactions: [],
+		pinned_at: null,
+		attachments: [],
+		previews: [],
+		forwarded: null,
 		call: null,
 	};
 }
@@ -122,6 +129,43 @@ describe("MessageList: o fim da conversa", () => {
 		expect(
 			screen.queryByRole("button", { name: "Novas mensagens" }),
 		).not.toBeInTheDocument();
+	});
+});
+
+describe("MessageList: o conteúdo que cresce", () => {
+	/** O jsdom não tem `ResizeObserver`: este guarda quem observa, e o teste avisa. */
+	let resized: (() => void)[] = [];
+	beforeEach(() => {
+		resized = [];
+		vi.stubGlobal(
+			"ResizeObserver",
+			class {
+				constructor(callback: () => void) {
+					resized.push(callback);
+				}
+				observe() {}
+				disconnect() {}
+			},
+		);
+	});
+	afterEach(() => vi.unstubAllGlobals());
+
+	it("a prévia que chega depois não esconde o fim de quem estava nele", () => {
+		box.scrollHeight = 500;
+		box.clientHeight = 100;
+		render(list([message("m1"), message("m2")]));
+		expect(box.scrollTop).toBe(500);
+		// O cartão da prévia entrou: a mensagem ficou mais alta.
+		box.scrollHeight = 800;
+		act(() => resized.forEach((callback) => callback()));
+		expect(box.scrollTop).toBe(800);
+	});
+
+	it("quem lê o histórico fica onde está", () => {
+		scrolledUp();
+		box.scrollHeight = 1300;
+		act(() => resized.forEach((callback) => callback()));
+		expect(box.scrollTop).toBe(0);
 	});
 });
 

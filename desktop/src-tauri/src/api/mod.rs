@@ -12,6 +12,7 @@
 //! token da resposta.
 
 mod config;
+pub mod download;
 mod error;
 
 use std::sync::OnceLock;

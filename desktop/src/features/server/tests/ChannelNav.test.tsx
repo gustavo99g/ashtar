@@ -64,7 +64,7 @@ const layout: Layout = {
 };
 
 function person(id: string, sharing = false): ParticipantView {
-	return { user_id: id, nick: id, display_name: null, screen_sharing: sharing };
+	return { user_id: id, nick: id, display_name: null, screen_sharing: sharing, mic_off: false, deafened: false, camera: false };
 }
 
 function renderNav({ manage = false, at = paths.channel("geral") } = {}) {
@@ -79,7 +79,7 @@ function renderNav({ manage = false, at = paths.channel("geral") } = {}) {
 		can_create_invite: true,
 		can_view_panel: true,
 		can_manage_channels: manage,
-		can_move_members: manage,
+		can_move_members: manage, can_manage_emojis: false, can_view_logs: false,
 	};
 	client.setQueryData(identityKeys.me(), me);
 	client.setQueryData(["channels", "layout"], layout);

@@ -1,5 +1,6 @@
 import { LogsSettings, ServerStatusSettings } from "@/features/admin";
 import { ArchivedSettings } from "@/features/channels";
+import { EmojiSettings } from "@/features/emojis";
 import { ProfileSettings } from "@/features/identity";
 import { ShortcutsSettings } from "@/features/settings";
 import { InvitesSettings } from "@/features/invites";
@@ -45,6 +46,10 @@ export function MembersSettingsRoute() {
 }
 export function ArchivedSettingsRoute() {
 	return <ArchivedSettings />;
+}
+
+export function EmojisSettingsRoute() {
+	return <EmojiSettings />;
 }
 
 export function LogsSettingsRoute() {

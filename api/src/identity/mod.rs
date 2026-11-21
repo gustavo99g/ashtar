@@ -22,6 +22,8 @@ pub struct User {
     pub is_owner: bool,
     pub created_at: i64,
     pub removed_at: Option<i64>,
+    /// O arquivo da foto de perfil (ADR 0031); `None` mostra a letra e a cor do nick.
+    pub avatar_id: Option<String>,
 }
 
 impl User {

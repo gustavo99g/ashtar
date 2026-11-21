@@ -19,6 +19,11 @@ interface RoomViewState {
 	watching: readonly string[];
 	/** A transmissão em foco (grande, com as outras embaixo), ou nenhuma. */
 	focused: string | null;
+	/**
+	 * A câmera em foco (v0.7): a de quem, grande no palco, com o resto embaixo. Vale só enquanto a
+	 * câmera está ligada; desligou, a sala volta para o que mostrava antes.
+	 */
+	focusedCamera: string | null;
 	/** Qual transmissão a miniatura mostra quando há várias abertas (as setas trocam). */
 	miniPick: string | null;
 	/**
@@ -38,6 +43,7 @@ interface RoomViewState {
 export const useRoomView = create<RoomViewState>()(() => ({
 	watching: [],
 	focused: null,
+	focusedCamera: null,
 	miniPick: null,
 	shown: {},
 	camerasShown: false,
@@ -61,10 +67,22 @@ export function unwatchShare(identity: string): void {
 	}));
 }
 
-/** Põe `identity` em foco; de novo na que já está em foco, volta para a divisão. */
+/**
+ * Põe `identity` em foco; de novo na que já está em foco, volta para a divisão. Com uma câmera em
+ * foco, a transmissão escolhida toma o lugar dela.
+ */
 export function focusShare(identity: string | null): void {
 	useRoomView.setState((state) => ({
-		focused: identity === state.focused ? null : identity,
+		focused:
+			identity === state.focused && !state.focusedCamera ? null : identity,
+		focusedCamera: null,
+	}));
+}
+
+/** Põe a câmera de `identity` em foco; de novo na mesma (ou `null`), tira. */
+export function focusCamera(identity: string | null): void {
+	useRoomView.setState((state) => ({
+		focusedCamera: identity === state.focusedCamera ? null : identity,
 	}));
 }
 
@@ -75,7 +93,12 @@ export function pickMiniShare(identity: string): void {
 
 /** Volta para a Grade: fecha todas (e a miniatura). */
 export function stopWatching(): void {
-	useRoomView.setState({ watching: [], focused: null, miniPick: null });
+	useRoomView.setState({
+		watching: [],
+		focused: null,
+		focusedCamera: null,
+		miniPick: null,
+	});
 }
 
 /** A transmissão de `identity` aparece na tela, nesse tamanho; `null` tira. */

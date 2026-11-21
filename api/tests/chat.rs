@@ -127,6 +127,8 @@ async fn seed(ctx: &Ctx, n: usize) {
             &ctx.owner,
             &format!("seed-{i}"),
             &format!("mensagem {i}"),
+            None,
+            &[],
             now(),
         )
         .await
@@ -374,4 +376,315 @@ async fn quem_saiu_deixa_as_mensagens_e_some_da_lista() {
         .map(|p| p["nick"].as_str().unwrap())
         .collect();
     assert_eq!(nicks, ["Kid"]);
+}
+
+// ------------------------------------------------------------ chat avançado (ADR 0032)
+
+async fn get_page(ctx: &Ctx, query: &str) -> Value {
+    let (status, page) = call(
+        &ctx.router,
+        "GET",
+        &format!("/api/channels/geral/messages{query}"),
+        Some(&ctx.owner_token),
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{page}");
+    page
+}
+
+fn message_uri(message: &Value) -> String {
+    format!("/api/messages/{}", message["id"].as_str().unwrap())
+}
+
+#[tokio::test]
+async fn so_o_autor_edita_e_a_mencao_nova_vem_no_evento() {
+    let ctx = setup().await;
+    let bia = join(&ctx, "Bia", 2, false).await;
+    let _cadu = join(&ctx, "Cadu", 3, false).await;
+    let cadu_id = users::get_active_by_nick(&ctx.db, "Cadu").await.unwrap().id;
+    let bia_id = users::get_active_by_nick(&ctx.db, "Bia").await.unwrap().id;
+    let (_, message) = send(&ctx, &bia, "c-1", "oi @Kid").await;
+    assert_eq!(message["edited_at"], Value::Null);
+
+    // Nem o dono edita a mensagem dos outros.
+    let (status, _) = call(
+        &ctx.router,
+        "PATCH",
+        &message_uri(&message),
+        Some(&ctx.owner_token),
+        Some(json!({ "body": "mudei" })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+
+    let edited = api::chat::messages::edit(
+        &ctx.db,
+        &Readable::Text(
+            api::chat::channels::get_open_text(&ctx.db, "geral")
+                .await
+                .unwrap(),
+        ),
+        &users::get_by_id(&ctx.db, &bia_id).await.unwrap(),
+        &api::chat::messages::find(&ctx.db, message["id"].as_str().unwrap())
+            .await
+            .unwrap()
+            .unwrap(),
+        "oi @Kid e @Cadu",
+        now(),
+    )
+    .await
+    .unwrap();
+    // O Kid já tinha sido mencionado: só o Cadu é novo.
+    assert_eq!(edited.new_mentions, std::slice::from_ref(&cadu_id));
+    assert!(edited.message.mentions.contains(&cadu_id));
+    assert!(edited.message.edited_at.is_some());
+
+    let (status, again) = call(
+        &ctx.router,
+        "PATCH",
+        &message_uri(&message),
+        Some(&bia),
+        Some(json!({ "body": "  só @Cadu  " })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{again}");
+    assert_eq!(again["body"], "só @Cadu");
+    assert_eq!(again["mentions"], json!([cadu_id]));
+    assert_eq!(bodies(&get_page(&ctx, "").await), ["só @Cadu"]);
+
+    // Texto inválido continua recusado.
+    let (status, _) = call(
+        &ctx.router,
+        "PATCH",
+        &message_uri(&message),
+        Some(&bia),
+        Some(json!({ "body": "   " })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+}
+
+#[tokio::test]
+async fn excluir_e_a_resposta_fica_sem_a_original() {
+    let ctx = setup().await;
+    let bia = join(&ctx, "Bia", 2, false).await;
+    let cadu = join(&ctx, "Cadu", 3, false).await;
+    let (_, original) = send(&ctx, &bia, "c-1", "quem joga hoje?").await;
+    let (status, reply) = call(
+        &ctx.router,
+        "POST",
+        "/api/channels/geral/messages",
+        Some(&cadu),
+        Some(json!({ "client_id": "c-2", "body": "eu", "reply_to": original["id"] })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "{reply}");
+    assert_eq!(reply["reply_to"]["id"], original["id"]);
+    assert_eq!(reply["reply_to"]["author"]["nick"], "Bia");
+    assert_eq!(reply["reply_to"]["excerpt"], "quem joga hoje?");
+    // Com o `@` ligado (o padrão), a resposta menciona quem escreveu a original.
+    let bia_id = users::get_active_by_nick(&ctx.db, "Bia").await.unwrap().id;
+    assert_eq!(reply["mentions"], json!([bia_id]));
+    let (_, quiet) = call(
+        &ctx.router,
+        "POST",
+        "/api/channels/geral/messages",
+        Some(&ctx.owner_token),
+        Some(json!({
+            "client_id": "c-9",
+            "body": "eu também",
+            "reply_to": original["id"],
+            "reply_mention": false,
+        })),
+    )
+    .await;
+    assert_eq!(quiet["mentions"], json!([]));
+
+    // Responder a uma mensagem que não existe é recusado.
+    let (status, _) = call(
+        &ctx.router,
+        "POST",
+        "/api/channels/geral/messages",
+        Some(&cadu),
+        Some(json!({ "client_id": "c-3", "body": "eu", "reply_to": "nada" })),
+    )
+    .await;
+    assert!(status.is_client_error(), "{status}");
+
+    // O Cadu não exclui a da Bia; o dono exclui, num canal.
+    let (status, _) = call(
+        &ctx.router,
+        "DELETE",
+        &message_uri(&original),
+        Some(&cadu),
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    let (status, _) = call(
+        &ctx.router,
+        "DELETE",
+        &message_uri(&original),
+        Some(&ctx.owner_token),
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+    let (status, _) = call(
+        &ctx.router,
+        "DELETE",
+        &message_uri(&original),
+        Some(&bia),
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+
+    let page = get_page(&ctx, "").await;
+    assert_eq!(bodies(&page), ["eu", "eu também"]);
+    let quoted = &page["messages"][0]["reply_to"];
+    assert_eq!(quoted["id"], original["id"]);
+    assert_eq!(quoted["author"], Value::Null);
+    assert_eq!(quoted["excerpt"], Value::Null);
+
+    // O autor exclui a própria.
+    let (status, _) = call(
+        &ctx.router,
+        "DELETE",
+        &message_uri(&reply),
+        Some(&cadu),
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+    assert_eq!(bodies(&get_page(&ctx, "").await), ["eu também"]);
+}
+
+#[tokio::test]
+async fn o_dono_nao_exclui_nem_ve_a_conversa_dos_outros() {
+    let ctx = setup().await;
+    let bia = join(&ctx, "Bia", 2, false).await;
+    let _cadu = join(&ctx, "Cadu", 3, false).await;
+    let cadu_id = users::get_active_by_nick(&ctx.db, "Cadu").await.unwrap().id;
+    let (status, dm) = call(
+        &ctx.router,
+        "POST",
+        "/api/dms",
+        Some(&bia),
+        Some(json!({ "user_id": cadu_id })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "{dm}");
+    let (status, message) = call(
+        &ctx.router,
+        "POST",
+        &format!("/api/channels/{}/messages", dm["id"].as_str().unwrap()),
+        Some(&bia),
+        Some(json!({ "client_id": "c-1", "body": "segredo" })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "{message}");
+
+    for (method, uri) in [
+        ("DELETE", message_uri(&message)),
+        (
+            "PUT",
+            format!("{}/reactions/%F0%9F%91%8D", message_uri(&message)),
+        ),
+    ] {
+        let (status, _) = call(&ctx.router, method, &uri, Some(&ctx.owner_token), None).await;
+        assert_eq!(status, StatusCode::NOT_FOUND, "{method} {uri}");
+    }
+}
+
+#[tokio::test]
+async fn reacoes() {
+    let ctx = setup().await;
+    let bia = join(&ctx, "Bia", 2, false).await;
+    let (_, message) = send(&ctx, &bia, "c-1", "gg").await;
+    let thumbs = format!("{}/reactions/%F0%9F%91%8D", message_uri(&message));
+
+    for token in [&bia, &ctx.owner_token, &ctx.owner_token] {
+        let (status, body) = call(&ctx.router, "PUT", &thumbs, Some(token), None).await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+    }
+    let page = get_page(&ctx, "").await;
+    let reactions = &page["messages"][0]["reactions"];
+    assert_eq!(reactions.as_array().unwrap().len(), 1);
+    assert_eq!(reactions[0]["emoji"], "👍");
+    assert_eq!(reactions[0]["users"].as_array().unwrap().len(), 2);
+
+    let (status, body) = call(&ctx.router, "DELETE", &thumbs, Some(&bia), None).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["reactions"][0]["users"], json!([ctx.owner.id]));
+
+    // Emoji do grupo que não existe e emoji inválido.
+    let custom = format!("{}/reactions/c:abc-123", message_uri(&message));
+    let (status, _) = call(&ctx.router, "PUT", &custom, Some(&bia), None).await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+    let invalid = format!("{}/reactions/oi", message_uri(&message));
+    let (status, _) = call(&ctx.router, "PUT", &invalid, Some(&bia), None).await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+}
+
+#[tokio::test]
+async fn no_maximo_20_reacoes_diferentes() {
+    let ctx = setup().await;
+    let (_, message) = send(&ctx, &ctx.owner_token, "c-1", "vota aí").await;
+    let emojis: Vec<char> = ('\u{1F600}'..='\u{1F615}').collect();
+    assert_eq!(emojis.len(), 22);
+    for (i, emoji) in emojis.iter().enumerate() {
+        let mut buf = [0; 4];
+        let encoded: String = emoji
+            .encode_utf8(&mut buf)
+            .bytes()
+            .map(|b| format!("%{b:02X}"))
+            .collect();
+        let uri = format!("{}/reactions/{encoded}", message_uri(&message));
+        let (status, _) = call(&ctx.router, "PUT", &uri, Some(&ctx.owner_token), None).await;
+        if i < 20 {
+            assert_eq!(status, StatusCode::OK);
+        } else {
+            assert_eq!(status, StatusCode::CONFLICT);
+        }
+    }
+}
+
+#[tokio::test]
+async fn pagina_em_volta_de_uma_mensagem() {
+    let ctx = setup().await;
+    seed(&ctx, 30).await;
+    let all = get_page(&ctx, "?limit=30").await;
+    let ten = all["messages"][10]["id"].as_str().unwrap().to_owned();
+
+    let page = get_page(&ctx, &format!("?around={ten}&limit=6")).await;
+    assert_eq!(
+        bodies(&page),
+        [
+            "mensagem 7",
+            "mensagem 8",
+            "mensagem 9",
+            "mensagem 10",
+            "mensagem 11",
+            "mensagem 12"
+        ]
+    );
+    assert_eq!(page["has_more"], true);
+    assert_eq!(page["has_newer"], true);
+
+    let last = all["messages"][29]["id"].as_str().unwrap().to_owned();
+    let page = get_page(&ctx, &format!("?around={last}&limit=6")).await;
+    assert_eq!(bodies(&page).last().unwrap(), "mensagem 29");
+    assert_eq!(page["has_newer"], false);
+
+    let (status, _) = call(
+        &ctx.router,
+        "GET",
+        &format!("/api/channels/geral/messages?around={last}&before={last}"),
+        Some(&ctx.owner_token),
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
 }

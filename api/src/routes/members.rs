@@ -38,6 +38,9 @@ pub struct MemberView {
     pub id: String,
     pub nick: String,
     pub display_name: Option<String>,
+    /// O id do arquivo da foto de perfil, ou `null` (ADR 0031).
+    #[ts(optional = nullable)]
+    pub avatar: Option<String>,
     pub is_owner: bool,
     pub created_at: i64,
     pub removed_at: Option<i64>,
@@ -57,6 +60,7 @@ impl From<MemberDetails> for MemberView {
             id: user.id,
             nick: user.nick,
             display_name: user.display_name,
+            avatar: user.avatar_id,
             is_owner: user.is_owner,
             created_at: user.created_at,
             removed_at: user.removed_at,

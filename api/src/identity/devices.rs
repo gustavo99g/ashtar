@@ -113,7 +113,7 @@ pub async fn login(db: &SqlitePool, key: &str, now: i64) -> Result<(User, String
 
     let token = open_session(&mut tx, &device_id, now).await?;
     let user = sqlx::query_as(
-        "SELECT id, nick, display_name, is_owner, created_at, removed_at FROM users WHERE id = ?",
+        "SELECT id, nick, display_name, is_owner, created_at, removed_at, avatar_id FROM users WHERE id = ?",
     )
     .bind(&user_id)
     .fetch_one(&mut *tx)
@@ -126,7 +126,7 @@ pub async fn login(db: &SqlitePool, key: &str, now: i64) -> Result<(User, String
 pub async fn authenticate(db: &SqlitePool, token: &str, now: i64) -> Result<User, ApiError> {
     let token_hash = secret::hash(token);
     let user: Option<User> = sqlx::query_as(
-        "SELECT u.id, u.nick, u.display_name, u.is_owner, u.created_at, u.removed_at
+        "SELECT u.id, u.nick, u.display_name, u.is_owner, u.created_at, u.removed_at, u.avatar_id
          FROM sessions s
          JOIN devices d ON d.id = s.device_id
          JOIN users u ON u.id = d.user_id

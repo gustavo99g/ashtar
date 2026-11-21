@@ -1,6 +1,7 @@
 /**
  * O padrão do seletor de fontes (Configurações › Voz e vídeo › Compartilhamento de tela, ADR 0029):
- * a qualidade e o áudio com que o seletor abre. Guardado neste computador.
+ * a qualidade e o áudio com que o seletor abre, e se o vídeo é codificado na placa. Guardado neste
+ * computador.
  */
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
@@ -12,11 +13,14 @@ export type ShareAudioChoice = AudioMode["mode"];
 export interface ShareDefaults {
 	quality: Quality;
 	audio: ShareAudioChoice;
+	/** Codificar o vídeo na placa (v0.7). Desligado, vai pela CPU: para comparar o jogo aberto junto. */
+	hardwareEncoder: boolean;
 }
 
 export const DEFAULT_SHARE: ShareDefaults = {
 	quality: DEFAULT_QUALITY,
 	audio: "application",
+	hardwareEncoder: true,
 };
 
 const AUDIO: readonly ShareAudioChoice[] = ["off", "application", "system"];
@@ -30,6 +34,10 @@ export function readShareDefaults(saved: unknown): ShareDefaults {
 		audio: AUDIO.includes(value.audio as ShareAudioChoice)
 			? (value.audio as ShareAudioChoice)
 			: DEFAULT_SHARE.audio,
+		hardwareEncoder:
+			typeof value.hardwareEncoder === "boolean"
+				? value.hardwareEncoder
+				: DEFAULT_SHARE.hardwareEncoder,
 	};
 }
 
