@@ -118,6 +118,7 @@ describe("o Painel", () => {
 				at: Math.floor(Date.now() / 1000) - 3600,
 				size: 2048,
 			},
+			files_bytes: 3 * 1024 ** 3,
 		};
 		vi.mocked(getServerStatus).mockResolvedValue(status);
 		wrap(<ServerStatusSettings />);
@@ -125,6 +126,7 @@ describe("o Painel", () => {
 		expect(screen.getByText("connection refused")).toBeInTheDocument();
 		expect(screen.getByText("No ar há 3 dias e 4 h")).toBeInTheDocument();
 		expect(screen.getByText("20 GB livres")).toBeInTheDocument();
+		expect(screen.getByText(/os arquivos ocupam 3 GB/)).toBeInTheDocument();
 		expect(screen.getByText("há 1 h")).toBeInTheDocument();
 	});
 

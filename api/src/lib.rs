@@ -8,6 +8,7 @@ pub mod client_policy;
 pub mod db;
 pub mod download;
 pub mod error;
+pub mod files;
 pub mod identity;
 pub mod limiter;
 pub mod logs;
@@ -64,6 +65,10 @@ pub struct AppState {
     pub data_dir: Arc<std::path::Path>,
     /// Quando a API subiu, para o "no ar há" do Painel.
     pub started_at: i64,
+    /// Onde ficam os bytes dos arquivos (ADR 0031).
+    pub files: Arc<files::FileStore>,
+    /// Quando o dono foi avisado do disco cheio pela última vez (no máximo uma vez por dia).
+    pub disk_alerted_at: Arc<std::sync::atomic::AtomicI64>,
 }
 
 impl AppState {
@@ -82,6 +87,8 @@ impl AppState {
             move_grace: routes::voice::MOVE_GRACE,
             data_dir: logs::data_dir_from_env().into(),
             started_at: db::now(),
+            files: Arc::new(files::FileStore::from_env(&logs::data_dir_from_env())),
+            disk_alerted_at: Arc::new(std::sync::atomic::AtomicI64::new(0)),
         }
     }
 
@@ -92,6 +99,43 @@ impl AppState {
             InviteKind::Recovery => "recovery",
         };
         format!("{}/{path}/{code}", self.public_url)
+    }
+}
+
+/// De quanto em quanto tempo a API limpa os arquivos não usados e olha o disco (ADR 0031).
+pub const FILE_MAINTENANCE_EVERY: std::time::Duration = std::time::Duration::from_secs(60 * 60);
+
+/// Uma rodada da manutenção dos arquivos: apaga os não usados há 24 horas e, com o disco acima de
+/// 80%, avisa o dono (no máximo uma vez por dia).
+pub async fn maintain_files(state: &AppState) {
+    let now = db::now();
+    match files::sweep(&state.db, &state.files, now).await {
+        Ok(0) => {}
+        Ok(n) => println!("Arquivos não usados apagados: {n}"),
+        Err(error) => eprintln!("limpeza dos arquivos: {error}"),
+    }
+    let Some(disk) =
+        routes::admin::disk(state.files.root()).or_else(|| routes::admin::disk(&state.data_dir))
+    else {
+        return;
+    };
+    let last = state
+        .disk_alerted_at
+        .load(std::sync::atomic::Ordering::Relaxed);
+    if !files::disk_alert(disk.free_bytes, disk.total_bytes, last, now) {
+        return;
+    }
+    if let Ok(Some(owner)) = identity::users::find_owner(&state.db).await {
+        state
+            .disk_alerted_at
+            .store(now, std::sync::atomic::Ordering::Relaxed);
+        state.hub.publish_to(
+            &[owner.id],
+            &realtime::ServerEvent::DiskAlert {
+                free_bytes: disk.free_bytes,
+                total_bytes: disk.total_bytes,
+            },
+        );
     }
 }
 
@@ -195,6 +239,7 @@ pub fn app(state: AppState, policy: Arc<ClientPolicy>) -> Router {
         .route("/logs", get(routes::logs::list))
         .route("/logs/{id}", get(routes::logs::download))
         .route("/admin/status", get(routes::admin::status))
+        .route("/files/{id}", get(routes::files::download))
         .layer(middleware::from_fn_with_state(
             timeout::REQUEST_TIMEOUT,
             timeout::limit,
@@ -205,6 +250,15 @@ pub fn app(state: AppState, policy: Arc<ClientPolicy>) -> Router {
                 .route("/logs", post(routes::logs::upload))
                 .layer(middleware::from_fn_with_state(
                     timeout::UPLOAD_TIMEOUT,
+                    timeout::limit,
+                )),
+        )
+        // O arquivo do chat: até 100 MB, com 10 minutos.
+        .merge(
+            Router::new()
+                .route("/files", post(routes::files::upload))
+                .layer(middleware::from_fn_with_state(
+                    timeout::FILE_UPLOAD_TIMEOUT,
                     timeout::limit,
                 )),
         )

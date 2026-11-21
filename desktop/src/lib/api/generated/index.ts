@@ -206,7 +206,17 @@ min_version?: string, };
  * O `kind` de toda recusa da API. O app decide o que mostrar por ele, nunca
  * pela mensagem.
  */
-export type ErrorKind = "unauthenticated" | "unknown_device" | "forbidden" | "invalid_invite" | "invalid_nick" | "invalid_display_name" | "nick_taken" | "invalid_device_key" | "device_already_linked" | "invalid_request" | "not_found" | "conflict" | "too_many_attempts" | "too_many_messages" | "internal" | "client_outdated" | "share_limit" | "timeout";
+export type ErrorKind = "unauthenticated" | "unknown_device" | "forbidden" | "invalid_invite" | "invalid_nick" | "invalid_display_name" | "nick_taken" | "invalid_device_key" | "device_already_linked" | "invalid_request" | "not_found" | "conflict" | "too_many_attempts" | "too_many_messages" | "internal" | "client_outdated" | "share_limit" | "timeout" | "file_too_large" | "disk_full";
+
+/**
+ * Para que o arquivo serve.
+ */
+export type FileKind = "avatar" | "attachment" | "preview" | "emoji";
+
+/**
+ * O que o app sabe de um arquivo.
+ */
+export type FileView = { id: string, kind: FileKind, name: string, mime: string, size: number, width: number | null, height: number | null, duration_ms: number | null, thumbnail_id: string | null, };
 
 /**
  * Se a linha é uma [`Permission`] (o dono pode ligar e desligar) ou uma
@@ -528,7 +538,7 @@ reply_mention?: boolean, };
 /**
  * Tudo o que a API manda pelo WebSocket. O `type` é o nome do evento.
  */
-export type ServerEvent = { "type": "ready", user_id: string, status: Status, online: Array<string>, busy: Array<string>, away: Array<string>, channels: Array<ChannelHead>, dms: Array<ChannelHead>, call: CallView | null, } | { "type": "pong" } | { "type": "message.created", message: Message, } | { "type": "message.updated", message: Message, new_mentions: Array<string>, } | { "type": "message.deleted", channel_id: string, message_id: string, } | { "type": "presence.changed", user_id: string, online: boolean, status: Shown, } | { "type": "status.changed", status: Status, } | { "type": "voice.participants", channel_id: string, participants: Array<ParticipantView>, } | { "type": "voice.moved", channel_id: string, by: string, 
+export type ServerEvent = { "type": "ready", user_id: string, status: Status, online: Array<string>, busy: Array<string>, away: Array<string>, channels: Array<ChannelHead>, dms: Array<ChannelHead>, call: CallView | null, } | { "type": "pong" } | { "type": "message.created", message: Message, } | { "type": "message.updated", message: Message, new_mentions: Array<string>, } | { "type": "disk.alert", free_bytes: number, total_bytes: number, } | { "type": "message.deleted", channel_id: string, message_id: string, } | { "type": "presence.changed", user_id: string, online: boolean, status: Shown, } | { "type": "status.changed", status: Status, } | { "type": "voice.participants", channel_id: string, participants: Array<ParticipantView>, } | { "type": "voice.moved", channel_id: string, by: string, 
 /**
  * O nome de quem moveu, para o aviso.
  */
@@ -542,7 +552,11 @@ disk: DiskStatus | null,
 /**
  * O backup mais novo de `data/backups/`, ou `None` sem nenhum.
  */
-last_backup: BackupStatus | null, };
+last_backup: BackupStatus | null, 
+/**
+ * Quanto os arquivos (fotos, anexos, prévias e emojis) ocupam, em bytes (ADR 0031).
+ */
+files_bytes: number, };
 
 /**
  * A resposta do `redeem` e do `login`. No app, quem recebe é o Rust, que a

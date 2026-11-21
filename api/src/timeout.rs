@@ -20,6 +20,8 @@ use crate::error::ApiError;
 pub const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
 /// O tempo do envio dos logs, que sobe um arquivo.
 pub const UPLOAD_TIMEOUT: Duration = Duration::from_secs(120);
+/// O tempo do envio de um arquivo do chat (até 100 MB, ADR 0031).
+pub const FILE_UPLOAD_TIMEOUT: Duration = Duration::from_secs(10 * 60);
 
 /// O middleware: `from_fn_with_state(REQUEST_TIMEOUT, timeout::limit)`.
 pub async fn limit(State(after): State<Duration>, request: Request, next: Next) -> Response {

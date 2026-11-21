@@ -71,6 +71,14 @@ pub enum ServerEvent {
         message: Message,
         new_mentions: Vec<String>,
     },
+    /// Só para o dono: o disco do servidor passou de 80% (ADR 0031), no máximo uma vez por dia.
+    #[serde(rename = "disk.alert")]
+    DiskAlert {
+        #[ts(type = "number")]
+        free_bytes: u64,
+        #[ts(type = "number")]
+        total_bytes: u64,
+    },
     /// A mensagem foi excluída (ADR 0032).
     #[serde(rename = "message.deleted")]
     MessageDeleted {
@@ -183,6 +191,7 @@ impl ServerEvent {
             | Self::MemberJoined { .. }
             | Self::MemberLeft { .. }
             | Self::LogsReceived { .. }
+            | Self::DiskAlert { .. }
             | Self::ChannelsChanged { .. } => false,
         }
     }

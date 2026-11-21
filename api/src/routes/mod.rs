@@ -4,6 +4,7 @@ pub mod calls;
 pub mod channels;
 pub mod dms;
 pub mod extract;
+pub mod files;
 pub mod invites;
 pub mod logs;
 pub mod members;

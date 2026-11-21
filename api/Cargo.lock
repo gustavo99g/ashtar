@@ -107,6 +107,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "tokio-tungstenite 0.30.0",
+ "tokio-util",
  "tower",
  "tower-http 0.7.1",
  "ts-rs",

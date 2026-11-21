@@ -32,7 +32,19 @@ async fn main() {
 
     println!("Endereço público: {public_url}");
 
-    let app = api::app(AppState::new(pool, &public_url), policy);
+    let state = AppState::new(pool, &public_url);
+    println!("Arquivos: {}", state.files.root().display());
+    // A limpeza dos arquivos não usados e o aviso do disco, de hora em hora (ADR 0031).
+    let maintenance = state.clone();
+    tokio::spawn(async move {
+        let mut every = tokio::time::interval(api::FILE_MAINTENANCE_EVERY);
+        loop {
+            every.tick().await;
+            api::maintain_files(&maintenance).await;
+        }
+    });
+
+    let app = api::app(state, policy);
 
     let listener = tokio::net::TcpListener::bind("127.0.0.1:3000")
         .await
