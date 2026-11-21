@@ -140,7 +140,7 @@ export function SearchBox({ channelId }: { channelId: string }) {
 	}
 
 	return (
-		<div ref={anchor} className="relative ml-1 w-[min(180px,40%)] shrink-0">
+		<div ref={anchor} className="relative ml-1 w-[180px] shrink-0">
 			{!text && (
 				<SearchIcon
 					aria-hidden="true"

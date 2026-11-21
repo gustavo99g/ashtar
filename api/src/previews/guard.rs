@@ -111,7 +111,12 @@ impl Guard {
             .await
             .map_err(|_| Refused::Dns)?
             .collect();
-        let first = *addrs.first().ok_or(Refused::Dns)?;
+        // O IPv4 antes: o contêiner da VPS pode não ter rota para IPv6.
+        let first = *addrs
+            .iter()
+            .find(|addr| addr.is_ipv4())
+            .or(addrs.first())
+            .ok_or(Refused::Dns)?;
         if addrs.iter().all(|addr| self.trusted.contains(addr)) {
             return Ok(first);
         }
@@ -163,7 +168,7 @@ impl Guard {
                 .map_err(|error| Refused::Network(error.to_string()))?;
             let mut response = client
                 .get(url.clone())
-                .header("Accept", "text/html,image/*;q=0.8")
+                .header("Accept", "text/html,application/json,image/*;q=0.8")
                 .send()
                 .await
                 .map_err(|error| Refused::Network(error.to_string()))?;

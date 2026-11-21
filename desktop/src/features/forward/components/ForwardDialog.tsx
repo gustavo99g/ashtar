@@ -24,7 +24,9 @@ import {
 	useForwardRequest,
 	useSendMessage,
 } from "@/features/chat";
-import { useDms } from "@/features/dms";
+import { showDm, useDms } from "@/features/dms";
+import { useNavigate } from "react-router-dom";
+import { paths } from "@/lib/paths";
 import { Avatar } from "@/features/identity";
 import { cn } from "@/lib/utils";
 
@@ -90,6 +92,7 @@ function ForwardForm() {
 	const [chosen, setChosen] = useState<string | null>(null);
 	const [comment, setComment] = useState("");
 	const listId = useId();
+	const navigate = useNavigate();
 	if (!message) return null;
 
 	const shown = destinations.filter((d) => fold(d.label).includes(fold(query)));
@@ -105,6 +108,13 @@ function ForwardForm() {
 				target.kind === "channel"
 					? `Encaminhada para #${target.label}`
 					: `Encaminhada para ${target.label}`,
+			actionProps: {
+				children: "Abrir",
+				onClick: () =>
+					target.kind === "channel"
+						? navigate(paths.channel(target.id))
+						: showDm(target.id),
+			},
 		});
 	}
 

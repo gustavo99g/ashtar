@@ -89,10 +89,13 @@ function ToastItem({
 				<div className="flex min-w-0 flex-1 flex-col gap-0.5 pt-px">
 					<ToastPrimitive.Title className="text-sm text-foreground" />
 					<ToastPrimitive.Description className="text-xs leading-[1.45] text-muted-foreground" />
-					<ToastPrimitive.Action className="mt-[5px] flex items-center gap-1 self-start text-xs font-semibold text-link hover:text-link-hover">
-						{item.actionProps?.children}
-						<ArrowRightIcon className="size-3" />
-					</ToastPrimitive.Action>
+					{/* Sem ação, nada de setinha sozinha. */}
+					{item.actionProps?.children && (
+						<ToastPrimitive.Action className="mt-[5px] flex items-center gap-1 self-start text-xs font-semibold text-link hover:text-link-hover">
+							{item.actionProps.children}
+							<ArrowRightIcon className="size-3" />
+						</ToastPrimitive.Action>
+					)}
 				</div>
 				<ToastPrimitive.Close
 					aria-label="Fechar aviso"

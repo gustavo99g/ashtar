@@ -55,6 +55,11 @@ export function EmojiPicker({ onPick }: { onPick: (emoji: string) => void }) {
 	const [failed, setFailed] = useState(false);
 	const [query, setQuery] = useState("");
 	const [hovered, setHovered] = useState<EmojiEntry | null>(null);
+	/**
+	 * Abrir desenha só as primeiras seções (o que aparece); as outras vêm no quadro seguinte. Sem
+	 * isso, o clique esperava os ~1900 botões ficarem prontos.
+	 */
+	const [all, setAll] = useState(false);
 	const recent = useRecentEmoji((state) => state.recent);
 	const scroller = useRef<HTMLDivElement>(null);
 	const groupEmojis = useGroupEmojis();
@@ -129,8 +134,15 @@ export function EmojiPicker({ onPick }: { onPick: (emoji: string) => void }) {
 		onPickRef.current(emoji.unicode);
 	}, []);
 
+	useEffect(() => {
+		if (!groups || all) return;
+		const timer = setTimeout(() => setAll(true), 60);
+		return () => clearTimeout(timer);
+	}, [groups, all]);
+
 	function jump(key: string) {
 		setQuery("");
+		setAll(true);
 		requestAnimationFrame(() => {
 			scroller.current
 				?.querySelector<HTMLElement>(`[data-section="${key}"]`)
@@ -210,7 +222,7 @@ export function EmojiPicker({ onPick }: { onPick: (emoji: string) => void }) {
 						<div className="pt-2.5">{grid(results)}</div>
 					)
 				) : (
-					sections.map((section) => (
+					(all ? sections : sections.slice(0, 3)).map((section) => (
 						<section
 							key={section.key}
 							data-section={section.key}

@@ -13,11 +13,13 @@ import {
 	PopoverTrigger,
 } from "@/components/ui/popover";
 import { Avatar } from "@/features/identity";
-import type { Message } from "@/lib/api";
+import { toast } from "@/components/ui/toast";
+import { ApiError, type Message } from "@/lib/api";
 import { attachmentsLabel } from "../model/attachments";
 import { plainText } from "../model/markdown";
 import { authorName, stampLabel } from "../model/messages";
-import { usePins } from "../queries";
+import { useMessageActions, usePins } from "../queries";
+import { requestJump } from "../stores/jumpStore";
 import type { MessageActionsValue } from "./messageContext";
 
 function pinCount(count: number): string {
@@ -26,11 +28,12 @@ function pinCount(count: number): string {
 
 function PinnedItem({
 	message,
-	actions,
+	onUnpin,
 	onJump,
 }: {
 	message: Message;
-	actions: MessageActionsValue;
+	/** Desafixar; sem isto (quem não pode), o botão não aparece. */
+	onUnpin?: () => void;
 	onJump: () => void;
 }) {
 	const text =
@@ -62,10 +65,10 @@ function PinnedItem({
 				>
 					Ir até a mensagem
 				</button>
-				{actions.canPin && (
+				{onUnpin && (
 					<button
 						type="button"
-						onClick={() => actions.pin(message, false)}
+						onClick={onUnpin}
 						className="text-muted-foreground hover:text-foreground hover:underline"
 					>
 						Desafixar
@@ -105,27 +108,102 @@ export function PinsBar({
 					· clique para ver
 				</span>
 			</PopoverTrigger>
-			<PopoverContent
-					align="start"
-					className="max-h-[min(70vh,520px)] w-[min(420px,calc(100vw-2rem))] overflow-hidden p-0"
-				>
-					<PopoverTitle className="border-b border-border px-4 py-3 text-sm font-bold">
-						Mensagens fixadas
-					</PopoverTitle>
-					<ul className="flex flex-col gap-2 overflow-y-auto px-3 pb-3">
-						{pins.map((message) => (
-							<PinnedItem
-								key={message.id}
-								message={message}
-								actions={actions}
-								onJump={() => {
-									setOpen(false);
-									actions.jumpTo(message.id);
-								}}
-							/>
-						))}
-					</ul>
-			</PopoverContent>
+			<PinsPopup
+				pins={pins}
+				align="start"
+				onUnpin={actions.canPin ? (message) => actions.pin(message, false) : undefined}
+				onJump={(message) => {
+					setOpen(false);
+					actions.jumpTo(message.id);
+				}}
+			/>
+		</Popover>
+	);
+}
+
+/** A caixa das fixadas, da faixa e do botão do cabeçalho. */
+function PinsPopup({
+	pins,
+	align,
+	onUnpin,
+	onJump,
+}: {
+	pins: readonly Message[];
+	align: "start" | "end";
+	onUnpin?: (message: Message) => void;
+	onJump: (message: Message) => void;
+}) {
+	return (
+		<PopoverContent
+			align={align}
+			className="max-h-[min(70vh,520px)] w-[min(420px,calc(100vw-2rem))] overflow-hidden p-0"
+		>
+			<PopoverTitle className="border-b border-border px-4 py-3 text-sm font-bold">
+				Mensagens fixadas
+			</PopoverTitle>
+			{pins.length === 0 ? (
+				<p className="px-4 pb-5 text-center text-[13px] text-muted-foreground">
+					Nenhuma mensagem fixada neste canal.
+				</p>
+			) : (
+				<ul className="flex flex-col gap-2 overflow-y-auto px-3 pb-3">
+					{pins.map((message) => (
+						<PinnedItem
+							key={message.id}
+							message={message}
+							onUnpin={onUnpin && (() => onUnpin(message))}
+							onJump={() => onJump(message)}
+						/>
+					))}
+				</ul>
+			)}
+		</PopoverContent>
+	);
+}
+
+/**
+ * O botão das fixadas no cabeçalho (o quadro "Canal de texto — paleta Ashtar"): abre a mesma caixa
+ * da faixa, também quando não há nenhuma.
+ */
+export function PinsButton({
+	channelId,
+	canPin,
+}: {
+	channelId: string;
+	canPin: boolean;
+}) {
+	const pins = usePins(channelId).data ?? [];
+	const [open, setOpen] = useState(false);
+	const { pin } = useMessageActions();
+	return (
+		<Popover open={open} onOpenChange={setOpen}>
+			<PopoverTrigger
+				aria-label="Mensagens fixadas"
+				title="Mensagens fixadas"
+				className="flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-secondary hover:text-foreground data-popup-open:bg-secondary data-popup-open:text-foreground"
+			>
+				<PinIcon aria-hidden="true" className="size-[18px]" />
+			</PopoverTrigger>
+			<PinsPopup
+				pins={pins}
+				align="end"
+				onUnpin={
+					canPin
+						? (message) =>
+								void pin(message, false).catch((error: unknown) =>
+									toast.add({
+										title: "Não deu para desafixar",
+										description:
+											error instanceof ApiError ? error.message : "Tente de novo.",
+									}),
+								)
+						: undefined
+				}
+				onJump={(message) => {
+					setOpen(false);
+					requestJump(channelId, message.id);
+				}}
+			/>
 		</Popover>
 	);
 }

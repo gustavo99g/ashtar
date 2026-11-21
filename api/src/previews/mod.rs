@@ -24,6 +24,8 @@ use crate::files::{self, FileKind, FileStore, NewFile};
 
 /// Quanto tempo o cache de um endereço vale, em segundos.
 pub const CACHE_SECS: i64 = 24 * 60 * 60;
+/// Um endereço que não deu prévia tenta de novo depois disso (o site pode ter só falhado).
+pub const FAILED_CACHE_SECS: i64 = 30 * 60;
 /// O começo da página que é lido.
 pub const HTML_MAX: usize = 512 * 1024;
 /// A maior imagem de prévia.
@@ -77,6 +79,11 @@ async fn fetch(
     uploader_id: &str,
     now: i64,
 ) -> Result<Option<LinkPreview>, ApiError> {
+    if let Some(id) = youtube_id(url)
+        && let Some(found) = youtube(db, store, guard, url, &id, uploader_id, now).await?
+    {
+        return Ok(Some(found));
+    }
     let (page, _, body) = match guard.get(url.clone(), is_html, HTML_MAX, true).await {
         Ok(found) => found,
         Err(refused) => {
@@ -98,6 +105,86 @@ async fn fetch(
         site: found.site,
         title: found.title,
         description: found.description,
+        image_id,
+    }))
+}
+
+/// O id do vídeo de um link do YouTube (`watch?v=`, `youtu.be/`, `shorts/`, `live/`, `embed/`).
+pub fn youtube_id(url: &Url) -> Option<String> {
+    let host = url
+        .host_str()?
+        .trim_start_matches("www.")
+        .trim_start_matches("m.");
+    let id = match host {
+        "youtu.be" => url.path_segments()?.next()?.to_owned(),
+        "youtube.com" | "music.youtube.com" => {
+            let mut segments = url.path_segments()?;
+            match segments.next()? {
+                "watch" => url
+                    .query_pairs()
+                    .find(|(key, _)| key == "v")
+                    .map(|(_, value)| value.into_owned())?,
+                "shorts" | "live" | "embed" => segments.next()?.to_owned(),
+                _ => return None,
+            }
+        }
+        _ => return None,
+    };
+    let valid = (6..=20).contains(&id.len())
+        && id
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_');
+    valid.then_some(id)
+}
+
+fn is_json(content_type: &str) -> bool {
+    content_type == "application/json" || content_type == "text/json"
+}
+
+#[derive(serde::Deserialize)]
+struct OEmbed {
+    title: Option<String>,
+    author_name: Option<String>,
+}
+
+/// O YouTube pelo oEmbed: a página de um vídeo tem mais de 1 MB e às vezes nem traz as tags
+/// `og:`; o oEmbed dá o título e o canal num JSON pequeno, e a miniatura tem endereço fixo.
+/// `None`: o oEmbed não respondeu, e a busca segue pela página.
+async fn youtube(
+    db: &SqlitePool,
+    store: &FileStore,
+    guard: &Guard,
+    url: &Url,
+    id: &str,
+    uploader_id: &str,
+    now: i64,
+) -> Result<Option<LinkPreview>, ApiError> {
+    let mut endpoint = Url::parse("https://www.youtube.com/oembed").expect("endereço fixo");
+    endpoint
+        .query_pairs_mut()
+        .append_pair("format", "json")
+        .append_pair("url", &format!("https://www.youtube.com/watch?v={id}"));
+    let body = match guard.get(endpoint, is_json, 64 * 1024, false).await {
+        Ok((_, _, body)) => body,
+        Err(refused) => {
+            eprintln!("prévia de {url} (oEmbed): {refused}");
+            return Ok(None);
+        }
+    };
+    let Ok(found) = serde_json::from_slice::<OEmbed>(&body) else {
+        return Ok(None);
+    };
+    let Some(title) = found.title.filter(|t| !t.trim().is_empty()) else {
+        return Ok(None);
+    };
+    let image =
+        Url::parse(&format!("https://i.ytimg.com/vi/{id}/hqdefault.jpg")).expect("id conferido");
+    let image_id = save_image(db, store, guard, &image, uploader_id, now).await?;
+    Ok(Some(LinkPreview {
+        url: url.to_string(),
+        site: Some("YouTube".into()),
+        title: Some(title),
+        description: found.author_name,
         image_id,
     }))
 }
@@ -175,7 +262,12 @@ async fn preview_of(
             .fetch_optional(db)
             .await?;
     if let Some(cached) = &cached
-        && now - cached.fetched_at < CACHE_SECS
+        && now - cached.fetched_at
+            < if cached.ok {
+                CACHE_SECS
+            } else {
+                FAILED_CACHE_SECS
+            }
     {
         return Ok(cached.ok);
     }
@@ -348,4 +440,28 @@ pub async fn sweep(db: &SqlitePool, store: &FileStore, now: i64) -> Result<usize
         }
     }
     Ok(old.len())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn acha_o_id_do_video_do_youtube() {
+        let id = |s: &str| youtube_id(&Url::parse(s).unwrap());
+        assert_eq!(
+            id("https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=10").as_deref(),
+            Some("dQw4w9WgXcQ")
+        );
+        assert_eq!(
+            id("https://youtu.be/dQw4w9WgXcQ?si=x").as_deref(),
+            Some("dQw4w9WgXcQ")
+        );
+        assert_eq!(
+            id("https://m.youtube.com/shorts/abcDEF_-123").as_deref(),
+            Some("abcDEF_-123")
+        );
+        assert_eq!(id("https://www.youtube.com/@canal"), None);
+        assert_eq!(id("https://exemplo.com/watch?v=dQw4w9WgXcQ"), None);
+    }
 }

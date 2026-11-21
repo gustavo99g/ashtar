@@ -1408,7 +1408,8 @@ mod regras {
             [
                 (beta, Origin::Owner),
                 (Permission::ManageChannels, Origin::Owner),
-                (Permission::MoveMembers, Origin::Owner)
+                (Permission::MoveMembers, Origin::Owner),
+                (Permission::ManageEmojis, Origin::Owner)
             ]
         );
 
@@ -2422,6 +2423,7 @@ mod painel {
                 "atualizacoes.beta",
                 "canais.gerenciar",
                 "membros.mover",
+                "emojis.gerenciar",
                 "convites.criar",
                 "convites.recuperacao",
                 "convites.revogar",
@@ -2446,8 +2448,10 @@ mod painel {
         assert_eq!(list[1]["kind"], "permission");
         assert_eq!(list[2]["key"], "membros.mover");
         assert_eq!(list[2]["kind"], "permission");
+        assert_eq!(list[3]["key"], "emojis.gerenciar");
+        assert_eq!(list[3]["kind"], "permission");
         // As permissões vêm antes das ações.
-        for grant in list.as_array().unwrap()[3..].iter() {
+        for grant in list.as_array().unwrap()[4..].iter() {
             assert_eq!(grant["kind"], "action");
             assert_eq!(grant["granted"], true);
             assert_eq!(grant["origin"], "owner");
