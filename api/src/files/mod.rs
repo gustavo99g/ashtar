@@ -291,17 +291,21 @@ pub async fn mark_used(
     Ok(())
 }
 
-/// Se `user` pode ver `file`: a foto, os emojis e a imagem das prévias, todo mundo do grupo; o anexo, quem
+/// Se `user` pode ver `file`: a foto de agora, os emojis e a imagem das prévias, todo mundo do grupo; o anexo, quem
 /// enviou e quem lê o canal de uma das mensagens que o usam. A miniatura vale o que vale o arquivo
 /// de que ela é a miniatura.
 pub async fn can_read(db: &SqlitePool, user: &User, file: &FileRecord) -> Result<bool, ApiError> {
     // A imagem de uma prévia veio de um site público: quem está no grupo vê.
-    if matches!(
-        file.kind,
-        FileKind::Avatar | FileKind::Emoji | FileKind::Preview
-    ) || file.uploader_id == user.id
-    {
+    if matches!(file.kind, FileKind::Emoji | FileKind::Preview) || file.uploader_id == user.id {
         return Ok(true);
+    }
+    // A foto de perfil, só a de agora: as guardadas para voltar a elas são só de quem enviou.
+    if file.kind == FileKind::Avatar {
+        let current: Option<i64> = sqlx::query_scalar("SELECT 1 FROM users WHERE avatar_id = ?")
+            .bind(&file.id)
+            .fetch_optional(db)
+            .await?;
+        return Ok(current.is_some());
     }
     let channels: Vec<String> = sqlx::query_scalar(
         "SELECT DISTINCT m.channel_id

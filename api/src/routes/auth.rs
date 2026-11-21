@@ -197,7 +197,8 @@ pub struct SetAvatarRequest {
     pub file_id: String,
 }
 
-/// `PUT /api/me/avatar`: troca a foto de perfil. A antiga é apagada.
+/// `PUT /api/me/avatar`: troca a foto de perfil, por uma nova ou por uma que a pessoa já usou. A
+/// antiga fica guardada (`GET /api/me/avatars`).
 pub async fn set_avatar(
     State(state): State<AppState>,
     CurrentUser(user): CurrentUser,
@@ -206,7 +207,7 @@ pub async fn set_avatar(
     change_avatar(state, user, Some(&request.file_id)).await
 }
 
-/// `DELETE /api/me/avatar`: tira a foto; volta a letra e a cor do nick.
+/// `DELETE /api/me/avatar`: tira a foto; volta a letra e a cor do nick. A foto fica guardada.
 pub async fn remove_avatar(
     State(state): State<AppState>,
     CurrentUser(user): CurrentUser,
@@ -220,16 +221,37 @@ async fn change_avatar(
     file_id: Option<&str>,
 ) -> Result<Json<MeResponse>, ApiError> {
     let changed = user.avatar_id.as_deref() != file_id;
-    let (user, old) = users::set_avatar(&state.db, &user, file_id, now()).await?;
-    if let Some(old) = old
-        && let Err(error) = state.files.delete(&old).await
-    {
-        eprintln!("foto {old}: não deu para apagar do disco: {error}");
+    let (user, pruned) = users::set_avatar(&state.db, &user, file_id, now()).await?;
+    for old in pruned {
+        if let Err(error) = state.files.delete(&old).await {
+            eprintln!("foto {old}: não deu para apagar do disco: {error}");
+        }
     }
     if changed {
         publish_user_updated(&state, &user);
     }
     Ok(Json(me_response(&state, &user).await?))
+}
+
+/// `GET /api/me/avatars`: as fotos que a pessoa já usou, da usada por último para a mais antiga.
+pub async fn list_avatars(
+    State(state): State<AppState>,
+    CurrentUser(user): CurrentUser,
+) -> Result<Json<Vec<users::AvatarFile>>, ApiError> {
+    Ok(Json(users::list_avatars(&state.db, &user.id).await?))
+}
+
+/// `DELETE /api/me/avatars/{id}`: apaga uma foto guardada. A de agora não (409).
+pub async fn delete_avatar(
+    State(state): State<AppState>,
+    CurrentUser(user): CurrentUser,
+    axum::extract::Path(file_id): axum::extract::Path<String>,
+) -> Result<axum::http::StatusCode, ApiError> {
+    users::delete_avatar(&state.db, &user, &file_id).await?;
+    if let Err(error) = state.files.delete(&file_id).await {
+        eprintln!("foto {file_id}: não deu para apagar do disco: {error}");
+    }
+    Ok(axum::http::StatusCode::NO_CONTENT)
 }
 
 #[derive(Debug, Deserialize, TS)]

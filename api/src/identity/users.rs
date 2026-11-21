@@ -388,12 +388,67 @@ pub async fn set_display_name(
 
 /// Troca a foto de perfil por `file_id` (um arquivo `avatar` de imagem que a própria pessoa
 /// enviou), ou tira com `None`. Devolve o membro novo e a foto antiga, que quem chama apaga.
+/// Quantas fotos de perfil cada um guarda, contando a de agora (v0.7): as que passam disso, as
+/// usadas há mais tempo, são apagadas.
+pub const AVATAR_HISTORY: i64 = 12;
+
+/// Uma foto de perfil que a pessoa já usou, para voltar a ela.
+#[derive(Debug, Clone, serde::Serialize, ts_rs::TS, sqlx::FromRow)]
+#[ts(export, export_to = "index.ts")]
+pub struct AvatarFile {
+    pub file_id: String,
+    /// Quando foi a foto pela última vez (Unix, segundos).
+    pub used_at: i64,
+}
+
+/// As fotos que `user_id` já usou, da usada por último para a mais antiga (a de agora entra).
+pub async fn list_avatars(db: &SqlitePool, user_id: &str) -> Result<Vec<AvatarFile>, ApiError> {
+    Ok(sqlx::query_as(
+        "SELECT id AS file_id, used_at FROM files
+         WHERE uploader_id = ? AND kind = 'avatar' AND used_at IS NOT NULL
+         ORDER BY used_at DESC, id DESC",
+    )
+    .bind(user_id)
+    .fetch_all(db)
+    .await?)
+}
+
+/// Apaga uma foto antiga de `user` da tabela (os bytes, quem chama apaga). A de agora não: 409.
+pub async fn delete_avatar(db: &SqlitePool, user: &User, file_id: &str) -> Result<(), ApiError> {
+    let mut tx = db.begin_with("BEGIN IMMEDIATE").await?;
+    let current: Option<String> = sqlx::query_scalar("SELECT avatar_id FROM users WHERE id = ?")
+        .bind(&user.id)
+        .fetch_one(&mut *tx)
+        .await?;
+    if current.as_deref() == Some(file_id) {
+        return Err(ApiError::Conflict(
+            "Essa é a foto de agora: troque ou tire antes de apagar.".into(),
+        ));
+    }
+    let deleted = sqlx::query(
+        "DELETE FROM files WHERE id = ? AND uploader_id = ? AND kind = 'avatar'
+                             AND used_at IS NOT NULL",
+    )
+    .bind(file_id)
+    .bind(&user.id)
+    .execute(&mut *tx)
+    .await?;
+    if deleted.rows_affected() == 0 {
+        return Err(ApiError::NotFound("Nenhuma foto com esse id.".into()));
+    }
+    tx.commit().await?;
+    Ok(())
+}
+
+/// Troca a foto de `user` (ou tira, com `None`). A antiga fica guardada para voltar a ela (até
+/// [`AVATAR_HISTORY`]); devolve as que passaram do limite e saíram da tabela, para quem chama
+/// apagar os bytes.
 pub async fn set_avatar(
     db: &SqlitePool,
     user: &User,
     file_id: Option<&str>,
     now: i64,
-) -> Result<(User, Option<String>), ApiError> {
+) -> Result<(User, Vec<String>), ApiError> {
     let mut tx = db.begin_with("BEGIN IMMEDIATE").await?;
     if let Some(file_id) = file_id {
         let ok: Option<i64> = sqlx::query_scalar(
@@ -410,21 +465,34 @@ pub async fn set_avatar(
             ));
         }
         crate::files::mark_used(&mut tx, &[file_id.to_owned()], now).await?;
+        // A ordem das fotos guardadas é a do último uso: voltar a uma antiga a põe na frente.
+        sqlx::query("UPDATE files SET used_at = ? WHERE id = ?")
+            .bind(now)
+            .bind(file_id)
+            .execute(&mut *tx)
+            .await?;
     }
-    let old: Option<String> = sqlx::query_scalar("SELECT avatar_id FROM users WHERE id = ?")
-        .bind(&user.id)
-        .fetch_one(&mut *tx)
-        .await?;
     sqlx::query("UPDATE users SET avatar_id = ? WHERE id = ? AND removed_at IS NULL")
         .bind(file_id)
         .bind(&user.id)
         .execute(&mut *tx)
         .await?;
-    // A foto antiga sai da tabela aqui; os bytes, quem chama apaga.
-    let old = old.filter(|old| Some(old.as_str()) != file_id);
-    if let Some(old) = &old {
+    // As que passaram do limite saem da tabela aqui; os bytes, quem chama apaga.
+    let pruned: Vec<String> = sqlx::query_scalar(
+        "SELECT id FROM files
+         WHERE uploader_id = ? AND kind = 'avatar' AND used_at IS NOT NULL
+           AND id IS NOT coalesce(?, '')
+         ORDER BY used_at DESC, id DESC
+         LIMIT -1 OFFSET ?",
+    )
+    .bind(&user.id)
+    .bind(file_id)
+    .bind(AVATAR_HISTORY - i64::from(file_id.is_some()))
+    .fetch_all(&mut *tx)
+    .await?;
+    for id in &pruned {
         sqlx::query("DELETE FROM files WHERE id = ?")
-            .bind(old)
+            .bind(id)
             .execute(&mut *tx)
             .await?;
     }
@@ -434,7 +502,7 @@ pub async fn set_avatar(
             avatar_id: file_id.map(str::to_owned),
             ..user.clone()
         },
-        old,
+        pruned,
     ))
 }
 

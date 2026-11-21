@@ -383,13 +383,25 @@ async fn o_anexo_so_le_quem_le_a_conversa() {
         StatusCode::NOT_FOUND
     );
 
-    // A foto de perfil, todo mundo vê.
+    // A foto de perfil de agora, todo mundo vê; antes de virar a foto, só quem enviou.
     let (_, avatar) = upload(
         &ctx,
         &bia,
         "kind=avatar&name=eu.webp",
         "image/png",
         PNG.to_vec(),
+    )
+    .await;
+    assert_eq!(
+        status_of(cadu.clone(), avatar.clone()).await,
+        StatusCode::NOT_FOUND
+    );
+    json_call(
+        &ctx,
+        "PUT",
+        "/api/me/avatar",
+        &bia,
+        json!({ "file_id": avatar["id"] }),
     )
     .await;
     assert_eq!(status_of(cadu, avatar).await, StatusCode::OK);
@@ -436,7 +448,7 @@ async fn a_limpeza_apaga_so_o_que_ninguem_usou_em_24_horas() {
 }
 
 #[tokio::test]
-async fn a_foto_de_perfil_troca_apaga_a_antiga_e_aparece_para_todos() {
+async fn a_foto_de_perfil_troca_guarda_a_antiga_e_aparece_para_todos() {
     let ctx = setup().await;
     let bia = join(&ctx, "Bia", 2, false).await;
     let webp = b"RIFF\x00\x00\x00\x00WEBPVP8 resto".to_vec();
@@ -498,9 +510,22 @@ async fn a_foto_de_perfil_troca_apaga_a_antiga_e_aparece_para_todos() {
     let page: Value = serde_json::from_slice(&bytes).unwrap();
     assert_eq!(page["messages"][0]["author"]["avatar"], first_id.as_str());
 
-    // A nova troca e a antiga some da tabela e do disco.
-    let (_, second) = upload(&ctx, &bia, "kind=avatar&name=eu2.webp", "image/webp", webp).await;
+    // A nova troca, e a antiga fica guardada, só para Bia.
+    let (_, second) = upload(
+        &ctx,
+        &bia,
+        "kind=avatar&name=eu2.webp",
+        "image/webp",
+        webp.clone(),
+    )
+    .await;
     let second_id = second["id"].as_str().unwrap().to_owned();
+    // O relógio do `used_at` é em segundos: a segunda troca tem que ser depois.
+    sqlx::query("UPDATE files SET used_at = used_at - 10 WHERE id = ?")
+        .bind(&first_id)
+        .execute(&ctx.db)
+        .await
+        .unwrap();
     json_call(
         &ctx,
         "PUT",
@@ -509,6 +534,61 @@ async fn a_foto_de_perfil_troca_apaga_a_antiga_e_aparece_para_todos() {
         json!({ "file_id": second_id }),
     )
     .await;
+    assert_eq!(files_on_disk(&ctx), 2);
+    let saved = json_call(&ctx, "GET", "/api/me/avatars", &bia, Value::Null).await;
+    let ids: Vec<&str> = saved
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|a| a["file_id"].as_str().unwrap())
+        .collect();
+    assert_eq!(ids, [second_id.as_str(), first_id.as_str()]);
+    let file = |token: String, id: String| {
+        let ctx = &ctx;
+        async move {
+            send(
+                ctx,
+                "GET",
+                &format!("/api/files/{id}"),
+                Some(&token),
+                None,
+                Body::empty(),
+            )
+            .await
+            .0
+        }
+    };
+    assert_eq!(
+        file(ctx.owner_token.clone(), first_id.clone()).await,
+        StatusCode::NOT_FOUND
+    );
+    assert_eq!(file(bia.clone(), first_id.clone()).await, StatusCode::OK);
+    assert_eq!(
+        file(ctx.owner_token.clone(), second_id.clone()).await,
+        StatusCode::OK
+    );
+
+    // A de agora não se apaga; a guardada, sim.
+    let (status, _, _) = send(
+        &ctx,
+        "DELETE",
+        &format!("/api/me/avatars/{second_id}"),
+        Some(&bia),
+        None,
+        Body::empty(),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CONFLICT);
+    let (status, _, _) = send(
+        &ctx,
+        "DELETE",
+        &format!("/api/me/avatars/{first_id}"),
+        Some(&bia),
+        None,
+        Body::empty(),
+    )
+    .await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
     assert!(
         api::files::find(&ctx.db, &first_id)
             .await
@@ -516,6 +596,60 @@ async fn a_foto_de_perfil_troca_apaga_a_antiga_e_aparece_para_todos() {
             .is_none()
     );
     assert_eq!(files_on_disk(&ctx), 1);
+
+    // Só ficam as últimas 12: a mais velha sai da tabela e do disco.
+    let mut last = second_id.clone();
+    for n in 0..12 {
+        sqlx::query("UPDATE files SET used_at = used_at - 100 WHERE kind = 'avatar'")
+            .execute(&ctx.db)
+            .await
+            .unwrap();
+        let (_, next) = upload(
+            &ctx,
+            &bia,
+            &format!("kind=avatar&name=n{n}.webp"),
+            "image/webp",
+            webp.clone(),
+        )
+        .await;
+        last = next["id"].as_str().unwrap().to_owned();
+        json_call(
+            &ctx,
+            "PUT",
+            "/api/me/avatar",
+            &bia,
+            json!({ "file_id": last }),
+        )
+        .await;
+    }
+    let saved = json_call(&ctx, "GET", "/api/me/avatars", &bia, Value::Null).await;
+    assert_eq!(saved.as_array().unwrap().len(), 12);
+    assert_eq!(saved[0]["file_id"], last.as_str());
+    assert!(
+        api::files::find(&ctx.db, &second_id)
+            .await
+            .unwrap()
+            .is_none()
+    );
+    // Voltar a uma guardada a põe na frente.
+    let older = saved[5]["file_id"].as_str().unwrap().to_owned();
+    sqlx::query("UPDATE files SET used_at = used_at - 100 WHERE kind = 'avatar'")
+        .execute(&ctx.db)
+        .await
+        .unwrap();
+    let me = json_call(
+        &ctx,
+        "PUT",
+        "/api/me/avatar",
+        &bia,
+        json!({ "file_id": older }),
+    )
+    .await;
+    assert_eq!(me["user"]["avatar"], older.as_str());
+    let saved = json_call(&ctx, "GET", "/api/me/avatars", &bia, Value::Null).await;
+    assert_eq!(saved[0]["file_id"], older.as_str());
+    assert_eq!(saved.as_array().unwrap().len(), 12);
+    let second_id = older;
 
     // Um anexo, ou a foto de outra pessoa, não serve.
     let (_, attachment) = upload(
@@ -547,14 +681,14 @@ async fn a_foto_de_perfil_troca_apaga_a_antiga_e_aparece_para_todos() {
         assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
     }
 
-    // Tirar volta para a letra, e a foto sai.
+    // Tirar volta para a letra, e a foto fica guardada.
     let me = json_call(&ctx, "DELETE", "/api/me/avatar", &bia, json!({})).await;
     assert_eq!(me["user"]["avatar"], Value::Null);
     assert!(
         api::files::find(&ctx.db, &second_id)
             .await
             .unwrap()
-            .is_none()
+            .is_some()
     );
 }
 

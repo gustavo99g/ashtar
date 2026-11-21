@@ -6,8 +6,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect } from "react";
 import {
+	deleteSavedAvatar,
 	getInvite,
 	getMe,
+	listSavedAvatars,
 	type MeResponse,
 	removeAvatar,
 	type Status,
@@ -46,6 +48,7 @@ async function fetchMe(): Promise<MeResponse> {
 export const identityKeys = {
 	all: ["identity"] as const,
 	me: () => [...identityKeys.all, "me"] as const,
+	savedAvatars: () => [...identityKeys.all, "saved-avatars"] as const,
 	invite: (code: string) => [...identityKeys.all, "invite", code] as const,
 };
 
@@ -144,7 +147,45 @@ export function useChangeAvatar() {
 		onSuccess: (me) => {
 			queryClient.setQueryData(identityKeys.me(), me);
 			rememberAvatars([me.user]);
+			void queryClient.invalidateQueries({
+				queryKey: identityKeys.savedAvatars(),
+			});
 		},
+	});
+}
+
+/** As fotos que já usei, para voltar a uma delas (a API guarda até 12, contando a de agora). */
+export function useSavedAvatars() {
+	const connected = useSession().status === "connected";
+	return useQuery({
+		queryKey: identityKeys.savedAvatars(),
+		queryFn: listSavedAvatars,
+		enabled: connected,
+	});
+}
+
+/** Volta a uma foto guardada. */
+export function useReuseAvatar() {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: (fileId: string) => setAvatar(fileId),
+		onSuccess: (me) => {
+			queryClient.setQueryData(identityKeys.me(), me);
+			rememberAvatars([me.user]);
+			void queryClient.invalidateQueries({
+				queryKey: identityKeys.savedAvatars(),
+			});
+		},
+	});
+}
+
+/** Apaga uma foto guardada (a de agora não dá). */
+export function useDeleteSavedAvatar() {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: (fileId: string) => deleteSavedAvatar(fileId),
+		onSuccess: () =>
+			queryClient.invalidateQueries({ queryKey: identityKeys.savedAvatars() }),
 	});
 }
 

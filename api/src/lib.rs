@@ -192,6 +192,8 @@ pub fn app(state: AppState, policy: Arc<ClientPolicy>) -> Router {
             "/me/avatar",
             put(routes::auth::set_avatar).delete(routes::auth::remove_avatar),
         )
+        .route("/me/avatars", get(routes::auth::list_avatars))
+        .route("/me/avatars/{id}", delete(routes::auth::delete_avatar))
         .route(
             "/invites",
             get(routes::invites::list).post(routes::invites::create),

@@ -1,8 +1,13 @@
 /**
  * O perfil de quem está usando o app (`/api/me`).
  */
-import { apiJson, jsonRequest } from "../client";
-import type { MeResponse, Status, UpdateMeRequest } from "../generated";
+import { apiFetch, apiJson, jsonRequest } from "../client";
+import type {
+	AvatarFile,
+	MeResponse,
+	Status,
+	UpdateMeRequest,
+} from "../generated";
 
 /** `GET /api/me`: quem sou, o que posso e de qual canal vêm as atualizações. */
 export function getMe(): Promise<MeResponse> {
@@ -28,6 +33,18 @@ export function setAvatar(fileId: string): Promise<MeResponse> {
 		"/api/me/avatar",
 		jsonRequest("PUT", { file_id: fileId }),
 	);
+}
+
+/** `GET /api/me/avatars`: as fotos que já usei (a de agora entra), da usada por último. */
+export function listSavedAvatars(): Promise<AvatarFile[]> {
+	return apiJson<AvatarFile[]>("/api/me/avatars");
+}
+
+/** `DELETE /api/me/avatars/{id}`: apaga uma foto guardada. A de agora não (409). */
+export async function deleteSavedAvatar(fileId: string): Promise<void> {
+	await apiFetch(`/api/me/avatars/${encodeURIComponent(fileId)}`, {
+		method: "DELETE",
+	});
 }
 
 /** `DELETE /api/me/avatar`: tira a foto (volta a letra e a cor). Responde como o `getMe`. */

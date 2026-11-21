@@ -30,6 +30,15 @@ removed: boolean,
  */
 avatar?: string | null, };
 
+/**
+ * Uma foto de perfil que a pessoa já usou, para voltar a ela.
+ */
+export type AvatarFile = { file_id: string, 
+/**
+ * Quando foi a foto pela última vez (Unix, segundos).
+ */
+used_at: number, };
+
 export type BackupStatus = { name: string, 
 /**
  * Quando foi feito (a data de modificação do arquivo), em segundos.

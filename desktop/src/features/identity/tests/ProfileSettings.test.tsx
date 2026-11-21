@@ -1,7 +1,14 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ApiError, type MeResponse, updateMe } from "@/lib/api";
+import {
+	ApiError,
+	deleteSavedAvatar,
+	listSavedAvatars,
+	type MeResponse,
+	setAvatar,
+	updateMe,
+} from "@/lib/api";
 import { ProfileSettings } from "../components/ProfileSettings";
 import { identityKeys } from "../queries";
 import { useSessionStore } from "../stores/sessionStore";
@@ -9,6 +16,9 @@ import { useSessionStore } from "../stores/sessionStore";
 vi.mock("@/lib/api", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/lib/api")>()),
 	updateMe: vi.fn(),
+	listSavedAvatars: vi.fn(() => Promise.resolve([])),
+	setAvatar: vi.fn(),
+	deleteSavedAvatar: vi.fn(() => Promise.resolve()),
 }));
 
 function me(displayName: string | null): MeResponse {
@@ -157,5 +167,44 @@ describe("ProfileSettings", () => {
 				"Você está numa chamada: na sala, o nome novo vale na próxima entrada.",
 			),
 		).toBeInTheDocument();
+	});
+
+	it("as fotos anteriores: clicar volta a uma, o X apaga; a de agora não aparece", async () => {
+		vi.mocked(listSavedAvatars).mockResolvedValue([
+			{ file_id: "agora", used_at: 3 },
+			{ file_id: "antiga", used_at: 2 },
+		]);
+		const current = me(null);
+		current.user = { ...current.user, avatar: "agora" };
+		vi.mocked(setAvatar).mockResolvedValue({
+			...current,
+			user: { ...current.user, avatar: "antiga" },
+		});
+		const queryClient = renderProfile();
+		queryClient.setQueryData(identityKeys.me(), current);
+
+		const list = await screen.findByRole("list", { name: "Fotos anteriores" });
+		expect(list.querySelectorAll("li")).toHaveLength(1);
+		fireEvent.click(screen.getByRole("button", { name: "Usar esta foto" }));
+		await vi.waitFor(() => expect(setAvatar).toHaveBeenCalledWith("antiga"));
+		await vi.waitFor(() =>
+			expect(
+				queryClient.getQueryData<MeResponse>(identityKeys.me())?.user.avatar,
+			).toBe("antiga"),
+		);
+
+		vi.mocked(listSavedAvatars).mockResolvedValue([
+			{ file_id: "antiga", used_at: 4 },
+			{ file_id: "agora", used_at: 3 },
+		]);
+		await vi.waitFor(() =>
+			expect(
+				screen.getByRole("button", { name: "Apagar esta foto" }),
+			).toBeInTheDocument(),
+		);
+		fireEvent.click(screen.getByRole("button", { name: "Apagar esta foto" }));
+		await vi.waitFor(() =>
+			expect(deleteSavedAvatar).toHaveBeenCalledWith("agora"),
+		);
 	});
 });

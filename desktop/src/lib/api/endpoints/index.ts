@@ -48,7 +48,9 @@ export {
 	uploadFile,
 } from "./files";
 export {
+	deleteSavedAvatar,
 	getMe,
+	listSavedAvatars,
 	removeAvatar,
 	setAvatar,
 	setStatus,
