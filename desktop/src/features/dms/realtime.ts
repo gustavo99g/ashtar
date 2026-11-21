@@ -5,7 +5,7 @@
  */
 import type { QueryClient } from "@tanstack/react-query";
 import { channelsKeys, findChannel } from "@/features/channels";
-import type { Layout, ServerEvent } from "@/lib/api";
+import type { Conversation, Layout, ServerEvent } from "@/lib/api";
 import type { RealtimeEventInfo } from "@/lib/realtime";
 import { dmsKeys, touchConversation } from "./queries";
 
@@ -24,6 +24,23 @@ export function handleDmsRealtime(
 			void queryClient.invalidateQueries({ queryKey: dmsKeys.list() });
 			break;
 		}
+		case "message.updated":
+		case "message.deleted":
+			// O resumo da conversa mostra a última mensagem: se foi ela que mudou, busca a lista.
+			if (
+				queryClient
+					.getQueryData<Conversation[]>(dmsKeys.list())
+					?.some(
+						(c) =>
+							c.last_message?.id ===
+							(event.type === "message.updated"
+								? event.message.id
+								: event.message_id),
+					)
+			) {
+				void queryClient.invalidateQueries({ queryKey: dmsKeys.list() });
+			}
+			break;
 		case "member.left":
 			// A conversa com quem saiu fica só para leitura: a lista traz o `removed`.
 			void queryClient.invalidateQueries({ queryKey: dmsKeys.list() });

@@ -81,6 +81,10 @@ pub struct SendMessageRequest {
     #[serde(default)]
     #[ts(optional)]
     pub reply_to: Option<String>,
+    /// Se a resposta menciona quem escreveu a original (o `@` ligado). Padrão: sim.
+    #[serde(default)]
+    #[ts(optional)]
+    pub reply_mention: Option<bool>,
 }
 
 /// `POST /api/channels/{id}/messages`: 201 com a mensagem nova, ou 200 com a
@@ -108,7 +112,10 @@ pub async fn send(
         &user,
         &request.client_id,
         &request.body,
-        request.reply_to.as_deref(),
+        request.reply_to.as_deref().map(|id| messages::ReplyTo {
+            id,
+            mention: request.reply_mention.unwrap_or(true),
+        }),
         now(),
     )
     .await?;

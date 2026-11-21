@@ -1,5 +1,5 @@
 import { openLink } from "@/lib/tauri/opener";
-import { authorName, bodyParts } from "../model/messages";
+import { authorName, bodyParts, stampLabel } from "../model/messages";
 import type { Mentionable } from "../model/mentions";
 
 /**
@@ -13,9 +13,12 @@ import type { Mentionable } from "../model/mentions";
 export function MessageBody({
 	body,
 	mentioned = [],
+	editedAt = null,
 }: {
 	body: string;
 	mentioned?: readonly Mentionable[];
+	/** Quando foi editada: aparece "(editada)" no fim, com a hora no `title`. */
+	editedAt?: number | null;
 }) {
 	return (
 		<p className="text-sm leading-[1.55] break-words whitespace-pre-wrap text-secondary-foreground">
@@ -47,6 +50,14 @@ export function MessageBody({
 						{part.url}
 					</a>
 				),
+			)}
+			{editedAt !== null && (
+				<span
+					title={`Editada ${stampLabel(editedAt).toLowerCase()}`}
+					className="ml-1 text-[11px] text-foreground-subtle"
+				>
+					(editada)
+				</span>
 			)}
 		</p>
 	);

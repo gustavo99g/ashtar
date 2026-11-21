@@ -23,17 +23,21 @@ import { useSession } from "@/features/identity";
 import {
 	ApiError,
 	type ChannelHead,
+	deleteMessage,
+	editMessage,
 	listMessages,
 	listPeople,
 	type Message,
 	type MessagePage,
 	sendMessage,
+	setReaction,
 } from "@/lib/api";
 import { useRealtimeOpen } from "@/lib/realtime";
 import { useAppVisible } from "@/lib/visibility";
 import {
 	addPending,
 	findPending,
+	type PendingReply,
 	removePending,
 	updatePending,
 } from "./stores/outboxStore";
@@ -43,6 +47,9 @@ export const chatKeys = {
 	messages: (channelId: string) =>
 		[...chatKeys.all, "messages", channelId] as const,
 	people: () => [...chatKeys.all, "people"] as const,
+	/** O histórico aberto em volta de uma mensagem antiga (a citação, a busca, as fixadas). */
+	around: (channelId: string, anchor: string) =>
+		[...chatKeys.all, "around", channelId, anchor] as const,
 };
 
 export type MessagePages = InfiniteData<MessagePage, string | null>;
@@ -64,6 +71,116 @@ export function useMessages(channelId: string) {
 	});
 	const messages = query.data?.pages.flatMap((page) => page.messages);
 	return { ...query, messages };
+}
+
+/** Uma página do histórico em volta de uma mensagem: o cursor diz para que lado ela foi buscada. */
+type AroundParam = { around: string } | { before: string } | { after: string };
+
+/**
+ * O histórico em volta de `anchor` (ADR 0032): a primeira página vem do `?around=`, e dali rola para
+ * os dois lados (`before` no topo, `after` no fim). Fica numa chave separada do histórico de
+ * sempre, que continua recebendo as novas pelo tempo real; "Ir para o presente" só volta para ele.
+ */
+export function useAroundMessages(channelId: string, anchor: string | null) {
+	const connected = useSession().status === "connected";
+	const query = useInfiniteQuery({
+		queryKey: chatKeys.around(channelId, anchor ?? ""),
+		queryFn: ({ pageParam }) => listMessages(channelId, pageParam),
+		initialPageParam: { around: anchor ?? "" } as AroundParam,
+		getPreviousPageParam: (first) =>
+			first.has_more && first.messages[0]
+				? ({ before: first.messages[0].id } as AroundParam)
+				: null,
+		getNextPageParam: (last) => {
+			// A do `around` diz no `has_newer`; as do `after`, no `has_more`.
+			const newer = last.has_newer ?? last.has_more;
+			const newest = last.messages[last.messages.length - 1];
+			return newer && newest ? ({ after: newest.id } as AroundParam) : null;
+		},
+		enabled: connected && anchor !== null,
+		staleTime: Number.POSITIVE_INFINITY,
+		gcTime: 0,
+	});
+	const messages = query.data?.pages.flatMap((page) => page.messages);
+	return { ...query, messages };
+}
+
+/**
+ * Muda as mensagens de `channelId` em todo histórico em cache (o de sempre e os abertos em volta
+ * de uma mensagem).
+ */
+function changeHistories(
+	queryClient: QueryClient,
+	channelId: string,
+	change: (message: Message) => Message | null,
+): void {
+	const update = (data: MessagePages | undefined) => {
+		if (!data) return data;
+		let changed = false;
+		const pages = data.pages.map((page) => {
+			const messages: Message[] = [];
+			for (const message of page.messages) {
+				const next = change(message);
+				if (next !== message) changed = true;
+				if (next) messages.push(next);
+			}
+			return changed ? { ...page, messages } : page;
+		});
+		return changed ? { ...data, pages } : data;
+	};
+	queryClient.setQueriesData<MessagePages>(
+		{ queryKey: chatKeys.messages(channelId) },
+		update,
+	);
+	queryClient.setQueriesData<MessagePages>(
+		{ queryKey: [...chatKeys.all, "around", channelId] },
+		update,
+	);
+}
+
+/** O começo do texto que a citação da resposta mostra (o mesmo corte da API). */
+export function replyExcerpt(body: string): string {
+	const line = body.split(/\s+/).filter(Boolean).join(" ");
+	const chars = [...line];
+	return chars.length > 120 ? `${chars.slice(0, 120).join("")}…` : line;
+}
+
+/**
+ * A mensagem mudou (`message.updated`, ou a resposta de editar ou reagir): troca no cache, e as
+ * respostas a ela passam a citar o texto novo.
+ */
+export function replaceMessage(queryClient: QueryClient, updated: Message): void {
+	changeHistories(queryClient, updated.channel_id, (message) => {
+		if (message.id === updated.id) return updated;
+		if (message.reply_to?.id === updated.id && message.reply_to.author) {
+			return {
+				...message,
+				reply_to: { ...message.reply_to, excerpt: replyExcerpt(updated.body) },
+			};
+		}
+		return message;
+	});
+}
+
+/**
+ * A mensagem foi excluída (`message.deleted`): sai do cache, e as respostas a ela passam a mostrar
+ * "Mensagem original excluída".
+ */
+export function dropMessage(
+	queryClient: QueryClient,
+	channelId: string,
+	messageId: string,
+): void {
+	changeHistories(queryClient, channelId, (message) => {
+		if (message.id === messageId) return null;
+		if (message.reply_to?.id === messageId && message.reply_to.author) {
+			return {
+				...message,
+				reply_to: { id: messageId, author: null, excerpt: null },
+			};
+		}
+		return message;
+	});
 }
 
 /**
@@ -226,6 +343,8 @@ async function deliver(
 		const message = await sendMessage(pending.channel_id, {
 			client_id: clientId,
 			body: pending.body,
+			reply_to: pending.reply?.id,
+			reply_mention: pending.reply?.mention,
 		});
 		appendMessages(queryClient, pending.channel_id, [message]);
 		removePending(clientId);
@@ -247,12 +366,13 @@ async function deliver(
 export function useSendMessage() {
 	const queryClient = useQueryClient();
 	const send = useCallback(
-		(channelId: string, body: string) => {
+		(channelId: string, body: string, reply?: PendingReply) => {
 			const clientId = newClientId();
 			addPending({
 				client_id: clientId,
 				channel_id: channelId,
 				body: body.trim(),
+				reply,
 				created_at: Math.floor(Date.now() / 1000),
 				status: "sending",
 			});
@@ -265,6 +385,34 @@ export function useSendMessage() {
 		[queryClient],
 	);
 	return { send, retry, discard: removePending };
+}
+
+/**
+ * Editar, excluir e reagir (ADR 0032). Cada um já põe a resposta no cache, sem esperar o
+ * `message.updated` ou o `message.deleted` (que chegam também, e não mudam nada de novo).
+ */
+export function useMessageActions() {
+	const queryClient = useQueryClient();
+	const edit = useCallback(
+		async (message: Message, body: string) => {
+			replaceMessage(queryClient, await editMessage(message.id, { body: body.trim() }));
+		},
+		[queryClient],
+	);
+	const remove = useCallback(
+		async (message: Message) => {
+			await deleteMessage(message.id);
+			dropMessage(queryClient, message.channel_id, message.id);
+		},
+		[queryClient],
+	);
+	const react = useCallback(
+		async (message: Message, emoji: string, on: boolean) => {
+			replaceMessage(queryClient, await setReaction(message.id, emoji, on));
+		},
+		[queryClient],
+	);
+	return { edit, remove, react };
 }
 
 /** De quanto em quanto tempo a coluna de membros pergunta quem está online, com o tempo real fora. */

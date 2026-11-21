@@ -519,7 +519,11 @@ client_id: string, body: string,
 /**
  * A mensagem respondida, do mesmo canal.
  */
-reply_to?: string, };
+reply_to?: string, 
+/**
+ * Se a resposta menciona quem escreveu a original (o `@` ligado). Padrão: sim.
+ */
+reply_mention?: boolean, };
 
 /**
  * Tudo o que a API manda pelo WebSocket. O `type` é o nome do evento.

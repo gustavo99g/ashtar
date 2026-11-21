@@ -109,6 +109,30 @@ pub async fn resolve(
     if !body.contains('@') {
         return Ok(Vec::new());
     }
+    let candidates = candidates(db, channel, author).await?;
+    Ok(find(body, &candidates))
+}
+
+/// Se `author` pode mencionar `user_id` em `channel` (a menção da resposta, com o
+/// `@` ligado): a mesma regra do [`resolve`].
+pub async fn can_mention(
+    db: &SqlitePool,
+    channel: &Readable,
+    author: &User,
+    user_id: &str,
+) -> Result<bool, ApiError> {
+    Ok(candidates(db, channel, author)
+        .await?
+        .iter()
+        .any(|c| c.id == user_id))
+}
+
+/// Quem `author` pode mencionar em `channel`.
+async fn candidates(
+    db: &SqlitePool,
+    channel: &Readable,
+    author: &User,
+) -> Result<Vec<Candidate>, ApiError> {
     let candidates: Vec<Candidate> = match channel {
         Readable::Text(text) => {
             let everyone: Vec<Candidate> =
@@ -131,7 +155,7 @@ pub async fn resolve(
                 .await?
         }
     };
-    Ok(find(body, &candidates))
+    Ok(candidates)
 }
 
 #[cfg(test)]

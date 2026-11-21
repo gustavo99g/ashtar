@@ -7,10 +7,17 @@
  */
 import { create } from "zustand";
 
+/** A mensagem que o envio responde, e se a resposta menciona quem a escreveu (o `@` ligado). */
+export interface PendingReply {
+	id: string;
+	mention: boolean;
+}
+
 export interface PendingMessage {
 	client_id: string;
 	channel_id: string;
 	body: string;
+	reply?: PendingReply;
 	/** Em segundos, como o `created_at` da API. */
 	created_at: number;
 	status: "sending" | "failed";

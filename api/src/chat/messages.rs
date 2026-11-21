@@ -72,6 +72,14 @@ pub struct Message {
     pub pinned_at: Option<i64>,
 }
 
+/// A mensagem que o envio responde, e se a resposta menciona quem a escreveu
+/// (o `@` ligado, o padrão do app).
+#[derive(Debug, Clone, Copy)]
+pub struct ReplyTo<'a> {
+    pub id: &'a str,
+    pub mention: bool,
+}
+
 /// A citação da resposta: a original, ou só o id se ela foi excluída.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
 #[ts(export, export_to = "index.ts")]
@@ -279,7 +287,7 @@ pub async fn create(
     author: &User,
     client_id: &str,
     body: &str,
-    reply_to: Option<&str>,
+    reply: Option<ReplyTo<'_>>,
     now: i64,
 ) -> Result<(Message, bool), ApiError> {
     validate_client_id(client_id)?;
@@ -289,22 +297,31 @@ pub async fn create(
     if let Some(existing) = find_existing(db, channel_id, author, client_id).await? {
         return Ok((existing, false));
     }
-    if let Some(reply_to) = reply_to {
-        // Só se responde a uma mensagem que existe, no mesmo canal.
-        let found: Option<i64> =
-            sqlx::query_scalar("SELECT 1 FROM messages WHERE id = ? AND channel_id = ?")
-                .bind(reply_to)
+    // Só se responde a uma mensagem que existe, no mesmo canal.
+    let replied_author: Option<String> = match &reply {
+        None => None,
+        Some(reply) => Some(
+            sqlx::query_scalar("SELECT author_id FROM messages WHERE id = ? AND channel_id = ?")
+                .bind(reply.id)
                 .bind(channel_id)
                 .fetch_optional(db)
-                .await?;
-        if found.is_none() {
-            return Err(ApiError::NotFound(
-                "A mensagem respondida não existe mais.".into(),
-            ));
-        }
-    }
+                .await?
+                .ok_or_else(|| {
+                    ApiError::NotFound("A mensagem respondida não existe mais.".into())
+                })?,
+        ),
+    };
     limiter.try_send(&author.id)?;
-    let mentioned = mentions::resolve(db, channel, author, &body).await?;
+    let mut mentioned = mentions::resolve(db, channel, author, &body).await?;
+    // Com o `@` ligado, a resposta menciona quem escreveu a original.
+    if let (Some(reply), Some(replied)) = (&reply, replied_author)
+        && reply.mention
+        && !mentioned.contains(&replied)
+        && mentions::can_mention(db, channel, author, &replied).await?
+    {
+        mentioned.push(replied);
+    }
+    let reply_to = reply.map(|reply| reply.id);
 
     let id = Uuid::now_v7().to_string();
     let mut tx = db.begin_with("BEGIN IMMEDIATE").await?;

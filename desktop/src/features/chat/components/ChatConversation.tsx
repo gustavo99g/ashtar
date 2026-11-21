@@ -1,4 +1,6 @@
-import { type ReactNode, useMemo, useState } from "react";
+import { ArrowRightIcon, ClockIcon } from "lucide-react";
+import { type ReactNode, useCallback, useMemo, useState } from "react";
+import { toast } from "@/components/ui/toast";
 import {
 	ErrorState,
 	LoadingState,
@@ -6,13 +8,26 @@ import {
 } from "@/components/ui/states";
 import { useSession } from "@/features/identity";
 import { useMarkRead, useUnreadMarker } from "@/features/unread";
-import { isApiError, type Message, type Person } from "@/lib/api";
+import { ApiError, isApiError, type Message, type Person } from "@/lib/api";
 import { useAppFocused } from "@/lib/visibility";
 import type { Mentionable } from "../model/mentions";
-import { useMessages, usePeople, useSendMessage } from "../queries";
+import {
+	useAroundMessages,
+	useMessageActions,
+	useMessages,
+	usePeople,
+	useSendMessage,
+} from "../queries";
 import { usePending } from "../stores/outboxStore";
+import { cancelReply, startReply, useReplyStore } from "../stores/replyStore";
 import { Composer } from "./Composer";
+import { DeleteMessageDialog } from "./DeleteMessageDialog";
 import { MessageList } from "./MessageList";
+import {
+	canEdit,
+	MessageActionsContext,
+	type MessageActionsValue,
+} from "./messageContext";
 
 /**
  * A conversa de um canal de texto ou de uma conversa privada: o histórico e o campo de escrever.
@@ -25,6 +40,10 @@ import { MessageList } from "./MessageList";
  * Aqui também se dá a conversa como lida (`useMarkRead`) e se decide onde fica a linha "Novas
  * mensagens" (`useUnreadMarker`). Quem usa monta uma por conversa (`key`), para a linha não passar
  * de uma para a outra.
+ *
+ * E as ações das mensagens (ADR 0032): editar, excluir (com a confirmação), responder, reagir e ir
+ * até a original de uma resposta. Se ela não está no histórico carregado, abre o histórico em volta
+ * dela (`useAroundMessages`), com a faixa "Ir para o presente".
  */
 export function ChatConversation({
 	channelId,
@@ -36,6 +55,7 @@ export function ChatConversation({
 	mentionable,
 	aboveComposer,
 	renderCall,
+	kind = "channel",
 }: {
 	channelId: string;
 	listLabel: string;
@@ -50,6 +70,8 @@ export function ChatConversation({
 	aboveComposer?: ReactNode;
 	/** O registro de uma ligação no histórico (ver `MessageList`). */
 	renderCall?: (message: Message) => ReactNode;
+	/** Numa conversa privada o dono não exclui a mensagem da outra pessoa. */
+	kind?: "channel" | "dm";
 }) {
 	const query = useMessages(channelId);
 	const pending = usePending(channelId);
@@ -69,13 +91,130 @@ export function ChatConversation({
 	const [seeingEnd, setSeeingEnd] = useState(true);
 	const focused = useAppFocused();
 	const lastMessageId = query.messages?.[query.messages.length - 1]?.id;
-	useMarkRead(channelId, lastMessageId, seeingEnd);
+	/** A mensagem em volta da qual o histórico antigo está aberto (`null`: o de sempre). */
+	const [anchor, setAnchor] = useState<string | null>(null);
+	const around = useAroundMessages(channelId, anchor);
+	useMarkRead(channelId, lastMessageId, seeingEnd && anchor === null);
 	const unreadAfter = useUnreadMarker(channelId, focused && seeingEnd);
 
+	const [focus, setFocus] = useState<{ id: string; key: number } | null>(null);
+	const [highlightId, setHighlightId] = useState<string | null>(null);
+	const [editingId, setEditingId] = useState<string | null>(null);
+	const [deleting, setDeleting] = useState<Message | null>(null);
+	const { edit, remove, react } = useMessageActions();
+	const shown = anchor === null ? query.messages : around.messages;
+
+	const jumpTo = useCallback(
+		(messageId: string) => {
+			setFocus((current) => ({ id: messageId, key: (current?.key ?? 0) + 1 }));
+			setHighlightId(messageId);
+			window.setTimeout(
+				() => setHighlightId((id) => (id === messageId ? null : id)),
+				2000,
+			);
+			if (!shown?.some((m) => m.id === messageId)) setAnchor(messageId);
+		},
+		[shown],
+	);
+
+	const removeNow = useCallback(
+		(message: Message) => {
+			remove(message).catch((error: unknown) =>
+				toast.add({
+					title: "Não deu para excluir a mensagem",
+					description:
+						error instanceof ApiError ? error.message : "Tente de novo.",
+				}),
+			);
+		},
+		[remove],
+	);
+
+	const actions = useMemo<MessageActionsValue>(
+		() => ({
+			myId,
+			canModerate: kind === "channel" && ownerId !== null && ownerId === myId,
+			people: byId,
+			editingId,
+			highlightId,
+			startEdit: (message) => setEditingId(message.id),
+			stopEdit: () => setEditingId(null),
+			saveEdit: edit,
+			reply: (message) => startReply(message),
+			remove: (message, skipConfirm) =>
+				skipConfirm ? removeNow(message) : setDeleting(message),
+			react: (message, emoji, on) => {
+				react(message, emoji, on).catch((error: unknown) =>
+					toast.add({
+						title: "Não deu para reagir",
+						description:
+							error instanceof ApiError ? error.message : "Tente de novo.",
+					}),
+				);
+			},
+			jumpTo,
+		}),
+		[myId, kind, ownerId, byId, editingId, highlightId, edit, removeNow, react, jumpTo],
+	);
+
+	/** A seta para cima no campo vazio: edita a última mensagem de quem escreve. */
+	const editLast = useCallback(() => {
+		const last = [...(query.messages ?? [])]
+			.reverse()
+			.find((message) => canEdit(message, myId));
+		if (!last) return false;
+		setAnchor(null);
+		setEditingId(last.id);
+		return true;
+	}, [query.messages, myId]);
+
+	function sendHere(body: string) {
+		const reply = useReplyStore.getState().byChannel[channelId];
+		send(
+			channelId,
+			body,
+			reply && { id: reply.message.id, mention: reply.mention },
+		);
+		cancelReply(channelId);
+		// Quem manda quer ver o que mandou: volta para o presente.
+		setAnchor(null);
+	}
+
 	return (
-		<>
-			{query.messages ? (
+		<MessageActionsContext.Provider value={actions}>
+			{anchor !== null && around.messages ? (
 				<MessageList
+					key={`around:${anchor}`}
+					label={listLabel}
+					start={start}
+					messages={around.messages}
+					pending={NO_PENDING}
+					ownerId={ownerId}
+					people={byId}
+					myId={myId}
+					hasOlder={around.hasPreviousPage}
+					loadingOlder={around.isFetchingPreviousPage}
+					onLoadOlder={() => void around.fetchPreviousPage()}
+					hasNewer={around.hasNextPage}
+					loadingNewer={around.isFetchingNextPage}
+					onLoadNewer={() => void around.fetchNextPage()}
+					onRetry={retry}
+					onDiscard={discard}
+					renderCall={renderCall}
+					focusId={focus?.id ?? anchor}
+					focusKey={focus?.key}
+				/>
+			) : anchor !== null && around.isError ? (
+				<Centered>
+					<ErrorState onRetry={() => setAnchor(null)} />
+				</Centered>
+			) : anchor !== null ? (
+				<Centered>
+					<LoadingState />
+				</Centered>
+			) : query.messages ? (
+				<MessageList
+					key="live"
 					label={listLabel}
 					start={start}
 					messages={query.messages}
@@ -91,6 +230,8 @@ export function ChatConversation({
 					unreadAfter={unreadAfter}
 					onSeeingEndChange={setSeeingEnd}
 					renderCall={renderCall}
+					focusId={focus?.id}
+					focusKey={focus?.key}
 				/>
 			) : query.isError ? (
 				<Centered>
@@ -105,6 +246,28 @@ export function ChatConversation({
 					<LoadingState />
 				</Centered>
 			)}
+			{anchor !== null && (
+				<div className={compact ? "px-2.5" : "px-4"}>
+					<div
+						role="status"
+						className="mb-1.5 flex h-9 items-center gap-2.5 rounded-[10px] border border-border-strong bg-card pr-1.5 pl-3.5 text-[13px] text-secondary-foreground"
+					>
+						<ClockIcon className="size-[15px] shrink-0" />
+						<span className="truncate">Você está vendo mensagens antigas</span>
+						<button
+							type="button"
+							onClick={() => {
+								setAnchor(null);
+								setFocus(null);
+							}}
+							className="ml-auto flex h-7 shrink-0 items-center gap-1.5 rounded-md bg-primary px-3 text-[13px] font-semibold text-primary-foreground hover:bg-primary-hover"
+						>
+							Ir para o presente
+							<ArrowRightIcon className="size-3.5" />
+						</button>
+					</div>
+				</div>
+			)}
 			{aboveComposer}
 			{readOnly ?? (
 				<Composer
@@ -113,14 +276,21 @@ export function ChatConversation({
 					compact={compact}
 					mentionable={mentionable ?? people.data ?? NO_PEOPLE}
 					myId={myId}
-					onSend={(body) => send(channelId, body)}
+					onSend={sendHere}
+					onEditLast={editLast}
 				/>
 			)}
-		</>
+			<DeleteMessageDialog
+				message={deleting}
+				onConfirm={remove}
+				onClose={() => setDeleting(null)}
+			/>
+		</MessageActionsContext.Provider>
 	);
 }
 
 const NO_PEOPLE: Person[] = [];
+const NO_PENDING: never[] = [];
 
 function Centered({ children }: { children: ReactNode }) {
 	return (

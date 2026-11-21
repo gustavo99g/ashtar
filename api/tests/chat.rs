@@ -482,6 +482,23 @@ async fn excluir_e_a_resposta_fica_sem_a_original() {
     assert_eq!(reply["reply_to"]["id"], original["id"]);
     assert_eq!(reply["reply_to"]["author"]["nick"], "Bia");
     assert_eq!(reply["reply_to"]["excerpt"], "quem joga hoje?");
+    // Com o `@` ligado (o padrão), a resposta menciona quem escreveu a original.
+    let bia_id = users::get_active_by_nick(&ctx.db, "Bia").await.unwrap().id;
+    assert_eq!(reply["mentions"], json!([bia_id]));
+    let (_, quiet) = call(
+        &ctx.router,
+        "POST",
+        "/api/channels/geral/messages",
+        Some(&ctx.owner_token),
+        Some(json!({
+            "client_id": "c-9",
+            "body": "eu também",
+            "reply_to": original["id"],
+            "reply_mention": false,
+        })),
+    )
+    .await;
+    assert_eq!(quiet["mentions"], json!([]));
 
     // Responder a uma mensagem que não existe é recusado.
     let (status, _) = call(
@@ -524,7 +541,7 @@ async fn excluir_e_a_resposta_fica_sem_a_original() {
     assert_eq!(status, StatusCode::NOT_FOUND);
 
     let page = get_page(&ctx, "").await;
-    assert_eq!(bodies(&page), ["eu"]);
+    assert_eq!(bodies(&page), ["eu", "eu também"]);
     let quoted = &page["messages"][0]["reply_to"];
     assert_eq!(quoted["id"], original["id"]);
     assert_eq!(quoted["author"], Value::Null);
@@ -540,7 +557,7 @@ async fn excluir_e_a_resposta_fica_sem_a_original() {
     )
     .await;
     assert_eq!(status, StatusCode::NO_CONTENT);
-    assert!(bodies(&get_page(&ctx, "").await).is_empty());
+    assert_eq!(bodies(&get_page(&ctx, "").await), ["eu também"]);
 }
 
 #[tokio::test]

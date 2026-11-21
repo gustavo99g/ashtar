@@ -1,5 +1,5 @@
 /**
- * Os eventos do tempo real do chat: a mensagem nova, quem ficou online ou offline, quem entrou ou
+ * Os eventos do tempo real do chat: a mensagem nova, editada ou excluída, quem ficou online ou offline, quem entrou ou
  * saiu do grupo, e o `ready`. Todo `ready` traz quem está online; o da volta de uma queda
  * (`resumed`) também busca o que faltou.
  */
@@ -10,9 +10,12 @@ import {
 	appendMessages,
 	catchUp,
 	chatKeys,
+	dropMessage,
 	markAuthorRemoved,
+	replaceMessage,
 } from "./queries";
 import { removePending } from "./stores/outboxStore";
+import { forgetReplyTo } from "./stores/replyStore";
 import { addTyping, clearTyping, resetTyping } from "./stores/typingStore";
 
 function updatePeople(
@@ -36,6 +39,13 @@ export function handleChatRealtime(
 			removePending(event.message.client_id);
 			// Quem mandou parou de digitar.
 			clearTyping(event.message.channel_id, event.message.author.id);
+			break;
+		case "message.updated":
+			replaceMessage(queryClient, event.message);
+			break;
+		case "message.deleted":
+			dropMessage(queryClient, event.channel_id, event.message_id);
+			forgetReplyTo(event.channel_id, event.message_id);
 			break;
 		case "typing":
 			addTyping(event.channel_id, event.user_id);

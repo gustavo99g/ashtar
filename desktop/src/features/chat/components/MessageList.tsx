@@ -51,6 +51,19 @@ interface MessageListProps {
 	 * uma mensagem comum ("Ligação").
 	 */
 	renderCall?: (message: Message) => ReactNode;
+	/**
+	 * Uma mensagem para mostrar no meio da tela (a citação clicada, ADR 0032). Muda o `focusKey` para
+	 * ir de novo até a mesma.
+	 */
+	focusId?: string | null;
+	focusKey?: number;
+	/**
+	 * O histórico aberto em volta de uma mensagem antiga: há mais novas para buscar ao chegar perto
+	 * do fim, e a lista não acompanha as que chegam (elas vão para o histórico de sempre).
+	 */
+	hasNewer?: boolean;
+	loadingNewer?: boolean;
+	onLoadNewer?: () => void;
 }
 
 /**
@@ -79,7 +92,14 @@ export function MessageList({
 	unreadAfter,
 	onSeeingEndChange,
 	renderCall,
+	focusId = null,
+	focusKey = 0,
+	hasNewer,
+	loadingNewer = false,
+	onLoadNewer,
 }: MessageListProps) {
+	/** No histórico em volta de uma mensagem, a lista fica parada onde a pessoa está lendo. */
+	const follow = hasNewer === undefined;
 	const ref = useRef<HTMLDivElement>(null);
 	const lineRef = useRef<HTMLLIElement>(null);
 	const atBottom = useRef(true);
@@ -136,6 +156,10 @@ export function MessageList({
 		if (!opened.current) {
 			opened.current = true;
 			const list = ref.current;
+			if (list && focusId && scrollToMessage(list, focusId)) {
+				measureBottom();
+				return;
+			}
 			const line = lineRef.current;
 			if (list && line) {
 				list.scrollTop = Math.max(0, line.offsetTop - 16);
@@ -144,9 +168,20 @@ export function MessageList({
 				return;
 			}
 		}
+		if (!follow) return;
 		if (sentHere || atBottom.current) scrollToBottom();
 		else setShowJump(true);
-	}, [lastKey, pending.length, scrollToBottom, measureBottom]);
+		// O `focusId` só conta ao abrir; depois, quem leva até a mensagem é o efeito abaixo.
+	}, [lastKey, pending.length, scrollToBottom, measureBottom, follow]);
+
+	// Pediram para ir até uma mensagem que já está na lista.
+	useLayoutEffect(() => {
+		const list = ref.current;
+		if (!list || !focusId || !opened.current) return;
+		scrollToMessage(list, focusId);
+		measureBottom();
+		// Só o pedido novo (`focusKey`) move a lista.
+	}, [focusKey]);
 
 	// A conversa não encheu a tela (mensagens curtas, janela grande): sem rolagem, o "chegou perto
 	// do topo" nunca dispara, então busca a página anterior daqui. Sem altura (antes do layout), não
@@ -169,6 +204,8 @@ export function MessageList({
 			heightBeforeOlder.current = list.scrollHeight;
 			onLoadOlder();
 		}
+		const toEnd = list.scrollHeight - list.scrollTop - list.clientHeight;
+		if (toEnd <= LOAD_OLDER_PX && hasNewer && !loadingNewer) onLoadNewer?.();
 	}
 
 	const rows = conversationRows(messages);
@@ -222,6 +259,13 @@ export function MessageList({
 							)}
 						</RowWithDay>
 					))}
+					{hasNewer && (
+						<li className="flex justify-center py-4">
+							{loadingNewer && (
+								<Spinner className="size-5 text-muted-foreground" />
+							)}
+						</li>
+					)}
 					{pending.map((message) => (
 						<PendingItem
 							key={message.client_id}
@@ -244,6 +288,19 @@ export function MessageList({
 			)}
 		</div>
 	);
+}
+
+/** Rola a lista até deixar a mensagem `id` no meio. Diz se achou. */
+function scrollToMessage(list: HTMLElement, id: string): boolean {
+	const row = list.querySelector<HTMLElement>(
+		`[data-message-id="${CSS.escape(id)}"]`,
+	);
+	if (!row) return false;
+	list.scrollTop = Math.max(
+		0,
+		row.offsetTop - list.clientHeight / 2 + row.offsetHeight / 2,
+	);
+	return true;
 }
 
 function RowWithDay({

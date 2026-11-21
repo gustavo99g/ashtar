@@ -23,7 +23,15 @@ export {
 	hangUpCall,
 	startCall,
 } from "./calls";
-export { listMessages, listPeople, type PageCursor, sendMessage } from "./chat";
+export {
+	deleteMessage,
+	editMessage,
+	listMessages,
+	listPeople,
+	type PageCursor,
+	sendMessage,
+	setReaction,
+} from "./chat";
 export { listDms, openDm } from "./dms";
 export { createInvite, getInvite, listInvites, revokeInvite } from "./invites";
 export { getMe, setStatus, updateMe } from "./me";

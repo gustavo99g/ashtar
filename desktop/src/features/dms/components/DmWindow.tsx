@@ -110,6 +110,7 @@ export function DmWindow({
 				listLabel={`Mensagens com ${name}`}
 				composerLabel={`Mensagem para ${name}`}
 				compact
+				kind="dm"
 				mentionable={person.removed ? [] : [person]}
 				aboveComposer={<ReturnToRoom channelId={conversation.id} />}
 				renderCall={(message) => (
