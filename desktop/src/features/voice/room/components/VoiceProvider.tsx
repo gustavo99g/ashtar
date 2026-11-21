@@ -594,10 +594,11 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 	// qualidade escolhida: assina a voz de todos, a tela de quem aparece e as câmeras à vista.
 	const shown = useRoomView((state) => state.shown);
 	const camerasShown = useRoomView((state) => state.camerasShown);
+	const focusedCamera = useRoomView((state) => state.focusedCamera);
 	const shareSettings = useShareVolume((state) => state.byOwner);
 	useEffect(() => {
 		if (room) syncSubscriptions(room, currentView());
-	}, [room, shown, camerasShown, shareSettings]);
+	}, [room, shown, camerasShown, focusedCamera, shareSettings]);
 
 	// Quem assiste o quê (ADR 0024): as transmissões à vista, para a sala, e os avisos dos outros.
 	const shownOwners = useMemo(() => Object.keys(shown).sort(), [shown]);
@@ -732,11 +733,11 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
  * como pequena, para pedir a camada leve em qualquer tamanho) e os blocos com as câmeras.
  */
 function currentView(): SubscriptionView {
-	const { shown, camerasShown } = useRoomView.getState();
+	const { shown, camerasShown, focusedCamera } = useRoomView.getState();
 	const { byOwner } = useShareVolume.getState();
 	const effective: Record<string, ShownSize> = {};
 	for (const [owner, size] of Object.entries(shown)) {
 		effective[owner] = byOwner[owner]?.quality === "lite" ? "small" : size;
 	}
-	return { shown: effective, cameras: camerasShown };
+	return { shown: effective, cameras: camerasShown, bigCamera: focusedCamera };
 }

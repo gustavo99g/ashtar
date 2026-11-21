@@ -6,6 +6,7 @@ import {
 	useRef,
 	useState,
 } from "react";
+import { Minimize2Icon } from "lucide-react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/components/ui/states";
@@ -25,6 +26,11 @@ import { paths } from "@/lib/paths";
 import { cn } from "@/lib/utils";
 import type { CaptureSource } from "@/lib/tauri/commands";
 import {
+	CameraVideo,
+	cameraTrackOf,
+} from "../../camera/components/CameraVideo";
+import { useCameraChoice } from "../../camera/stores/cameraChoiceStore";
+import {
 	ConnectingTile,
 	ParticipantTile,
 } from "../../members/components/ParticipantTile";
@@ -36,6 +42,7 @@ import { useShareQuality } from "../../room/hooks/useShareQuality";
 import { useVoice } from "../../room/hooks/useVoice";
 import { stageLayout } from "../model/stageLayout";
 import {
+	focusCamera,
 	focusShare,
 	setCamerasShown,
 	stopWatching,
@@ -54,7 +61,8 @@ import { ShareTile } from "./ShareTile";
  * A sala de voz por dentro. Grade e Foco mostram as mesmas trilhas: a Grade, todo mundo e o lugar
  * de cada transmissão; o Foco (o palco), as transmissões que a pessoa abriu, arrumadas pelo
  * `stageLayout` (uma, lado a lado, 2×2, ou uma em foco com as outras pequenas), com quem está na
- * chamada numa faixa embaixo (a tela cheia leva os dois juntos). Várias pessoas transmitem ao mesmo
+ * chamada numa faixa embaixo (a tela cheia leva os dois juntos). Uma câmera também vai para o
+ * palco (v0.7): sozinha e grande, com as transmissões abertas e o resto da chamada na faixa. Várias pessoas transmitem ao mesmo
  * tempo (ADR 0024). A chamada mora no `VoiceProvider`, acima do
  * router: sair desta tela não sai da sala.
  *
@@ -192,7 +200,17 @@ function ConnectedRoom({
 		remotes.some((share) => share.ownerId === id && memberOf(id)),
 	);
 	const layout = stageLayout(open, focused);
-	const stage = open.length > 0;
+	const focusedCamera = useRoomView((state) => state.focusedCamera);
+	// A câmera em foco, enquanto está ligada.
+	const camMember = members.find(
+		(member) =>
+			member.id === focusedCamera && cameraTrackOf(member.participant) !== null,
+	);
+	const stage = open.length > 0 || camMember !== undefined;
+	// A câmera desligou (ou a pessoa saiu): o foco dela sai junto, e a sala volta ao que era.
+	useEffect(() => {
+		if (focusedCamera && !camMember) focusCamera(null);
+	}, [focusedCamera, camMember]);
 	// As que estão no ar e a pessoa não abriu: aparecem com Assistir embaixo do palco.
 	const notOpen = remotes.filter(
 		(share) => !open.includes(share.ownerId) && memberOf(share.ownerId),
@@ -209,16 +227,20 @@ function ConnectedRoom({
 	const fullscreen = useFullscreen(stageView);
 
 	const firstOpen = open[0] ? memberOf(open[0]) : undefined;
-	const subtitle = stage
-		? open.length === 1 && firstOpen
-			? `Assistindo ${firstOpen.name}`
-			: `Assistindo ${open.length} transmissões`
-		: call
-			? clockLabel(connectedFor)
-			: `${members.length} ${members.length === 1 ? "participante" : "participantes"}`;
+	const subtitle = camMember
+		? `Câmera de ${camMember.name}`
+		: stage
+			? open.length === 1 && firstOpen
+				? `Assistindo ${firstOpen.name}`
+				: `Assistindo ${open.length} transmissões`
+			: call
+				? clockLabel(connectedFor)
+				: `${members.length} ${members.length === 1 ? "participante" : "participantes"}`;
+	const withCamera = members.filter(
+		(member) => cameraTrackOf(member.participant) !== null,
+	);
 
-	const shareOf = (id: string) =>
-		remotes.find((share) => share.ownerId === id);
+	const shareOf = (id: string) => remotes.find((share) => share.ownerId === id);
 
 	return (
 		<RoomFrame
@@ -233,11 +255,12 @@ function ConnectedRoom({
 							)}
 							<LayoutToggle
 								focus={stage}
-								focusAvailable={remotes.length > 0}
+								focusAvailable={remotes.length > 0 || withCamera.length > 0}
 								onGrid={stopWatching}
 								onFocus={() => {
 									const first = remotes[0];
 									if (first) watchShare(first.ownerId);
+									else if (withCamera[0]) focusCamera(withCamera[0].id);
 								}}
 							/>
 						</>
@@ -257,38 +280,42 @@ function ConnectedRoom({
 					ref={stageView}
 					className="flex min-h-0 flex-1 flex-col items-center gap-4 px-6 pt-5 pb-4 [&:fullscreen]:bg-background"
 				>
-					<div
-						className={cn(
-							"grid min-h-0 w-full flex-1 gap-3",
-							layout.columns === 2 ? "grid-cols-2" : "grid-cols-1",
-							layout.main.length > 2 && "grid-rows-2",
-						)}
-					>
-						{layout.main.map((id) => {
-							const share = shareOf(id);
-							const sharer = memberOf(id);
-							if (!share || !sharer) return null;
-							return (
-								<WatchedShare
-									key={id}
-									share={share.track}
-									sharer={sharer}
-									inFocus={layout.inFocus === id}
-									focused={focused === id}
-									canFocus={open.length > 1}
-									onFocus={() => focusShare(id)}
-									onStop={() => unwatchShare(id)}
-									fullscreen={fullscreen.active}
-									onToggleFullscreen={fullscreen.toggle}
-								/>
-							);
-						})}
-					</div>
+					{camMember ? (
+						<CameraStage member={camMember} onExit={() => focusCamera(null)} />
+					) : (
+						<div
+							className={cn(
+								"grid min-h-0 w-full flex-1 gap-3",
+								layout.columns === 2 ? "grid-cols-2" : "grid-cols-1",
+								layout.main.length > 2 && "grid-rows-2",
+							)}
+						>
+							{layout.main.map((id) => {
+								const share = shareOf(id);
+								const sharer = memberOf(id);
+								if (!share || !sharer) return null;
+								return (
+									<WatchedShare
+										key={id}
+										share={share.track}
+										sharer={sharer}
+										inFocus={layout.inFocus === id}
+										focused={focused === id}
+										canFocus={open.length > 1}
+										onFocus={() => focusShare(id)}
+										onStop={() => unwatchShare(id)}
+										fullscreen={fullscreen.active}
+										onToggleFullscreen={fullscreen.toggle}
+									/>
+								);
+							})}
+						</div>
+					)}
 					<div
 						aria-label="Participantes"
 						className="flex max-w-full shrink-0 items-center gap-2 overflow-x-auto"
 					>
-						{layout.strip.map((id) => {
+						{(camMember ? open : layout.strip).map((id) => {
 							const share = shareOf(id);
 							const sharer = memberOf(id);
 							if (!share || !sharer) return null;
@@ -319,14 +346,17 @@ function ConnectedRoom({
 								</button>
 							);
 						})}
-						{members.map((member) => (
-							<ParticipantTile
-								key={member.id}
-								member={member}
-								isLocal={member.isLocal}
-								size="strip"
-							/>
-						))}
+						{members
+							.filter((member) => member.id !== camMember?.id)
+							.map((member) => (
+								<ParticipantTile
+									key={member.id}
+									member={member}
+									isLocal={member.isLocal}
+									size="strip"
+									onFocus={() => focusCamera(member.id)}
+								/>
+							))}
 					</div>
 				</div>
 			) : (
@@ -364,11 +394,56 @@ function ConnectedRoom({
 							key={member.id}
 							member={member}
 							isLocal={member.isLocal}
+							onFocus={() => focusCamera(member.id)}
 						/>
 					))}
 				</RoomGrid>
 			)}
 		</RoomFrame>
+	);
+}
+
+/** A câmera em foco: grande, inteira (sem cortar), com o nome e o botão de sair do foco. */
+function CameraStage({
+	member,
+	onExit,
+}: {
+	member: LiveMember;
+	onExit: () => void;
+}) {
+	const camera = cameraTrackOf(member.participant);
+	const mirror = useCameraChoice((state) => state.mirror) && member.isLocal;
+	return (
+		<section
+			aria-label={`Câmera de ${member.name}`}
+			className={cn(
+				"relative min-h-0 w-full flex-1 overflow-hidden rounded-[10px] bg-rail",
+				member.speaking && "shadow-[inset_0_0_0_2px_var(--color-speaking)]",
+			)}
+		>
+			{camera && (
+				<CameraVideo
+					trackRef={camera}
+					mirror={mirror}
+					className="absolute inset-0 object-contain"
+				/>
+			)}
+			<span className="absolute bottom-3 left-3 max-w-[calc(100%-24px)] truncate rounded-md bg-rail/80 px-2 py-1 text-[13px] font-semibold text-foreground">
+				{member.name}
+				{member.isLocal && (
+					<span className="font-normal text-muted-foreground"> (você)</span>
+				)}
+			</span>
+			<button
+				type="button"
+				aria-label="Sair do foco"
+				title="Sair do foco"
+				onClick={onExit}
+				className="absolute top-3 right-3 flex size-8 items-center justify-center rounded-md bg-rail/80 text-foreground hover:bg-rail"
+			>
+				<Minimize2Icon className="size-4" />
+			</button>
+		</section>
 	);
 }
 
