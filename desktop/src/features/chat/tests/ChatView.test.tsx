@@ -12,9 +12,11 @@ import {
 	type Layout,
 	listMessages,
 	listPeople,
+	listPins,
 	listVoiceParticipants,
 	type Message,
 	sendMessage,
+	setPinned,
 	type UserView,
 } from "@/lib/api";
 import { ChatView } from "../components/ChatView";
@@ -26,8 +28,10 @@ vi.mock("@/lib/api", async (importOriginal) => ({
 	getChannelLayout: vi.fn(),
 	listMessages: vi.fn(),
 	listPeople: vi.fn(),
+	listPins: vi.fn(),
 	listVoiceParticipants: vi.fn(),
 	sendMessage: vi.fn(),
+	setPinned: vi.fn(),
 }));
 vi.mock("@/lib/tauri/opener", () => ({ openLink: vi.fn() }));
 
@@ -144,6 +148,7 @@ beforeEach(() => {
 		{ user_id: "u1", nick: "kid", display_name: "Kid", screen_sharing: false },
 	]);
 	vi.mocked(sendMessage).mockReset();
+	vi.mocked(listPins).mockResolvedValue([]);
 });
 
 describe("ChatView", () => {
@@ -272,6 +277,30 @@ describe("ChatView", () => {
 		});
 		await userEvent.type(field, "pela metade");
 		expect(useDrafts.getState().drafts).toEqual({ geral: "pela metade" });
+	});
+
+	it("a faixa das fixadas abre a caixa; quem gerencia desafixa", async () => {
+		const user = userEvent.setup();
+		const pinned = { ...message("m1", "oi, grupo"), pinned_at: 10 };
+		vi.mocked(listPins).mockResolvedValue([pinned]);
+		vi.mocked(setPinned).mockResolvedValue({ ...pinned, pinned_at: null });
+		renderChat("geral", { manage: true });
+		await user.click(
+			await screen.findByRole("button", {
+				name: "1 mensagem fixada · clique para ver",
+			}),
+		);
+		const box = await screen.findByRole("dialog", {
+			name: "Mensagens fixadas",
+		});
+		expect(within(box).getByText("Ir até a mensagem")).toBeInTheDocument();
+		await user.click(within(box).getByRole("button", { name: "Desafixar" }));
+		expect(setPinned).toHaveBeenCalledWith("m1", false);
+		await vi.waitFor(() =>
+			expect(
+				screen.queryByRole("button", { name: /mensagem fixada/ }),
+			).not.toBeInTheDocument(),
+		);
 	});
 
 	it("canal arquivado oferece voltar para o #geral", async () => {

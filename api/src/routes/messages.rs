@@ -332,3 +332,50 @@ async fn set_reaction(
     publish(&state, &channel, &event).await?;
     Ok(Json(message))
 }
+
+/// `PUT /api/messages/{id}/pin`: fixa. Num canal, só quem gerencia os canais (403); 409 com 50
+/// fixadas.
+pub async fn pin(
+    state: State<AppState>,
+    user: CurrentUser,
+    path: Path<String>,
+) -> Result<Json<Message>, ApiError> {
+    set_pin(state, user, path, true).await
+}
+
+/// `DELETE /api/messages/{id}/pin`: desafixa.
+pub async fn unpin(
+    state: State<AppState>,
+    user: CurrentUser,
+    path: Path<String>,
+) -> Result<Json<Message>, ApiError> {
+    set_pin(state, user, path, false).await
+}
+
+async fn set_pin(
+    State(state): State<AppState>,
+    CurrentUser(user): CurrentUser,
+    Path(id): Path<String>,
+    on: bool,
+) -> Result<Json<Message>, ApiError> {
+    let (channel, message) = readable_message(&state, &user, &id).await?;
+    let changed = messages::set_pinned(&state.db, &channel, &user, &message, on, now()).await?;
+    if changed.pinned_at != message.pinned_at {
+        let event = ServerEvent::MessageUpdated {
+            message: changed.clone(),
+            new_mentions: Vec::new(),
+        };
+        publish(&state, &channel, &event).await?;
+    }
+    Ok(Json(changed))
+}
+
+/// `GET /api/channels/{id}/pins`: as fixadas, da fixada mais recente para a mais antiga.
+pub async fn pins(
+    State(state): State<AppState>,
+    CurrentUser(user): CurrentUser,
+    Path(channel_id): Path<String>,
+) -> Result<Json<Vec<Message>>, ApiError> {
+    let channel = access::readable(&state.db, &user, &channel_id).await?;
+    Ok(Json(messages::pins(&state.db, channel.id()).await?))
+}

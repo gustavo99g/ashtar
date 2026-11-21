@@ -27,10 +27,12 @@ import {
 	editMessage,
 	listMessages,
 	listPeople,
+	listPins,
 	type Message,
 	type MessagePage,
 	type Person,
 	sendMessage,
+	setPinned,
 	setReaction,
 	uploadFile,
 } from "@/lib/api";
@@ -56,7 +58,41 @@ export const chatKeys = {
 	/** O histórico aberto em volta de uma mensagem antiga (a citação, a busca, as fixadas). */
 	around: (channelId: string, anchor: string) =>
 		[...chatKeys.all, "around", channelId, anchor] as const,
+	pins: (channelId: string) => [...chatKeys.all, "pins", channelId] as const,
 };
+
+/** As fixadas do canal (`GET /api/channels/{id}/pins`); o tempo real mantém em dia (`syncPin`). */
+export function usePins(channelId: string) {
+	const connected = useSession().status === "connected";
+	return useQuery({
+		queryKey: chatKeys.pins(channelId),
+		queryFn: () => listPins(channelId),
+		enabled: connected,
+		staleTime: Number.POSITIVE_INFINITY,
+	});
+}
+
+/**
+ * Põe a mensagem mudada na lista das fixadas: entra se foi fixada, sai se foi desafixada ou
+ * excluída (`null`), e a que continua fixada fica com o texto novo.
+ */
+export function syncPin(
+	queryClient: QueryClient,
+	channelId: string,
+	messageId: string,
+	message: Message | null,
+): void {
+	queryClient.setQueryData<Message[]>(chatKeys.pins(channelId), (pins) => {
+		if (!pins) return pins;
+		const rest = pins.filter((pin) => pin.id !== messageId);
+		if (!message?.pinned_at) {
+			return rest.length === pins.length ? pins : rest;
+		}
+		return [...rest, message].sort(
+			(a, b) => (b.pinned_at ?? 0) - (a.pinned_at ?? 0),
+		);
+	});
+}
 
 export type MessagePages = InfiniteData<MessagePage, string | null>;
 
@@ -156,6 +192,7 @@ export function replyExcerpt(body: string): string {
  * respostas a ela passam a citar o texto novo.
  */
 export function replaceMessage(queryClient: QueryClient, updated: Message): void {
+	syncPin(queryClient, updated.channel_id, updated.id, updated);
 	changeHistories(queryClient, updated.channel_id, (message) => {
 		if (message.id === updated.id) return updated;
 		if (message.reply_to?.id === updated.id && message.reply_to.author) {
@@ -177,6 +214,7 @@ export function dropMessage(
 	channelId: string,
 	messageId: string,
 ): void {
+	syncPin(queryClient, channelId, messageId, null);
 	changeHistories(queryClient, channelId, (message) => {
 		if (message.id === messageId) return null;
 		if (message.reply_to?.id === messageId && message.reply_to.author) {
@@ -485,7 +523,13 @@ export function useMessageActions() {
 		},
 		[queryClient],
 	);
-	return { edit, remove, react };
+	const pin = useCallback(
+		async (message: Message, on: boolean) => {
+			replaceMessage(queryClient, await setPinned(message.id, on));
+		},
+		[queryClient],
+	);
+	return { edit, remove, react, pin };
 }
 
 /** A lista de pessoas, guardando a foto de cada uma para o `Avatar`. */

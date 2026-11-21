@@ -29,8 +29,10 @@ export {
 	hidePreviews,
 	listMessages,
 	listPeople,
+	listPins,
 	type PageCursor,
 	sendMessage,
+	setPinned,
 	setReaction,
 } from "./chat";
 export { listDms, openDm } from "./dms";

@@ -982,3 +982,74 @@ async fn encaminhar_leva_o_texto_e_os_mesmos_arquivos() {
     assert_eq!(status, StatusCode::NO_CONTENT);
     assert_eq!(files_on_disk(&ctx), 0);
 }
+
+#[tokio::test]
+async fn fixar_no_canal_e_quem_gerencia_e_na_conversa_os_dois() {
+    let ctx = setup().await;
+    let bia = join(&ctx, "Bia", 2, false).await;
+    let cadu_token = join(&ctx, "Cadu", 3, false).await;
+    let cadu = users::get_active_by_nick(&ctx.db, "Cadu").await.unwrap().id;
+    let (_, message) =
+        post_message(&ctx, &bia, json!({ "client_id": "c-1", "body": "fixa" })).await;
+    let pin = format!("/api/messages/{}/pin", message["id"].as_str().unwrap());
+
+    let (status, _, _) = send(&ctx, "PUT", &pin, Some(&bia), None, Body::empty()).await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    let pinned = json_call(&ctx, "PUT", &pin, &ctx.owner_token, Value::Null).await;
+    assert!(pinned["pinned_at"].is_i64());
+    let list = json_call(&ctx, "GET", "/api/channels/geral/pins", &bia, Value::Null).await;
+    assert_eq!(list.as_array().unwrap().len(), 1);
+    assert_eq!(list[0]["id"], message["id"]);
+    let unpinned = json_call(&ctx, "DELETE", &pin, &ctx.owner_token, Value::Null).await;
+    assert_eq!(unpinned["pinned_at"], Value::Null);
+
+    // Na conversa privada, os dois fixam.
+    let dm = json_call(&ctx, "POST", "/api/dms", &bia, json!({ "user_id": cadu })).await;
+    let dm_id = dm["id"].as_str().unwrap();
+    let in_dm = json_call(
+        &ctx,
+        "POST",
+        &format!("/api/channels/{dm_id}/messages"),
+        &bia,
+        json!({ "client_id": "d-1", "body": "nossa" }),
+    )
+    .await;
+    let pinned = json_call(
+        &ctx,
+        "PUT",
+        &format!("/api/messages/{}/pin", in_dm["id"].as_str().unwrap()),
+        &cadu_token,
+        Value::Null,
+    )
+    .await;
+    assert!(pinned["pinned_at"].is_i64());
+
+    // Com 50 fixadas, a 51ª pede para desafixar uma.
+    for i in 0..50 {
+        sqlx::query(
+            "INSERT INTO messages (id, channel_id, author_id, client_id, body, created_at, pinned_at)
+             VALUES (?, 'geral', ?, ?, 'x', 1, 1)",
+        )
+        .bind(format!("fixada-{i}"))
+        .bind(&ctx.owner.id)
+        .bind(format!("p-{i}"))
+        .execute(&ctx.db)
+        .await
+        .unwrap();
+    }
+    let (status, _, body) = send(
+        &ctx,
+        "PUT",
+        &pin,
+        Some(&ctx.owner_token),
+        None,
+        Body::empty(),
+    )
+    .await;
+    assert_eq!(
+        status,
+        StatusCode::CONFLICT,
+        "{}",
+        String::from_utf8_lossy(&body)
+    );
+}

@@ -23,6 +23,9 @@ export interface MessageActionsValue {
 	/** `skipConfirm`: o Shift segurado no clique, como no Discord. */
 	remove: (message: Message, skipConfirm: boolean) => void;
 	react: (message: Message, emoji: string, on: boolean) => void;
+	/** Fixar: num canal, quem gerencia os canais; numa conversa privada, os dois. */
+	canPin: boolean;
+	pin: (message: Message, on: boolean) => void;
 	jumpTo: (messageId: string) => void;
 }
 

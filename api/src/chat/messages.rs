@@ -916,6 +916,73 @@ pub async fn edit(
     })
 }
 
+/// Quantas mensagens fixadas um canal tem no máximo.
+pub const PINS_MAX: i64 = 50;
+
+/// Fixa (`on`) ou desafixa `message` de `channel` (decisão 24 do plano da v0.7): num canal, quem
+/// tem "Gerenciar canais"; numa conversa privada, os dois. Até [`PINS_MAX`] por canal. Repetir
+/// não muda nada. Devolve a mensagem como ficou.
+pub async fn set_pinned(
+    db: &SqlitePool,
+    channel: &Readable,
+    user: &User,
+    message: &Message,
+    on: bool,
+    now: i64,
+) -> Result<Message, ApiError> {
+    if let Readable::Text(_) = channel {
+        crate::identity::permissions::require_permission(
+            db,
+            user,
+            crate::identity::permissions::Permission::ManageChannels,
+        )
+        .await?;
+    }
+    if message.kind != MessageKind::Text {
+        return Err(ApiError::InvalidRequest(
+            "Só dá para fixar uma mensagem de texto.".into(),
+        ));
+    }
+    if on == message.pinned_at.is_some() {
+        return Ok(message.clone());
+    }
+    let mut tx = db.begin_with("BEGIN IMMEDIATE").await?;
+    if on {
+        let count: i64 = sqlx::query_scalar(
+            "SELECT count(*) FROM messages WHERE channel_id = ? AND pinned_at IS NOT NULL",
+        )
+        .bind(&message.channel_id)
+        .fetch_one(&mut *tx)
+        .await?;
+        if count >= PINS_MAX {
+            return Err(ApiError::Conflict(
+                "Já são 50 mensagens fixadas aqui. Desafixe uma antes.".into(),
+            ));
+        }
+    }
+    sqlx::query("UPDATE messages SET pinned_at = ?, pinned_by = ? WHERE id = ?")
+        .bind(on.then_some(now))
+        .bind(on.then_some(&user.id))
+        .bind(&message.id)
+        .execute(&mut *tx)
+        .await?;
+    tx.commit().await?;
+    get(db, &message.id).await
+}
+
+/// As fixadas de `channel_id`, da fixada mais recente para a mais antiga.
+pub async fn pins(db: &SqlitePool, channel_id: &str) -> Result<Vec<Message>, ApiError> {
+    let rows: Vec<MessageRow> = sqlx::query_as(select_message!(
+        "WHERE m.channel_id = ? AND m.pinned_at IS NOT NULL ORDER BY m.pinned_at DESC, m.id DESC"
+    ))
+    .bind(channel_id)
+    .fetch_all(db)
+    .await?;
+    let mut messages: Vec<Message> = rows.into_iter().map(Message::from).collect();
+    attach_extras(db, &mut messages).await?;
+    Ok(messages)
+}
+
 /// Se `user` pode excluir `message` de `channel`: o autor, ou o dono numa
 /// mensagem de canal. O registro de uma ligação ninguém exclui.
 pub fn can_delete(channel: &Readable, user: &User, message: &Message) -> bool {

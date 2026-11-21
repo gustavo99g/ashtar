@@ -219,6 +219,11 @@ pub fn app(state: AppState, policy: Arc<ClientPolicy>) -> Router {
             patch(routes::messages::edit).delete(routes::messages::delete),
         )
         .route(
+            "/messages/{id}/pin",
+            put(routes::messages::pin).delete(routes::messages::unpin),
+        )
+        .route("/channels/{id}/pins", get(routes::messages::pins))
+        .route(
             "/messages/{id}/previews",
             delete(routes::messages::hide_previews),
         )

@@ -3,6 +3,8 @@ import {
 	ForwardIcon,
 	MoreHorizontalIcon,
 	PencilIcon,
+	PinIcon,
+	PinOffIcon,
 	ReplyIcon,
 	SmilePlusIcon,
 	Trash2Icon,
@@ -96,6 +98,14 @@ export function MessageMenuItems({
 				<DropdownMenuItem onClick={() => actions.startEdit(message)}>
 					<PencilIcon />
 					Editar mensagem
+				</DropdownMenuItem>
+			)}
+			{actions.canPin && (
+				<DropdownMenuItem
+					onClick={() => actions.pin(message, message.pinned_at === null)}
+				>
+					{message.pinned_at === null ? <PinIcon /> : <PinOffIcon />}
+					{message.pinned_at === null ? "Fixar mensagem" : "Desafixar mensagem"}
 				</DropdownMenuItem>
 			)}
 			<DropdownMenuItem onClick={() => requestForward(message)}>

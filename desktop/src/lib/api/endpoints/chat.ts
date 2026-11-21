@@ -114,6 +114,21 @@ export function hidePreviews(messageId: string): Promise<Message> {
 	});
 }
 
+/**
+ * `PUT` (`on`) ou `DELETE /api/messages/{id}/pin`: fixa ou desafixa. Num canal, só quem gerencia
+ * os canais (`forbidden`); com 50 fixadas, `conflict`. Devolve a mensagem como ficou.
+ */
+export function setPinned(messageId: string, on: boolean): Promise<Message> {
+	return apiJson<Message>(`${messagePath(messageId)}/pin`, {
+		method: on ? "PUT" : "DELETE",
+	});
+}
+
+/** `GET /api/channels/{id}/pins`: as fixadas, da fixada mais recente para a mais antiga. */
+export function listPins(channelId: string): Promise<Message[]> {
+	return apiJson<Message[]>(`/api/channels/${encodeURIComponent(channelId)}/pins`);
+}
+
 /** `GET /api/people`: quem está no grupo, com quem está online. */
 export function listPeople(): Promise<Person[]> {
 	return apiJson<Person[]>("/api/people");

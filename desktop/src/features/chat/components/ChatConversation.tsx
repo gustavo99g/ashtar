@@ -12,7 +12,7 @@ import {
 	LoadingState,
 	OfflineState,
 } from "@/components/ui/states";
-import { useSession } from "@/features/identity";
+import { useOptionalMe, useSession } from "@/features/identity";
 import { useMarkRead, useUnreadMarker } from "@/features/unread";
 import { ApiError, isApiError, type Message, type Person } from "@/lib/api";
 import { useAppFocused } from "@/lib/visibility";
@@ -30,6 +30,7 @@ import { cancelReply, startReply, useReplyStore } from "../stores/replyStore";
 import { Composer } from "./Composer";
 import { DeleteMessageDialog } from "./DeleteMessageDialog";
 import { MessageList } from "./MessageList";
+import { PinsBar } from "./PinsBar";
 import {
 	canEdit,
 	MessageActionsContext,
@@ -108,7 +109,8 @@ export function ChatConversation({
 	const [highlightId, setHighlightId] = useState<string | null>(null);
 	const [editingId, setEditingId] = useState<string | null>(null);
 	const [deleting, setDeleting] = useState<Message | null>(null);
-	const { edit, remove, react } = useMessageActions();
+	const { edit, remove, react, pin } = useMessageActions();
+	const canPin = useOptionalMe()?.can_manage_channels === true || kind === "dm";
 	const shown = anchor === null ? query.messages : around.messages;
 
 	const jumpTo = useCallback(
@@ -160,8 +162,31 @@ export function ChatConversation({
 				);
 			},
 			jumpTo,
+			canPin,
+			pin: (message, on) => {
+				pin(message, on).catch((error: unknown) =>
+					toast.add({
+						title: on ? "Não deu para fixar" : "Não deu para desafixar",
+						description:
+							error instanceof ApiError ? error.message : "Tente de novo.",
+					}),
+				);
+			},
 		}),
-		[myId, kind, ownerId, byId, editingId, highlightId, edit, removeNow, react, jumpTo],
+		[
+			myId,
+			kind,
+			ownerId,
+			byId,
+			editingId,
+			highlightId,
+			edit,
+			removeNow,
+			react,
+			jumpTo,
+			canPin,
+			pin,
+		],
 	);
 
 	/** A seta para cima no campo vazio: edita a última mensagem de quem escreve. */
@@ -205,6 +230,7 @@ export function ChatConversation({
 	return (
 		<MessageActionsContext.Provider value={actions}>
 			<div className="contents" onDragOver={acceptDrag} onDrop={drop}>
+			<PinsBar channelId={channelId} actions={actions} compact={compact} />
 			{anchor !== null && around.messages ? (
 				<MessageList
 					key={`around:${anchor}`}
