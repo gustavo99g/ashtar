@@ -18,6 +18,7 @@ use crate::chat::access::{self, Readable};
 use crate::chat::messages::{
     self, CATCH_UP_MAX, Cursor, Message, MessagePage, PAGE_DEFAULT, PAGE_MAX,
 };
+use crate::chat::search::{self, SearchPage, SearchQuery};
 use crate::db::now;
 use crate::error::ApiError;
 use crate::identity::User;
@@ -378,4 +379,16 @@ pub async fn pins(
 ) -> Result<Json<Vec<Message>>, ApiError> {
     let channel = access::readable(&state.db, &user, &channel_id).await?;
     Ok(Json(messages::pins(&state.db, channel.id()).await?))
+}
+
+/// `GET /api/search`: a busca nos canais de texto que a pessoa lê (as conversas privadas ficam
+/// de fora). Sem palavra e sem filtro, 422.
+pub async fn search(
+    State(state): State<AppState>,
+    CurrentUser(user): CurrentUser,
+    query: Result<Query<SearchQuery>, QueryRejection>,
+) -> Result<Json<SearchPage>, ApiError> {
+    let Query(query) = query
+        .map_err(|_| ApiError::InvalidRequest("O pedido não está no formato esperado.".into()))?;
+    Ok(Json(search::search(&state.db, &user, &query).await?))
 }

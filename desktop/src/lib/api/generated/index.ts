@@ -585,6 +585,17 @@ author: Author | null,
  */
 excerpt: string | null, };
 
+/**
+ * O que a mensagem tem (`tem:`).
+ */
+export type SearchHas = "attachment" | "image" | "video" | "link";
+
+export type SearchPage = { 
+/**
+ * Da mais nova para a mais velha.
+ */
+messages: Array<Message>, has_more: boolean, };
+
 export type SendMessageRequest = { 
 /**
  * Gerado pelo app antes de enviar (um UUID); o mesmo valor não duplica.

@@ -11,3 +11,4 @@ pub mod layout;
 pub mod mentions;
 pub mod messages;
 pub mod read;
+pub mod search;

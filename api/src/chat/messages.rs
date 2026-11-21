@@ -591,6 +591,24 @@ pub(crate) async fn get(db: &SqlitePool, id: &str) -> Result<Message, ApiError> 
     Ok(messages.remove(0))
 }
 
+/// As mensagens `ids`, na mesma ordem (as que não existem mais ficam de fora).
+pub async fn by_ids(db: &SqlitePool, ids: &[String]) -> Result<Vec<Message>, ApiError> {
+    if ids.is_empty() {
+        return Ok(Vec::new());
+    }
+    let mut query = sqlx::QueryBuilder::new(select_message!("WHERE m.id IN ("));
+    let mut list = query.separated(", ");
+    for id in ids {
+        list.push_bind(id);
+    }
+    query.push(")");
+    let rows: Vec<MessageRow> = query.build_query_as().fetch_all(db).await?;
+    let mut messages: Vec<Message> = rows.into_iter().map(Message::from).collect();
+    attach_extras(db, &mut messages).await?;
+    messages.sort_by_key(|m| ids.iter().position(|id| *id == m.id));
+    Ok(messages)
+}
+
 /// A mensagem `id`, se ela existe.
 pub async fn find(db: &SqlitePool, id: &str) -> Result<Option<Message>, ApiError> {
     let row: Option<MessageRow> = sqlx::query_as(select_message!("WHERE m.id = ?"))

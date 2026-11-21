@@ -427,3 +427,96 @@ async fn quem_ganha_gerenciar_canais_ve_os_restritos_e_quem_sai_do_grupo_sai_da_
     let listed = api::chat::access::listed(&ctx.db, &staff).await.unwrap();
     assert!(listed.is_empty());
 }
+
+/// A busca (v0.7): acha sem acento e pelo começo da palavra, filtra por quem mandou e nunca
+/// mostra o que a pessoa não lê: o canal restrito de fora e as conversas privadas.
+#[tokio::test]
+async fn a_busca_so_acha_o_que_a_pessoa_le() {
+    let ctx = setup().await;
+    let ana = join(&ctx, "Ana", 2, false).await;
+    let ana_id = member_id(&ctx, &ana).await;
+    let beto = join(&ctx, "Beto", 3, false).await;
+    let beto_id = member_id(&ctx, &beto).await;
+    let staff = create_restricted(&ctx, "text", "staff", "texto", &[&ana_id]).await;
+
+    let (status, _) = send(&ctx, &ana, "geral", "Você vai jogar hoje?").await;
+    assert_eq!(status, StatusCode::CREATED);
+    let (status, _) = send(&ctx, &ctx.owner_token, "geral", "voce viu o jogo?").await;
+    assert_eq!(status, StatusCode::CREATED);
+    let (status, _) = send(&ctx, &ana, &staff, "você no staff").await;
+    assert_eq!(status, StatusCode::CREATED);
+    let (status, dm) = call(
+        &ctx.router,
+        "POST",
+        "/api/dms",
+        Some(&ana),
+        Some(json!({ "user_id": beto_id })),
+    )
+    .await;
+    assert!(status.is_success(), "{dm}");
+    let dm_id = dm["id"].as_str().unwrap().to_owned();
+    let (status, _) = send(&ctx, &ana, &dm_id, "você no privado").await;
+    assert_eq!(status, StatusCode::CREATED);
+
+    let bodies = |page: &Value| -> Vec<String> {
+        page["messages"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|m| m["body"].as_str().unwrap().to_owned())
+            .collect()
+    };
+
+    // O Beto não está no staff, e a conversa privada não entra na busca.
+    let (status, page) = call(&ctx.router, "GET", "/api/search?q=voce", Some(&beto), None).await;
+    assert_eq!(status, StatusCode::OK, "{page}");
+    assert_eq!(bodies(&page), ["voce viu o jogo?", "Você vai jogar hoje?"]);
+    assert_eq!(page["has_more"], false);
+
+    // A Ana está no staff.
+    let (_, page) = call(&ctx.router, "GET", "/api/search?q=voc", Some(&ana), None).await;
+    assert_eq!(bodies(&page).len(), 3);
+
+    // O começo da palavra, o canal e quem mandou.
+    let (_, page) = call(
+        &ctx.router,
+        "GET",
+        "/api/search?q=jog&author=ana",
+        Some(&beto),
+        None,
+    )
+    .await;
+    assert_eq!(bodies(&page), ["Você vai jogar hoje?"]);
+    let uri = format!("/api/search?q=voce&channel_id={staff}");
+    let (status, _) = call(&ctx.router, "GET", &uri, Some(&beto), None).await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    let uri = format!("/api/search?q=voce&channel_id={dm_id}");
+    let (status, _) = call(&ctx.router, "GET", &uri, Some(&ana), None).await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+
+    // Editar muda o que a busca acha; sem nada para buscar, 422.
+    let (_, page) = call(&ctx.router, "GET", "/api/search?q=viu", Some(&beto), None).await;
+    let id = page["messages"][0]["id"].as_str().unwrap().to_owned();
+    let (status, _) = call(
+        &ctx.router,
+        "PATCH",
+        &format!("/api/messages/{id}"),
+        Some(&ctx.owner_token),
+        Some(json!({ "body": "partida amanhã" })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    let (_, page) = call(&ctx.router, "GET", "/api/search?q=viu", Some(&beto), None).await;
+    assert!(bodies(&page).is_empty());
+    let (_, page) = call(
+        &ctx.router,
+        "GET",
+        "/api/search?q=amanha",
+        Some(&beto),
+        None,
+    )
+    .await;
+    assert_eq!(bodies(&page), ["partida amanhã"]);
+    let (status, _) = call(&ctx.router, "GET", "/api/search?q=", Some(&beto), None).await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+}
