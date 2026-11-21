@@ -145,6 +145,7 @@ fn transmite_assiste_pausa_e_para() {
                 source: primary(),
                 format: Quality::Detail.format(),
                 cursor: true,
+                software_encoder: false,
             },
             audio: AudioMode::System,
             leveler: true,

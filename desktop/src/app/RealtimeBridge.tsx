@@ -19,6 +19,7 @@ import { useEffect, useRef } from "react";
 import { handleAdminRealtime } from "@/features/admin";
 import { handleCallsRealtime } from "@/features/calls";
 import { handleChannelsRealtime } from "@/features/channels";
+import { handleEmojisRealtime } from "@/features/emojis";
 import { handleChatRealtime, useOfflineCatchUp } from "@/features/chat";
 import { handleDmsRealtime } from "@/features/dms";
 import { handleIdentityRealtime, useSession } from "@/features/identity";
@@ -57,6 +58,7 @@ const HANDLERS: Handler[] = [
 	handleDmsRealtime,
 	handleUnreadRealtime,
 	handleChannelsRealtime,
+	handleEmojisRealtime,
 	handleCallsRealtime,
 	handleAdminRealtime,
 	// Por último: a regra dos avisos lê o silenciar e a lista de canais já em dia.

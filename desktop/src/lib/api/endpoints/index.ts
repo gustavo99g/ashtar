@@ -1,7 +1,8 @@
 export {
-	downloadLogReport,
 	getServerStatus,
+	listLogEntries,
 	listLogReports,
+	readLogEntry,
 	sendLogs,
 } from "./admin";
 export {
@@ -23,10 +24,39 @@ export {
 	hangUpCall,
 	startCall,
 } from "./calls";
-export { listMessages, listPeople, type PageCursor, sendMessage } from "./chat";
+export {
+	deleteMessage,
+	editMessage,
+	hidePreviews,
+	listChannelFiles,
+	listMessages,
+	listPeople,
+	listPins,
+	type PageCursor,
+	type SearchParams,
+	searchMessages,
+	sendMessage,
+	setPinned,
+	setReaction,
+} from "./chat";
 export { listDms, openDm } from "./dms";
+export { createEmoji, deleteEmoji, listEmojis, renameEmoji } from "./emojis";
 export { createInvite, getInvite, listInvites, revokeInvite } from "./invites";
-export { getMe, setStatus, updateMe } from "./me";
+export {
+	fetchFile,
+	fileLink,
+	type UploadOptions,
+	uploadFile,
+} from "./files";
+export {
+	deleteSavedAvatar,
+	getMe,
+	listSavedAvatars,
+	removeAvatar,
+	setAvatar,
+	setStatus,
+	updateMe,
+} from "./me";
 export {
 	createRecoveryInvite,
 	getMemberPermissions,
@@ -45,5 +75,7 @@ export {
 	disconnectMember,
 	moveMember,
 	createVoiceToken,
+	leaveVoiceState,
 	listVoiceParticipants,
+	putVoiceState,
 } from "./voice";

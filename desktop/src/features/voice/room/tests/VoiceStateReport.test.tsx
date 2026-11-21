@@ -1,0 +1,61 @@
+import { render } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { leaveVoiceState, putVoiceState } from "@/lib/api";
+import { VoiceStateReport } from "../components/VoiceStateReport";
+
+vi.mock("@/lib/api", () => ({
+	putVoiceState: vi.fn(() => Promise.resolve()),
+	leaveVoiceState: vi.fn(() => Promise.resolve()),
+}));
+
+let me: Record<string, unknown> | null = null;
+vi.mock("../../members/hooks/useLiveMembers", () => ({
+	useLiveMembers: () => (me ? [me] : []),
+}));
+
+const put = vi.mocked(putVoiceState);
+const leave = vi.mocked(leaveVoiceState);
+
+beforeEach(() => {
+	put.mockClear();
+	leave.mockClear();
+	me = {
+		id: "eu",
+		isLocal: true,
+		micOff: false,
+		deafened: false,
+		camera: false,
+		sharing: false,
+	};
+});
+
+describe("VoiceStateReport", () => {
+	it("conta o estado ao entrar, a cada mudança e avisa ao sair", () => {
+		const view = render(<VoiceStateReport channelId="sala" />);
+		expect(put).toHaveBeenLastCalledWith("sala", {
+			mic_off: false,
+			deafened: false,
+			camera: false,
+			sharing: false,
+		});
+
+		me = { ...me, micOff: true, deafened: true, camera: true };
+		view.rerender(<VoiceStateReport channelId="sala" />);
+		expect(put).toHaveBeenLastCalledWith("sala", {
+			mic_off: true,
+			deafened: true,
+			camera: true,
+			sharing: false,
+		});
+		expect(put).toHaveBeenCalledTimes(2);
+
+		view.unmount();
+		expect(leave).toHaveBeenCalledWith("sala");
+	});
+
+	it("sem a própria pessoa na lista ainda, não conta nada", () => {
+		me = null;
+		render(<VoiceStateReport channelId="sala" />);
+		expect(put).not.toHaveBeenCalled();
+	});
+});

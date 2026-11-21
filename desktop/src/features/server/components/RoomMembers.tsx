@@ -1,4 +1,4 @@
-import { HeadphoneOffIcon, MicOffIcon } from "lucide-react";
+import { HeadphoneOffIcon, MicOffIcon, VideoIcon } from "lucide-react";
 import { useState } from "react";
 import { Popover, PopoverTrigger } from "@/components/ui/popover";
 import { COLLAPSED_AVATARS } from "@/features/channels";
@@ -110,7 +110,7 @@ function MemberRow({
 				{...(drag.enabled ? drag.listeners : {})}
 				className={cn(
 					drag.isDragging && "opacity-50",
-					"mx-2 flex w-[calc(100%-16px)] items-center gap-2 rounded-md py-[3px] pr-2 pl-[42px] text-left text-[13px]",
+					"mx-2 flex w-[calc(100%-16px)] items-center gap-2 rounded-md py-[3px] pr-2 pl-6 text-left text-[13px]",
 					"text-muted-foreground hover:bg-secondary hover:text-foreground data-popup-open:bg-secondary",
 					isMe && "text-foreground",
 				)}
@@ -129,9 +129,13 @@ function MemberRow({
 				</span>
 				<span className="ml-auto flex shrink-0 items-center gap-1">
 					<ConnectionMark connection={member.connection} className="size-3.5" />
-					{member.sharing ? (
-						<LiveBadge />
-					) : member.deafened ? (
+					{member.camera && (
+						<VideoIcon
+							aria-label="câmera ligada"
+							className="size-3.5 text-muted-foreground"
+						/>
+					)}
+					{member.deafened ? (
 						<HeadphoneOffIcon
 							aria-label="áudio desativado"
 							className="size-3.5 text-destructive-border"
@@ -142,6 +146,7 @@ function MemberRow({
 							className="size-3.5 text-destructive-border"
 						/>
 					) : null}
+					{member.sharing && <LiveBadge />}
 				</span>
 			</PopoverTrigger>
 			<UserCardPopup

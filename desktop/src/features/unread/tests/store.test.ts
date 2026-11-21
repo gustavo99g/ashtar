@@ -44,6 +44,13 @@ function message(
 		mentions,
 		created_at: 1,
 		kind: "text",
+		edited_at: null,
+		reply_to: null,
+		reactions: [],
+		pinned_at: null,
+		attachments: [],
+		previews: [],
+		forwarded: null,
 		call: null,
 	};
 }
@@ -99,6 +106,13 @@ describe("as não lidas", () => {
 		const record = (id: string, outcome: "missed" | "declined") => ({
 			...message(id, "d-ana", "ana"),
 			kind: "call" as const,
+			edited_at: null,
+			reply_to: null,
+			reactions: [],
+			pinned_at: null,
+			attachments: [],
+			previews: [],
+			forwarded: null,
 			call: { id: `c-${id}`, outcome, duration: null },
 		});
 		created(record("m7", "declined"));
@@ -218,5 +232,26 @@ describe("silenciar", () => {
 		expect(of("geral").muted).toBe(false);
 		await expect(failing).rejects.toThrow("rede");
 		expect(of("geral").muted).toBe(true);
+	});
+});
+
+describe("a menção nova de uma edição (ADR 0032)", () => {
+	const updated = (m: Message, newMentions: string[]) =>
+		handleUnreadRealtime({
+			type: "message.updated",
+			message: m,
+			new_mentions: newMentions,
+		});
+
+	it("conta numa mensagem ainda não lida", () => {
+		updated(message("m3", "geral", "ana", ["kid"]), ["kid"]);
+		expect(of("geral").mentions).toBe(1);
+		expect(of("geral").unread).toBe(2);
+	});
+
+	it("não conta numa já lida, nem quando a menção nova é de outra pessoa", () => {
+		updated(message("m1", "geral", "ana", ["kid"]), ["kid"]);
+		updated(message("m3", "geral", "ana", ["bia"]), ["bia"]);
+		expect(of("geral").mentions).toBe(0);
 	});
 });

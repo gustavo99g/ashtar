@@ -36,6 +36,7 @@ import type {
 	ShareRequest,
 } from "../model/controller";
 import { shareTrackName } from "../model/shareInfo";
+import { useShareDefaults } from "../stores/shareDefaultsStore";
 
 /** A espera antes de cada tentativa de voltar a conexão; a última se repete. */
 export const RETRY_DELAYS_MS = [1000, 2000, 5000, 10_000, 20_000, 30_000];
@@ -173,6 +174,7 @@ export class NativeScreenShare implements ScreenShareController {
 				audio: request.audio,
 				cursor: request.cursor,
 				leveler: request.leveler ?? true,
+				hardwareEncoder: useShareDefaults.getState().hardwareEncoder,
 				target: { url, token, trackName: session.trackName },
 			});
 		} catch (error) {

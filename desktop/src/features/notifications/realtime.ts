@@ -9,6 +9,7 @@
  */
 import type { QueryClient } from "@tanstack/react-query";
 import { channelsKeys, findChannel } from "@/features/channels";
+import { attachmentsLabel, plainText } from "@/features/chat";
 import { useSettingsStore } from "@/features/settings";
 import { EMPTY_STATE, useUnreadStore } from "@/features/unread";
 import type { Layout, Message, ParticipantView, ServerEvent } from "@/lib/api";
@@ -33,6 +34,15 @@ export function handleNotificationsRealtime(
 		case "message.created":
 			onMessage(event.message, queryClient);
 			break;
+		case "message.updated": {
+			// A edição que passou a mencionar quem usa avisa como uma menção (ADR 0032). Numa conversa
+			// privada a mensagem já tinha avisado ao chegar.
+			const me = useUnreadStore.getState().me;
+			if (me && event.new_mentions.includes(me)) {
+				onMessage(event.message, queryClient, true);
+			}
+			break;
+		}
 		case "voice.participants":
 			onParticipants(event.channel_id, event.participants, queryClient);
 			break;
@@ -43,7 +53,11 @@ function show(card: CardInput): void {
 	void notificationShow(card).catch(() => {});
 }
 
-function onMessage(message: Message, queryClient: QueryClient): void {
+function onMessage(
+	message: Message,
+	queryClient: QueryClient,
+	edited = false,
+): void {
 	const me = useUnreadStore.getState().me;
 	if (!me || message.author.id === me) return;
 	// O registro de uma ligação não vira aviso: quem toca e mostra a perdida é a `features/calls`.
@@ -52,6 +66,7 @@ function onMessage(message: Message, queryClient: QueryClient): void {
 	// Sem a lista de canais, não dá para saber se é conversa ou canal: melhor não avisar errado.
 	if (!layout) return;
 	const channel = findChannel(layout, message.channel_id);
+	if (edited && !channel) return;
 	const mentioned = message.mentions.includes(me);
 	const event: NotifyEvent = channel
 		? { kind: "channel", mentioned }
@@ -78,7 +93,10 @@ function onMessage(message: Message, queryClient: QueryClient): void {
 		person: { nick: author.nick, displayName: author.display_name },
 		title: author.display_name ?? author.nick,
 		context: channel ? `#${channel.name}` : "Mensagem privada",
-		body: shortBody(message.body),
+		// O spoiler não aparece no aviso do Windows (ADR 0032).
+		body: shortBody(
+			plainText(message.body) || attachmentsLabel(message.attachments ?? []),
+		),
 		sound: decision.sound,
 		target,
 	});

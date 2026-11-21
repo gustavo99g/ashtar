@@ -152,6 +152,83 @@ pub async fn find(db: &SqlitePool, id: &str) -> Result<Option<LogReportView>, Ap
         .await?)
 }
 
+/// Um arquivo de dentro do `.zip` de um envio.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[ts(export, export_to = "index.ts")]
+pub struct LogEntry {
+    pub name: String,
+    /// O tamanho descompactado, em bytes.
+    #[ts(type = "number")]
+    pub size: u64,
+}
+
+/// O texto de um arquivo do `.zip`, para ler no app.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[ts(export, export_to = "index.ts")]
+pub struct LogText {
+    pub name: String,
+    pub text: String,
+    /// Se o arquivo passava de [`TEXT_MAX`] e veio só o fim dele.
+    pub truncated: bool,
+}
+
+/// O maior texto que o app recebe de um arquivo: de um log maior, vai o fim (o mais recente).
+pub const TEXT_MAX: usize = 2 * 1024 * 1024;
+
+fn open_zip(bytes: &[u8]) -> Result<zip::ZipArchive<std::io::Cursor<&[u8]>>, ApiError> {
+    zip::ZipArchive::new(std::io::Cursor::new(bytes))
+        .map_err(|_| ApiError::InvalidRequest("O .zip desses logs está estragado.".into()))
+}
+
+/// Os arquivos do `.zip`, na ordem em que estão nele (as pastas ficam de fora).
+pub fn entries(bytes: &[u8]) -> Result<Vec<LogEntry>, ApiError> {
+    let mut archive = open_zip(bytes)?;
+    let mut found = Vec::new();
+    for index in 0..archive.len() {
+        let Ok(file) = archive.by_index(index) else {
+            continue;
+        };
+        let Ok(name) = file.name() else {
+            continue;
+        };
+        if file.is_dir() {
+            continue;
+        }
+        found.push(LogEntry {
+            name: name.into_owned(),
+            size: file.size(),
+        });
+    }
+    Ok(found)
+}
+
+/// O texto do arquivo `name` do `.zip` (UTF-8, com o que não for trocado por �), ou `None` se não
+/// há um com esse nome. De um arquivo maior que [`TEXT_MAX`], só o fim.
+pub fn entry_text(bytes: &[u8], name: &str) -> Result<Option<LogText>, ApiError> {
+    use std::io::Read;
+    let mut archive = open_zip(bytes)?;
+    let Ok(file) = archive.by_name(name) else {
+        return Ok(None);
+    };
+    if file.is_dir() {
+        return Ok(None);
+    }
+    // O `.zip` passou pelo limite de 10 MB no envio, mas descompactado pode ser maior: lê até um
+    // teto, e guarda só o fim.
+    let mut content = Vec::new();
+    file.take(64 * 1024 * 1024)
+        .read_to_end(&mut content)
+        .map_err(|_| ApiError::InvalidRequest("O .zip desses logs está estragado.".into()))?;
+    let truncated = content.len() > TEXT_MAX;
+    let start = content.len().saturating_sub(TEXT_MAX);
+    let text = String::from_utf8_lossy(&content[start..]).into_owned();
+    Ok(Some(LogText {
+        name: name.to_owned(),
+        text,
+        truncated,
+    }))
+}
+
 /// O arquivo de um envio, ou `None` se sumiu do disco.
 pub async fn read(data_dir: &Path, id: &str) -> Option<Vec<u8>> {
     tokio::fs::read(file_of(data_dir, id)).await.ok()

@@ -3,7 +3,12 @@
  * decisões 16, 17 e 21).
  */
 import { apiFetch, apiJson } from "../client";
-import type { LogReportView, ServerStatus } from "../generated";
+import type {
+	LogEntry,
+	LogReportView,
+	LogText,
+	ServerStatus,
+} from "../generated";
 
 /** O envio dos logs tem até 2 minutos, como na API. */
 const UPLOAD_TIMEOUT_MS = 120_000;
@@ -30,14 +35,17 @@ export function listLogReports(): Promise<LogReportView[]> {
 	return apiJson<LogReportView[]>("/api/logs");
 }
 
-/** O `.zip` de um envio. */
-export async function downloadLogReport(id: string): Promise<Blob> {
-	const response = await apiFetch(
-		`/api/logs/${encodeURIComponent(id)}`,
-		{},
-		UPLOAD_TIMEOUT_MS,
+/** Os arquivos de dentro do `.zip` de um envio, para ler no app. */
+export function listLogEntries(id: string): Promise<LogEntry[]> {
+	return apiJson<LogEntry[]>(`/api/logs/${encodeURIComponent(id)}/entries`);
+}
+
+/** O texto de um arquivo do `.zip` (o fim dele, se for grande). */
+export function readLogEntry(id: string, name: string): Promise<LogText> {
+	const query = new URLSearchParams({ name });
+	return apiJson<LogText>(
+		`/api/logs/${encodeURIComponent(id)}/entry?${query}`,
 	);
-	return response.blob();
 }
 
 export function getServerStatus(): Promise<ServerStatus> {

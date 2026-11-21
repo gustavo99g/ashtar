@@ -119,16 +119,83 @@ mod tests {
                 "channel_state",
                 "channels",
                 "devices",
+                "emojis",
+                "files",
                 "invite_uses",
                 "invites",
+                "link_previews",
                 "log_reports",
                 "mentions",
+                "message_files",
+                "message_previews",
                 "messages",
+                "messages_fts",
+                "messages_fts_config",
+                "messages_fts_content",
+                "messages_fts_data",
+                "messages_fts_docsize",
+                "messages_fts_idx",
+                "reactions",
                 "sessions",
                 "user_permissions",
                 "users"
             ]
         );
+    }
+
+    /// A 0011 recria a tabela `messages` (ADR 0032): as mensagens, as menções e
+    /// as ligações de antes continuam lá, e as chaves estrangeiras voltam a valer.
+    #[tokio::test]
+    async fn a_migracao_das_mensagens_mantem_o_que_existia() {
+        let options = SqliteConnectOptions::from_str("sqlite::memory:")
+            .unwrap()
+            .foreign_keys(true);
+        let pool = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect_with(options)
+            .await
+            .unwrap();
+        sqlx::migrate!().run_to(10, &pool).await.unwrap();
+        insert_user(&pool, "u1", "Kid").await.unwrap();
+        for sql in [
+            "INSERT INTO messages (id, channel_id, author_id, client_id, body, created_at)
+             VALUES ('m1', 'geral', 'u1', 'c1', 'oi @Kid', 10)",
+            "INSERT INTO mentions (message_id, user_id, channel_id) VALUES ('m1', 'u1', 'geral')",
+        ] {
+            sqlx::query(sql).execute(&pool).await.unwrap();
+        }
+
+        migrate(&pool).await.unwrap();
+
+        let (body, kind): (String, String) =
+            sqlx::query_as("SELECT body, kind FROM messages WHERE id = 'm1'")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!((body.as_str(), kind.as_str()), ("oi @Kid", "text"));
+        let mentions: i64 = sqlx::query_scalar("SELECT count(*) FROM mentions")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(mentions, 1);
+        let broken: Vec<(String,)> = sqlx::query_as("PRAGMA foreign_key_check")
+            .fetch_all(&pool)
+            .await
+            .unwrap();
+        assert!(broken.is_empty());
+        let on: i64 = sqlx::query_scalar("PRAGMA foreign_keys")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(on, 1);
+        // Agora o texto pode ficar vazio (a mensagem só com anexo).
+        sqlx::query(
+            "INSERT INTO messages (id, channel_id, author_id, client_id, body, created_at)
+             VALUES ('m2', 'geral', 'u1', 'c2', '', 11)",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
     }
 
     #[tokio::test]

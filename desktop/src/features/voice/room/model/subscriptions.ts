@@ -37,6 +37,8 @@ export interface SubscriptionView {
 	shown: Readonly<Record<string, ShownSize>>;
 	/** `false`: os blocos não estão à vista; senão, o tamanho deles (Grade ou fileira de baixo). */
 	cameras: ShownSize | false;
+	/** A câmera em foco, grande no palco: vem na camada alta. */
+	bigCamera?: string | null;
 }
 
 /** Nada à vista: só as vozes. */
@@ -65,6 +67,7 @@ export function wantedQuality(
 	view: SubscriptionView,
 ): VideoQuality {
 	if (source === Track.Source.Camera) {
+		if (view.bigCamera === identity) return VideoQuality.HIGH;
 		return view.cameras === "small" ? VideoQuality.LOW : VideoQuality.MEDIUM;
 	}
 	return view.shown[shareOwner(identity)] === "small"

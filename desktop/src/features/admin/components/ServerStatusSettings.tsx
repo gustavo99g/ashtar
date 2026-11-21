@@ -80,7 +80,7 @@ export function ServerStatusSettings() {
 									: "ok"
 							}
 							value={`${size(status.data.disk.free_bytes)} livres`}
-							detail={`de ${size(status.data.disk.total_bytes)}, na pasta de dados`}
+							detail={`de ${size(status.data.disk.total_bytes)}, na pasta de dados · os arquivos ocupam ${size(status.data.files_bytes)}`}
 						/>
 					) : (
 						<Card

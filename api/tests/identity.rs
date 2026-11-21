@@ -1408,7 +1408,9 @@ mod regras {
             [
                 (beta, Origin::Owner),
                 (Permission::ManageChannels, Origin::Owner),
-                (Permission::MoveMembers, Origin::Owner)
+                (Permission::MoveMembers, Origin::Owner),
+                (Permission::ManageEmojis, Origin::Owner),
+                (Permission::ViewLogs, Origin::Owner),
             ]
         );
 
@@ -2422,6 +2424,8 @@ mod painel {
                 "atualizacoes.beta",
                 "canais.gerenciar",
                 "membros.mover",
+                "emojis.gerenciar",
+                "logs.ver",
                 "convites.criar",
                 "convites.recuperacao",
                 "convites.revogar",
@@ -2446,8 +2450,12 @@ mod painel {
         assert_eq!(list[1]["kind"], "permission");
         assert_eq!(list[2]["key"], "membros.mover");
         assert_eq!(list[2]["kind"], "permission");
+        assert_eq!(list[3]["key"], "emojis.gerenciar");
+        assert_eq!(list[3]["kind"], "permission");
+        assert_eq!(list[4]["key"], "logs.ver");
+        assert_eq!(list[4]["kind"], "permission");
         // As permissões vêm antes das ações.
-        for grant in list.as_array().unwrap()[3..].iter() {
+        for grant in list.as_array().unwrap()[5..].iter() {
             assert_eq!(grant["kind"], "action");
             assert_eq!(grant["granted"], true);
             assert_eq!(grant["origin"], "owner");
@@ -2704,8 +2712,8 @@ mod sala {
         assert_eq!(
             json,
             json!([
-                { "user_id": carla.id, "nick": "carla", "display_name": null, "screen_sharing": true },
-                { "user_id": ju.id, "nick": "juliana", "display_name": "juju", "screen_sharing": false },
+                { "user_id": carla.id, "nick": "carla", "display_name": null, "screen_sharing": true, "avatar": null, "mic_off": false, "deafened": false, "camera": false },
+                { "user_id": ju.id, "nick": "juliana", "display_name": "juju", "screen_sharing": false, "avatar": null, "mic_off": false, "deafened": false, "camera": false },
             ])
         );
     }

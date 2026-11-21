@@ -38,12 +38,19 @@ function message(channelId: string, mentions: string[] = [], author = "ana"): Me
 		mentions,
 		created_at: 1,
 		kind: "text",
+		edited_at: null,
+		reply_to: null,
+		reactions: [],
+		pinned_at: null,
+		attachments: [],
+		previews: [],
+		forwarded: null,
 		call: null,
 	};
 }
 
 function participant(id: string, sharing: boolean): ParticipantView {
-	return { user_id: id, nick: id, display_name: null, screen_sharing: sharing };
+	return { user_id: id, nick: id, display_name: null, screen_sharing: sharing, mic_off: false, deafened: false, camera: false };
 }
 
 let client: QueryClient;

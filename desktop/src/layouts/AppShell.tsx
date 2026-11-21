@@ -2,6 +2,8 @@ import { Outlet } from "react-router-dom";
 import { CallBridge } from "@/features/calls";
 import { ChannelDialogs } from "@/features/channels";
 import { DmDock, showDm } from "@/features/dms";
+import { useLoadEmojis } from "@/features/emojis";
+import { ForwardDialog } from "@/features/forward";
 import { LogsNotices } from "@/features/admin";
 import { JoinNotices } from "@/features/members";
 import { NotificationsBridge, RoomSounds } from "@/features/notifications";
@@ -31,6 +33,8 @@ import { ConnectionBanner } from "./ConnectionBanner";
  * posicionada: as configurações abertas não a cobrem.
  */
 export function AppShell() {
+	// Os emojis do grupo: o texto, as reações e o seletor leem do store.
+	useLoadEmojis();
 	return (
 		<div className="flex h-full flex-col">
 			<ConnectionBanner />
@@ -71,6 +75,8 @@ function AppFrame() {
 			<SideDock />
 			{/* Os diálogos de criar, editar e arquivar canais: abrem pela lista ou pelo cabeçalho do chat. */}
 			<ChannelDialogs />
+			{/* O Encaminhar do menu da mensagem: escolher o canal ou a conversa. */}
+			<ForwardDialog />
 			{/* Os avisos: a regra, o ponto de não lido e o clique num cartão. Não desenha nada. */}
 			<NotificationsBridge />
 			<RoomSounds />

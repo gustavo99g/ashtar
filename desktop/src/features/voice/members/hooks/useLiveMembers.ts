@@ -36,6 +36,7 @@ export function useLiveMembers(): LiveMember[] {
 				participant.isScreenShareEnabled || screens.has(participant.identity),
 			speaking: participant.isSpeaking,
 			micOff: !participant.isMicrophoneEnabled,
+			camera: participant.isCameraEnabled,
 			deafened: participant.isLocal
 				? isDeafened
 				: deafenedIds.has(participant.identity),

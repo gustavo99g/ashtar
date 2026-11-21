@@ -34,5 +34,7 @@ export const paths = {
 		server: "/settings/server",
 		/** Servidor › Arquivados: só no menu de quem gerencia os canais. */
 		archived: "/settings/archived",
+		/** Painel › Emojis: quem tem "Gerenciar emojis" (v0.7). */
+		emojis: "/settings/emojis",
 	},
 } as const;

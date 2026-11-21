@@ -6,14 +6,22 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect } from "react";
 import {
+	deleteSavedAvatar,
 	getInvite,
 	getMe,
+	listSavedAvatars,
 	type MeResponse,
+	removeAvatar,
 	type Status,
+	setAvatar,
 	setStatus,
 	updateMe,
+	uploadFile,
 } from "@/lib/api";
+import { clearFileCache } from "@/lib/fileCache";
 import { useOptionalQueryClient } from "@/lib/query";
+import { AVATAR_OUTPUT } from "./model/avatarCrop";
+import { clearAvatars, rememberAvatars } from "./stores/avatarStore";
 import { redeemInvite, useSession } from "./stores/sessionStore";
 import { rememberStatus, useLastStatus } from "./stores/statusStore";
 
@@ -23,12 +31,24 @@ import { rememberStatus, useLastStatus } from "./stores/statusStore";
  */
 export function useClearCache() {
 	const queryClient = useQueryClient();
-	return useCallback(() => queryClient.clear(), [queryClient]);
+	return useCallback(() => {
+		queryClient.clear();
+		clearFileCache();
+		clearAvatars();
+	}, [queryClient]);
+}
+
+/** O `/api/me`, guardando a minha foto para o `Avatar`. */
+async function fetchMe(): Promise<MeResponse> {
+	const me = await getMe();
+	rememberAvatars([me.user]);
+	return me;
 }
 
 export const identityKeys = {
 	all: ["identity"] as const,
 	me: () => [...identityKeys.all, "me"] as const,
+	savedAvatars: () => [...identityKeys.all, "saved-avatars"] as const,
 	invite: (code: string) => [...identityKeys.all, "invite", code] as const,
 };
 
@@ -40,7 +60,7 @@ export function useMe() {
 	const connected = useSession().status === "connected";
 	return useQuery({
 		queryKey: identityKeys.me(),
-		queryFn: getMe,
+		queryFn: fetchMe,
 		enabled: connected,
 	});
 }
@@ -55,7 +75,7 @@ export function useOptionalMe(): MeResponse | undefined {
 	return useQuery(
 		{
 			queryKey: identityKeys.me(),
-			queryFn: getMe,
+			queryFn: fetchMe,
 			enabled: connected && present,
 		},
 		client,
@@ -103,6 +123,69 @@ export function useUpdateMe() {
 		mutationFn: (displayName: string | null) =>
 			updateMe({ display_name: displayName }),
 		onSuccess: (me) => queryClient.setQueryData(identityKeys.me(), me),
+	});
+}
+
+/**
+ * Troca a foto de perfil: envia a imagem já recortada (`kind=avatar`) e liga ela ao perfil. Com
+ * `null`, tira a foto. Quem vê recebe o `user.updated`; aqui, o `/api/me` em cache já muda.
+ */
+export function useChangeAvatar() {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: async (image: Blob | null) => {
+			if (!image) return removeAvatar();
+			const extension = image.type === "image/webp" ? "webp" : "png";
+			const file = await uploadFile(image, {
+				kind: "avatar",
+				name: `foto.${extension}`,
+				width: AVATAR_OUTPUT,
+				height: AVATAR_OUTPUT,
+			});
+			return setAvatar(file.id);
+		},
+		onSuccess: (me) => {
+			queryClient.setQueryData(identityKeys.me(), me);
+			rememberAvatars([me.user]);
+			void queryClient.invalidateQueries({
+				queryKey: identityKeys.savedAvatars(),
+			});
+		},
+	});
+}
+
+/** As fotos que já usei, para voltar a uma delas (a API guarda até 12, contando a de agora). */
+export function useSavedAvatars() {
+	const connected = useSession().status === "connected";
+	return useQuery({
+		queryKey: identityKeys.savedAvatars(),
+		queryFn: listSavedAvatars,
+		enabled: connected,
+	});
+}
+
+/** Volta a uma foto guardada. */
+export function useReuseAvatar() {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: (fileId: string) => setAvatar(fileId),
+		onSuccess: (me) => {
+			queryClient.setQueryData(identityKeys.me(), me);
+			rememberAvatars([me.user]);
+			void queryClient.invalidateQueries({
+				queryKey: identityKeys.savedAvatars(),
+			});
+		},
+	});
+}
+
+/** Apaga uma foto guardada (a de agora não dá). */
+export function useDeleteSavedAvatar() {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: (fileId: string) => deleteSavedAvatar(fileId),
+		onSuccess: () =>
+			queryClient.invalidateQueries({ queryKey: identityKeys.savedAvatars() }),
 	});
 }
 

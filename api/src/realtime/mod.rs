@@ -23,7 +23,7 @@ use crate::identity::status::{Shown, Status};
 use crate::identity::users::Person;
 use crate::logs::LogReportView;
 use crate::secret;
-use crate::voice::ParticipantView;
+use crate::voice::{ParticipantView, VoiceFlags};
 
 /// Quanto o ticket vale depois de emitido. O app pede e já conecta.
 pub const TICKET_TTL: Duration = Duration::from_secs(30);
@@ -63,6 +63,28 @@ pub enum ServerEvent {
     Pong,
     #[serde(rename = "message.created")]
     MessageCreated { message: Message },
+    /// A mensagem mudou (texto editado, reações, fixada): vai a mensagem inteira.
+    /// `new_mentions` traz só quem a edição passou a mencionar, para o app
+    /// notificar sem repetir quem já tinha sido avisado.
+    #[serde(rename = "message.updated")]
+    MessageUpdated {
+        message: Message,
+        new_mentions: Vec<String>,
+    },
+    /// Só para o dono: o disco do servidor passou de 80% (ADR 0031), no máximo uma vez por dia.
+    #[serde(rename = "disk.alert")]
+    DiskAlert {
+        #[ts(type = "number")]
+        free_bytes: u64,
+        #[ts(type = "number")]
+        total_bytes: u64,
+    },
+    /// A mensagem foi excluída (ADR 0032).
+    #[serde(rename = "message.deleted")]
+    MessageDeleted {
+        channel_id: String,
+        message_id: String,
+    },
     /// Alguém ficou online ou offline, ou trocou entre disponível, ausente e
     /// ocupado.
     /// Ficar invisível sai daqui como ficar offline. O `status` só quer dizer
@@ -108,6 +130,14 @@ pub enum ServerEvent {
     Typing { channel_id: String, user_id: String },
     #[serde(rename = "member.joined")]
     MemberJoined { person: Person },
+    /// Alguém trocou o nome visível ou a foto (ADR 0031): vai para todos, e o app troca nas
+    /// listas, nas mensagens já carregadas e na sala de voz sem recarregar.
+    #[serde(rename = "user.updated")]
+    UserUpdated {
+        id: String,
+        display_name: Option<String>,
+        avatar: Option<String>,
+    },
     /// Alguém foi removido: sai da coluna de membros.
     #[serde(rename = "member.left")]
     MemberLeft { user_id: String },
@@ -118,6 +148,11 @@ pub enum ServerEvent {
     /// recarrega o `GET /api/channels`.
     #[serde(rename = "channels.changed")]
     ChannelsChanged { version: i64 },
+    /// Os emojis do grupo mudaram (um novo, um nome, uma exclusão): a lista inteira.
+    #[serde(rename = "emojis.changed")]
+    EmojisChanged {
+        emojis: Vec<crate::chat::emojis::Emoji>,
+    },
     /// O estado de um canal ou conversa mudou para a pessoa (leu, marcou tudo
     /// como lido, silenciou). Só vai para as conexões dela: é o que zera o
     /// número no outro computador.
@@ -152,6 +187,8 @@ impl ServerEvent {
     pub fn of_channel(&self) -> bool {
         match self {
             Self::MessageCreated { .. }
+            | Self::MessageUpdated { .. }
+            | Self::MessageDeleted { .. }
             | Self::VoiceParticipants { .. }
             | Self::Typing { .. }
             | Self::ChannelState { .. }
@@ -165,8 +202,11 @@ impl ServerEvent {
             | Self::StatusChanged { .. }
             | Self::VoiceDisconnected { .. }
             | Self::MemberJoined { .. }
+            | Self::UserUpdated { .. }
             | Self::MemberLeft { .. }
             | Self::LogsReceived { .. }
+            | Self::DiskAlert { .. }
+            | Self::EmojisChanged { .. }
             | Self::ChannelsChanged { .. } => false,
         }
     }
@@ -269,7 +309,23 @@ struct Inner {
     voice_reads: HashMap<String, u64>,
     /// Quem está em cada sala de voz, pela última lista publicada
     /// (`voice.participants`). As salas das ligações privadas nunca entram.
-    voice_rooms: HashMap<String, Vec<String>>,
+    voice_rooms: HashMap<String, Vec<ParticipantView>>,
+    /// O estado que o app de cada um contou, e de qual sala ([`VoiceFlags`]).
+    voice_flags: HashMap<String, (String, VoiceFlags)>,
+}
+
+impl Inner {
+    /// `list` da sala `room` com o estado que cada app contou dela.
+    fn with_flags(&self, room: &str, mut list: Vec<ParticipantView>) -> Vec<ParticipantView> {
+        for view in &mut list {
+            if let Some((flagged, flags)) = self.voice_flags.get(&view.user_id)
+                && flagged == room
+            {
+                flags.apply(view);
+            }
+        }
+        list
+    }
 }
 
 pub struct Hub {
@@ -526,15 +582,16 @@ impl Hub {
         participants: Vec<ParticipantView>,
         to: Audience,
     ) {
-        let ids: Vec<String> = participants.iter().map(|p| p.user_id.clone()).collect();
-        {
+        let participants = {
             let mut inner = self.lock();
-            if ids.is_empty() {
+            let participants = inner.with_flags(&room, participants);
+            if participants.is_empty() {
                 inner.voice_rooms.remove(&room);
             } else {
-                inner.voice_rooms.insert(room.clone(), ids);
+                inner.voice_rooms.insert(room.clone(), participants.clone());
             }
-        }
+            participants
+        };
         self.publish_in(
             &ServerEvent::VoiceParticipants {
                 channel_id: room,
@@ -549,7 +606,7 @@ impl Hub {
         self.lock()
             .voice_rooms
             .iter()
-            .find(|(_, ids)| ids.iter().any(|id| id == user_id))
+            .find(|(_, people)| people.iter().any(|p| p.user_id == user_id))
             .map(|(room, _)| room.clone())
     }
 
@@ -558,8 +615,44 @@ impl Hub {
         self.lock()
             .voice_rooms
             .get(room)
-            .cloned()
+            .map(|people| people.iter().map(|p| p.user_id.clone()).collect())
             .unwrap_or_default()
+    }
+
+    /// Guarda o estado que o app de `user_id` contou da sala `room`. Devolve a lista da sala já com
+    /// ele, se a pessoa está nela (aí é só publicar); `None` se a lista ainda não tem a pessoa (a
+    /// sala precisa ser relida).
+    pub fn set_voice_flags(
+        &self,
+        user_id: &str,
+        room: &str,
+        flags: VoiceFlags,
+    ) -> Option<Vec<ParticipantView>> {
+        let mut inner = self.lock();
+        inner
+            .voice_flags
+            .insert(user_id.to_owned(), (room.to_owned(), flags));
+        let list = inner.voice_rooms.get(room)?.clone();
+        list.iter()
+            .any(|p| p.user_id == user_id)
+            .then(|| inner.with_flags(room, list))
+    }
+
+    /// Esquece o estado que o app de `user_id` contou da sala `room` (saiu dela).
+    pub fn clear_voice_flags(&self, user_id: &str, room: &str) {
+        let mut inner = self.lock();
+        if inner
+            .voice_flags
+            .get(user_id)
+            .is_some_and(|(flagged, _)| flagged == room)
+        {
+            inner.voice_flags.remove(user_id);
+        }
+    }
+
+    /// `list` da sala `room` com o estado que cada app contou (a lista que o LiveKit deu).
+    pub fn with_voice_flags(&self, room: &str, list: Vec<ParticipantView>) -> Vec<ParticipantView> {
+        self.lock().with_flags(room, list)
     }
 
     /// Se a releitura `n` ainda é a última pedida para `room`.
@@ -763,6 +856,8 @@ mod tests {
             nick: id.into(),
             display_name: None,
             screen_sharing: false,
+            avatar: None,
+            ..ParticipantView::default()
         }
     }
 

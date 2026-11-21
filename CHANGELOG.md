@@ -1,5 +1,31 @@
 # O que há de novo no Ashtar
 
+## 0.7.0
+
+- A 0.7.0 é a primeira versão publicada com o que está na 0.6.0: quem vem da 0.5 ganha as duas de uma vez.
+- Foto de perfil: escolha em Configurações › Perfil, com o recorte redondo e o zoom. Ela aparece para todos na hora, no chat, na lista de membros e na sala, e "Remover foto" volta para a letra e a cor. As fotos que você já usou ficam guardadas em "Fotos anteriores", para voltar a uma delas com um clique ou apagar de vez.
+- O menu da mensagem: passe o mouse para reagir, responder ou abrir os três pontinhos, ou clique com o botão direito. Dá para responder, reagir, editar, copiar o texto, encaminhar, fixar e excluir, e só aparece o que você pode fazer.
+- Editar: só as suas mensagens, sem limite de tempo; elas ganham "(editada)". A seta para cima no campo vazio edita a sua última, e Esc cancela.
+- Excluir: o autor exclui as suas, e o dono exclui qualquer uma de um canal. Segure Shift para pular a confirmação.
+- Responder: a resposta mostra a mensagem original em cima, e clicar nela leva até lá, mesmo que seja antiga. Por padrão o autor é mencionado; o botão "@ Ligado" no campo desliga.
+- Reações com qualquer emoji, até 20 diferentes por mensagem. Clique numa reação para somar a sua ou tirá-la, e passe o mouse para ver quem reagiu. Os seis da barra são os que você mais usa.
+- Seletor de emoji, também no botão do campo: em português, com busca, os seus recentes e uma categoria por vez.
+- Emojis do grupo: quem tem a nova permissão "Gerenciar emojis" sobe imagens em Painel de controle › Emojis, até 100, GIF animado incluído. Escreva :nome: para usar no texto, ou escolha no seletor e nas reações.
+- Formatação no texto: **negrito** entre dois asteriscos, *itálico* entre um, código entre crases (três crases para um bloco) e spoiler entre duas barras verticais, que esconde até o clique.
+- Anexos: pelo botão +, arrastando para a conversa ou colando com Ctrl+V. Até 10 arquivos de até 100 MB por mensagem, com a barra de progresso no envio. Imagens aparecem no chat e abrem em tela cheia com Baixar; os outros arquivos viram um cartão com Baixar.
+- Vídeos .mp4 e .webm tocam ali mesmo no chat, sem baixar antes.
+- Prévia de links: a mensagem com um link ganha o cartão com o site, o título, a descrição e a imagem, YouTube incluído. O autor pode tirar a prévia pelo X, e um link entre < e > não ganha prévia.
+- Encaminhar: mande uma mensagem, com os anexos, para outro canal ou conversa, com um comentário se quiser. Ela chega marcada como "Encaminhada", com quem escreveu e de onde veio.
+- Mensagens fixadas: quem gerencia os canais fixa no canal, e numa conversa privada os dois podem fixar. A faixa embaixo do cabeçalho abre a lista, com Ir até a mensagem.
+- Buscar: o campo no alto procura no canal aberto ou em todo o grupo, sem ligar para acentos, e acha também pelo nome dos arquivos. Os filtros de:, em: e tem:anexo, tem:link ou tem:imagem ajudam a afinar. Clique num resultado para ir até a mensagem.
+- Mídia do canal: o botão no cabeçalho mostra as imagens, os vídeos e os arquivos que já passaram pelo canal ou pela conversa.
+- Quem está fora da sala agora vê, na lista da sala, quem está mutado, com o áudio desligado, com a câmera ligada ou transmitindo.
+- Câmera em foco: passe o mouse numa câmera na grade e clique no botão do canto para deixá-la grande, como uma transmissão. Na fileira de baixo, clicar numa câmera também foca.
+- Com o áudio desligado, os sons da sala ficam calados também.
+- Logs: ler os logs que chegaram agora dá para fazer no próprio app, sem baixar. Ver logs virou uma permissão, "Ver logs", que o dono pode dar a outras pessoas.
+- Configurações › Aplicativo ganhou "Aceleração de hardware", para desligar o uso da placa de vídeo pela janela do Ashtar (pede para reiniciar). Em Voz e vídeo, "Codificar na placa de vídeo" pode ser desligado para a transmissão usar a CPU.
+- No painel da transmissão, o atraso aparece em milissegundos inteiros, e Detalhes e Trocar fonte ficaram mais fáceis de ver.
+
 ## 0.6.0
 
 - Configurações › Voz e vídeo ficou completa: o volume do microfone e o volume geral de saída (de 0 a 200%, por cima do volume de cada pessoa), Testar microfone, com o medidor, e as chaves de Supressão de ruído, Cancelamento de eco e Controle automático de ganho. Tudo vale no meio da chamada, sem sair da sala.

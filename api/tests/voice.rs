@@ -117,6 +117,8 @@ fn person(id: &str) -> ParticipantView {
         nick: id.into(),
         display_name: None,
         screen_sharing: false,
+        avatar: None,
+        ..ParticipantView::default()
     }
 }
 
@@ -295,4 +297,89 @@ async fn desconectar_avisa_a_pessoa_de_quem_tirou() {
         json!({ "type": "voice.disconnected", "by": ctx.owner.id, "by_name": "Kid", "reason": "moderator" })
     );
     assert!(to.includes(&ana_id) && !to.includes(&ctx.owner.id));
+}
+
+#[tokio::test]
+async fn o_estado_que_o_app_conta_vai_para_quem_esta_fora() {
+    let ctx = setup().await;
+    let ana = join(&ctx, "Ana", 2, false).await;
+    let ana_id = member_id(&ctx, &ana).await;
+    let owner_id = ctx.owner.id.clone();
+    ctx.hub.publish_voice_participants(
+        "sala".into(),
+        vec![person(&ana_id), person(&owner_id)],
+        Audience::Everyone,
+    );
+    let mut rx = ctx.hub.subscribe();
+
+    let (status, body) = call(
+        &ctx.router,
+        "PUT",
+        "/api/voice/state",
+        Some(&ana),
+        Some(json!({
+            "channel_id": "sala",
+            "mic_off": true,
+            "deafened": true,
+            "camera": true,
+            "sharing": false,
+        })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::NO_CONTENT, "{body}");
+    let events = drain(&mut rx);
+    assert_eq!(events.len(), 1);
+    let (event, to) = &events[0];
+    assert!(to.includes(&owner_id));
+    assert_eq!(event["type"], "voice.participants");
+    let people = event["participants"].as_array().unwrap();
+    assert_eq!(people[0]["user_id"], ana_id);
+    assert_eq!(people[0]["mic_off"], true);
+    assert_eq!(people[0]["deafened"], true);
+    assert_eq!(people[0]["camera"], true);
+    assert_eq!(people[1]["mic_off"], false);
+
+    // A próxima lista do LiveKit (um webhook) continua com o estado de Ana.
+    ctx.hub.publish_voice_participants(
+        "sala".into(),
+        vec![person(&ana_id), person(&owner_id)],
+        Audience::Everyone,
+    );
+    let events = drain(&mut rx);
+    assert_eq!(events[0].0["participants"][0]["deafened"], true);
+
+    // Uma sala que não existe: 404.
+    let (status, _) = call(
+        &ctx.router,
+        "PUT",
+        "/api/voice/state",
+        Some(&ana),
+        Some(json!({
+            "channel_id": "nada",
+            "mic_off": false,
+            "deafened": false,
+            "camera": false,
+            "sharing": false,
+        })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+
+    // Saiu: o estado é esquecido.
+    let (status, _) = call(
+        &ctx.router,
+        "DELETE",
+        "/api/voice/state?channel_id=sala",
+        Some(&ana),
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+    ctx.hub
+        .publish_voice_participants("sala".into(), vec![person(&ana_id)], Audience::Everyone);
+    let events = drain(&mut rx);
+    assert_eq!(
+        events.last().unwrap().0["participants"][0]["deafened"],
+        false
+    );
 }

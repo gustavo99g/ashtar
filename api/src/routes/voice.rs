@@ -240,7 +240,70 @@ pub async fn participants(
     validate_channel_id(&query.channel_id)?;
     access::joinable(&state.db, &user, &query.channel_id).await?;
     let room = list_room(&query.channel_id).await?;
-    Ok(Json(join_participants(&state.db, room).await?))
+    let list = join_participants(&state.db, room).await?;
+    Ok(Json(state.hub.with_voice_flags(&query.channel_id, list)))
+}
+
+/// O que o app manda no `PUT /api/voice/state`.
+#[derive(Debug, Deserialize, TS)]
+#[ts(export, export_to = "index.ts")]
+pub struct VoiceStateRequest {
+    pub channel_id: String,
+    #[serde(flatten)]
+    #[ts(flatten)]
+    pub flags: voice::VoiceFlags,
+}
+
+/// Quanto esperar para reler a sala de novo depois de alguém entrar ou sair: o LiveKit pode
+/// ainda não ter a mudança na primeira leitura.
+const REREAD_AGAIN: Duration = Duration::from_millis(1500);
+
+/// Relê a sala agora e de novo daqui a pouco. Com o webhook do LiveKit (a VPS), é só reforço; sem
+/// ele (o `livekit-server --dev` sem configuração), é o que mostra quem entrou e saiu.
+fn reread_soon(state: &AppState, room: String) {
+    let state = state.clone();
+    tokio::spawn(async move {
+        super::webhooks::reread(state.clone(), room.clone()).await;
+        tokio::time::sleep(REREAD_AGAIN).await;
+        super::webhooks::reread(state, room).await;
+    });
+}
+
+/// `PUT /api/voice/state`: o app conta o próprio estado na sala de voz do grupo (microfone, áudio,
+/// câmera e tela), a cada mudança e ao entrar. A API publica a lista da sala com ele para quem
+/// está de fora. Ligações privadas não passam por aqui (404, como uma sala que não existe).
+pub async fn voice_state(
+    State(state): State<AppState>,
+    CurrentUser(user): CurrentUser,
+    ApiJson(request): ApiJson<VoiceStateRequest>,
+) -> Result<axum::http::StatusCode, ApiError> {
+    validate_channel_id(&request.channel_id)?;
+    let room = access::joinable(&state.db, &user, &request.channel_id).await?;
+    match state.hub.set_voice_flags(&user.id, &room.id, request.flags) {
+        Some(list) => {
+            let to = access::audience(&state.db, &room.id).await?;
+            state.hub.publish_voice_participants(room.id, list, to);
+        }
+        // A lista ainda não tem a pessoa: acabou de entrar.
+        None => reread_soon(&state, room.id),
+    }
+    Ok(axum::http::StatusCode::NO_CONTENT)
+}
+
+/// `DELETE /api/voice/state?channel_id=sala`: o app saiu da sala. A API esquece o estado (se
+/// ainda é dessa sala: ao trocar de sala, o da nova pode chegar antes) e relê a sala.
+pub async fn leave_voice_state(
+    State(state): State<AppState>,
+    CurrentUser(user): CurrentUser,
+    query: Result<Query<ParticipantsQuery>, QueryRejection>,
+) -> Result<axum::http::StatusCode, ApiError> {
+    let Query(query) = query
+        .map_err(|_| ApiError::InvalidRequest("O pedido não está no formato esperado.".into()))?;
+    validate_channel_id(&query.channel_id)?;
+    let room = access::joinable(&state.db, &user, &query.channel_id).await?;
+    state.hub.clear_voice_flags(&user.id, &room.id);
+    reread_soon(&state, room.id);
+    Ok(axum::http::StatusCode::NO_CONTENT)
 }
 
 /// Quanto o app de quem foi movido tem para trocar de sala sozinho, antes de a

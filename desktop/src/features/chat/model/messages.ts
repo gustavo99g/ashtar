@@ -44,8 +44,8 @@ function dayKey(seconds: number): string {
 }
 
 /**
- * Monta as linhas: grupo novo quando muda o autor, passa de 5 minutos ou muda o dia, e em volta
- * do registro de uma ligação.
+ * Monta as linhas: grupo novo quando muda o autor, passa de 5 minutos ou muda o dia, em volta do
+ * registro de uma ligação, e numa resposta (a citação fica em cima do nome).
  */
 export function conversationRows(
 	messages: Message[],
@@ -63,6 +63,7 @@ export function conversationRows(
 			// O registro de uma ligação é uma linha à parte: não entra no grupo de ninguém.
 			previous.kind === "call" ||
 			message.kind === "call" ||
+			message.reply_to !== null ||
 			message.created_at - previous.created_at > GROUP_GAP_SECONDS;
 		previous = message;
 		return {

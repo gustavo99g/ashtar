@@ -1,5 +1,6 @@
-//! O "Enviar logs" (v0.6, decisões 16 e 17): qualquer membro manda; só o dono lista e baixa. Para
-//! os outros, a lista e o arquivo respondem 404, como se não existissem.
+//! O "Enviar logs" (v0.6, decisões 16 e 17): qualquer membro manda; quem tem "Ver logs" (o dono
+//! sempre, v0.7) lista, lê no próprio app e baixa. Para os outros, a lista e o arquivo respondem
+//! 404, como se não existissem.
 
 use axum::Json;
 use axum::body::Body;
@@ -13,6 +14,7 @@ use super::auth::CurrentUser;
 use crate::AppState;
 use crate::db::now;
 use crate::error::ApiError;
+use crate::identity::permissions::{self, Permission};
 use crate::identity::{User, users};
 use crate::logs::{self, LogReportView};
 use crate::realtime::ServerEvent;
@@ -27,8 +29,8 @@ fn not_found() -> ApiError {
     ApiError::NotFound("Não encontrado.".into())
 }
 
-fn require_owner(user: &User) -> Result<(), ApiError> {
-    if user.is_owner {
+async fn require_logs(state: &AppState, user: &User) -> Result<(), ApiError> {
+    if permissions::has(&state.db, user, Permission::ViewLogs).await? {
         Ok(())
     } else {
         Err(not_found())
@@ -91,33 +93,37 @@ pub async fn upload(
     )
     .await?;
     let report = logs::find(&state.db, &id).await?.ok_or_else(not_found)?;
-    if let Some(owner) = users::find_owner(&state.db).await? {
-        state.hub.publish_to(
-            &[owner.id],
-            &ServerEvent::LogsReceived {
-                report: report.clone(),
-            },
-        );
+    let mut readers = Vec::new();
+    for member in users::list(&state.db).await? {
+        if member.is_active() && permissions::has(&state.db, &member, Permission::ViewLogs).await? {
+            readers.push(member.id);
+        }
     }
+    state.hub.publish_to(
+        &readers,
+        &ServerEvent::LogsReceived {
+            report: report.clone(),
+        },
+    );
     Ok(Json(report))
 }
 
-/// `GET /api/logs`: os envios, do mais novo ao mais antigo. Só o dono.
+/// `GET /api/logs`: os envios, do mais novo ao mais antigo. Só com "Ver logs".
 pub async fn list(
     State(state): State<AppState>,
     CurrentUser(user): CurrentUser,
 ) -> Result<Json<Vec<LogReportView>>, ApiError> {
-    require_owner(&user)?;
+    require_logs(&state, &user).await?;
     Ok(Json(logs::list(&state.db).await?))
 }
 
-/// `GET /api/logs/{id}`: o `.zip`. Só o dono.
+/// `GET /api/logs/{id}`: o `.zip`. Só com "Ver logs".
 pub async fn download(
     State(state): State<AppState>,
     CurrentUser(user): CurrentUser,
     Path(id): Path<String>,
 ) -> Result<Response, ApiError> {
-    require_owner(&user)?;
+    require_logs(&state, &user).await?;
     let report = logs::find(&state.db, &id).await?.ok_or_else(not_found)?;
     let bytes = logs::read(&state.data_dir, &report.id)
         .await
@@ -136,4 +142,42 @@ pub async fn download(
         bytes,
     )
         .into_response())
+}
+
+/// `GET /api/logs/{id}/entries`: os arquivos de dentro do `.zip`, para ler no app.
+pub async fn entries(
+    State(state): State<AppState>,
+    CurrentUser(user): CurrentUser,
+    Path(id): Path<String>,
+) -> Result<Json<Vec<logs::LogEntry>>, ApiError> {
+    require_logs(&state, &user).await?;
+    let bytes = logs::read(&state.data_dir, &id)
+        .await
+        .ok_or_else(not_found)?;
+    Ok(Json(logs::entries(&bytes)?))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct EntryQuery {
+    #[serde(default)]
+    pub name: String,
+}
+
+/// `GET /api/logs/{id}/entry?name=info.txt`: o texto de um arquivo do `.zip` (o fim dele, se for
+/// grande).
+pub async fn entry(
+    State(state): State<AppState>,
+    CurrentUser(user): CurrentUser,
+    Path(id): Path<String>,
+    query: Result<Query<EntryQuery>, QueryRejection>,
+) -> Result<Json<logs::LogText>, ApiError> {
+    require_logs(&state, &user).await?;
+    let Query(query) = query
+        .map_err(|_| ApiError::InvalidRequest("O pedido não está no formato esperado.".into()))?;
+    let bytes = logs::read(&state.data_dir, &id)
+        .await
+        .ok_or_else(not_found)?;
+    logs::entry_text(&bytes, &query.name)?
+        .map(Json)
+        .ok_or_else(not_found)
 }

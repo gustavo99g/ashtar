@@ -119,6 +119,30 @@ export function countMessage(message: Message): void {
 }
 
 /**
+ * Uma edição passou a mencionar quem usa (`message.updated`, ADR 0032): se a mensagem ainda não foi
+ * lida, conta como uma menção a mais, como a API conta.
+ */
+export function countNewMention(message: Message, newMentions: string[]): void {
+	useUnreadStore.setState((store) => {
+		if (!store.me || !newMentions.includes(store.me)) return store;
+		const id = message.channel_id;
+		const current = store.byChannel[id] ?? EMPTY_STATE;
+		if (current.last_read_id !== null && message.id <= current.last_read_id) {
+			return store;
+		}
+		return {
+			byChannel: {
+				...store.byChannel,
+				[id]: {
+					...current,
+					mentions: Math.min(UNREAD_CAP, current.mentions + 1),
+				},
+			},
+		};
+	});
+}
+
+/**
  * Dá o canal como lido até `messageId`: zera aqui na hora e avisa a API. A resposta (e o
  * `channel.state` que vem junto) acerta o que tiver chegado no meio. Se falhar, a próxima mensagem
  * vista tenta de novo.

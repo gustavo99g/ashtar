@@ -5,6 +5,8 @@
  *   sair da voz toca o de sair. Trocar não toca a saída de ninguém da sala velha;
  * - alguém entrando ou saindo da sua sala, pelos eventos da conexão. A conexão `:screen` de uma
  *   transmissão (ADR 0017) é o começar e o parar de transmitir, menos a sua;
+ * - com o áudio desligado (surdo), nada dos outros toca: só os sons dos próprios botões e o de
+ *   entrar e sair da sala, como no Discord;
  * - mutar, desmutar, ficar surdo e voltar. Ficar surdo também muta: toca só o do surdo. Fora da voz
  *   também toca (o botão e o atalho valem lá, v0.6); numa ligação, não.
  */
@@ -24,6 +26,8 @@ export function RoomSounds() {
 	const isMuted = voice?.isMuted ?? false;
 	const isDeafened = voice?.isDeafened ?? false;
 	const outOfVoice = (voice?.voiceChannelId ?? null) === null;
+	const deafened = useRef(isDeafened);
+	deafened.current = isDeafened;
 
 	// Entrar, trocar e sair.
 	const joined = useRef<string | null>(null);
@@ -44,6 +48,7 @@ export function RoomSounds() {
 		if (!room) return;
 		const mine = room.localParticipant.identity + SCREEN_SUFFIX;
 		const changed = (participant: RemoteParticipant, came: boolean) => {
+			if (deafened.current) return;
 			const identity = participant.identity;
 			if (identity.endsWith(SCREEN_SUFFIX)) {
 				if (identity !== mine) playRoomSound(came ? "shareStart" : "shareStop");

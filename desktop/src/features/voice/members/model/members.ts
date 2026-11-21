@@ -14,10 +14,12 @@ export interface ChannelMember {
 	sharing: boolean;
 	/** Só dentro da chamada: falando agora. */
 	speaking?: boolean;
-	/** Só dentro da chamada: sem microfone (mutado ou sem trilha). */
+	/** Sem microfone (mutado ou sem trilha). Fora da chamada, pelo que o app da pessoa contou. */
 	micOff?: boolean;
-	/** Só dentro da chamada: desligou o áudio (deafen). */
+	/** Desligou o áudio (deafen). */
 	deafened?: boolean;
+	/** Fora da chamada: está com a câmera ligada (dentro, o bloco mostra a própria câmera). */
+	camera?: boolean;
 	/** Só dentro da chamada, e só quando está ruim: a qualidade que o LiveKit dá (decisão 15). */
 	connection?: ConnectionTrouble;
 }
@@ -32,6 +34,9 @@ export function memberFromApi(participant: ParticipantView): ChannelMember {
 		nick: participant.nick,
 		name: participant.display_name?.trim() || participant.nick,
 		sharing: participant.screen_sharing,
+		micOff: participant.mic_off,
+		deafened: participant.deafened,
+		camera: participant.camera,
 	};
 }
 

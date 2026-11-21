@@ -1,6 +1,7 @@
 import type { Participant } from "livekit-client";
 import {
 	HeadphoneOffIcon,
+	Maximize2Icon,
 	MicOffIcon,
 	ScreenShareIcon,
 	VideoIcon,
@@ -10,6 +11,7 @@ import {
 	PopoverContent,
 	PopoverTrigger,
 } from "@/components/ui/popover";
+import type { ReactNode } from "react";
 import { Avatar } from "@/features/identity";
 import { cn } from "@/lib/utils";
 import {
@@ -33,6 +35,9 @@ import { UserVolume, UserVolumeMark } from "./UserVolume";
  * Com a câmera ligada (ADR 0025), o vídeo dela toma o lugar do avatar, com o ícone de câmera ao
  * lado do nome; o anel de quem fala continua. A própria câmera aparece espelhada se a pessoa
  * escolheu Espelhar.
+ *
+ * Com a câmera ligada e o `onFocus`, a câmera vai para o foco (v0.7): na Grade, pelo botão que
+ * aparece no canto com o mouse em cima (o bloco já abre o volume); na faixa, clicando no bloco.
  */
 
 interface ParticipantTileProps {
@@ -40,12 +45,15 @@ interface ParticipantTileProps {
 	member: ChannelMember & { participant?: Participant };
 	isLocal: boolean;
 	size?: "grid" | "strip";
+	/** Põe a câmera em foco. Só vale com a câmera ligada. */
+	onFocus?: () => void;
 }
 
 export function ParticipantTile({
 	member,
 	isLocal,
 	size = "grid",
+	onFocus,
 }: ParticipantTileProps) {
 	const grid = size === "grid";
 	const camera = cameraTrackOf(member.participant);
@@ -108,7 +116,10 @@ export function ParticipantTile({
 				{camera && (
 					<VideoIcon
 						aria-label="câmera ligada"
-						className={cn(grid ? "size-3.5" : "size-[11px]", "shrink-0 text-muted-foreground")}
+						className={cn(
+							grid ? "size-3.5" : "size-[11px]",
+							"shrink-0 text-muted-foreground",
+						)}
 					/>
 				)}
 				<MemberIcons member={member} size={grid ? "size-3.5" : "size-[11px]"} />
@@ -116,9 +127,59 @@ export function ParticipantTile({
 		</>
 	);
 
-	// O volume abre só na Grade e só no bloco dos outros.
-	if (!grid || isLocal) return <div className={tileClass}>{content}</div>;
+	const focusable = camera !== null && onFocus !== undefined;
+	if (!grid && focusable) {
+		return (
+			<button
+				type="button"
+				aria-label={`Pôr a câmera de ${member.name} em foco`}
+				title="Pôr em foco"
+				onClick={onFocus}
+				className={cn(
+					tileClass,
+					"hover:shadow-[inset_0_0_0_2px_var(--color-border-strong)]",
+				)}
+			>
+				{content}
+			</button>
+		);
+	}
 
+	// O volume abre só na Grade e só no bloco dos outros.
+	const tile =
+		!grid || isLocal ? (
+			<div className={tileClass}>{content}</div>
+		) : (
+			<VolumeTile member={member} tileClass={tileClass}>
+				{content}
+			</VolumeTile>
+		);
+	if (!focusable) return tile;
+	return (
+		<div className="group/tile relative w-full">
+			{tile}
+			<button
+				type="button"
+				aria-label={`Pôr a câmera de ${member.name} em foco`}
+				title="Pôr em foco"
+				onClick={onFocus}
+				className="absolute top-2.5 left-2.5 flex size-8 items-center justify-center rounded-md bg-rail/80 text-foreground opacity-0 group-hover/tile:opacity-100 hover:bg-rail focus-visible:opacity-100"
+			>
+				<Maximize2Icon className="size-4" />
+			</button>
+		</div>
+	);
+}
+
+function VolumeTile({
+	member,
+	tileClass,
+	children,
+}: {
+	member: ChannelMember;
+	tileClass: string;
+	children: ReactNode;
+}) {
 	return (
 		<Popover>
 			<PopoverTrigger
@@ -130,7 +191,7 @@ export function ParticipantTile({
 						"hover:shadow-[inset_0_0_0_2px_var(--color-speaking)]",
 				)}
 			>
-				{content}
+				{children}
 			</PopoverTrigger>
 			<PopoverContent
 				side="bottom"
@@ -139,10 +200,7 @@ export function ParticipantTile({
 				className="w-[260px] gap-2 border-border-strong bg-card px-3.5 py-3"
 			>
 				<UserVolume userId={member.id} name={member.name} />
-				<ConnectionSection
-					userId={member.id}
-					connection={member.connection}
-				/>
+				<ConnectionSection userId={member.id} connection={member.connection} />
 			</PopoverContent>
 		</Popover>
 	);

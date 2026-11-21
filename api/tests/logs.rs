@@ -283,3 +283,86 @@ async fn o_estado_do_servidor_e_so_do_dono_e_diz_quando_o_livekit_esta_fora() {
         "ashtar-2026-11-19-223000000.db"
     );
 }
+
+/// Um `.zip` de verdade, com estes arquivos.
+fn real_zip(files: &[(&str, &str)]) -> Vec<u8> {
+    use std::io::Write;
+    let mut writer = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
+    for (name, text) in files {
+        writer
+            .start_file(*name, zip::write::SimpleFileOptions::default())
+            .unwrap();
+        writer.write_all(text.as_bytes()).unwrap();
+    }
+    writer.finish().unwrap().into_inner()
+}
+
+#[tokio::test]
+async fn quem_tem_ver_logs_le_os_arquivos_no_app() {
+    use api::identity::permissions::{self, Permission};
+    let ctx = setup().await;
+    let ana = join(&ctx, "ana", 2, false).await;
+    let bia = join(&ctx, "bia", 3, false).await;
+    let bia_user = users::get_active_by_nick(&ctx.db, "bia").await.unwrap();
+    permissions::set(
+        &ctx.db,
+        &ctx.owner,
+        &bia_user,
+        Permission::ViewLogs,
+        true,
+        now(),
+    )
+    .await
+    .unwrap();
+    let mut rx = ctx.hub.subscribe();
+
+    let bytes = real_zip(&[
+        ("info.txt", "Ashtar 0.7.0"),
+        ("logs/app.log", "linha 1\nlinha 2"),
+    ]);
+    let (status, report) = upload(&ctx, &ana, "x", bytes).await;
+    assert_eq!(status, StatusCode::OK, "{report}");
+    let id = report["id"].as_str().unwrap();
+
+    // O aviso vai para o dono e para Bia.
+    let received: Vec<_> = drain(&mut rx)
+        .into_iter()
+        .filter(|(event, _)| event["type"] == "logs.received")
+        .collect();
+    assert!(received[0].1.includes(&ctx.owner.id) && received[0].1.includes(&bia_user.id));
+
+    let uri = format!("/api/logs/{id}/entries");
+    let (status, _) = call(&ctx.router, "GET", &uri, Some(&ana), None).await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    let (status, list) = call(&ctx.router, "GET", &uri, Some(&bia), None).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        list,
+        json!([
+            { "name": "info.txt", "size": 12 },
+            { "name": "logs/app.log", "size": 15 },
+        ])
+    );
+    let (status, text) = call(
+        &ctx.router,
+        "GET",
+        &format!("/api/logs/{id}/entry?name=logs%2Fapp.log"),
+        Some(&bia),
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        text,
+        json!({ "name": "logs/app.log", "text": "linha 1\nlinha 2", "truncated": false })
+    );
+    let (status, _) = call(
+        &ctx.router,
+        "GET",
+        &format!("/api/logs/{id}/entry?name=nada.txt"),
+        Some(&bia),
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+}

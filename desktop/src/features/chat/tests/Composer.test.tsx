@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Composer } from "../components/Composer";
 import type { Mentionable } from "../model/mentions";
+import { clearDraftFiles, useAttachments } from "../stores/attachmentStore";
 import { setDraft } from "../stores/draftStore";
 
 const people: Mentionable[] = [
@@ -38,6 +39,9 @@ function options() {
 
 beforeEach(() => {
 	setDraft("geral", "");
+	clearDraftFiles();
+	URL.createObjectURL = vi.fn(() => "blob:local");
+	URL.revokeObjectURL = vi.fn();
 });
 
 describe("a sugestão de nicks", () => {
@@ -69,7 +73,7 @@ describe("a sugestão de nicks", () => {
 
 		// Com a lista fechada, o Enter manda.
 		await user.type(field, "vem{Enter}");
-		expect(onSend).toHaveBeenCalledWith("oi @ana paula vem");
+		expect(onSend).toHaveBeenCalledWith("oi @ana paula vem", []);
 	});
 
 	it("o Tab também escolhe, e o clique na opção também", async () => {
@@ -109,5 +113,49 @@ describe("a sugestão de nicks", () => {
 		await user.clear(field);
 		await user.type(field, "kid@an");
 		expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+	});
+});
+
+describe("os anexos no campo", () => {
+	const png = (name: string) => new File(["x"], name, { type: "image/png" });
+
+	it("o + anexa; o cartão mostra o nome e o X tira; com anexo, o texto é opcional", async () => {
+		const user = userEvent.setup();
+		const { field, onSend } = renderComposer();
+		await user.upload(screen.getByLabelText("Escolher arquivos"), [
+			png("a.png"),
+			png("b.png"),
+		]);
+		const list = screen.getByRole("list", { name: "Arquivos para enviar" });
+		expect(within(list).getByText("a.png")).toBeInTheDocument();
+		await user.click(screen.getByRole("button", { name: "Tirar a.png" }));
+		expect(within(list).queryByText("a.png")).not.toBeInTheDocument();
+
+		await user.type(field, "{Enter}");
+		expect(onSend).toHaveBeenCalledWith("", [
+			expect.objectContaining({ file: expect.objectContaining({ name: "b.png" }) }),
+		]);
+		expect(useAttachments.getState().byChannel.geral).toBeUndefined();
+		expect(
+			screen.queryByRole("list", { name: "Arquivos para enviar" }),
+		).not.toBeInTheDocument();
+	});
+
+	it("colar um print anexa; passar de 10 avisa", async () => {
+		const user = userEvent.setup();
+		const { field } = renderComposer();
+		field.focus();
+		await user.paste({
+			files: [png("print.png")],
+		} as unknown as DataTransfer);
+		expect(screen.getByText("print.png")).toBeInTheDocument();
+
+		await user.upload(
+			screen.getByLabelText("Escolher arquivos"),
+			Array.from({ length: 10 }, (_, i) => png(`${i}.png`)),
+		);
+		expect(screen.getByRole("alert")).toHaveTextContent(
+			"Uma mensagem leva até 10 arquivos.",
+		);
 	});
 });

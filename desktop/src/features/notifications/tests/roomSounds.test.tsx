@@ -116,6 +116,16 @@ describe("os sons da sala", () => {
 		await flush();
 		expect(names().slice(-2)).toEqual(["deafen", "unmute"]);
 
+		// Surdo, os outros entrando e transmitindo não tocam.
+		played.length = 0;
+		resetRoomSounds();
+		act(() => {
+			room.emit(RoomEvent.ParticipantConnected, { identity: "bia" });
+			room.emit(RoomEvent.ParticipantConnected, { identity: "bia:screen" });
+		});
+		await flush();
+		expect(names()).toEqual([]);
+
 		// Trocar de sala: só o de entrar da nova.
 		resetRoomSounds();
 		played.length = 0;

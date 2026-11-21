@@ -31,6 +31,13 @@ function message(id: string, channelId: string): Message {
 		mentions: [],
 		created_at: 1,
 		kind: "text",
+		edited_at: null,
+		reply_to: null,
+		reactions: [],
+		pinned_at: null,
+		attachments: [],
+		previews: [],
+		forwarded: null,
 		call: null,
 	};
 }

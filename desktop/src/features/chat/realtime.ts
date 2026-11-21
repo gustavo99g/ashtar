@@ -1,18 +1,23 @@
 /**
- * Os eventos do tempo real do chat: a mensagem nova, quem ficou online ou offline, quem entrou ou
+ * Os eventos do tempo real do chat: a mensagem nova, editada ou excluída, quem ficou online ou offline, quem entrou ou
  * saiu do grupo, e o `ready`. Todo `ready` traz quem está online; o da volta de uma queda
  * (`resumed`) também busca o que faltou.
  */
 import type { QueryClient } from "@tanstack/react-query";
 import type { Person, ServerEvent } from "@/lib/api";
+import { rememberAvatars } from "@/features/identity";
 import type { RealtimeEventInfo } from "@/lib/realtime";
 import {
 	appendMessages,
 	catchUp,
 	chatKeys,
+	dropMessage,
 	markAuthorRemoved,
+	replaceMessage,
+	updateAuthor,
 } from "./queries";
 import { removePending } from "./stores/outboxStore";
+import { forgetReplyTo } from "./stores/replyStore";
 import { addTyping, clearTyping, resetTyping } from "./stores/typingStore";
 
 function updatePeople(
@@ -37,6 +42,13 @@ export function handleChatRealtime(
 			// Quem mandou parou de digitar.
 			clearTyping(event.message.channel_id, event.message.author.id);
 			break;
+		case "message.updated":
+			replaceMessage(queryClient, event.message);
+			break;
+		case "message.deleted":
+			dropMessage(queryClient, event.channel_id, event.message_id);
+			forgetReplyTo(event.channel_id, event.message_id);
+			break;
 		case "typing":
 			addTyping(event.channel_id, event.user_id);
 			break;
@@ -49,7 +61,18 @@ export function handleChatRealtime(
 				),
 			);
 			break;
+		case "user.updated": {
+			const change = { display_name: event.display_name, avatar: event.avatar };
+			updatePeople(queryClient, (people) =>
+				people.map((person) =>
+					person.id === event.id ? { ...person, ...change } : person,
+				),
+			);
+			updateAuthor(queryClient, event.id, change);
+			break;
+		}
 		case "member.joined":
+			rememberAvatars([event.person]);
 			updatePeople(queryClient, (people) =>
 				people.some((person) => person.id === event.person.id)
 					? people
