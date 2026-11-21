@@ -17,8 +17,8 @@ anexo, e entram `reply_to`, `pinned_at`, `pinned_by` e o resumo da mensagem enca
 `message.updated` (a mensagem inteira) e `message.deleted`, com a mesma audiência do `message.created`.
 
 **Editar:** só o autor, sem limite de tempo, só o texto, com "(editada)"; sem histórico; não conta como não lida; a
-menção nova notifica quem não era mencionado antes. **Excluir:** o autor, e o dono numa mensagem de canal; apaga o
-texto, as reações e os arquivos, e fica só o `deleted_at`. **Responder:** a citação de uma linha, com `@` ligado por
+menção nova notifica quem não era mencionado antes. **Excluir:** o autor, e o dono numa mensagem de canal; apaga a
+mensagem de verdade, com as menções, as reações e os arquivos (o `deleted_at` fica sem uso). **Responder:** a citação de uma linha, com `@` ligado por
 padrão, e o histórico em volta carregado por `?around=<id>`, com a faixa "Ir para o presente".
 
 **Reações** com qualquer emoji Unicode ou do grupo (`c:<id>`), até 20 diferentes por mensagem, numa tabela própria. O

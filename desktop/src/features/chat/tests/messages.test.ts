@@ -35,6 +35,10 @@ function message(authorId: string, created_at: number): Message {
 		mentions: [],
 		created_at,
 		kind: "text",
+		edited_at: null,
+		reply_to: null,
+		reactions: [],
+		pinned_at: null,
 		call: null,
 	};
 }

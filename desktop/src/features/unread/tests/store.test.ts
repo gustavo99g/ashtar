@@ -44,6 +44,10 @@ function message(
 		mentions,
 		created_at: 1,
 		kind: "text",
+		edited_at: null,
+		reply_to: null,
+		reactions: [],
+		pinned_at: null,
 		call: null,
 	};
 }
@@ -99,6 +103,10 @@ describe("as não lidas", () => {
 		const record = (id: string, outcome: "missed" | "declined") => ({
 			...message(id, "d-ana", "ana"),
 			kind: "call" as const,
+			edited_at: null,
+			reply_to: null,
+			reactions: [],
+			pinned_at: null,
 			call: { id: `c-${id}`, outcome, duration: null },
 		});
 		created(record("m7", "declined"));

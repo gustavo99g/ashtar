@@ -63,6 +63,20 @@ pub enum ServerEvent {
     Pong,
     #[serde(rename = "message.created")]
     MessageCreated { message: Message },
+    /// A mensagem mudou (texto editado, reações, fixada): vai a mensagem inteira.
+    /// `new_mentions` traz só quem a edição passou a mencionar, para o app
+    /// notificar sem repetir quem já tinha sido avisado.
+    #[serde(rename = "message.updated")]
+    MessageUpdated {
+        message: Message,
+        new_mentions: Vec<String>,
+    },
+    /// A mensagem foi excluída (ADR 0032).
+    #[serde(rename = "message.deleted")]
+    MessageDeleted {
+        channel_id: String,
+        message_id: String,
+    },
     /// Alguém ficou online ou offline, ou trocou entre disponível, ausente e
     /// ocupado.
     /// Ficar invisível sai daqui como ficar offline. O `status` só quer dizer
@@ -152,6 +166,8 @@ impl ServerEvent {
     pub fn of_channel(&self) -> bool {
         match self {
             Self::MessageCreated { .. }
+            | Self::MessageUpdated { .. }
+            | Self::MessageDeleted { .. }
             | Self::VoiceParticipants { .. }
             | Self::Typing { .. }
             | Self::ChannelState { .. }

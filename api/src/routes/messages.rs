@@ -20,6 +20,7 @@ use crate::chat::messages::{
 };
 use crate::db::now;
 use crate::error::ApiError;
+use crate::identity::User;
 use crate::identity::users;
 use crate::realtime::ServerEvent;
 
@@ -27,12 +28,14 @@ use crate::realtime::ServerEvent;
 pub struct PageQuery {
     pub before: Option<String>,
     pub after: Option<String>,
+    pub around: Option<String>,
     pub limit: Option<i64>,
 }
 
 /// `GET /api/channels/{id}/messages`: sem nada, as 50 mais novas;
 /// `?before=<id>`, as anteriores; `?after=<id>`, as que chegaram depois (até
-/// 200, para a volta de uma reconexão). `limit` vai de 1 a 100.
+/// 200, para a volta de uma reconexão); `?around=<id>`, metade antes e metade
+/// depois dela (ir até uma mensagem antiga). `limit` vai de 1 a 100.
 pub async fn list(
     State(state): State<AppState>,
     CurrentUser(user): CurrentUser,
@@ -41,13 +44,14 @@ pub async fn list(
 ) -> Result<Json<MessagePage>, ApiError> {
     let Query(query) = query
         .map_err(|_| ApiError::InvalidRequest("O pedido não está no formato esperado.".into()))?;
-    let (cursor, max) = match (query.before, query.after) {
-        (None, None) => (Cursor::Latest, PAGE_MAX),
-        (Some(before), None) => (Cursor::Before(before), PAGE_MAX),
-        (None, Some(after)) => (Cursor::After(after), CATCH_UP_MAX),
-        (Some(_), Some(_)) => {
+    let (cursor, max) = match (query.before, query.after, query.around) {
+        (None, None, None) => (Cursor::Latest, PAGE_MAX),
+        (Some(before), None, None) => (Cursor::Before(before), PAGE_MAX),
+        (None, Some(after), None) => (Cursor::After(after), CATCH_UP_MAX),
+        (None, None, Some(around)) => (Cursor::Around(around), PAGE_MAX),
+        _ => {
             return Err(ApiError::InvalidRequest(
-                "Use before ou after, não os dois.".into(),
+                "Use só um de before, after e around.".into(),
             ));
         }
     };
@@ -73,6 +77,10 @@ pub struct SendMessageRequest {
     /// Gerado pelo app antes de enviar (um UUID); o mesmo valor não duplica.
     pub client_id: String,
     pub body: String,
+    /// A mensagem respondida, do mesmo canal.
+    #[serde(default)]
+    #[ts(optional)]
+    pub reply_to: Option<String>,
 }
 
 /// `POST /api/channels/{id}/messages`: 201 com a mensagem nova, ou 200 com a
@@ -100,6 +108,7 @@ pub async fn send(
         &user,
         &request.client_id,
         &request.body,
+        request.reply_to.as_deref(),
         now(),
     )
     .await?;
@@ -110,16 +119,122 @@ pub async fn send(
         let event = ServerEvent::MessageCreated {
             message: message.clone(),
         };
-        match &channel {
-            Readable::Text(text) => {
-                let to = access::audience(&state.db, &text.id).await?;
-                state.hub.publish_in(&event, to);
-            }
-            Readable::Dm(dm) => state.hub.publish_to(&dm.members, &event),
-        }
+        publish(&state, &channel, &event).await?;
         StatusCode::CREATED
     } else {
         StatusCode::OK
     };
     Ok((status, Json(message)))
+}
+
+/// Manda `event` para quem lê `channel`: num canal de texto, quem acessa o canal
+/// (todos, se ele não é restrito); numa conversa privada, só os dois.
+async fn publish(
+    state: &AppState,
+    channel: &Readable,
+    event: &ServerEvent,
+) -> Result<(), ApiError> {
+    match channel {
+        Readable::Text(text) => {
+            let to = access::audience(&state.db, &text.id).await?;
+            state.hub.publish_in(event, to);
+        }
+        Readable::Dm(dm) => state.hub.publish_to(&dm.members, event),
+    }
+    Ok(())
+}
+
+/// A mensagem `id` e o canal dela, se quem pede lê esse canal. Sem acesso ao
+/// canal, a mensagem "não existe" (404), como o canal.
+async fn readable_message(
+    state: &AppState,
+    user: &User,
+    id: &str,
+) -> Result<(Readable, Message), ApiError> {
+    let not_found = || ApiError::NotFound("Essa mensagem não existe mais.".into());
+    let message = messages::find(&state.db, id).await?.ok_or_else(not_found)?;
+    let channel = access::readable(&state.db, user, &message.channel_id)
+        .await
+        .map_err(|error| match error {
+            ApiError::Forbidden | ApiError::NotFound(_) => not_found(),
+            other => other,
+        })?;
+    Ok((channel, message))
+}
+
+#[derive(Debug, Deserialize, TS)]
+#[ts(export, export_to = "index.ts")]
+pub struct EditMessageRequest {
+    pub body: String,
+}
+
+/// `PATCH /api/messages/{id}`: troca o texto. Só o autor (403); a mensagem vai
+/// inteira no `message.updated`.
+pub async fn edit(
+    State(state): State<AppState>,
+    CurrentUser(user): CurrentUser,
+    Path(id): Path<String>,
+    ApiJson(request): ApiJson<EditMessageRequest>,
+) -> Result<Json<Message>, ApiError> {
+    let (channel, message) = readable_message(&state, &user, &id).await?;
+    let edited = messages::edit(&state.db, &channel, &user, &message, &request.body, now()).await?;
+    let event = ServerEvent::MessageUpdated {
+        message: edited.message.clone(),
+        new_mentions: edited.new_mentions,
+    };
+    publish(&state, &channel, &event).await?;
+    Ok(Json(edited.message))
+}
+
+/// `DELETE /api/messages/{id}`: 204. O autor, ou o dono numa mensagem de canal.
+pub async fn delete(
+    State(state): State<AppState>,
+    CurrentUser(user): CurrentUser,
+    Path(id): Path<String>,
+) -> Result<StatusCode, ApiError> {
+    let (channel, message) = readable_message(&state, &user, &id).await?;
+    if !messages::can_delete(&channel, &user, &message) {
+        return Err(ApiError::Forbidden);
+    }
+    messages::delete(&state.db, &message.id).await?;
+    let event = ServerEvent::MessageDeleted {
+        channel_id: message.channel_id,
+        message_id: message.id,
+    };
+    publish(&state, &channel, &event).await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// `PUT /api/messages/{id}/reactions/{emoji}`: reage (repetir não muda nada).
+pub async fn react(
+    state: State<AppState>,
+    user: CurrentUser,
+    path: Path<(String, String)>,
+) -> Result<Json<Message>, ApiError> {
+    set_reaction(state, user, path, true).await
+}
+
+/// `DELETE /api/messages/{id}/reactions/{emoji}`: tira a própria reação.
+pub async fn unreact(
+    state: State<AppState>,
+    user: CurrentUser,
+    path: Path<(String, String)>,
+) -> Result<Json<Message>, ApiError> {
+    set_reaction(state, user, path, false).await
+}
+
+async fn set_reaction(
+    State(state): State<AppState>,
+    CurrentUser(user): CurrentUser,
+    Path((id, emoji)): Path<(String, String)>,
+    on: bool,
+) -> Result<Json<Message>, ApiError> {
+    let (channel, message) = readable_message(&state, &user, &id).await?;
+    let message = messages::react(&state.db, &user, &message, &emoji, on, now()).await?;
+    let event = ServerEvent::MessageUpdated {
+        message: message.clone(),
+        new_mentions: Vec::new(),
+    };
+    publish(&state, &channel, &event).await?;
+    Ok(Json(message))
 }

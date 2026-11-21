@@ -445,6 +445,7 @@ async fn seed(
             author,
             &format!("semear-{now}-{i}"),
             &format!("{line} ({})", i + 1),
+            None,
             at,
         )
         .await?;
@@ -473,6 +474,7 @@ async fn seed(
                 author,
                 &format!("semear-dm-{now}-{i}"),
                 &format!("{line} ({})", i + 1),
+                None,
                 now - 3600 + (3600 * i as i64) / total as i64,
             )
             .await?;

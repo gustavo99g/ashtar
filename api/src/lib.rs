@@ -151,6 +151,14 @@ pub fn app(state: AppState, policy: Arc<ClientPolicy>) -> Router {
             "/channels/{id}/messages",
             get(routes::messages::list).post(routes::messages::send),
         )
+        .route(
+            "/messages/{id}",
+            patch(routes::messages::edit).delete(routes::messages::delete),
+        )
+        .route(
+            "/messages/{id}/reactions/{emoji}",
+            put(routes::messages::react).delete(routes::messages::unreact),
+        )
         .route("/channels/{id}/read", put(routes::read::mark_read))
         .route("/channels/{id}/mute", put(routes::read::set_muted))
         .route("/read-all", post(routes::read::mark_all_read))

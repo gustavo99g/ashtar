@@ -139,6 +139,10 @@ describe("o registro da ligação no histórico", () => {
 			mentions: [],
 			created_at: 1_700_000_000,
 			kind: "call" as const,
+			edited_at: null,
+			reply_to: null,
+			reactions: [],
+			pinned_at: null,
 			call: { id: "c1", outcome, duration },
 		};
 	}

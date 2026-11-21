@@ -38,6 +38,10 @@ function message(channelId: string, mentions: string[] = [], author = "ana"): Me
 		mentions,
 		created_at: 1,
 		kind: "text",
+		edited_at: null,
+		reply_to: null,
+		reactions: [],
+		pinned_at: null,
 		call: null,
 	};
 }

@@ -53,6 +53,10 @@ function message(id: string): Message {
 		mentions: [],
 		created_at: Math.floor(Date.now() / 1000),
 		kind: "text",
+		edited_at: null,
+		reply_to: null,
+		reactions: [],
+		pinned_at: null,
 		call: null,
 	};
 }

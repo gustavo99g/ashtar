@@ -191,6 +191,8 @@ export type DisconnectReason = "moderator" | "no_access";
 
 export type DiskStatus = { free_bytes: number, total_bytes: number, };
 
+export type EditMessageRequest = { body: string, };
+
 /**
  * O corpo de toda resposta de erro.
  */
@@ -362,7 +364,23 @@ mentions: Array<string>, created_at: number, kind: MessageKind,
 /**
  * Só no `kind = "call"`: como a ligação acabou e quanto durou.
  */
-call: CallRecord | null, };
+call: CallRecord | null, 
+/**
+ * Quando o autor editou o texto pela última vez (ADR 0032).
+ */
+edited_at: number | null, 
+/**
+ * A mensagem respondida, se esta é uma resposta.
+ */
+reply_to: ReplyRef | null, 
+/**
+ * As reações, na ordem da primeira de cada emoji.
+ */
+reactions: Array<Reaction>, 
+/**
+ * Quando foi fixada, se está.
+ */
+pinned_at: number | null, };
 
 /**
  * O tipo da mensagem: o texto de alguém, ou o registro de uma ligação.
@@ -381,7 +399,11 @@ messages: Array<Message>,
  * Se há mais mensagens além desta página (antes, no `before`; depois, no
  * `after`).
  */
-has_more: boolean, };
+has_more: boolean, 
+/**
+ * Só no `around`: se há mensagens mais novas que a página.
+ */
+has_newer?: boolean, };
 
 export type MoveMemberRequest = { user_id: string, channel_id: string, };
 
@@ -439,6 +461,19 @@ status: Shown, };
 export type Preset = "person" | "group" | "custom";
 
 /**
+ * Uma reação: o emoji e quem reagiu com ele.
+ */
+export type Reaction = { 
+/**
+ * O emoji Unicode, ou `c:<id>` de um emoji do grupo.
+ */
+emoji: string, 
+/**
+ * Os ids de quem reagiu, na ordem em que reagiram.
+ */
+users: Array<string>, };
+
+/**
  * O estado de um canal ou conversa para uma pessoa.
  */
 export type ReadState = { 
@@ -463,16 +498,33 @@ export type RealtimeTicket = { ticket: string,
  */
 expires_in: number, };
 
+/**
+ * A citação da resposta: a original, ou só o id se ela foi excluída.
+ */
+export type ReplyRef = { id: string, 
+/**
+ * `None`: a original foi excluída ("Mensagem original excluída").
+ */
+author: Author | null, 
+/**
+ * O começo do texto da original, até [`REPLY_EXCERPT`] caracteres.
+ */
+excerpt: string | null, };
+
 export type SendMessageRequest = { 
 /**
  * Gerado pelo app antes de enviar (um UUID); o mesmo valor não duplica.
  */
-client_id: string, body: string, };
+client_id: string, body: string, 
+/**
+ * A mensagem respondida, do mesmo canal.
+ */
+reply_to?: string, };
 
 /**
  * Tudo o que a API manda pelo WebSocket. O `type` é o nome do evento.
  */
-export type ServerEvent = { "type": "ready", user_id: string, status: Status, online: Array<string>, busy: Array<string>, away: Array<string>, channels: Array<ChannelHead>, dms: Array<ChannelHead>, call: CallView | null, } | { "type": "pong" } | { "type": "message.created", message: Message, } | { "type": "presence.changed", user_id: string, online: boolean, status: Shown, } | { "type": "status.changed", status: Status, } | { "type": "voice.participants", channel_id: string, participants: Array<ParticipantView>, } | { "type": "voice.moved", channel_id: string, by: string, 
+export type ServerEvent = { "type": "ready", user_id: string, status: Status, online: Array<string>, busy: Array<string>, away: Array<string>, channels: Array<ChannelHead>, dms: Array<ChannelHead>, call: CallView | null, } | { "type": "pong" } | { "type": "message.created", message: Message, } | { "type": "message.updated", message: Message, new_mentions: Array<string>, } | { "type": "message.deleted", channel_id: string, message_id: string, } | { "type": "presence.changed", user_id: string, online: boolean, status: Shown, } | { "type": "status.changed", status: Status, } | { "type": "voice.participants", channel_id: string, participants: Array<ParticipantView>, } | { "type": "voice.moved", channel_id: string, by: string, 
 /**
  * O nome de quem moveu, para o aviso.
  */
