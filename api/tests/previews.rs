@@ -322,3 +322,33 @@ async fn sem_confiar_no_site_local_nada_e_buscado() {
     assert!(!changed);
     assert_eq!(hits.load(Ordering::SeqCst), 0);
 }
+
+#[tokio::test]
+async fn a_previa_sem_imagem_busca_de_novo_depois_de_meia_hora() {
+    let (trusted, hits) = site(None).await;
+    let ctx = setup(vec![trusted]).await;
+    let url = format!("http://{trusted}/page");
+    // Uma busca de 31 minutos atrás que achou o título, mas não a imagem.
+    sqlx::query(
+        "INSERT INTO link_previews (url, site, title, description, image_id, fetched_at, ok)
+         VALUES (?, NULL, 'Sem imagem', NULL, NULL, ?, 1)",
+    )
+    .bind(&url)
+    .bind(now() - 31 * 60)
+    .execute(&ctx.db)
+    .await
+    .unwrap();
+
+    let sent = json_call(
+        &ctx,
+        "POST",
+        "/api/channels/geral/messages",
+        &ctx.owner_token,
+        json!({ "client_id": "c-1", "body": url }),
+    )
+    .await;
+    let found = wait_previews(&ctx, &ctx.owner_token, sent["id"].as_str().unwrap(), 1).await;
+    assert_eq!(hits.load(Ordering::SeqCst), 1);
+    assert_eq!(found["previews"][0]["title"], "O título & tal");
+    assert!(found["previews"][0]["image_id"].is_string());
+}

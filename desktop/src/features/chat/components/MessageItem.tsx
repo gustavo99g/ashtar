@@ -67,8 +67,8 @@ export function MessageItem({
 				mentionsMe
 					? "bg-gold/10 shadow-[inset_2px_0_0_var(--color-gold)] hover:bg-gold/15"
 					: editing
-						? "bg-secondary/40"
-						: "hover:bg-secondary/40 data-[menu-open]:bg-secondary/40",
+						? "bg-secondary/80"
+						: "hover:bg-secondary/80 data-[menu-open]:bg-secondary/80",
 				highlighted && "animate-[pulse_1s_ease-in-out_2] bg-primary/15",
 				startsGroup ? "mt-3 py-1" : "py-px",
 			)}

@@ -24,7 +24,8 @@ use crate::files::{self, FileKind, FileStore, NewFile};
 
 /// Quanto tempo o cache de um endereço vale, em segundos.
 pub const CACHE_SECS: i64 = 24 * 60 * 60;
-/// Um endereço que não deu prévia tenta de novo depois disso (o site pode ter só falhado).
+/// Um endereço que não deu prévia, ou deu sem imagem, tenta de novo depois disso (o site, ou só a
+/// imagem, pode ter falhado).
 pub const FAILED_CACHE_SECS: i64 = 30 * 60;
 /// O começo da página que é lido.
 pub const HTML_MAX: usize = 512 * 1024;
@@ -263,7 +264,7 @@ async fn preview_of(
             .await?;
     if let Some(cached) = &cached
         && now - cached.fetched_at
-            < if cached.ok {
+            < if cached.ok && cached.image_id.is_some() {
                 CACHE_SECS
             } else {
                 FAILED_CACHE_SECS
