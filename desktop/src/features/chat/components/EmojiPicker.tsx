@@ -9,22 +9,26 @@ import {
 	PlaneIcon,
 	SearchIcon,
 	SmileIcon,
+	SparklesIcon,
 	TrophyIcon,
 	UtensilsIcon,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Spinner } from "@/components/ui/spinner";
+import { CustomEmoji, customId, useEmojiById, useGroupEmojis } from "@/features/emojis";
 import { cn } from "@/lib/utils";
 import {
 	type EmojiEntry,
 	type EmojiGroup,
 	loadEmojiGroups,
+	fold,
 	searchEmoji,
 } from "../model/emoji";
 import { rememberEmoji, useRecentEmoji } from "../stores/recentEmojiStore";
 
 const GROUP_ICONS: Record<string, LucideIcon> = {
 	recent: ClockIcon,
+	group: SparklesIcon,
 	"smileys-emotion": SmileIcon,
 	"people-body": HandIcon,
 	"animals-nature": LeafIcon,
@@ -43,8 +47,8 @@ function bare(unicode: string): EmojiEntry {
 
 /**
  * O seletor de emoji (o quadro "Chat — seletor de emoji"): a busca em cima, os botões das seções,
- * as seções com Recentes primeiro, e embaixo o emoji sob o mouse com o apelido. Os emojis do grupo
- * entram na Etapa 14. Escolher guarda nos Recentes e chama `onPick`.
+ * as seções com Recentes primeiro, depois os emojis do grupo (`c:<id>`, decisão 31), e embaixo o
+ * emoji sob o mouse com o apelido. Escolher guarda nos Recentes e chama `onPick`.
  */
 export function EmojiPicker({ onPick }: { onPick: (emoji: string) => void }) {
 	const [groups, setGroups] = useState<EmojiGroup[] | null>(null);
@@ -53,6 +57,24 @@ export function EmojiPicker({ onPick }: { onPick: (emoji: string) => void }) {
 	const [hovered, setHovered] = useState<EmojiEntry | null>(null);
 	const recent = useRecentEmoji((state) => state.recent);
 	const scroller = useRef<HTMLDivElement>(null);
+	const groupEmojis = useGroupEmojis();
+	const customById = useEmojiById();
+	const custom = useMemo<EmojiGroup | null>(
+		() =>
+			groupEmojis.length === 0
+				? null
+				: {
+						key: "group",
+						label: "Do grupo",
+						emojis: groupEmojis.map((emoji) => ({
+							unicode: `c:${emoji.id}`,
+							label: `:${emoji.name}:`,
+							terms: `${fold(emoji.name)} ${fold(emoji.name.replace(/_/g, " "))}`,
+							shortcode: emoji.name,
+						})),
+					},
+		[groupEmojis],
+	);
 
 	useEffect(() => {
 		let alive = true;
@@ -67,11 +89,11 @@ export function EmojiPicker({ onPick }: { onPick: (emoji: string) => void }) {
 
 	const byUnicode = useMemo(() => {
 		const map = new Map<string, EmojiEntry>();
-		for (const group of groups ?? []) {
+		for (const group of [...(custom ? [custom] : []), ...(groups ?? [])]) {
 			for (const emoji of group.emojis) map.set(emoji.unicode, emoji);
 		}
 		return map;
-	}, [groups]);
+	}, [groups, custom]);
 
 	const sections = useMemo(() => {
 		if (!groups) return [];
@@ -80,15 +102,22 @@ export function EmojiPicker({ onPick }: { onPick: (emoji: string) => void }) {
 			all.push({
 				key: "recent",
 				label: "Recentes",
-				emojis: recent.map((e) => byUnicode.get(e) ?? bare(e)),
+				emojis: recent
+					// Um do grupo que foi excluído sai dos Recentes.
+					.filter((e) => customId(e) === null || byUnicode.has(e))
+					.map((e) => byUnicode.get(e) ?? bare(e)),
 			});
 		}
+		if (custom) all.push(custom);
 		return [...all, ...groups];
-	}, [groups, recent, byUnicode]);
+	}, [groups, recent, byUnicode, custom]);
 
 	const results = useMemo(
-		() => (groups && query.trim() ? searchEmoji(groups, query) : null),
-		[groups, query],
+		() =>
+			groups && query.trim()
+				? searchEmoji([...(custom ? [custom] : []), ...groups], query)
+				: null,
+		[groups, query, custom],
 	);
 
 	function pick(emoji: EmojiEntry) {
@@ -118,7 +147,7 @@ export function EmojiPicker({ onPick }: { onPick: (emoji: string) => void }) {
 						onFocus={() => setHovered(emoji)}
 						className="flex h-9 items-center justify-center rounded-md text-[22px] hover:bg-accent focus-visible:bg-accent focus-visible:outline-none"
 					>
-						{emoji.unicode}
+						<EmojiGlyph entry={emoji} byId={customById} />
 					</button>
 				))}
 			</div>
@@ -206,11 +235,27 @@ export function EmojiPicker({ onPick }: { onPick: (emoji: string) => void }) {
 					!hovered && "invisible",
 				)}
 			>
-				<span className="text-[22px]">{hovered?.unicode}</span>
+				<span className="text-[22px]">
+					{hovered && <EmojiGlyph entry={hovered} byId={customById} />}
+				</span>
 				<span className="truncate font-mono text-foreground">
 					:{hovered?.shortcode}:
 				</span>
 			</div>
 		</div>
 	);
+}
+
+/** O emoji na grade e no rodapé: o Unicode, ou a imagem do emoji do grupo. */
+function EmojiGlyph({
+	entry,
+	byId,
+}: {
+	entry: EmojiEntry;
+	byId: ReadonlyMap<string, { name: string; file_id: string }>;
+}) {
+	const id = customId(entry.unicode);
+	const emoji = id ? byId.get(id) : undefined;
+	if (emoji) return <CustomEmoji emoji={emoji} className="size-7 align-middle" />;
+	return <>{entry.unicode}</>;
 }

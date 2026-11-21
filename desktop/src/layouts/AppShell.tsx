@@ -2,6 +2,7 @@ import { Outlet } from "react-router-dom";
 import { CallBridge } from "@/features/calls";
 import { ChannelDialogs } from "@/features/channels";
 import { DmDock, showDm } from "@/features/dms";
+import { useLoadEmojis } from "@/features/emojis";
 import { ForwardDialog } from "@/features/forward";
 import { LogsNotices } from "@/features/admin";
 import { JoinNotices } from "@/features/members";
@@ -32,6 +33,8 @@ import { ConnectionBanner } from "./ConnectionBanner";
  * posicionada: as configurações abertas não a cobrem.
  */
 export function AppShell() {
+	// Os emojis do grupo: o texto, as reações e o seletor leem do store.
+	useLoadEmojis();
 	return (
 		<div className="flex h-full flex-col">
 			<ConnectionBanner />

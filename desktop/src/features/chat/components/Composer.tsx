@@ -23,6 +23,7 @@ import {
 import { useTypingSignal } from "../hooks/useTypingSignal";
 import { AttachmentDrafts } from "./AttachmentDrafts";
 import { TypingLine } from "./TypingLine";
+import { EmojiSuggest, useEmojiSuggest } from "./EmojiSuggest";
 import { MentionPicker, useMentionPicker } from "./MentionPicker";
 
 /** Altura máxima do campo antes de rolar por dentro (umas 10 linhas). */
@@ -83,6 +84,13 @@ export function Composer({
 		myId,
 		onChange: (text) => setDraft(channelId, text),
 	});
+	const emojiSuggest = useEmojiSuggest({
+		field: ref,
+		text: draft,
+		onChange: (text) => setDraft(channelId, text),
+	});
+	/** A lista aberta agora (as duas nunca abrem juntas: uma começa com `@`, a outra com `:`). */
+	const list = picker.open ? picker : emojiSuggest.open ? emojiSuggest : null;
 
 	// O campo cresce com o texto, até o máximo.
 	useLayoutEffect(() => {
@@ -185,6 +193,7 @@ export function Composer({
 						}}
 					/>
 					<MentionPicker picker={picker} />
+					<EmojiSuggest suggest={emojiSuggest} />
 					<textarea
 						ref={ref}
 						rows={1}
@@ -192,17 +201,19 @@ export function Composer({
 						aria-label={label}
 						placeholder={label}
 						aria-autocomplete="list"
-						aria-controls={picker.open ? picker.listId : undefined}
-						aria-activedescendant={
-							picker.open ? picker.optionId(picker.active) : undefined
-						}
+						aria-controls={list?.listId}
+						aria-activedescendant={list ? list.optionId(list.active) : undefined}
 						onChange={(event) => {
 							setDraft(channelId, event.target.value);
 							if (event.target.value.trim()) signalTyping();
 							picker.track(event.target);
+							emojiSuggest.track(event.target);
 							if (problem) setProblem(null);
 						}}
-						onSelect={(event) => picker.track(event.currentTarget)}
+						onSelect={(event) => {
+							picker.track(event.currentTarget);
+							emojiSuggest.track(event.currentTarget);
+						}}
 						onPaste={(event) => {
 							const pasted = [...event.clipboardData.files];
 							if (pasted.length === 0) return;
@@ -210,7 +221,9 @@ export function Composer({
 							attach(pasted);
 						}}
 						onKeyDown={(event) => {
-							if (picker.onKeyDown(event)) return;
+							if (picker.onKeyDown(event) || emojiSuggest.onKeyDown(event)) {
+								return;
+							}
 							if (event.key === "Escape" && reply) {
 								event.preventDefault();
 								cancelReply(channelId);

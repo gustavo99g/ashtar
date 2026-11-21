@@ -5,6 +5,7 @@ import {
 	PopoverContent,
 	PopoverTrigger,
 } from "@/components/ui/popover";
+import { CustomEmoji, customId, useEmojiById } from "@/features/emojis";
 import type { Message } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { authorName } from "../model/messages";
@@ -43,14 +44,22 @@ export function Reactions({
 	actions: MessageActionsValue | null;
 }) {
 	const [pickerOpen, setPickerOpen] = useState(false);
-	if (message.reactions.length === 0) return null;
+	const byId = useEmojiById();
+	// A reação com um emoji do grupo que foi excluído some (a API também já tirou).
+	const reactions = message.reactions.filter((reaction) => {
+		const id = customId(reaction.emoji);
+		return id === null || byId.has(id);
+	});
+	if (reactions.length === 0) return null;
 	return (
 		<div className="mt-1 flex flex-wrap gap-1">
-			{message.reactions.map((reaction) => {
+			{reactions.map((reaction) => {
+				const custom = byId.get(customId(reaction.emoji) ?? "");
 				const mine =
 					actions?.myId != null && reaction.users.includes(actions.myId);
 				const count = reaction.users.length;
-				const label = `Reação ${reaction.emoji}, ${count} ${count === 1 ? "pessoa" : "pessoas"}${mine ? ", incluindo você" : ""}`;
+				const shown = custom ? `:${custom.name}:` : reaction.emoji;
+				const label = `Reação ${shown}, ${count} ${count === 1 ? "pessoa" : "pessoas"}${mine ? ", incluindo você" : ""}`;
 				return (
 					<button
 						key={reaction.emoji}
@@ -67,7 +76,11 @@ export function Reactions({
 								: "border-border bg-secondary hover:border-border-strong",
 						)}
 					>
-						<span>{reaction.emoji}</span>
+						{custom ? (
+							<CustomEmoji emoji={custom} className="size-[18px] align-middle" />
+						) : (
+							<span>{reaction.emoji}</span>
+						)}
 						<span
 							className={cn(
 								"text-xs font-semibold",

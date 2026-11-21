@@ -1,6 +1,9 @@
 import { type KeyboardEvent, type ReactNode, useState } from "react";
+import { CustomEmoji, useEmojiByName } from "@/features/emojis";
+import type { Emoji } from "@/lib/api";
 import { openLink } from "@/lib/tauri/opener";
 import { cn } from "@/lib/utils";
+import { emojiParts, onlyCustomEmojis } from "../model/customEmoji";
 import { type MdNode, parseMarkdown } from "../model/markdown";
 import type { Mentionable } from "../model/mentions";
 import { authorName, bodyParts, stampLabel } from "../model/messages";
@@ -13,6 +16,9 @@ import { authorName, bodyParts, stampLabel } from "../model/messages";
  *
  * A menção vira um selo com o nome visível de quem foi mencionado (o `@nick` escrito fica no
  * `title`). Só vira selo quem está em `mentioned`: quem a API confirmou.
+ *
+ * O `:nome:` de um emoji do grupo vira a imagem, do tamanho da letra, ou maior quando a mensagem
+ * é só emojis do grupo.
  */
 export function MessageBody({
 	body,
@@ -24,9 +30,15 @@ export function MessageBody({
 	/** Quando foi editada: aparece "(editada)" no fim, com a hora no `title`. */
 	editedAt?: number | null;
 }) {
+	const byName = useEmojiByName();
+	const context: Context = {
+		mentioned,
+		byName,
+		jumbo: onlyCustomEmojis(body, byName),
+	};
 	return (
 		<div className="text-sm leading-[1.55] break-words whitespace-pre-wrap text-secondary-foreground">
-			{renderNodes(parseMarkdown(body), mentioned)}
+			{renderNodes(parseMarkdown(body), context)}
 			{editedAt !== null && (
 				<span
 					title={`Editada ${stampLabel(editedAt).toLowerCase()}`}
@@ -39,14 +51,17 @@ export function MessageBody({
 	);
 }
 
-function renderNodes(
-	nodes: MdNode[],
-	mentioned: readonly Mentionable[],
-): ReactNode[] {
+interface Context {
+	mentioned: readonly Mentionable[];
+	byName: ReadonlyMap<string, Emoji>;
+	jumbo: boolean;
+}
+
+function renderNodes(nodes: MdNode[], context: Context): ReactNode[] {
 	return nodes.map((node, index) => {
 		switch (node.kind) {
 			case "text":
-				return <TextWithLinks key={index} text={node.text} mentioned={mentioned} />;
+				return <TextWithLinks key={index} text={node.text} context={context} />;
 			case "code":
 				return (
 					<code
@@ -68,14 +83,14 @@ function renderNodes(
 			case "bold":
 				return (
 					<strong key={index} className="font-semibold text-foreground">
-						{renderNodes(node.children, mentioned)}
+						{renderNodes(node.children, context)}
 					</strong>
 				);
 			case "italic":
-				return <em key={index}>{renderNodes(node.children, mentioned)}</em>;
+				return <em key={index}>{renderNodes(node.children, context)}</em>;
 			case "spoiler":
 				return (
-					<Spoiler key={index}>{renderNodes(node.children, mentioned)}</Spoiler>
+					<Spoiler key={index}>{renderNodes(node.children, context)}</Spoiler>
 				);
 		}
 	});
@@ -116,16 +131,22 @@ function Spoiler({ children }: { children: ReactNode }) {
 	);
 }
 
-function TextWithLinks({
-	text,
-	mentioned,
-}: {
-	text: string;
-	mentioned: readonly Mentionable[];
-}) {
-	return bodyParts(text, mentioned).map((part, index) =>
+function TextWithLinks({ text, context }: { text: string; context: Context }) {
+	return bodyParts(text, context.mentioned).map((part, index) =>
 		part.kind === "text" ? (
-			<span key={index}>{part.text}</span>
+			<span key={index}>
+				{emojiParts(part.text, context.byName).map((piece, at) =>
+					piece.kind === "text" ? (
+						piece.text
+					) : (
+						<CustomEmoji
+							key={at}
+							emoji={piece.emoji}
+							className={context.jumbo ? "size-12" : undefined}
+						/>
+					),
+				)}
+			</span>
 		) : part.kind === "mention" ? (
 			<span
 				key={index}
