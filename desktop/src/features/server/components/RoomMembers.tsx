@@ -135,7 +135,6 @@ function MemberRow({
 							className="size-3.5 text-muted-foreground"
 						/>
 					)}
-					{member.sharing && <LiveBadge />}
 					{member.deafened ? (
 						<HeadphoneOffIcon
 							aria-label="áudio desativado"
@@ -147,6 +146,7 @@ function MemberRow({
 							className="size-3.5 text-destructive-border"
 						/>
 					) : null}
+					{member.sharing && <LiveBadge />}
 				</span>
 			</PopoverTrigger>
 			<UserCardPopup
