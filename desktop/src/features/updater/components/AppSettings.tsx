@@ -24,6 +24,9 @@ import { SendLogs } from "@/features/admin";
 import { useMe } from "@/features/identity";
 import {
 	autostartEnabled,
+	hardwareAcceleration,
+	restartApp,
+	setHardwareAcceleration,
 	checkForUpdateNow,
 	openLogDir,
 	setAutostart,
@@ -172,8 +175,8 @@ function StartWithWindows() {
 					Iniciar com o Windows
 				</span>
 				<span className="text-xs leading-normal text-muted-foreground">
-					O Ashtar abre junto com o computador, direto na bandeja, e já recebe as
-					mensagens.
+					O Ashtar abre junto com o computador, direto na bandeja, e já recebe
+					as mensagens.
 				</span>
 				{failed && (
 					<span role="alert" className="text-xs text-destructive-text">
@@ -185,6 +188,80 @@ function StartWithWindows() {
 				variant="blue"
 				aria-labelledby={labelId}
 				checked={enabled ?? false}
+				disabled={enabled === null}
+				onCheckedChange={change}
+			/>
+		</div>
+	);
+}
+
+/**
+ * A chave da aceleração de hardware da janela (v0.7): desligada, o WebView2 desenha tudo na CPU.
+ * Vale ao reiniciar; o Reiniciar agora aparece quando a escolha é diferente da abertura.
+ */
+function HardwareAcceleration() {
+	const labelId = useId();
+	const [enabled, setEnabled] = useState<boolean | null>(null);
+	const [atStart, setAtStart] = useState<boolean | null>(null);
+	const [failed, setFailed] = useState(false);
+
+	useEffect(() => {
+		let alive = true;
+		hardwareAcceleration()
+			.then((value) => {
+				if (!alive) return;
+				setEnabled(value);
+				setAtStart(value);
+			})
+			.catch(() => alive && setFailed(true));
+		return () => {
+			alive = false;
+		};
+	}, []);
+
+	function change(next: boolean) {
+		const before = enabled;
+		setEnabled(next);
+		setFailed(false);
+		setHardwareAcceleration(next).catch(() => {
+			setEnabled(before);
+			setFailed(true);
+		});
+	}
+
+	const pending = enabled !== null && atStart !== null && enabled !== atStart;
+	return (
+		<div className={cn(cardClass, "justify-between gap-6 py-4 pr-[18px] pl-5")}>
+			<span className="flex min-w-0 flex-col gap-1">
+				<span
+					id={labelId}
+					className="text-sm leading-tight font-semibold text-foreground"
+				>
+					Aceleração de hardware
+				</span>
+				<span className="text-xs leading-normal text-muted-foreground">
+					Usa a placa de vídeo para desenhar o app. Desligada, tudo vai pelo
+					processador. Vale ao reiniciar o Ashtar.
+				</span>
+				{pending && (
+					<button
+						type="button"
+						onClick={() => void restartApp()}
+						className="self-start text-xs font-semibold text-link hover:underline"
+					>
+						Reiniciar agora
+					</button>
+				)}
+				{failed && (
+					<span role="alert" className="text-xs text-destructive-text">
+						Não deu para mudar a aceleração de hardware. Tente de novo.
+					</span>
+				)}
+			</span>
+			<Switch
+				variant="blue"
+				aria-labelledby={labelId}
+				checked={enabled ?? true}
 				disabled={enabled === null}
 				onCheckedChange={change}
 			/>
@@ -315,6 +392,7 @@ export function AppSettings() {
 
 			<Section title="Inicialização">
 				<StartWithWindows />
+				<HardwareAcceleration />
 			</Section>
 
 			<Section title="Problemas">
@@ -341,7 +419,11 @@ export function AppSettings() {
 					</span>
 					<div className="flex shrink-0 flex-col gap-2">
 						<SendLogs className={outlineClass} />
-						<Button variant="outline" className={outlineClass} onClick={openLogs}>
+						<Button
+							variant="outline"
+							className={outlineClass}
+							onClick={openLogs}
+						>
 							<FolderOpenIcon aria-hidden="true" className="size-[15px]" />
 							Abrir pasta
 						</Button>

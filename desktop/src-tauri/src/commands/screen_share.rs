@@ -124,7 +124,15 @@ pub struct ShareOptions {
     pub cursor: bool,
     /// O nivelador do áudio (`media/leveler.rs`), ligado por padrão no app.
     pub leveler: bool,
+    /// Codificar na placa de vídeo (v0.7). Desligado, o vídeo vai pelo plano B, na CPU, como sem
+    /// encoder de hardware. Ausente (app antigo), ligado.
+    #[serde(default = "encoder_default")]
+    pub hardware_encoder: bool,
     pub target: ShareTarget,
+}
+
+fn encoder_default() -> bool {
+    true
 }
 
 /// Um ajuste no meio (argumento de `screen_share_update`).
@@ -246,6 +254,7 @@ pub async fn screen_share_start(
             source: options.source,
             format: options.quality.format(),
             cursor: options.cursor,
+            software_encoder: !options.hardware_encoder,
         },
         audio: options.audio,
         leveler: options.leveler,
@@ -256,6 +265,7 @@ pub async fn screen_share_start(
         quality = ?options.quality,
         audio = ?options.audio,
         leveler = options.leveler,
+        hardware_encoder = options.hardware_encoder,
         "começando a transmissão"
     );
     let starting = Arc::clone(&manager);
@@ -326,7 +336,16 @@ mod tests {
         assert_eq!(options.source, SourceRef::Window(123));
         assert_eq!(options.quality, Quality::Detail);
         assert!(options.leveler);
+        // O app antigo não manda a escolha do encoder: fica a placa.
+        assert!(options.hardware_encoder);
         assert_eq!(options.target.url, "wss://sala");
+
+        let cpu = json.replace(
+            r#""leveler": true,"#,
+            r#""leveler": true, "hardwareEncoder": false,"#,
+        );
+        let options: ShareOptions = serde_json::from_str(&cpu).unwrap();
+        assert!(!options.hardware_encoder);
     }
 
     #[test]

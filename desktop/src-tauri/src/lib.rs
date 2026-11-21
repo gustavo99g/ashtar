@@ -13,6 +13,7 @@ mod changelog;
 mod commands;
 mod deep_link;
 mod error;
+mod gpu;
 mod identity;
 mod log_bundle;
 pub mod logging;
@@ -40,9 +41,12 @@ const WINDOW_STATE: StateFlags = StateFlags::SIZE
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run(log_file: logging::LateFile) {
+    let context = tauri::generate_context!();
+    // Sem aceleração de hardware (Configurações › Aplicativo), o WebView2 nasce com `--disable-gpu`.
+    let gpu_disabled = gpu::disabled_at_start(&context.config().identifier);
     std::env::set_var(
         "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS",
-        "--enable-usermedia-screen-capturing --auto-select-desktop-capture-source=Entire screen",
+        gpu::browser_args(gpu_disabled),
     );
 
     let app = tauri::Builder::default()
@@ -117,6 +121,9 @@ pub fn run(log_file: logging::LateFile) {
             commands::app::tray_share_state,
             commands::app::autostart_enabled,
             commands::app::set_autostart,
+            commands::app::hardware_acceleration,
+            commands::app::set_hardware_acceleration,
+            commands::app::restart_app,
             commands::notifications::notification_show,
             commands::notifications::notification_layout,
             commands::notifications::notification_open,
@@ -132,7 +139,7 @@ pub fn run(log_file: logging::LateFile) {
             commands::shortcuts::shortcuts_record,
             commands::shortcuts::shortcuts_input
         ])
-        .build(tauri::generate_context!())
+        .build(context)
         .expect("error while running tauri application");
 
     // Antes do `run()`: a janela nasce no começo dele, e o window-state grava o arquivo nessa hora.

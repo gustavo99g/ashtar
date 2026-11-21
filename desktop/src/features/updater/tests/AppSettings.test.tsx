@@ -6,14 +6,20 @@ import type { MeResponse } from "@/lib/api";
 import {
 	autostartEnabled,
 	checkForUpdateNow,
+	hardwareAcceleration,
 	installUpdate,
 	openLogDir,
+	restartApp,
 	setAutostart,
+	setHardwareAcceleration,
 } from "@/lib/tauri/commands";
 
 vi.mock("@/lib/tauri/commands", () => ({
 	autostartEnabled: vi.fn(),
 	setAutostart: vi.fn(),
+	hardwareAcceleration: vi.fn(() => Promise.resolve(true)),
+	setHardwareAcceleration: vi.fn(() => Promise.resolve()),
+	restartApp: vi.fn(),
 	checkForUpdateNow: vi.fn(),
 	installUpdate: vi.fn(() => new Promise(() => {})),
 	openLogDir: vi.fn(),
@@ -154,5 +160,23 @@ describe("AppSettings: iniciar com o Windows", () => {
 			"Não deu para mudar a inicialização do Windows.",
 		);
 		expect(toggle).toBeChecked();
+	});
+});
+
+describe("AppSettings: aceleração de hardware", () => {
+	it("desligar pede ao Rust e oferece reiniciar", async () => {
+		render(<AppSettings />);
+		const toggle = screen.getByRole("switch", {
+			name: "Aceleração de hardware",
+		});
+		await vi.waitFor(() => expect(toggle).toBeEnabled());
+		expect(toggle).toBeChecked();
+		await userEvent.click(toggle);
+		expect(setHardwareAcceleration).toHaveBeenCalledWith(false);
+		await userEvent.click(
+			screen.getByRole("button", { name: "Reiniciar agora" }),
+		);
+		expect(restartApp).toHaveBeenCalled();
+		expect(hardwareAcceleration).toHaveBeenCalled();
 	});
 });

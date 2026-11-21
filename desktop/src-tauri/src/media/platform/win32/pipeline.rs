@@ -569,6 +569,7 @@ mod tests {
                 bitrate_bps: 8_000_000,
             },
             cursor: true,
+            software_encoder: false,
         };
         let (handle, control, stats) =
             spawn_video(config, force_software, sink, Box::new(|_| {})).expect("o vídeo começa");

@@ -57,6 +57,21 @@ export function setAutostart(enabled: boolean) {
 	return call<void>("set_autostart", { enabled });
 }
 
+/** Se a janela usa a placa de vídeo na próxima abertura (Configurações › Aplicativo). */
+export function hardwareAcceleration() {
+	return call<boolean>("hardware_acceleration");
+}
+
+/** Liga ou desliga a aceleração de hardware da janela. Vale ao reiniciar o app. */
+export function setHardwareAcceleration(enabled: boolean) {
+	return call<void>("set_hardware_acceleration", { enabled });
+}
+
+/** Fecha e abre o app de novo. */
+export function restartApp() {
+	return call<void>("restart_app");
+}
+
 /** Os logs dos últimos 2 dias e o `info.txt` num `.zip` ("Enviar logs"), em bytes. */
 export function logsBundle() {
 	return call<ArrayBuffer>("logs_bundle");
