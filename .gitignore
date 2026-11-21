@@ -43,3 +43,6 @@ dist-ssr
 
 # O cache do tsc
 *.tsbuildinfo
+
+# Os arquivos que a API local guarda (anexos, fotos, emojis, prévias)
+files/
