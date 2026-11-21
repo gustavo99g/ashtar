@@ -88,6 +88,7 @@ describe("o digitando", () => {
 			reply_to: null,
 			reactions: [],
 			pinned_at: null,
+			attachments: [],
 			call: null,
 		} satisfies Message;
 		handleChatRealtime({ type: "message.created", message }, client, info);

@@ -39,6 +39,7 @@ function message(id: string, authorId = "ana", channelId = "geral"): Message {
 		reply_to: null,
 		reactions: [],
 		pinned_at: null,
+		attachments: [],
 		call: null,
 	};
 }

@@ -128,6 +128,7 @@ async fn seed(ctx: &Ctx, n: usize) {
             &format!("seed-{i}"),
             &format!("mensagem {i}"),
             None,
+            &[],
             now(),
         )
         .await

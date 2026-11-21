@@ -21,6 +21,7 @@ function message(id: string, authorId: string, body = "oi"): Message {
 		reply_to: null,
 		reactions: [],
 		pinned_at: null,
+		attachments: [],
 		call: null,
 	};
 }
@@ -115,6 +116,7 @@ describe("a lista de conversas", () => {
 				reply_to: null,
 				reactions: [],
 				pinned_at: null,
+				attachments: [],
 				call: { id: "c", outcome, duration: outcome === "answered" ? 60 : null },
 			});
 		expect(preview(call("missed", "ana"), "eu")).toBe("Chamada perdida");

@@ -557,3 +557,167 @@ async fn a_foto_de_perfil_troca_apaga_a_antiga_e_aparece_para_todos() {
             .is_none()
     );
 }
+
+/// O `POST` de uma mensagem em #geral: o status e o corpo.
+async fn post_message(ctx: &Ctx, token: &str, body: Value) -> (StatusCode, Value) {
+    let (status, _, bytes) = send(
+        ctx,
+        "POST",
+        "/api/channels/geral/messages",
+        Some(token),
+        Some("application/json"),
+        Body::from(body.to_string()),
+    )
+    .await;
+    (
+        status,
+        serde_json::from_slice(&bytes).unwrap_or(Value::Null),
+    )
+}
+
+#[tokio::test]
+async fn a_mensagem_leva_os_anexos_e_a_exclusao_apaga_os_arquivos() {
+    let ctx = setup().await;
+    let bia = join(&ctx, "Bia", 2, false).await;
+    let (_, thumb) = upload(
+        &ctx,
+        &bia,
+        "kind=attachment&name=mini.png",
+        "image/png",
+        PNG.to_vec(),
+    )
+    .await;
+    let (_, image) = upload(
+        &ctx,
+        &bia,
+        &format!(
+            "kind=attachment&name=foto.png&width=800&height=600&thumbnail={}",
+            thumb["id"].as_str().unwrap()
+        ),
+        "image/png",
+        PNG.to_vec(),
+    )
+    .await;
+    let (_, doc) = upload(
+        &ctx,
+        &bia,
+        "kind=attachment&name=notas.txt",
+        "text/plain",
+        b"oi".to_vec(),
+    )
+    .await;
+    let id = |f: &Value| f["id"].as_str().unwrap().to_owned();
+
+    // A miniatura não vai como anexo, nem um arquivo de outra pessoa.
+    let (status, _) = post_message(
+        &ctx,
+        &bia,
+        json!({ "client_id": "c-0", "body": "", "attachments": [id(&thumb)] }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+    let (status, _) = post_message(
+        &ctx,
+        &ctx.owner_token,
+        json!({ "client_id": "c-0", "body": "", "attachments": [id(&image)] }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+    // Sem anexo, o texto vazio continua recusado.
+    let (status, _) = post_message(&ctx, &bia, json!({ "client_id": "c-0", "body": " " })).await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+    // Mais de 10, ou repetido, não.
+    let (status, _) = post_message(
+        &ctx,
+        &bia,
+        json!({ "client_id": "c-0", "body": "", "attachments": vec![id(&doc); 11] }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+    let (status, _) = post_message(
+        &ctx,
+        &bia,
+        json!({ "client_id": "c-0", "body": "", "attachments": [id(&doc), id(&doc)] }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+
+    // Só com anexo, na ordem escolhida, com as dimensões e a miniatura.
+    let (status, message) = post_message(
+        &ctx,
+        &bia,
+        json!({ "client_id": "c-1", "body": "  ", "attachments": [id(&image), id(&doc)] }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED);
+    assert_eq!(message["body"], "");
+    let attachments = message["attachments"].as_array().unwrap();
+    assert_eq!(attachments.len(), 2);
+    assert_eq!(attachments[0]["name"], "foto.png");
+    assert_eq!(attachments[0]["width"], 800);
+    assert_eq!(attachments[0]["thumbnail_id"], thumb["id"]);
+    assert_eq!(attachments[1]["mime"], "text/plain");
+
+    // O histórico traz os anexos; a limpeza não leva nada usado.
+    let page = json_call(
+        &ctx,
+        "GET",
+        "/api/channels/geral/messages",
+        &bia,
+        Value::Null,
+    )
+    .await;
+    let last = page["messages"].as_array().unwrap().last().unwrap().clone();
+    assert_eq!(last["attachments"], message["attachments"]);
+    api::files::sweep(&ctx.db, &ctx.state.files, now() + 2 * 24 * 3600)
+        .await
+        .unwrap();
+    assert_eq!(files_on_disk(&ctx), 3);
+
+    // O mesmo arquivo não vai em outra mensagem.
+    let (status, _) = post_message(
+        &ctx,
+        &bia,
+        json!({ "client_id": "c-2", "body": "", "attachments": [id(&doc)] }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+
+    // Editar para texto vazio vale numa mensagem com anexo.
+    let edited = json_call(
+        &ctx,
+        "PATCH",
+        &format!("/api/messages/{}", id(&message)),
+        &bia,
+        json!({ "body": "legenda" }),
+    )
+    .await;
+    assert_eq!(edited["body"], "legenda");
+    let edited = json_call(
+        &ctx,
+        "PATCH",
+        &format!("/api/messages/{}", id(&message)),
+        &bia,
+        json!({ "body": "" }),
+    )
+    .await;
+    assert_eq!(edited["body"], "");
+
+    // Excluir apaga os três: o original, a miniatura e o documento.
+    let (status, _, _) = send(
+        &ctx,
+        "DELETE",
+        &format!("/api/messages/{}", id(&message)),
+        Some(&bia),
+        None,
+        Body::empty(),
+    )
+    .await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+    assert_eq!(files_on_disk(&ctx), 0);
+    let left: i64 = sqlx::query_scalar("SELECT count(*) FROM files")
+        .fetch_one(&ctx.db)
+        .await
+        .unwrap();
+    assert_eq!(left, 0);
+}

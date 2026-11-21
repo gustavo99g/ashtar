@@ -35,6 +35,7 @@ function message(id: string, authorId = "ana"): Message {
 		reply_to: null,
 		reactions: [],
 		pinned_at: null,
+		attachments: [],
 		call: null,
 	};
 }

@@ -48,6 +48,7 @@ function message(
 		reply_to: null,
 		reactions: [],
 		pinned_at: null,
+		attachments: [],
 		call: null,
 	};
 }
@@ -107,6 +108,7 @@ describe("as não lidas", () => {
 			reply_to: null,
 			reactions: [],
 			pinned_at: null,
+			attachments: [],
 			call: { id: `c-${id}`, outcome, duration: null },
 		});
 		created(record("m7", "declined"));

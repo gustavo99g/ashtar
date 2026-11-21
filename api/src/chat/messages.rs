@@ -9,6 +9,7 @@ use super::access::Readable;
 use super::{mentions, read};
 use crate::calls::{CallOutcome, CallRecord};
 use crate::error::{ApiError, unique_violation};
+use crate::files::{self, FileView};
 use crate::identity::User;
 use crate::limiter::SendLimiter;
 
@@ -85,7 +86,12 @@ pub struct Message {
     pub reactions: Vec<Reaction>,
     /// Quando foi fixada, se está.
     pub pinned_at: Option<i64>,
+    /// Os anexos, na ordem em que foram escolhidos (até [`ATTACHMENTS_MAX`]).
+    pub attachments: Vec<FileView>,
 }
+
+/// Quantos arquivos uma mensagem leva.
+pub const ATTACHMENTS_MAX: usize = 10;
 
 /// A mensagem que o envio responde, e se a resposta menciona quem a escreveu
 /// (o `@` ligado, o padrão do app).
@@ -206,6 +212,7 @@ impl From<MessageRow> for Message {
             }),
             reactions: Vec::new(),
             pinned_at: row.pinned_at,
+            attachments: Vec::new(),
         }
     }
 }
@@ -260,7 +267,16 @@ macro_rules! select_message {
 /// Regras: de 1 a 2.000 caracteres depois do `trim`; quebras de linha valem,
 /// mas no máximo 5 seguidas.
 pub fn validate_body(input: &str) -> Result<String, ApiError> {
+    validate_text(input, false)
+}
+
+/// Como [`validate_body`], mas o texto vazio vale se `has_files` (a mensagem só
+/// com anexo, ADR 0032).
+pub fn validate_text(input: &str, has_files: bool) -> Result<String, ApiError> {
     let body = input.trim();
+    if body.is_empty() && has_files {
+        return Ok(String::new());
+    }
     if body.is_empty() {
         return Err(ApiError::InvalidRequest("A mensagem está vazia.".into()));
     }
@@ -308,15 +324,17 @@ pub async fn create(
     client_id: &str,
     body: &str,
     reply: Option<ReplyTo<'_>>,
+    attachments: &[String],
     now: i64,
 ) -> Result<(Message, bool), ApiError> {
     validate_client_id(client_id)?;
-    let body = validate_body(body)?;
+    let body = validate_text(body, !attachments.is_empty())?;
     let channel_id = channel.id();
 
     if let Some(existing) = find_existing(db, channel_id, author, client_id).await? {
         return Ok((existing, false));
     }
+    check_attachments(db, author, attachments).await?;
     // Só se responde a uma mensagem que existe, no mesmo canal.
     let replied_author: Option<String> = match &reply {
         None => None,
@@ -380,9 +398,56 @@ pub async fn create(
             .execute(&mut *tx)
             .await?;
     }
+    for (position, file_id) in attachments.iter().enumerate() {
+        sqlx::query("INSERT INTO message_files (message_id, file_id, position) VALUES (?, ?, ?)")
+            .bind(&id)
+            .bind(file_id)
+            .bind(position as i64)
+            .execute(&mut *tx)
+            .await?;
+    }
+    files::mark_used(&mut tx, attachments, now).await?;
     read::advance(&mut tx, &author.id, channel_id, &id).await?;
     tx.commit().await?;
     Ok((get(db, &id).await?, true))
+}
+
+/// Os anexos de um envio: até [`ATTACHMENTS_MAX`], sem repetir, cada um um
+/// arquivo `attachment` que a própria pessoa enviou e que nenhuma mensagem usa.
+async fn check_attachments(
+    db: &SqlitePool,
+    author: &User,
+    attachments: &[String],
+) -> Result<(), ApiError> {
+    if attachments.len() > ATTACHMENTS_MAX {
+        return Err(ApiError::InvalidRequest(
+            "Uma mensagem leva até 10 arquivos.".into(),
+        ));
+    }
+    for (index, id) in attachments.iter().enumerate() {
+        if attachments[..index].contains(id) {
+            return Err(ApiError::InvalidRequest(
+                "O mesmo arquivo foi anexado duas vezes.".into(),
+            ));
+        }
+        let usable: bool = sqlx::query_scalar(
+            "SELECT EXISTS (
+                SELECT 1 FROM files f
+                WHERE f.id = ? AND f.uploader_id = ? AND f.kind = 'attachment'
+                  AND NOT EXISTS (SELECT 1 FROM message_files mf WHERE mf.file_id = f.id)
+                  AND NOT EXISTS (SELECT 1 FROM files p WHERE p.thumbnail_id = f.id))",
+        )
+        .bind(id)
+        .bind(&author.id)
+        .fetch_one(db)
+        .await?;
+        if !usable {
+            return Err(ApiError::InvalidRequest(
+                "Um dos anexos não existe mais. Anexe de novo.".into(),
+            ));
+        }
+    }
+    Ok(())
 }
 
 /// A mensagem que `author` já gravou com esse `client_id`. Se ela está em
@@ -414,7 +479,7 @@ pub(crate) async fn get(db: &SqlitePool, id: &str) -> Result<Message, ApiError> 
         .fetch_one(db)
         .await?;
     let mut messages = vec![Message::from(row)];
-    attach_reactions(db, &mut messages).await?;
+    attach_extras(db, &mut messages).await?;
     Ok(messages.remove(0))
 }
 
@@ -426,8 +491,46 @@ pub async fn find(db: &SqlitePool, id: &str) -> Result<Option<Message>, ApiError
         .await?;
     let Some(row) = row else { return Ok(None) };
     let mut messages = vec![Message::from(row)];
-    attach_reactions(db, &mut messages).await?;
+    attach_extras(db, &mut messages).await?;
     Ok(messages.pop())
+}
+
+/// Preenche as reações e os anexos de `messages`.
+async fn attach_extras(db: &SqlitePool, messages: &mut [Message]) -> Result<(), ApiError> {
+    attach_reactions(db, messages).await?;
+    attach_files(db, messages).await
+}
+
+/// Preenche os anexos de `messages` com uma consulta só.
+async fn attach_files(db: &SqlitePool, messages: &mut [Message]) -> Result<(), ApiError> {
+    if messages.is_empty() {
+        return Ok(());
+    }
+    let mut query = sqlx::QueryBuilder::new(
+        "SELECT mf.message_id, f.id, f.kind, f.name, f.mime, f.size, f.width, f.height,
+                f.duration_ms, f.thumbnail_id
+         FROM message_files mf JOIN files f ON f.id = mf.file_id
+         WHERE mf.message_id IN (",
+    );
+    let mut ids = query.separated(", ");
+    for message in messages.iter() {
+        ids.push_bind(&message.id);
+    }
+    query.push(") ORDER BY mf.position");
+    let rows: Vec<AttachmentRow> = query.build_query_as().fetch_all(db).await?;
+    for row in rows {
+        if let Some(message) = messages.iter_mut().find(|m| m.id == row.message_id) {
+            message.attachments.push(row.file);
+        }
+    }
+    Ok(())
+}
+
+#[derive(FromRow)]
+struct AttachmentRow {
+    message_id: String,
+    #[sqlx(flatten)]
+    file: FileView,
 }
 
 /// Preenche as reações de `messages` com uma consulta só.
@@ -501,7 +604,7 @@ pub async fn last(db: &SqlitePool, channel_id: &str) -> Result<Option<Message>, 
     .fetch_optional(db)
     .await?;
     let mut messages: Vec<Message> = row.map(Message::from).into_iter().collect();
-    attach_reactions(db, &mut messages).await?;
+    attach_extras(db, &mut messages).await?;
     Ok(messages.pop())
 }
 
@@ -584,7 +687,7 @@ pub async fn page(
         rows.reverse();
     }
     let mut messages: Vec<Message> = rows.into_iter().map(Message::from).collect();
-    attach_reactions(db, &mut messages).await?;
+    attach_extras(db, &mut messages).await?;
     Ok(MessagePage {
         messages,
         has_more,
@@ -634,7 +737,7 @@ async fn around(
     let has_newer = after.len() as i64 > after_count + 1;
     after.truncate((after_count + 1) as usize);
     let mut messages: Vec<Message> = before.into_iter().chain(after).map(Message::from).collect();
-    attach_reactions(db, &mut messages).await?;
+    attach_extras(db, &mut messages).await?;
     Ok(MessagePage {
         messages,
         has_more,
@@ -664,7 +767,7 @@ pub async fn edit(
     if message.author.id != author.id || message.kind != MessageKind::Text {
         return Err(ApiError::Forbidden);
     }
-    let body = validate_body(body)?;
+    let body = validate_text(body, !message.attachments.is_empty())?;
     let mentioned = mentions::resolve(db, channel, author, &body).await?;
     let new_mentions: Vec<String> = mentioned
         .iter()
@@ -706,19 +809,28 @@ pub fn can_delete(channel: &Readable, user: &User, message: &Message) -> bool {
     message.author.id == user.id || (user.is_owner && matches!(channel, Readable::Text(_)))
 }
 
-/// Exclui a mensagem `message_id` de verdade, com as menções e as reações. As
-/// respostas a ela ficam, com a citação "Mensagem original excluída".
-pub async fn delete(db: &SqlitePool, message_id: &str) -> Result<(), ApiError> {
+/// Exclui a mensagem `message_id` de verdade, com as menções, as reações e os
+/// arquivos que só ela usava. As respostas a ela ficam, com a citação "Mensagem
+/// original excluída". Devolve os ids dos arquivos que saíram, para quem chama
+/// apagar os bytes.
+pub async fn delete(db: &SqlitePool, message_id: &str) -> Result<Vec<String>, ApiError> {
     let mut tx = db.begin_with("BEGIN IMMEDIATE").await?;
+    let used: Vec<String> =
+        sqlx::query_scalar("SELECT file_id FROM message_files WHERE message_id = ?")
+            .bind(message_id)
+            .fetch_all(&mut *tx)
+            .await?;
     for sql in [
         "DELETE FROM mentions WHERE message_id = ?",
         "DELETE FROM reactions WHERE message_id = ?",
+        "DELETE FROM message_files WHERE message_id = ?",
         "DELETE FROM messages WHERE id = ?",
     ] {
         sqlx::query(sql).bind(message_id).execute(&mut *tx).await?;
     }
+    let released = files::release(&mut tx, &used).await?;
     tx.commit().await?;
-    Ok(())
+    Ok(released)
 }
 
 /// Confere um emoji de reação: um emoji Unicode (sem letras nem números ASCII, até

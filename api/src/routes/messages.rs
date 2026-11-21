@@ -85,6 +85,11 @@ pub struct SendMessageRequest {
     #[serde(default)]
     #[ts(optional)]
     pub reply_mention: Option<bool>,
+    /// Os ids dos arquivos já enviados (`POST /api/files`), até 10. Com anexo, o texto pode
+    /// ser vazio.
+    #[serde(default)]
+    #[ts(optional)]
+    pub attachments: Option<Vec<String>>,
 }
 
 /// `POST /api/channels/{id}/messages`: 201 com a mensagem nova, ou 200 com a
@@ -116,6 +121,7 @@ pub async fn send(
             id,
             mention: request.reply_mention.unwrap_or(true),
         }),
+        request.attachments.as_deref().unwrap_or_default(),
         now(),
     )
     .await?;
@@ -203,7 +209,12 @@ pub async fn delete(
     if !messages::can_delete(&channel, &user, &message) {
         return Err(ApiError::Forbidden);
     }
-    messages::delete(&state.db, &message.id).await?;
+    let released = messages::delete(&state.db, &message.id).await?;
+    for id in released {
+        if let Err(error) = state.files.delete(&id).await {
+            eprintln!("arquivo {id}: não deu para apagar do disco: {error}");
+        }
+    }
     let event = ServerEvent::MessageDeleted {
         channel_id: message.channel_id,
         message_id: message.id,

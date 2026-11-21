@@ -51,7 +51,7 @@ pub const UNUSED_TTL_SECS: i64 = 24 * 60 * 60;
 pub const DISK_ALERT_RATIO: f64 = 0.8;
 
 /// O que o app sabe de um arquivo.
-#[derive(Debug, Clone, Serialize, TS, sqlx::FromRow)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS, sqlx::FromRow)]
 #[ts(export, export_to = "index.ts")]
 pub struct FileView {
     pub id: String,
@@ -272,6 +272,55 @@ pub async fn can_read(db: &SqlitePool, user: &User, file: &FileRecord) -> Result
         }
     }
     Ok(false)
+}
+
+/// Solta os arquivos `ids`, que uma mensagem excluída usava: os que nenhuma outra mensagem usa
+/// saem da tabela, com a miniatura. Devolve os ids que saíram, para quem chama apagar os bytes
+/// depois da transação.
+pub async fn release(
+    tx: &mut sqlx::SqliteConnection,
+    ids: &[String],
+) -> Result<Vec<String>, ApiError> {
+    let mut gone = Vec::new();
+    for id in ids {
+        let still_used: bool =
+            sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM message_files WHERE file_id = ?)")
+                .bind(id)
+                .fetch_one(&mut *tx)
+                .await?;
+        if still_used {
+            continue;
+        }
+        let thumbnail: Option<String> =
+            sqlx::query_scalar("SELECT thumbnail_id FROM files WHERE id = ?")
+                .bind(id)
+                .fetch_optional(&mut *tx)
+                .await?
+                .flatten();
+        sqlx::query("DELETE FROM files WHERE id = ?")
+            .bind(id)
+            .execute(&mut *tx)
+            .await?;
+        gone.push(id.clone());
+        if let Some(thumbnail) = thumbnail {
+            let shared: bool = sqlx::query_scalar(
+                "SELECT EXISTS (SELECT 1 FROM files WHERE thumbnail_id = ?)
+                     OR EXISTS (SELECT 1 FROM message_files WHERE file_id = ?)",
+            )
+            .bind(&thumbnail)
+            .bind(&thumbnail)
+            .fetch_one(&mut *tx)
+            .await?;
+            if !shared {
+                sqlx::query("DELETE FROM files WHERE id = ?")
+                    .bind(&thumbnail)
+                    .execute(&mut *tx)
+                    .await?;
+                gone.push(thumbnail);
+            }
+        }
+    }
+    Ok(gone)
 }
 
 /// Os arquivos enviados há mais de 24 horas e nunca usados: sai a linha, e quem chama apaga os

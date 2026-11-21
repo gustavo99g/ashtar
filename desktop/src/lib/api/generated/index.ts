@@ -398,7 +398,11 @@ reactions: Array<Reaction>,
 /**
  * Quando foi fixada, se está.
  */
-pinned_at: number | null, };
+pinned_at: number | null, 
+/**
+ * Os anexos, na ordem em que foram escolhidos (até [`ATTACHMENTS_MAX`]).
+ */
+attachments: Array<FileView>, };
 
 /**
  * O tipo da mensagem: o texto de alguém, ou o registro de uma ligação.
@@ -549,7 +553,12 @@ reply_to?: string,
 /**
  * Se a resposta menciona quem escreveu a original (o `@` ligado). Padrão: sim.
  */
-reply_mention?: boolean, };
+reply_mention?: boolean, 
+/**
+ * Os ids dos arquivos já enviados (`POST /api/files`), até 10. Com anexo, o texto pode
+ * ser vazio.
+ */
+attachments?: Array<string>, };
 
 /**
  * Tudo o que a API manda pelo WebSocket. O `type` é o nome do evento.
