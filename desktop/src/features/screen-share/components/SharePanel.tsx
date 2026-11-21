@@ -297,7 +297,7 @@ function StatCards({
 				{mbps(stats.bitrateKbps)} Mbps
 			</Card>
 			<Card label="Atraso" detail="da captura ao envio">
-				{stats.latencyMs} ms
+				{Math.round(stats.latencyMs)} ms
 			</Card>
 			<Card label="Perdidos" detail="quadros nesta transmissão">
 				{stats.dropped}
