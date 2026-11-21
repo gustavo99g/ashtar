@@ -1,0 +1,52 @@
+name: CI App
+
+# O frontend do desktop (lint, temas, typecheck, build e testes) roda no Ubuntu, onde o minuto
+# custa metade do Windows. Roda em todo push de PR que toca o desktop, inclusive em rascunho.
+on:
+  pull_request:
+    branches: [dev, main]
+    paths:
+      - "desktop/**"
+      - "!desktop/src-tauri/**"
+      - ".github/workflows/ci-app.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ci-app-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend:
+    name: Frontend
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: desktop/package.json
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: desktop/pnpm-lock.yaml
+
+      - name: Dependências
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Contrato dos temas
+        run: pnpm check:themes
+
+      - name: Typecheck e build
+        run: pnpm build
+
+      - name: Testes
+        run: pnpm test

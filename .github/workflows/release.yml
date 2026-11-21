@@ -70,7 +70,9 @@ jobs:
     name: Publica no beta
     needs: versao
     if: github.ref != 'refs/heads/main' && needs.versao.outputs.publicada == 'false'
-    runs-on: windows-latest
+    # Runner próprio se a variável WINDOWS_RUNNER existir (veja ci-windows.yml).
+    runs-on: ${{ fromJSON(vars.WINDOWS_RUNNER || '"windows-latest"') }}
+    timeout-minutes: 90
     env:
       VERSION: ${{ needs.versao.outputs.version }}
     steps:
@@ -91,7 +93,10 @@ jobs:
             echo 'FIM_DAS_NOTAS'
           } >> "$GITHUB_OUTPUT"
 
+      # O frontend já foi checado no PR (CI App, no Ubuntu); aqui só o Rust, no Windows.
       - uses: ./.github/actions/desktop-checks
+        with:
+          frontend: "false"
 
       - name: Compila, assina e publica como pre-release
         uses: tauri-apps/tauri-action@v0
