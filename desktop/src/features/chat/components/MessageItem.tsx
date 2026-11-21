@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import type { Mentionable } from "../model/mentions";
 import { authorName, stampLabel, timeLabel } from "../model/messages";
 import type { PendingMessage } from "../stores/outboxStore";
+import { Attachments, PendingFiles } from "./Attachments";
 import { MessageMenuItems, MessageToolbar } from "./MessageActions";
 import { MessageBody } from "./MessageBody";
 import { MessageEditor } from "./MessageEditor";
@@ -122,6 +123,7 @@ export function MessageItem({
 							editedAt={message.edited_at}
 						/>
 					)}
+					<Attachments files={message.attachments ?? []} />
 					<Reactions message={message} actions={actions} />
 				</div>
 			</div>
@@ -176,6 +178,7 @@ export function PendingItem({
 				)}
 			>
 				<MessageBody body={message.body} />
+				<PendingFiles files={message.files ?? []} />
 				{message.status === "failed" && (
 					<p role="alert" className="text-xs text-destructive-text">
 						Não enviada: {message.error}{" "}

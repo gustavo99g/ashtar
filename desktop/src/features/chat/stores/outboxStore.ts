@@ -6,6 +6,7 @@
  * também (`clearOutbox`, chamado pelo `App`), para nada ser mandado com a sessão seguinte.
  */
 import { create } from "zustand";
+import { clearDraftFiles } from "./attachmentStore";
 
 /** A mensagem que o envio responde, e se a resposta menciona quem a escreveu (o `@` ligado). */
 export interface PendingReply {
@@ -13,11 +14,23 @@ export interface PendingReply {
 	mention: boolean;
 }
 
+/** Um anexo saindo: o arquivo daqui, quanto já subiu e, depois de subir, o id na API. */
+export interface PendingFile {
+	key: string;
+	file: File;
+	/** De 0 a 1. */
+	progress: number;
+	/** O id na API, depois de subir: o "Tentar de novo" não sobe de novo. */
+	uploaded?: string;
+}
+
 export interface PendingMessage {
 	client_id: string;
 	channel_id: string;
 	body: string;
 	reply?: PendingReply;
+	/** Os anexos, que sobem antes de a mensagem ir. */
+	files?: PendingFile[];
 	/** Em segundos, como o `created_at` da API. */
 	created_at: number;
 	status: "sending" | "failed";
@@ -61,6 +74,27 @@ export function removePending(clientId: string): void {
 /** Esquece tudo o que estava saindo. */
 export function clearOutbox(): void {
 	useOutbox.setState({ pending: [] });
+	clearDraftFiles();
+}
+
+/** Muda o anexo `key` da mensagem `clientId`. */
+export function updatePendingFile(
+	clientId: string,
+	key: string,
+	change: Partial<PendingFile>,
+): void {
+	useOutbox.setState((state) => ({
+		pending: state.pending.map((message) =>
+			message.client_id === clientId && message.files
+				? {
+						...message,
+						files: message.files.map((file) =>
+							file.key === key ? { ...file, ...change } : file,
+						),
+					}
+				: message,
+		),
+	}));
 }
 
 export function findPending(clientId: string): PendingMessage | undefined {

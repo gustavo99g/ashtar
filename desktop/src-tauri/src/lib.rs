@@ -123,6 +123,7 @@ pub fn run(log_file: logging::LateFile) {
             commands::notifications::notification_ring,
             commands::notifications::notification_answer,
             commands::notifications::set_unread_badge,
+            commands::files::file_download,
             commands::identity::login,
             commands::identity::redeem,
             commands::identity::account_marker,

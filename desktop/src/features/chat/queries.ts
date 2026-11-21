@@ -28,19 +28,24 @@ import {
 	listMessages,
 	listPeople,
 	type Message,
-	type Person,
 	type MessagePage,
+	type Person,
 	sendMessage,
 	setReaction,
+	uploadFile,
 } from "@/lib/api";
 import { useRealtimeOpen } from "@/lib/realtime";
 import { useAppVisible } from "@/lib/visibility";
+import { makeThumbnail } from "./model/attachments";
+import type { DraftFile } from "./stores/attachmentStore";
 import {
 	addPending,
 	findPending,
+	type PendingFile,
 	type PendingReply,
 	removePending,
 	updatePending,
+	updatePendingFile,
 } from "./stores/outboxStore";
 
 export const chatKeys = {
@@ -332,6 +337,36 @@ function failureMessage(error: unknown): string {
 		: "Não foi possível mandar a mensagem.";
 }
 
+/**
+ * Sobe um anexo da caixa de saída: a miniatura antes (se é uma imagem que abre aqui), depois o
+ * arquivo, com as dimensões. Devolve o id e guarda na mensagem, para o "Tentar de novo" não subir
+ * de novo.
+ */
+async function uploadAttachment(
+	clientId: string,
+	pending: PendingFile,
+): Promise<string> {
+	const { file, key } = pending;
+	const thumbnail = await makeThumbnail(file);
+	const thumb = thumbnail
+		? await uploadFile(thumbnail.blob, {
+				kind: "attachment",
+				name: "miniatura.webp",
+			})
+		: null;
+	const uploaded = await uploadFile(file, {
+		kind: "attachment",
+		name: file.name || "arquivo",
+		width: thumbnail?.width,
+		height: thumbnail?.height,
+		thumbnail: thumb?.id,
+		onProgress: (progress) =>
+			updatePendingFile(clientId, key, { progress }),
+	});
+	updatePendingFile(clientId, key, { progress: 1, uploaded: uploaded.id });
+	return uploaded.id;
+}
+
 /** Manda (ou manda de novo) uma mensagem que já está na caixa de saída. */
 async function deliver(
 	queryClient: QueryClient,
@@ -341,11 +376,16 @@ async function deliver(
 	if (!pending) return;
 	updatePending(clientId, { status: "sending", error: undefined });
 	try {
+		const attachments: string[] = [];
+		for (const file of pending.files ?? []) {
+			attachments.push(file.uploaded ?? (await uploadAttachment(clientId, file)));
+		}
 		const message = await sendMessage(pending.channel_id, {
 			client_id: clientId,
 			body: pending.body,
 			reply_to: pending.reply?.id,
 			reply_mention: pending.reply?.mention,
+			...(attachments.length > 0 ? { attachments } : {}),
 		});
 		appendMessages(queryClient, pending.channel_id, [message]);
 		removePending(clientId);
@@ -367,13 +407,27 @@ async function deliver(
 export function useSendMessage() {
 	const queryClient = useQueryClient();
 	const send = useCallback(
-		(channelId: string, body: string, reply?: PendingReply) => {
+		(
+			channelId: string,
+			body: string,
+			reply?: PendingReply,
+			files: readonly DraftFile[] = [],
+		) => {
 			const clientId = newClientId();
 			addPending({
 				client_id: clientId,
 				channel_id: channelId,
 				body: body.trim(),
 				reply,
+				...(files.length > 0
+					? {
+							files: files.map(({ key, file }) => ({
+								key,
+								file,
+								progress: 0,
+							})),
+						}
+					: {}),
 				created_at: Math.floor(Date.now() / 1000),
 				status: "sending",
 			});

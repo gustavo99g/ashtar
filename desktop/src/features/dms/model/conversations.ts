@@ -2,6 +2,7 @@
  * O que a aba Conversas mostra de cada conversa privada: a ordem, a busca, o começo da última
  * mensagem e há quanto tempo foi. Tudo função pura, com os testes ao lado.
  */
+import { attachmentsLabel } from "@/features/chat";
 import type { CallOutcome, Conversation, Person, Shown } from "@/lib/api";
 
 /** O nome que aparece: o nome visível ou, sem ele, o nick. */
@@ -82,7 +83,9 @@ export function preview(conversation: Conversation, myId: string | null) {
 	if (last.kind === "call" && last.call) {
 		return callPreview(last.call.outcome, last.author.id === myId);
 	}
-	const line = last.body.replace(/\s+/g, " ").trim();
+	const line =
+		last.body.replace(/\s+/g, " ").trim() ||
+		attachmentsLabel(last.attachments ?? []);
 	return last.author.id === myId ? `Você: ${line}` : line;
 }
 

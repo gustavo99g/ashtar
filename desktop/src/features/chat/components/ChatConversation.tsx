@@ -1,5 +1,11 @@
 import { ArrowRightIcon, ClockIcon } from "lucide-react";
-import { type ReactNode, useCallback, useMemo, useState } from "react";
+import {
+	type DragEvent,
+	type ReactNode,
+	useCallback,
+	useMemo,
+	useState,
+} from "react";
 import { toast } from "@/components/ui/toast";
 import {
 	ErrorState,
@@ -18,6 +24,7 @@ import {
 	usePeople,
 	useSendMessage,
 } from "../queries";
+import { addDraftFiles, type DraftFile } from "../stores/attachmentStore";
 import { usePending } from "../stores/outboxStore";
 import { cancelReply, startReply, useReplyStore } from "../stores/replyStore";
 import { Composer } from "./Composer";
@@ -168,20 +175,36 @@ export function ChatConversation({
 		return true;
 	}, [query.messages, myId]);
 
-	function sendHere(body: string) {
+	function sendHere(body: string, files: DraftFile[]) {
 		const reply = useReplyStore.getState().byChannel[channelId];
 		send(
 			channelId,
 			body,
 			reply && { id: reply.message.id, mention: reply.mention },
+			files,
 		);
 		cancelReply(channelId);
 		// Quem manda quer ver o que mandou: volta para o presente.
 		setAnchor(null);
 	}
 
+	/** Arrastar arquivos para a conversa anexa, como o botão +. */
+	function acceptDrag(event: DragEvent<HTMLDivElement>) {
+		if (readOnly || !event.dataTransfer.types.includes("Files")) return;
+		event.preventDefault();
+		event.dataTransfer.dropEffect = "copy";
+	}
+
+	function drop(event: DragEvent<HTMLDivElement>) {
+		if (readOnly || event.dataTransfer.files.length === 0) return;
+		event.preventDefault();
+		const problem = addDraftFiles(channelId, [...event.dataTransfer.files]);
+		if (problem) toast.add({ title: problem });
+	}
+
 	return (
 		<MessageActionsContext.Provider value={actions}>
+			<div className="contents" onDragOver={acceptDrag} onDrop={drop}>
 			{anchor !== null && around.messages ? (
 				<MessageList
 					key={`around:${anchor}`}
@@ -280,6 +303,7 @@ export function ChatConversation({
 					onEditLast={editLast}
 				/>
 			)}
+			</div>
 			<DeleteMessageDialog
 				message={deleting}
 				onConfirm={remove}
