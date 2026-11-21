@@ -19,6 +19,8 @@ export async function downloadFile(
 	id: string,
 	name: string,
 	onProgress?: (progress: DownloadProgress) => void,
+	/** `logs`: os logs que alguém mandou (`/api/logs/{id}`), no Painel. */
+	source: "files" | "logs" = "files",
 ): Promise<string> {
 	const channel = new Channel<DownloadProgress>();
 	channel.onmessage = (progress) => onProgress?.(progress);
@@ -27,6 +29,7 @@ export async function downloadFile(
 			id,
 			name,
 			token: sessionToken() ?? "",
+			source,
 			onProgress: channel,
 		});
 	} catch (rejection) {

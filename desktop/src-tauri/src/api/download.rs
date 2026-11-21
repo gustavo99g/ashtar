@@ -78,9 +78,19 @@ pub fn free_path(dir: &Path, name: &str) -> PathBuf {
         .expect("sempre há um número livre")
 }
 
+/// De onde vem o que se baixa: um arquivo do chat (`/api/files/{id}`) ou os logs que alguém
+/// mandou (`/api/logs/{id}`, no Painel).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Source {
+    Files,
+    Logs,
+}
+
 /// Baixa o arquivo `id` para `dir` com o nome `name` (ou o próximo livre) e devolve o caminho.
 /// Enquanto baixa, grava em `<caminho>.part`; só no fim ganha o nome certo.
 pub async fn download(
+    source: Source,
     id: &str,
     name: &str,
     token: &str,
@@ -93,7 +103,10 @@ pub async fn download(
     }
     let base =
         config::api_url().ok_or_else(|| ApiError::app("VITE_API_URL não está configurada."))?;
-    let path = format!("/api/files/{id}");
+    let path = match source {
+        Source::Files => format!("/api/files/{id}"),
+        Source::Logs => format!("/api/logs/{id}"),
+    };
     let response = client()?
         .get(format!("{base}{path}"))
         .header("X-App-Version", version)

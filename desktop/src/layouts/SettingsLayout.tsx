@@ -60,9 +60,10 @@ export function SettingsLayout() {
 	const showPanel = useMe().data?.can_view_panel === true;
 	const channel = useMe().data?.update_channel;
 	const showServer = useMe().data?.can_manage_channels === true;
-	// Os logs e o estado do servidor são só do dono, e não viram permissão (decisão 17).
+	// O estado do servidor é só do dono (decisão 17); os logs, de quem tem "Ver logs" (v0.7).
 	const isOwner = useMe().data?.user.is_owner === true;
 	const showEmojis = useMe().data?.can_manage_emojis === true;
+	const showLogs = useMe().data?.can_view_logs === true;
 
 	useEffect(() => {
 		const onKeyDown = (event: KeyboardEvent) => {
@@ -99,7 +100,7 @@ export function SettingsLayout() {
 						</MenuGroup>
 					</>
 				)}
-				{(showPanel || showEmojis) && (
+				{(showPanel || showEmojis || showLogs) && (
 					<>
 						<MenuSeparator />
 						<MenuGroup
@@ -119,11 +120,11 @@ export function SettingsLayout() {
 							{showEmojis && (
 								<MenuItem to={paths.settings.emojis}>Emojis</MenuItem>
 							)}
+							{showLogs && (
+								<MenuItem to={paths.settings.logs}>Logs</MenuItem>
+							)}
 							{isOwner && (
-								<>
-									<MenuItem to={paths.settings.logs}>Logs</MenuItem>
-									<MenuItem to={paths.settings.server}>Servidor</MenuItem>
-								</>
+								<MenuItem to={paths.settings.server}>Servidor</MenuItem>
 							)}
 						</MenuGroup>
 					</>

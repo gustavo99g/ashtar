@@ -103,7 +103,7 @@ function renderChat(channelId = "geral", { manage = false } = {}) {
 		can_create_invite: true,
 		can_view_panel: true,
 		can_manage_channels: manage,
-		can_move_members: manage, can_manage_emojis: false,
+		can_move_members: manage, can_manage_emojis: false, can_view_logs: false,
 	});
 	render(
 		<QueryClientProvider client={client}>

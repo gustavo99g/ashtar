@@ -376,9 +376,27 @@ latency_ms: number | null,
 error: string | null, };
 
 /**
+ * Um arquivo de dentro do `.zip` de um envio.
+ */
+export type LogEntry = { name: string, 
+/**
+ * O tamanho descompactado, em bytes.
+ */
+size: number, };
+
+/**
  * Um envio, como o Painel mostra.
  */
 export type LogReportView = { id: string, user_id: string, nick: string, display_name: string | null, created_at: number, app_version: string, note: string | null, size: number, };
+
+/**
+ * O texto de um arquivo do `.zip`, para ler no app.
+ */
+export type LogText = { name: string, text: string, 
+/**
+ * Se o arquivo passava de [`TEXT_MAX`] e veio só o fim dele.
+ */
+truncated: boolean, };
 
 export type MarkReadRequest = { 
 /**
@@ -415,7 +433,11 @@ can_move_members: boolean,
 /**
  * Se o Painel mostra a tela Emojis.
  */
-can_manage_emojis: boolean, };
+can_manage_emojis: boolean, 
+/**
+ * Se lê os logs que os membros mandam (Painel › Logs).
+ */
+can_view_logs: boolean, };
 
 export type MediaFilter = "media" | "files";
 

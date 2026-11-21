@@ -1,7 +1,8 @@
 export {
-	downloadLogReport,
 	getServerStatus,
+	listLogEntries,
 	listLogReports,
+	readLogEntry,
 	sendLogs,
 } from "./admin";
 export {

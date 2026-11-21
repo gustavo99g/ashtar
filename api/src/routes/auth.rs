@@ -98,6 +98,8 @@ pub struct MeResponse {
     pub can_move_members: bool,
     /// Se o Painel mostra a tela Emojis.
     pub can_manage_emojis: bool,
+    /// Se lê os logs que os membros mandam (Painel › Logs).
+    pub can_view_logs: bool,
 }
 
 #[derive(Debug, Deserialize, TS)]
@@ -299,6 +301,7 @@ async fn me_response(state: &AppState, user: &User) -> Result<MeResponse, ApiErr
         can_manage_emojis: effective
             .iter()
             .any(|(p, _)| *p == Permission::ManageEmojis),
+        can_view_logs: effective.iter().any(|(p, _)| *p == Permission::ViewLogs),
     })
 }
 

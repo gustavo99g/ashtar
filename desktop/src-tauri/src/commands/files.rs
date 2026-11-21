@@ -3,7 +3,7 @@
 use tauri::ipc::Channel;
 use tauri::{AppHandle, Manager};
 
-use crate::api::download::{self, Progress};
+use crate::api::download::{self, Progress, Source};
 use crate::api::ApiError;
 
 /// Baixa o arquivo `id` para a pasta Downloads, com o nome `name` (ou o próximo livre), e devolve
@@ -15,6 +15,7 @@ pub async fn file_download(
     id: String,
     name: String,
     token: String,
+    source: Option<Source>,
     on_progress: Channel<Progress>,
 ) -> Result<String, ApiError> {
     let dir = app
@@ -22,7 +23,8 @@ pub async fn file_download(
         .download_dir()
         .map_err(|error| ApiError::app(format!("Não achei a pasta Downloads: {error}")))?;
     let version = app.package_info().version.to_string();
-    let path = download::download(&id, &name, &token, &version, &dir, |progress| {
+    let source = source.unwrap_or(Source::Files);
+    let path = download::download(source, &id, &name, &token, &version, &dir, |progress| {
         let _ = on_progress.send(progress);
     })
     .await?;

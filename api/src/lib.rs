@@ -282,6 +282,8 @@ pub fn app(state: AppState, policy: Arc<ClientPolicy>) -> Router {
         .route("/realtime/ticket", post(routes::realtime::ticket))
         .route("/logs", get(routes::logs::list))
         .route("/logs/{id}", get(routes::logs::download))
+        .route("/logs/{id}/entries", get(routes::logs::entries))
+        .route("/logs/{id}/entry", get(routes::logs::entry))
         .route("/admin/status", get(routes::admin::status))
         .route("/files/{id}", get(routes::files::download))
         .route("/files/{id}/link", post(routes::files::link))
