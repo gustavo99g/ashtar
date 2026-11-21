@@ -20,7 +20,7 @@ const DISPLAY_NAME_MAX: usize = 32;
 macro_rules! select_user {
     ($rest:literal) => {
         concat!(
-            "SELECT id, nick, display_name, is_owner, created_at, removed_at FROM users ",
+            "SELECT id, nick, display_name, is_owner, created_at, removed_at, avatar_id FROM users ",
             $rest
         )
     };
@@ -131,6 +131,9 @@ pub struct Person {
     pub id: String,
     pub nick: String,
     pub display_name: Option<String>,
+    /// O id do arquivo da foto de perfil, ou `null`.
+    #[ts(optional = nullable)]
+    pub avatar: Option<String>,
     pub is_owner: bool,
     /// Com pelo menos um WebSocket aberto (ou caído há menos de 10 segundos),
     /// e sem estar invisível.
@@ -148,6 +151,7 @@ impl Person {
             id: user.id.clone(),
             nick: user.nick.clone(),
             display_name: user.display_name.clone(),
+            avatar: user.avatar_id.clone(),
             is_owner: user.is_owner,
             online: shown.is_some(),
             status: shown.unwrap_or(Shown::Available),
@@ -227,7 +231,7 @@ pub async fn list_details(db: &SqlitePool, now: i64) -> Result<Vec<MemberDetails
              FROM invite_uses iu JOIN invites i ON i.id = iu.invite_id
              WHERE i.kind = 'new'
          )
-         SELECT u.id, u.nick, u.display_name, u.is_owner, u.created_at, u.removed_at,
+         SELECT u.id, u.nick, u.display_name, u.is_owner, u.created_at, u.removed_at, u.avatar_id,
                 d.linked_at AS device_linked_at,
                 p.granted_at AS beta_granted_at,
                 j.invite_id AS joined_invite_id, j.preset AS joined_preset,
@@ -320,6 +324,7 @@ pub(super) async fn insert(
         is_owner,
         created_at: now,
         removed_at: None,
+        avatar_id: None,
     };
     sqlx::query("INSERT INTO users (id, nick, is_owner, created_at) VALUES (?, ?, ?, ?)")
         .bind(&user.id)
@@ -379,6 +384,58 @@ pub async fn set_display_name(
         display_name,
         ..user.clone()
     })
+}
+
+/// Troca a foto de perfil por `file_id` (um arquivo `avatar` de imagem que a própria pessoa
+/// enviou), ou tira com `None`. Devolve o membro novo e a foto antiga, que quem chama apaga.
+pub async fn set_avatar(
+    db: &SqlitePool,
+    user: &User,
+    file_id: Option<&str>,
+    now: i64,
+) -> Result<(User, Option<String>), ApiError> {
+    let mut tx = db.begin_with("BEGIN IMMEDIATE").await?;
+    if let Some(file_id) = file_id {
+        let ok: Option<i64> = sqlx::query_scalar(
+            "SELECT 1 FROM files WHERE id = ? AND uploader_id = ? AND kind = 'avatar'
+                                   AND mime LIKE 'image/%'",
+        )
+        .bind(file_id)
+        .bind(&user.id)
+        .fetch_optional(&mut *tx)
+        .await?;
+        if ok.is_none() {
+            return Err(ApiError::InvalidRequest(
+                "Essa imagem não serve para foto.".into(),
+            ));
+        }
+        crate::files::mark_used(&mut tx, &[file_id.to_owned()], now).await?;
+    }
+    let old: Option<String> = sqlx::query_scalar("SELECT avatar_id FROM users WHERE id = ?")
+        .bind(&user.id)
+        .fetch_one(&mut *tx)
+        .await?;
+    sqlx::query("UPDATE users SET avatar_id = ? WHERE id = ? AND removed_at IS NULL")
+        .bind(file_id)
+        .bind(&user.id)
+        .execute(&mut *tx)
+        .await?;
+    // A foto antiga sai da tabela aqui; os bytes, quem chama apaga.
+    let old = old.filter(|old| Some(old.as_str()) != file_id);
+    if let Some(old) = &old {
+        sqlx::query("DELETE FROM files WHERE id = ?")
+            .bind(old)
+            .execute(&mut *tx)
+            .await?;
+    }
+    tx.commit().await?;
+    Ok((
+        User {
+            avatar_id: file_id.map(str::to_owned),
+            ..user.clone()
+        },
+        old,
+    ))
 }
 
 /// Remove um membro: marca como removido, apaga o dispositivo (e a sessão,

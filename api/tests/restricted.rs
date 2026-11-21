@@ -117,6 +117,7 @@ fn person(id: &str) -> ParticipantView {
         nick: id.into(),
         display_name: None,
         screen_sharing: false,
+        avatar: None,
     }
 }
 

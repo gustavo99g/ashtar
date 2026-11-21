@@ -29,6 +29,9 @@ pub struct ParticipantView {
     pub display_name: Option<String>,
     /// Se está transmitindo a tela (o selo TRANSMITINDO).
     pub screen_sharing: bool,
+    /// O id do arquivo da foto de perfil, ou `null` (ADR 0031).
+    #[ts(optional = nullable)]
+    pub avatar: Option<String>,
 }
 
 /// Quem o LiveKit diz que está na sala: a identidade do token (o id do membro)
@@ -108,6 +111,7 @@ pub async fn join_participants(
                 nick: user.nick.clone(),
                 display_name: user.display_name.clone(),
                 screen_sharing: participant.screen_sharing,
+                avatar: user.avatar_id.clone(),
             })
         })
         .collect())

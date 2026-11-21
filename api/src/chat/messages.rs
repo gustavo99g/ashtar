@@ -31,6 +31,21 @@ pub struct Author {
     pub display_name: Option<String>,
     /// Saiu do grupo: o app mostra "(saiu do grupo)" ao lado do nome.
     pub removed: bool,
+    /// O id do arquivo da foto de perfil, ou `null` (ADR 0031).
+    #[ts(optional = nullable)]
+    pub avatar: Option<String>,
+}
+
+impl Author {
+    pub fn of(user: &User) -> Self {
+        Self {
+            id: user.id.clone(),
+            nick: user.nick.clone(),
+            display_name: user.display_name.clone(),
+            removed: !user.is_active(),
+            avatar: user.avatar_id.clone(),
+        }
+    }
 }
 
 /// O tipo da mensagem: o texto de alguém, ou o registro de uma ligação.
@@ -118,6 +133,7 @@ struct MessageRow {
     nick: String,
     display_name: Option<String>,
     removed_at: Option<i64>,
+    avatar_id: Option<String>,
     /// Os ids mencionados, separados por vírgula; `NULL` sem menção.
     mentions: Option<String>,
     kind: String,
@@ -133,6 +149,7 @@ struct MessageRow {
     reply_nick: Option<String>,
     reply_display_name: Option<String>,
     reply_removed_at: Option<i64>,
+    reply_avatar_id: Option<String>,
 }
 
 impl From<MessageRow> for Message {
@@ -146,6 +163,7 @@ impl From<MessageRow> for Message {
                 nick: row.nick,
                 display_name: row.display_name,
                 removed: row.removed_at.is_some(),
+                avatar: row.avatar_id,
             },
             body: row.body,
             mentions: split_mentions(row.mentions.as_deref()),
@@ -176,6 +194,7 @@ impl From<MessageRow> for Message {
                         nick: row.reply_nick.unwrap_or_default(),
                         display_name: row.reply_display_name,
                         removed: row.reply_removed_at.is_some(),
+                        avatar: row.reply_avatar_id,
                     }),
                     excerpt: row.reply_body.map(|body| excerpt(&body)),
                 },
@@ -218,14 +237,15 @@ macro_rules! select_message {
     ($rest:literal) => {
         concat!(
             "SELECT m.id, m.channel_id, m.client_id, m.body, m.created_at,
-                    u.id AS author_id, u.nick, u.display_name, u.removed_at,
+                    u.id AS author_id, u.nick, u.display_name, u.removed_at, u.avatar_id,
                     (SELECT group_concat(x.user_id) FROM mentions x
                       WHERE x.message_id = m.id) AS mentions,
                     m.kind, m.call_id, k.outcome AS call_outcome,
                     k.answered_at AS call_answered_at, k.ended_at AS call_ended_at,
                     m.edited_at, m.pinned_at, m.reply_to AS reply_id, r.body AS reply_body,
                     ru.id AS reply_author_id, ru.nick AS reply_nick,
-                    ru.display_name AS reply_display_name, ru.removed_at AS reply_removed_at
+                    ru.display_name AS reply_display_name, ru.removed_at AS reply_removed_at,
+                    ru.avatar_id AS reply_avatar_id
              FROM messages m JOIN users u ON u.id = m.author_id
              LEFT JOIN calls k ON k.id = m.call_id
              LEFT JOIN messages r ON r.id = m.reply_to AND r.channel_id = m.channel_id

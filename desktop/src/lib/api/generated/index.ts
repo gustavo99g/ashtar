@@ -24,7 +24,11 @@ export type Author = { id: string, nick: string, display_name: string | null,
 /**
  * Saiu do grupo: o app mostra "(saiu do grupo)" ao lado do nome.
  */
-removed: boolean, };
+removed: boolean, 
+/**
+ * O id do arquivo da foto de perfil, ou `null` (ADR 0031).
+ */
+avatar?: string | null, };
 
 export type BackupStatus = { name: string, 
 /**
@@ -349,7 +353,11 @@ export type MemberRef = { id: string, nick: string, display_name: string | null,
 /**
  * Um membro na lista do Painel.
  */
-export type MemberView = { id: string, nick: string, display_name: string | null, is_owner: boolean, created_at: number, removed_at: number | null, 
+export type MemberView = { id: string, nick: string, display_name: string | null, 
+/**
+ * O id do arquivo da foto de perfil, ou `null` (ADR 0031).
+ */
+avatar?: string | null, is_owner: boolean, created_at: number, removed_at: number | null, 
 /**
  * `null` sem computador.
  */
@@ -442,7 +450,11 @@ export type ParticipantView = { user_id: string, nick: string, display_name: str
 /**
  * Se está transmitindo a tela (o selo TRANSMITINDO).
  */
-screen_sharing: boolean, };
+screen_sharing: boolean, 
+/**
+ * O id do arquivo da foto de perfil, ou `null` (ADR 0031).
+ */
+avatar?: string | null, };
 
 export type PendingRecovery = { invite_id: string, expires_at: number, };
 
@@ -452,7 +464,11 @@ export type PendingRecovery = { invite_id: string, expires_at: number, };
  * Um membro ativo, como a coluna de membros do chat mostra (`GET /api/people`
  * e o `member.joined` do tempo real). Só o que todo membro pode ver.
  */
-export type Person = { id: string, nick: string, display_name: string | null, is_owner: boolean, 
+export type Person = { id: string, nick: string, display_name: string | null, 
+/**
+ * O id do arquivo da foto de perfil, ou `null`.
+ */
+avatar?: string | null, is_owner: boolean, 
 /**
  * Com pelo menos um WebSocket aberto (ou caído há menos de 10 segundos),
  * e sem estar invisível.
@@ -542,7 +558,7 @@ export type ServerEvent = { "type": "ready", user_id: string, status: Status, on
 /**
  * O nome de quem moveu, para o aviso.
  */
-by_name: string, } | { "type": "voice.disconnected", by: string, by_name: string, reason: DisconnectReason, } | { "type": "typing", channel_id: string, user_id: string, } | { "type": "member.joined", person: Person, } | { "type": "member.left", user_id: string, } | { "type": "logs.received", report: LogReportView, } | { "type": "channels.changed", version: number, } | { "type": "channel.state", channel_id: string, state: ReadState, } | { "type": "call.ringing", call: CallView, } | { "type": "call.accepted", call: CallView, } | { "type": "call.ended", call_id: string, channel_id: string, outcome: CallOutcome, duration: number | null, };
+by_name: string, } | { "type": "voice.disconnected", by: string, by_name: string, reason: DisconnectReason, } | { "type": "typing", channel_id: string, user_id: string, } | { "type": "member.joined", person: Person, } | { "type": "user.updated", id: string, display_name: string | null, avatar: string | null, } | { "type": "member.left", user_id: string, } | { "type": "logs.received", report: LogReportView, } | { "type": "channels.changed", version: number, } | { "type": "channel.state", channel_id: string, state: ReadState, } | { "type": "call.ringing", call: CallView, } | { "type": "call.accepted", call: CallView, } | { "type": "call.ended", call_id: string, channel_id: string, outcome: CallOutcome, duration: number | null, };
 
 export type ServerStatus = { api: ApiStatus, livekit: LiveKitStatus, 
 /**
@@ -563,6 +579,12 @@ files_bytes: number, };
  * devolve igual ao JavaScript.
  */
 export type SessionResponse = { token: string, user: UserView, };
+
+export type SetAvatarRequest = { 
+/**
+ * Um arquivo `avatar` enviado antes pelo `POST /api/files` (256×256 WebP, feito no app).
+ */
+file_id: string, };
 
 export type SetBetaRequest = { enabled: boolean, };
 
@@ -608,6 +630,10 @@ export type UserView = { id: string, nick: string,
 /**
  * `null` quando está em branco: aí o app mostra o nick.
  */
-display_name: string | null, is_owner: boolean, };
+display_name: string | null, is_owner: boolean, 
+/**
+ * O id do arquivo da foto de perfil, ou `null` (ADR 0031).
+ */
+avatar?: string | null, };
 
 export type VoiceTokenRequest = { channel_id: string, };

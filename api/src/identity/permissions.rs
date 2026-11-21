@@ -313,6 +313,7 @@ mod tests {
             is_owner,
             created_at: 0,
             removed_at: removed.then_some(1),
+            avatar_id: None,
         }
     }
 

@@ -434,3 +434,126 @@ async fn a_limpeza_apaga_so_o_que_ninguem_usou_em_24_horas() {
     assert_eq!(left, [ids[1].clone(), ids[2].clone()]);
     assert_eq!(files_on_disk(&ctx), 2);
 }
+
+#[tokio::test]
+async fn a_foto_de_perfil_troca_apaga_a_antiga_e_aparece_para_todos() {
+    let ctx = setup().await;
+    let bia = join(&ctx, "Bia", 2, false).await;
+    let webp = b"RIFF\x00\x00\x00\x00WEBPVP8 resto".to_vec();
+    let (_, first) = upload(
+        &ctx,
+        &bia,
+        "kind=avatar&name=eu.webp",
+        "image/webp",
+        webp.clone(),
+    )
+    .await;
+    let first_id = first["id"].as_str().unwrap().to_owned();
+
+    let me = json_call(
+        &ctx,
+        "PUT",
+        "/api/me/avatar",
+        &bia,
+        json!({ "file_id": first_id }),
+    )
+    .await;
+    assert_eq!(me["user"]["avatar"], first_id.as_str());
+
+    // Todo mundo vê: na lista de pessoas e nas mensagens.
+    json_call(
+        &ctx,
+        "POST",
+        "/api/channels/geral/messages",
+        &bia,
+        json!({ "client_id": "c-1", "body": "oi" }),
+    )
+    .await;
+    let (_, _, bytes) = send(
+        &ctx,
+        "GET",
+        "/api/people",
+        Some(&ctx.owner_token),
+        None,
+        Body::empty(),
+    )
+    .await;
+    let people: Value = serde_json::from_slice(&bytes).unwrap();
+    let shown = people
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|p| p["nick"] == "Bia")
+        .unwrap();
+    assert_eq!(shown["avatar"], first_id.as_str());
+    let (_, _, bytes) = send(
+        &ctx,
+        "GET",
+        "/api/channels/geral/messages",
+        Some(&ctx.owner_token),
+        None,
+        Body::empty(),
+    )
+    .await;
+    let page: Value = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(page["messages"][0]["author"]["avatar"], first_id.as_str());
+
+    // A nova troca e a antiga some da tabela e do disco.
+    let (_, second) = upload(&ctx, &bia, "kind=avatar&name=eu2.webp", "image/webp", webp).await;
+    let second_id = second["id"].as_str().unwrap().to_owned();
+    json_call(
+        &ctx,
+        "PUT",
+        "/api/me/avatar",
+        &bia,
+        json!({ "file_id": second_id }),
+    )
+    .await;
+    assert!(
+        api::files::find(&ctx.db, &first_id)
+            .await
+            .unwrap()
+            .is_none()
+    );
+    assert_eq!(files_on_disk(&ctx), 1);
+
+    // Um anexo, ou a foto de outra pessoa, não serve.
+    let (_, attachment) = upload(
+        &ctx,
+        &bia,
+        "kind=attachment&name=a.png",
+        "image/png",
+        PNG.to_vec(),
+    )
+    .await;
+    let (_, theirs) = upload(
+        &ctx,
+        &ctx.owner_token,
+        "kind=avatar&name=k.png",
+        "image/png",
+        PNG.to_vec(),
+    )
+    .await;
+    for file in [attachment, theirs] {
+        let (status, _, _) = send(
+            &ctx,
+            "PUT",
+            "/api/me/avatar",
+            Some(&bia),
+            Some("application/json"),
+            Body::from(json!({ "file_id": file["id"] }).to_string()),
+        )
+        .await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+    }
+
+    // Tirar volta para a letra, e a foto sai.
+    let me = json_call(&ctx, "DELETE", "/api/me/avatar", &bia, json!({})).await;
+    assert_eq!(me["user"]["avatar"], Value::Null);
+    assert!(
+        api::files::find(&ctx.db, &second_id)
+            .await
+            .unwrap()
+            .is_none()
+    );
+}

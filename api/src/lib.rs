@@ -170,6 +170,10 @@ pub fn app(state: AppState, policy: Arc<ClientPolicy>) -> Router {
         .route("/me", get(routes::auth::me).patch(routes::auth::update_me))
         .route("/me/status", put(routes::auth::set_status))
         .route(
+            "/me/avatar",
+            put(routes::auth::set_avatar).delete(routes::auth::remove_avatar),
+        )
+        .route(
             "/invites",
             get(routes::invites::list).post(routes::invites::create),
         )

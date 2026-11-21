@@ -52,6 +52,9 @@ pub struct UserView {
     /// `null` quando está em branco: aí o app mostra o nick.
     pub display_name: Option<String>,
     pub is_owner: bool,
+    /// O id do arquivo da foto de perfil, ou `null` (ADR 0031).
+    #[ts(optional = nullable)]
+    pub avatar: Option<String>,
 }
 
 impl From<&User> for UserView {
@@ -61,6 +64,7 @@ impl From<&User> for UserView {
             nick: user.nick.clone(),
             display_name: user.display_name.clone(),
             is_owner: user.is_owner,
+            avatar: user.avatar_id.clone(),
         }
     }
 }
@@ -167,7 +171,62 @@ pub async fn update_me(
     CurrentUser(user): CurrentUser,
     ApiJson(request): ApiJson<UpdateMeRequest>,
 ) -> Result<Json<MeResponse>, ApiError> {
+    let before = user.display_name.clone();
     let user = users::set_display_name(&state.db, &user, request.display_name.as_deref()).await?;
+    if user.display_name != before {
+        publish_user_updated(&state, &user);
+    }
+    Ok(Json(me_response(&state, &user).await?))
+}
+
+/// O `user.updated` para todos: o nome visível ou a foto mudou (ADR 0031).
+fn publish_user_updated(state: &AppState, user: &User) {
+    state.hub.publish(&ServerEvent::UserUpdated {
+        id: user.id.clone(),
+        display_name: user.display_name.clone(),
+        avatar: user.avatar_id.clone(),
+    });
+}
+
+#[derive(Debug, Deserialize, TS)]
+#[ts(export, export_to = "index.ts")]
+pub struct SetAvatarRequest {
+    /// Um arquivo `avatar` enviado antes pelo `POST /api/files` (256×256 WebP, feito no app).
+    pub file_id: String,
+}
+
+/// `PUT /api/me/avatar`: troca a foto de perfil. A antiga é apagada.
+pub async fn set_avatar(
+    State(state): State<AppState>,
+    CurrentUser(user): CurrentUser,
+    ApiJson(request): ApiJson<SetAvatarRequest>,
+) -> Result<Json<MeResponse>, ApiError> {
+    change_avatar(state, user, Some(&request.file_id)).await
+}
+
+/// `DELETE /api/me/avatar`: tira a foto; volta a letra e a cor do nick.
+pub async fn remove_avatar(
+    State(state): State<AppState>,
+    CurrentUser(user): CurrentUser,
+) -> Result<Json<MeResponse>, ApiError> {
+    change_avatar(state, user, None).await
+}
+
+async fn change_avatar(
+    state: AppState,
+    user: User,
+    file_id: Option<&str>,
+) -> Result<Json<MeResponse>, ApiError> {
+    let changed = user.avatar_id.as_deref() != file_id;
+    let (user, old) = users::set_avatar(&state.db, &user, file_id, now()).await?;
+    if let Some(old) = old
+        && let Err(error) = state.files.delete(&old).await
+    {
+        eprintln!("foto {old}: não deu para apagar do disco: {error}");
+    }
+    if changed {
+        publish_user_updated(&state, &user);
+    }
     Ok(Json(me_response(&state, &user).await?))
 }
 

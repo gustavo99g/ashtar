@@ -130,6 +130,14 @@ pub enum ServerEvent {
     Typing { channel_id: String, user_id: String },
     #[serde(rename = "member.joined")]
     MemberJoined { person: Person },
+    /// Alguém trocou o nome visível ou a foto (ADR 0031): vai para todos, e o app troca nas
+    /// listas, nas mensagens já carregadas e na sala de voz sem recarregar.
+    #[serde(rename = "user.updated")]
+    UserUpdated {
+        id: String,
+        display_name: Option<String>,
+        avatar: Option<String>,
+    },
     /// Alguém foi removido: sai da coluna de membros.
     #[serde(rename = "member.left")]
     MemberLeft { user_id: String },
@@ -189,6 +197,7 @@ impl ServerEvent {
             | Self::StatusChanged { .. }
             | Self::VoiceDisconnected { .. }
             | Self::MemberJoined { .. }
+            | Self::UserUpdated { .. }
             | Self::MemberLeft { .. }
             | Self::LogsReceived { .. }
             | Self::DiskAlert { .. }
@@ -788,6 +797,7 @@ mod tests {
             nick: id.into(),
             display_name: None,
             screen_sharing: false,
+            avatar: None,
         }
     }
 

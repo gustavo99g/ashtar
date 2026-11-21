@@ -307,6 +307,7 @@ mod tests {
                 is_owner: false,
                 created_at: 0,
                 removed_at: None,
+                avatar_id: None,
             },
             expires_at: NOW + 35 * 60,
         }
