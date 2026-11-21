@@ -9,6 +9,7 @@
  */
 import type { QueryClient } from "@tanstack/react-query";
 import { channelsKeys, findChannel } from "@/features/channels";
+import { plainText } from "@/features/chat";
 import { useSettingsStore } from "@/features/settings";
 import { EMPTY_STATE, useUnreadStore } from "@/features/unread";
 import type { Layout, Message, ParticipantView, ServerEvent } from "@/lib/api";
@@ -92,7 +93,8 @@ function onMessage(
 		person: { nick: author.nick, displayName: author.display_name },
 		title: author.display_name ?? author.nick,
 		context: channel ? `#${channel.name}` : "Mensagem privada",
-		body: shortBody(message.body),
+		// O spoiler não aparece no aviso do Windows (ADR 0032).
+		body: shortBody(plainText(message.body)),
 		sound: decision.sound,
 		target,
 	});

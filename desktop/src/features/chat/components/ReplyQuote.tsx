@@ -1,5 +1,6 @@
 import { Avatar } from "@/features/identity";
 import type { ReplyRef } from "@/lib/api";
+import { plainText } from "../model/markdown";
 import { authorName } from "../model/messages";
 
 /**
@@ -35,7 +36,7 @@ export function ReplyQuote({
 		<button
 			type="button"
 			onClick={() => onJump?.(reply.id)}
-			aria-label={`Ir para a mensagem de ${name}: ${reply.excerpt ?? ""}`}
+			aria-label={`Ir para a mensagem de ${name}: ${reply.excerpt ? plainText(reply.excerpt) : ""}`}
 			className="relative ml-5 flex max-w-full min-w-0 items-center gap-1.5 text-left text-[13px] text-muted-foreground hover:text-foreground"
 		>
 			{curve}
@@ -45,7 +46,7 @@ export function ReplyQuote({
 				size={16}
 			/>
 			<span className="shrink-0 font-semibold text-foreground">{name}</span>
-			<span className="truncate">{reply.excerpt}</span>
+			<span className="truncate">{reply.excerpt && plainText(reply.excerpt)}</span>
 		</button>
 	);
 }
