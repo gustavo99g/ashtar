@@ -70,8 +70,7 @@ jobs:
     name: Publica no beta
     needs: versao
     if: github.ref != 'refs/heads/main' && needs.versao.outputs.publicada == 'false'
-    # Runner próprio se a variável WINDOWS_RUNNER existir (veja ci-windows.yml).
-    runs-on: ${{ fromJSON(vars.WINDOWS_RUNNER || '"windows-latest"') }}
+    runs-on: windows-latest
     timeout-minutes: 90
     env:
       VERSION: ${{ needs.versao.outputs.version }}

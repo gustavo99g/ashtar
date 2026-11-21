@@ -1,18 +1,11 @@
 name: CI Windows
 
-# O Rust do desktop (fmt, clippy e testes) só compila de verdade no Windows, e o minuto de
-# Windows no GitHub conta em dobro. Por isso este job:
-#   - só roda quando desktop/src-tauri mudou no PR;
-#   - não roda em PR rascunho: roda quando o PR é marcado como pronto para revisão e nos
-#     pushes seguintes;
-#   - pode rodar num runner próprio: crie a variável do repositório WINDOWS_RUNNER com
-#     ["self-hosted","windows"] (Settings > Secrets and variables > Actions > Variables).
-#     Sem a variável, usa o windows-latest do GitHub.
-# Para rodar à mão num rascunho: Actions > CI Windows > Run workflow, escolhendo a branch.
+# O Rust do desktop (fmt, clippy e testes) só compila de verdade no Windows, que é o job mais
+# lento (25 a 40 min). Por isso só roda quando desktop/src-tauri mudou no PR, e um push novo
+# cancela o anterior. Roda também à mão: Actions > CI Windows > Run workflow.
 on:
   pull_request:
     branches: [dev, main]
-    types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "desktop/src-tauri/**"
       - "rust-toolchain.toml"
@@ -27,8 +20,7 @@ concurrency:
 jobs:
   desktop:
     name: Desktop (Rust, Windows)
-    if: github.event_name == 'workflow_dispatch' || !github.event.pull_request.draft
-    runs-on: ${{ fromJSON(vars.WINDOWS_RUNNER || '"windows-latest"') }}
+    runs-on: windows-latest
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
