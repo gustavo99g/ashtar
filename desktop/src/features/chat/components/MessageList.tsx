@@ -102,6 +102,7 @@ export function MessageList({
 	const follow = hasNewer === undefined;
 	const ref = useRef<HTMLDivElement>(null);
 	const lineRef = useRef<HTMLLIElement>(null);
+	const contentRef = useRef<HTMLOListElement>(null);
 	const atBottom = useRef(true);
 	/** Se já se posicionou ao abrir: na linha das novas, ou no fim. */
 	const opened = useRef(false);
@@ -174,6 +175,22 @@ export function MessageList({
 		// O `focusId` só conta ao abrir; depois, quem leva até a mensagem é o efeito abaixo.
 	}, [lastKey, pending.length, scrollToBottom, measureBottom, follow]);
 
+	// O conteúdo cresceu sem mensagem nova (a prévia de um link chegou depois, uma imagem terminou de
+	// carregar) ou a lista encolheu (o campo cresceu): quem estava no fim continua no fim.
+	useEffect(() => {
+		const list = ref.current;
+		const content = contentRef.current;
+		if (!list || !content || typeof ResizeObserver === "undefined") return;
+		const observer = new ResizeObserver(() => {
+			if (follow && opened.current && atBottom.current) {
+				list.scrollTop = list.scrollHeight;
+			}
+		});
+		observer.observe(content);
+		observer.observe(list);
+		return () => observer.disconnect();
+	}, [follow]);
+
 	// Pediram para ir até uma mensagem que já está na lista.
 	useLayoutEffect(() => {
 		const list = ref.current;
@@ -232,7 +249,7 @@ export function MessageList({
 				) : (
 					start
 				)}
-				<ol aria-label={label}>
+				<ol ref={contentRef} aria-label={label}>
 					{rows.map((row) => (
 						<RowWithDay key={row.message.id} day={row.day}>
 							{row.message.id === firstUnread && (
