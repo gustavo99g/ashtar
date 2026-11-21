@@ -117,6 +117,47 @@ const MEDIA: &[&str] = &[
     "video/webm",
 ];
 
+/// Os vídeos que o chat toca (o WebView2 toca esses dois).
+pub fn is_video(mime: &str) -> bool {
+    mime == "video/mp4" || mime == "video/webm"
+}
+
+/// HMAC-SHA256 (RFC 2104), sem mais uma dependência só para isso.
+fn hmac_sha256(key: &[u8], message: &[u8]) -> [u8; 32] {
+    use sha2::{Digest, Sha256};
+    const BLOCK: usize = 64;
+    let mut block = [0u8; BLOCK];
+    if key.len() > BLOCK {
+        block[..32].copy_from_slice(&Sha256::digest(key));
+    } else {
+        block[..key.len()].copy_from_slice(key);
+    }
+    let mut inner = Sha256::new();
+    inner.update(block.map(|b| b ^ 0x36));
+    inner.update(message);
+    let inner = inner.finalize();
+    let mut outer = Sha256::new();
+    outer.update(block.map(|b| b ^ 0x5c));
+    outer.update(inner);
+    outer.finalize().into()
+}
+
+/// A assinatura do link curto de `id`, que vale até `expires_at` (decisão 28 do plano da v0.7).
+pub fn sign_link(key: &[u8], id: &str, expires_at: i64) -> String {
+    hex::encode(hmac_sha256(key, format!("{id}:{expires_at}").as_bytes()))
+}
+
+/// Se `sig` é a assinatura de `id` até `expires_at` (comparando em tempo constante).
+pub fn link_matches(key: &[u8], id: &str, expires_at: i64, sig: &str) -> bool {
+    let expected = sign_link(key, id, expires_at);
+    expected.len() == sig.len()
+        && expected
+            .bytes()
+            .zip(sig.bytes())
+            .fold(0u8, |acc, (a, b)| acc | (a ^ b))
+            == 0
+}
+
 pub fn is_media(mime: &str) -> bool {
     MEDIA.contains(&mime)
 }
@@ -390,6 +431,21 @@ pub fn disk_alert(free_bytes: u64, total_bytes: u64, last: i64, now: i64) -> boo
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn o_hmac_bate_com_a_rfc_4231() {
+        // Caso 2 da RFC 4231.
+        assert_eq!(
+            hex::encode(hmac_sha256(b"Jefe", b"what do ya want for nothing?")),
+            "5bdcc146bf60754e6a042426089575c75a003f089d2739839dec58b964ec3843"
+        );
+        let key = [7u8; 32];
+        let sig = sign_link(&key, "f1", 100);
+        assert!(link_matches(&key, "f1", 100, &sig));
+        assert!(!link_matches(&key, "f2", 100, &sig));
+        assert!(!link_matches(&key, "f1", 101, &sig));
+        assert!(!link_matches(&[8u8; 32], "f1", 100, &sig));
+    }
 
     #[test]
     fn o_aviso_do_disco_so_uma_vez_por_dia() {

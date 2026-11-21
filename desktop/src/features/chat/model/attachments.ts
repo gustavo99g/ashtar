@@ -20,6 +20,20 @@ const IMAGE_TYPES = new Set([
 	"image/gif",
 ]);
 
+/** Os vídeos que tocam no chat (os que o WebView2 toca); os outros viram o cartão de arquivo. */
+export function isVideo(mime: string): boolean {
+	return mime === "video/mp4" || mime === "video/webm";
+}
+
+/** "0:42", "12:05", "1:02:03". */
+export function durationLabel(ms: number): string {
+	const total = Math.max(0, Math.round(ms / 1000));
+	const h = Math.floor(total / 3600);
+	const m = Math.floor((total % 3600) / 60);
+	const s = String(total % 60).padStart(2, "0");
+	return h > 0 ? `${h}:${String(m).padStart(2, "0")}:${s}` : `${m}:${s}`;
+}
+
 /** As imagens que o chat mostra (as outras viram o cartão de arquivo). */
 export function isImage(mime: string): boolean {
 	return IMAGE_TYPES.has(mime);
@@ -83,9 +97,80 @@ export function attachProblem(
 
 export interface Thumbnail {
 	blob: Blob;
-	/** As dimensões da imagem original. */
+	/** As dimensões da imagem ou do vídeo original. */
 	width: number;
 	height: number;
+	/** Só no vídeo: quanto dura. */
+	durationMs?: number;
+}
+
+/** Desenha `source` (de `width`×`height`) com o lado maior em 640 px, em WebP. */
+async function shrink(
+	source: CanvasImageSource,
+	width: number,
+	height: number,
+): Promise<Blob | null> {
+	const scale = Math.min(1, THUMBNAIL_SIDE / Math.max(width, height));
+	const canvas = document.createElement("canvas");
+	canvas.width = Math.max(1, Math.round(width * scale));
+	canvas.height = Math.max(1, Math.round(height * scale));
+	const context = canvas.getContext("2d");
+	if (!context) return null;
+	context.imageSmoothingQuality = "high";
+	context.drawImage(source, 0, 0, canvas.width, canvas.height);
+	return new Promise<Blob | null>((resolve) =>
+		canvas.toBlob(resolve, "image/webp", 0.82),
+	);
+}
+
+/** Quanto esperar o vídeo abrir para tirar a capa. */
+const COVER_TIMEOUT_MS = 8000;
+
+/**
+ * A capa de um vídeo: o quadro do primeiro segundo (ou do meio, num vídeo mais curto), com as
+ * dimensões e a duração. `null` se o vídeo não abre aqui (vai sem capa).
+ */
+export async function makeVideoCover(file: Blob): Promise<Thumbnail | null> {
+	if (!isVideo(file.type) || typeof document === "undefined") return null;
+	const url = URL.createObjectURL(file);
+	const video = document.createElement("video");
+	video.muted = true;
+	video.preload = "auto";
+	video.playsInline = true;
+	try {
+		const ready = new Promise<void>((resolve, reject) => {
+			video.onloadedmetadata = () => {
+				video.currentTime = Math.min(
+					1,
+					Number.isFinite(video.duration) ? video.duration / 2 : 0,
+				);
+			};
+			video.onseeked = () => resolve();
+			video.onerror = () => reject(new Error("vídeo"));
+			setTimeout(() => reject(new Error("tempo")), COVER_TIMEOUT_MS);
+		});
+		video.src = url;
+		await ready;
+		const { videoWidth: width, videoHeight: height } = video;
+		if (!width || !height) return null;
+		const blob = await shrink(video, width, height);
+		return blob
+			? {
+					blob,
+					width,
+					height,
+					durationMs: Number.isFinite(video.duration)
+						? Math.round(video.duration * 1000)
+						: undefined,
+				}
+			: null;
+	} catch {
+		return null;
+	} finally {
+		video.removeAttribute("src");
+		video.load();
+		URL.revokeObjectURL(url);
+	}
 }
 
 /**
@@ -104,17 +189,7 @@ export async function makeThumbnail(file: Blob): Promise<Thumbnail | null> {
 	}
 	try {
 		const { width, height } = bitmap;
-		const scale = Math.min(1, THUMBNAIL_SIDE / Math.max(width, height));
-		const canvas = document.createElement("canvas");
-		canvas.width = Math.max(1, Math.round(width * scale));
-		canvas.height = Math.max(1, Math.round(height * scale));
-		const context = canvas.getContext("2d");
-		if (!context) return null;
-		context.imageSmoothingQuality = "high";
-		context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-		const blob = await new Promise<Blob | null>((resolve) =>
-			canvas.toBlob(resolve, "image/webp", 0.82),
-		);
+		const blob = await shrink(bitmap, width, height);
 		return blob ? { blob, width, height } : null;
 	} finally {
 		bitmap.close();

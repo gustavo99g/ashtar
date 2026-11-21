@@ -5,8 +5,9 @@
  *
  * Na mensagem que ainda está subindo (`PendingFiles`), os cartões mostram a barra de progresso.
  */
-import { DownloadIcon, FileIcon, XIcon } from "lucide-react";
+import { DownloadIcon, FileIcon, PlayIcon, XIcon } from "lucide-react";
 import { useState } from "react";
+import { create } from "zustand";
 import { Button } from "@/components/ui/button";
 import {
 	Dialog,
@@ -15,11 +16,17 @@ import {
 	DialogTitle,
 } from "@/components/ui/dialog";
 import { toast } from "@/components/ui/toast";
-import { ApiError, type FileView } from "@/lib/api";
+import { ApiError, apiUrl, type FileView, fileLink } from "@/lib/api";
 import { useFileUrl } from "@/lib/fileCache";
 import { downloadFile } from "@/lib/tauri/commands";
 import { cn } from "@/lib/utils";
-import { fileCaption, fitBox, isImage } from "../model/attachments";
+import {
+	durationLabel,
+	fileCaption,
+	fitBox,
+	isImage,
+	isVideo,
+} from "../model/attachments";
 import type { PendingFile } from "../stores/outboxStore";
 import { FileThumb } from "./AttachmentDrafts";
 
@@ -188,6 +195,76 @@ function ImageAttachment({
 	);
 }
 
+/** O vídeo tocando agora: um de cada vez (decisão 28). */
+const usePlaying = create<{ id: string | null }>(() => ({ id: null }));
+
+/**
+ * Um vídeo no chat: a capa com o play no espaço reservado; o play pede o link curto e toca ali
+ * mesmo, sem som até a pessoa ligar, com os controles do WebView. Começar outro para este.
+ */
+function VideoAttachment({ file }: { file: FileView }) {
+	const cover = useFileUrl(file.thumbnail_id);
+	const playing = usePlaying((state) => state.id === file.id);
+	const [src, setSrc] = useState<string | null>(null);
+	const [loading, setLoading] = useState(false);
+	const box = fitBox(file.width, file.height);
+
+	async function play() {
+		if (loading) return;
+		setLoading(true);
+		try {
+			const link = await fileLink(file.id);
+			setSrc(apiUrl(link.path));
+			usePlaying.setState({ id: file.id });
+		} catch (error) {
+			toast.add({
+				title: `Não deu para tocar ${file.name}`,
+				description:
+					error instanceof ApiError ? error.message : "Tente de novo.",
+			});
+		} finally {
+			setLoading(false);
+		}
+	}
+
+	const style = { width: box.width, aspectRatio: `${box.width} / ${box.height}` };
+	if (playing && src) {
+		return (
+			<video
+				src={src}
+				controls
+				autoPlay
+				muted
+				aria-label={file.name}
+				onPlay={() => usePlaying.setState({ id: file.id })}
+				className="block max-w-full rounded-lg bg-black"
+				style={style}
+			/>
+		);
+	}
+	return (
+		<button
+			type="button"
+			aria-label={`Tocar ${file.name}`}
+			onClick={() => void play()}
+			className="group/video relative block max-w-full overflow-hidden rounded-lg bg-black focus-visible:outline-2 focus-visible:outline-focus"
+			style={style}
+		>
+			{cover && <img src={cover} alt="" className="size-full object-cover" />}
+			<span className="absolute inset-0 flex items-center justify-center">
+				<span className="flex size-12 items-center justify-center rounded-full bg-black/60 text-white group-hover/video:bg-black/80">
+					<PlayIcon className={cn("size-6 fill-current", loading && "animate-pulse")} />
+				</span>
+			</span>
+			{file.duration_ms != null && (
+				<span className="absolute right-2 bottom-2 rounded bg-black/70 px-1.5 py-0.5 font-mono text-[11px] text-white">
+					{durationLabel(file.duration_ms)}
+				</span>
+			)}
+		</button>
+	);
+}
+
 export function Attachments({ files }: { files: readonly FileView[] }) {
 	const [viewing, setViewing] = useState<FileView | null>(null);
 	if (files.length === 0) return null;
@@ -195,7 +272,10 @@ export function Attachments({ files }: { files: readonly FileView[] }) {
 	const images = files.filter(
 		(file) => isImage(file.mime) && file.thumbnail_id,
 	);
-	const others = files.filter((file) => !images.includes(file));
+	const videos = files.filter((file) => isVideo(file.mime));
+	const others = files.filter(
+		(file) => !images.includes(file) && !videos.includes(file),
+	);
 	return (
 		<div className="flex flex-col gap-1.5 pt-1">
 			{images.length > 0 && (
@@ -209,6 +289,9 @@ export function Attachments({ files }: { files: readonly FileView[] }) {
 					))}
 				</div>
 			)}
+			{videos.map((file) => (
+				<VideoAttachment key={file.id} file={file} />
+			))}
 			{others.map((file) => (
 				<FileCard key={file.id} file={file} />
 			))}

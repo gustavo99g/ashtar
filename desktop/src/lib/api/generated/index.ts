@@ -218,6 +218,15 @@ export type ErrorKind = "unauthenticated" | "unknown_device" | "forbidden" | "in
 export type FileKind = "avatar" | "attachment" | "preview" | "emoji";
 
 /**
+ * O link curto do vídeo: o `<video>` não manda o cabeçalho do token.
+ */
+export type FileLink = { 
+/**
+ * O caminho na API (`/api/files/{id}/stream?...`), sem o endereço.
+ */
+path: string, expires_at: number, };
+
+/**
  * O que o app sabe de um arquivo.
  */
 export type FileView = { id: string, kind: FileKind, name: string, mime: string, size: number, width: number | null, height: number | null, duration_ms: number | null, thumbnail_id: string | null, };

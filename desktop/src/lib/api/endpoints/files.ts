@@ -15,7 +15,7 @@ import {
 	NETWORK_MESSAGE,
 	TIMEOUT_MESSAGE,
 } from "../errors";
-import type { FileKind, FileView } from "../generated";
+import type { FileKind, FileLink, FileView } from "../generated";
 import { renewSession, sessionToken } from "../session";
 
 /** O envio de um arquivo de até 100 MB tem até 10 minutos, como na API. */
@@ -135,4 +135,16 @@ export async function uploadFile(
 export async function fetchFile(id: string): Promise<Blob> {
 	const response = await apiFetch(`/api/files/${encodeURIComponent(id)}`);
 	return response.blob();
+}
+
+/**
+ * `POST /api/files/{id}/link`: o link curto (10 minutos, só este arquivo) para o `<video>`, que
+ * não manda o cabeçalho do token. Só vídeo.
+ */
+export async function fileLink(id: string): Promise<FileLink> {
+	const response = await apiFetch(
+		`/api/files/${encodeURIComponent(id)}/link`,
+		{ method: "POST" },
+	);
+	return (await response.json()) as FileLink;
 }

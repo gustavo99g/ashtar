@@ -721,3 +721,141 @@ async fn a_mensagem_leva_os_anexos_e_a_exclusao_apaga_os_arquivos() {
         .unwrap();
     assert_eq!(left, 0);
 }
+
+#[tokio::test]
+async fn o_video_toca_pelo_link_curto_com_range() {
+    let ctx = setup().await;
+    let bia = join(&ctx, "Bia", 2, false).await;
+    let video: Vec<u8> = b"\x00\x00\x00\x18ftypmp42-o-resto-do-video".to_vec();
+    let (_, file) = upload(
+        &ctx,
+        &bia,
+        "kind=attachment&name=clipe.mp4",
+        "video/mp4",
+        video.clone(),
+    )
+    .await;
+    let (_, image) = upload(
+        &ctx,
+        &bia,
+        "kind=attachment&name=a.png",
+        "image/png",
+        PNG.to_vec(),
+    )
+    .await;
+    let id = file["id"].as_str().unwrap().to_owned();
+    let image_id = image["id"].as_str().unwrap().to_owned();
+    let (status, _) = post_message(
+        &ctx,
+        &bia,
+        json!({ "client_id": "c-1", "body": "", "attachments": [id, image_id] }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED);
+
+    // O Range também vale no GET com o token.
+    let (status, headers, bytes) = send_with_range(
+        &ctx,
+        &format!("/api/files/{id}"),
+        Some(&ctx.owner_token),
+        "bytes=4-7",
+    )
+    .await;
+    assert_eq!(status, StatusCode::PARTIAL_CONTENT);
+    assert_eq!(bytes, b"ftyp");
+    assert_eq!(
+        headers["content-range"],
+        format!("bytes 4-7/{}", video.len())
+    );
+    assert_eq!(headers["accept-ranges"], "bytes");
+    let (status, _, _) = send_with_range(
+        &ctx,
+        &format!("/api/files/{id}"),
+        Some(&ctx.owner_token),
+        "bytes=9999-",
+    )
+    .await;
+    assert_eq!(status, StatusCode::RANGE_NOT_SATISFIABLE);
+
+    // O link: só para vídeo; sem o token, com o Range.
+    let (status, _, _) = send(
+        &ctx,
+        "POST",
+        &format!("/api/files/{}/link", image["id"].as_str().unwrap()),
+        Some(&ctx.owner_token),
+        None,
+        Body::empty(),
+    )
+    .await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+    let link = json_call(
+        &ctx,
+        "POST",
+        &format!("/api/files/{id}/link"),
+        &ctx.owner_token,
+        Value::Null,
+    )
+    .await;
+    let path = link["path"].as_str().unwrap().to_owned();
+    let (status, headers, bytes) = send_with_range(&ctx, &path, None, "bytes=0-3").await;
+    assert_eq!(status, StatusCode::PARTIAL_CONTENT);
+    assert_eq!(bytes, &video[..4]);
+    assert_eq!(headers["content-type"], "video/mp4");
+
+    // O link de outro arquivo, o vencido e o adulterado: 404.
+    let other = path.replace(&id, image["id"].as_str().unwrap());
+    let (status, _, _) = send(&ctx, "GET", &other, None, None, Body::empty()).await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    let past = now() - 1;
+    let sig = api::files::sign_link(ctx.state.link_key.as_slice(), &id, past);
+    let (status, _, _) = send(
+        &ctx,
+        "GET",
+        &format!("/api/files/{id}/stream?exp={past}&sig={sig}"),
+        None,
+        None,
+        Body::empty(),
+    )
+    .await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    let tampered = format!("{}0", &path[..path.len() - 1]);
+    let tampered = if tampered == path {
+        format!("{}1", &path[..path.len() - 1])
+    } else {
+        tampered
+    };
+    let (status, _, _) = send(&ctx, "GET", &tampered, None, None, Body::empty()).await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+}
+
+/// Um GET com o cabeçalho `Range`.
+async fn send_with_range(
+    ctx: &Ctx,
+    uri: &str,
+    token: Option<&str>,
+    range: &str,
+) -> (StatusCode, axum::http::HeaderMap, Vec<u8>) {
+    let mut request = Request::builder()
+        .method("GET")
+        .uri(uri)
+        .header("range", range);
+    if let Some(token) = token {
+        request = request.header("authorization", format!("Bearer {token}"));
+    }
+    let response = ctx
+        .router
+        .clone()
+        .oneshot(request.body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    let status = response.status();
+    let headers = response.headers().clone();
+    let bytes = response
+        .into_body()
+        .collect()
+        .await
+        .unwrap()
+        .to_bytes()
+        .to_vec();
+    (status, headers, bytes)
+}

@@ -36,3 +36,12 @@ describe("os anexos", () => {
 		).toBe("filme.mp4 passa de 100 MB.");
 	});
 });
+
+describe("a duração do vídeo", () => {
+	it("em minutos e segundos, e com horas quando passa de uma", async () => {
+		const { durationLabel } = await import("../model/attachments");
+		expect(durationLabel(42_000)).toBe("0:42");
+		expect(durationLabel(725_400)).toBe("12:05");
+		expect(durationLabel(3_723_000)).toBe("1:02:03");
+	});
+});

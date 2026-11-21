@@ -182,34 +182,185 @@ fn disposition(inline: bool, name: &str) -> HeaderValue {
     .unwrap_or_else(|_| HeaderValue::from_static("attachment"))
 }
 
-/// `GET /api/files/{id}`: o arquivo, para quem pode ver (para os outros, 404). A imagem e o vídeo
-/// com a assinatura certa vêm para mostrar; o resto, para baixar.
+/// `GET /api/files/{id}`: o arquivo, se quem pede pode ver (senão 404, como se não existisse).
+/// Aceita `Range` (um pedaço só), para o vídeo começar sem baixar tudo.
 pub async fn download(
     State(state): State<AppState>,
     CurrentUser(user): CurrentUser,
     Path(id): Path<String>,
+    headers: HeaderMap,
 ) -> Result<Response, ApiError> {
     let not_found = || ApiError::NotFound("Esse arquivo não existe.".into());
     let file = files::find(&state.db, &id).await?.ok_or_else(not_found)?;
     if !files::can_read(&state.db, &user, &file).await? {
         return Err(not_found());
     }
-    let handle = state.files.open(&file.id).await?;
+    serve(&state, &file, &headers).await
+}
+
+/// Quanto tempo vale o link do vídeo, em segundos.
+pub const LINK_SECS: i64 = 10 * 60;
+
+/// O link curto do vídeo: o `<video>` não manda o cabeçalho do token.
+#[derive(Debug, serde::Serialize, ts_rs::TS)]
+#[ts(export, export_to = "index.ts")]
+pub struct FileLink {
+    /// O caminho na API (`/api/files/{id}/stream?...`), sem o endereço.
+    pub path: String,
+    pub expires_at: i64,
+}
+
+/// `POST /api/files/{id}/link`: um link que vale 10 minutos só para este arquivo, sem o token
+/// (decisão 28 do plano da v0.7). Só para vídeo; o resto vai pelo `GET` com o token.
+pub async fn link(
+    State(state): State<AppState>,
+    CurrentUser(user): CurrentUser,
+    Path(id): Path<String>,
+) -> Result<Json<FileLink>, ApiError> {
+    let not_found = || ApiError::NotFound("Esse arquivo não existe.".into());
+    let file = files::find(&state.db, &id).await?.ok_or_else(not_found)?;
+    if !files::can_read(&state.db, &user, &file).await? {
+        return Err(not_found());
+    }
+    if !files::is_video(&file.mime) {
+        return Err(ApiError::InvalidRequest("Só o vídeo ganha link.".into()));
+    }
+    let expires_at = now() + LINK_SECS;
+    let sig = files::sign_link(state.link_key.as_slice(), &file.id, expires_at);
+    Ok(Json(FileLink {
+        path: format!("/api/files/{}/stream?exp={expires_at}&sig={sig}", file.id),
+        expires_at,
+    }))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct StreamQuery {
+    pub exp: i64,
+    pub sig: String,
+}
+
+/// `GET /api/files/{id}/stream?exp=...&sig=...`: o vídeo pelo link curto, sem o token. Link
+/// vencido ou de outro arquivo: 404.
+pub async fn stream(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    query: Result<Query<StreamQuery>, QueryRejection>,
+    headers: HeaderMap,
+) -> Result<Response, ApiError> {
+    let not_found = || ApiError::NotFound("Esse arquivo não existe.".into());
+    let Ok(Query(query)) = query else {
+        return Err(not_found());
+    };
+    if query.exp < now()
+        || query.exp > now() + LINK_SECS
+        || !files::link_matches(state.link_key.as_slice(), &id, query.exp, &query.sig)
+    {
+        return Err(not_found());
+    }
+    let file = files::find(&state.db, &id).await?.ok_or_else(not_found)?;
+    if !files::is_video(&file.mime) {
+        return Err(not_found());
+    }
+    serve(&state, &file, &headers).await
+}
+
+/// O `Range` pede um pedaço fora do arquivo (416).
+#[derive(Debug, PartialEq, Eq)]
+pub struct OutOfRange;
+
+/// O pedaço pedido no `Range` (`bytes=início-fim`, `bytes=início-` ou `bytes=-últimos`), de um
+/// arquivo de `length` bytes: `Ok(None)` sem `Range` (ou com um que não entendemos, como vários
+/// pedaços: vai o arquivo inteiro), `Err` se o pedaço está fora do arquivo (416).
+pub fn requested_range(value: Option<&str>, length: u64) -> Result<Option<(u64, u64)>, OutOfRange> {
+    let Some(spec) = value.and_then(|v| v.trim().strip_prefix("bytes=")) else {
+        return Ok(None);
+    };
+    if spec.contains(',') {
+        return Ok(None);
+    }
+    let Some((start, end)) = spec.split_once('-') else {
+        return Ok(None);
+    };
+    let (start, end) = match (start.trim(), end.trim()) {
+        ("", "") => return Ok(None),
+        ("", last) => {
+            let last: u64 = last.parse().map_err(|_| OutOfRange)?;
+            if last == 0 || length == 0 {
+                return Err(OutOfRange);
+            }
+            (length.saturating_sub(last), length - 1)
+        }
+        (start, "") => (
+            start.parse().map_err(|_| OutOfRange)?,
+            length.saturating_sub(1),
+        ),
+        (start, end) => {
+            let start: u64 = start.parse().map_err(|_| OutOfRange)?;
+            let end: u64 = end.parse().map_err(|_| OutOfRange)?;
+            (start, end.min(length.saturating_sub(1)))
+        }
+    };
+    if start >= length || start > end {
+        return Err(OutOfRange);
+    }
+    Ok(Some((start, end)))
+}
+
+/// Manda o arquivo (ou o pedaço do `Range`), com o tipo, o nome e o cache.
+async fn serve(
+    state: &AppState,
+    file: &files::FileRecord,
+    request: &HeaderMap,
+) -> Result<Response, ApiError> {
+    use tokio::io::{AsyncReadExt, AsyncSeekExt};
+
+    let mut handle = state.files.open(&file.id).await?;
     let length = handle.metadata().await?.len();
+    let range = request.get(header::RANGE).and_then(|v| v.to_str().ok());
+    let range = match requested_range(range, length) {
+        Ok(range) => range,
+        Err(OutOfRange) => {
+            let mut response = StatusCode::RANGE_NOT_SATISFIABLE.into_response();
+            if let Ok(value) = HeaderValue::from_str(&format!("bytes */{length}")) {
+                response.headers_mut().insert(header::CONTENT_RANGE, value);
+            }
+            return Ok(response);
+        }
+    };
     let inline = file.inline();
     let content_type = if inline {
         file.mime.as_str()
     } else {
         "application/octet-stream"
     };
-    let mut response = Body::from_stream(ReaderStream::new(handle)).into_response();
+    let mut response = match range {
+        Some((start, end)) => {
+            handle.seek(std::io::SeekFrom::Start(start)).await?;
+            let part = handle.take(end - start + 1);
+            let mut response = Body::from_stream(ReaderStream::new(part)).into_response();
+            *response.status_mut() = StatusCode::PARTIAL_CONTENT;
+            let headers = response.headers_mut();
+            headers.insert(header::CONTENT_LENGTH, HeaderValue::from(end - start + 1));
+            if let Ok(value) = HeaderValue::from_str(&format!("bytes {start}-{end}/{length}")) {
+                headers.insert(header::CONTENT_RANGE, value);
+            }
+            response
+        }
+        None => {
+            let mut response = Body::from_stream(ReaderStream::new(handle)).into_response();
+            response
+                .headers_mut()
+                .insert(header::CONTENT_LENGTH, HeaderValue::from(length));
+            response
+        }
+    };
     let headers = response.headers_mut();
     headers.insert(
         header::CONTENT_TYPE,
         HeaderValue::from_str(content_type)
             .unwrap_or_else(|_| HeaderValue::from_static("application/octet-stream")),
     );
-    headers.insert(header::CONTENT_LENGTH, HeaderValue::from(length));
+    headers.insert(header::ACCEPT_RANGES, HeaderValue::from_static("bytes"));
     headers.insert(header::CONTENT_DISPOSITION, disposition(inline, &file.name));
     // O id nunca muda de conteúdo: pode guardar, mas só para quem pediu.
     headers.insert(
@@ -226,6 +377,22 @@ pub async fn download(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn o_range() {
+        assert_eq!(requested_range(None, 100), Ok(None));
+        assert_eq!(requested_range(Some("bytes=0-9"), 100), Ok(Some((0, 9))));
+        assert_eq!(requested_range(Some("bytes=90-"), 100), Ok(Some((90, 99))));
+        assert_eq!(requested_range(Some("bytes=-10"), 100), Ok(Some((90, 99))));
+        assert_eq!(
+            requested_range(Some("bytes=50-500"), 100),
+            Ok(Some((50, 99)))
+        );
+        assert_eq!(requested_range(Some("bytes=0-1,5-6"), 100), Ok(None));
+        assert_eq!(requested_range(Some("bytes=100-"), 100), Err(OutOfRange));
+        assert_eq!(requested_range(Some("bytes=9-3"), 100), Err(OutOfRange));
+        assert_eq!(requested_range(Some("bytes=a-"), 100), Err(OutOfRange));
+    }
 
     #[test]
     fn o_nome_vai_nos_dois_formatos() {

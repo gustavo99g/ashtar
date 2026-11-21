@@ -36,7 +36,7 @@ import {
 } from "@/lib/api";
 import { useRealtimeOpen } from "@/lib/realtime";
 import { useAppVisible } from "@/lib/visibility";
-import { makeThumbnail } from "./model/attachments";
+import { makeThumbnail, makeVideoCover } from "./model/attachments";
 import type { DraftFile } from "./stores/attachmentStore";
 import {
 	addPending,
@@ -338,20 +338,20 @@ function failureMessage(error: unknown): string {
 }
 
 /**
- * Sobe um anexo da caixa de saída: a miniatura antes (se é uma imagem que abre aqui), depois o
- * arquivo, com as dimensões. Devolve o id e guarda na mensagem, para o "Tentar de novo" não subir
- * de novo.
+ * Sobe um anexo da caixa de saída: a miniatura (de uma imagem) ou a capa (de um vídeo) antes, se
+ * abre aqui, depois o arquivo, com as dimensões e a duração. Devolve o id e guarda na mensagem,
+ * para o "Tentar de novo" não subir de novo.
  */
 async function uploadAttachment(
 	clientId: string,
 	pending: PendingFile,
 ): Promise<string> {
 	const { file, key } = pending;
-	const thumbnail = await makeThumbnail(file);
+	const thumbnail = (await makeThumbnail(file)) ?? (await makeVideoCover(file));
 	const thumb = thumbnail
 		? await uploadFile(thumbnail.blob, {
 				kind: "attachment",
-				name: "miniatura.webp",
+				name: "capa.webp",
 			})
 		: null;
 	const uploaded = await uploadFile(file, {
@@ -359,6 +359,7 @@ async function uploadAttachment(
 		name: file.name || "arquivo",
 		width: thumbnail?.width,
 		height: thumbnail?.height,
+		durationMs: thumbnail?.durationMs,
 		thumbnail: thumb?.id,
 		onProgress: (progress) =>
 			updatePendingFile(clientId, key, { progress }),

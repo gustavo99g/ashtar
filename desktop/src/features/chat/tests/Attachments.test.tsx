@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fetchFile, type FileView } from "@/lib/api";
+import { fetchFile, type FileView, fileLink } from "@/lib/api";
 import { clearFileCache } from "@/lib/fileCache";
 import { downloadFile } from "@/lib/tauri/commands";
 import { Attachments } from "../components/Attachments";
@@ -9,6 +9,7 @@ import { Attachments } from "../components/Attachments";
 vi.mock("@/lib/api", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/lib/api")>()),
 	fetchFile: vi.fn(),
+	fileLink: vi.fn(),
 }));
 vi.mock("@/lib/tauri/commands", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/lib/tauri/commands")>()),
@@ -75,5 +76,43 @@ describe("os anexos na mensagem", () => {
 			"notas.pdf",
 			expect.any(Function),
 		);
+	});
+
+	it("o vídeo mostra a capa e a duração; o play toca ali, um de cada vez", async () => {
+		const user = userEvent.setup();
+		vi.mocked(fileLink).mockImplementation(async (id) => ({
+			path: `/api/files/${id}/stream?exp=1&sig=x`,
+			expires_at: 1,
+		}));
+		const video = (id: string) =>
+			file({
+				id,
+				name: `${id}.mp4`,
+				mime: "video/mp4",
+				thumbnail_id: `capa-${id}`,
+				duration_ms: 83_000,
+			});
+		const { container } = render(
+			<Attachments files={[video("v1"), video("v2")]} />,
+		);
+		expect(screen.getAllByText("1:23")).toHaveLength(2);
+		await user.click(screen.getByRole("button", { name: "Tocar v1.mp4" }));
+		await vi.waitFor(() =>
+			expect(container.querySelector("video")?.getAttribute("src")).toMatch(
+				/\/api\/files\/v1\/stream\?exp=1&sig=x$/,
+			),
+		);
+		expect(container.querySelector("video")?.muted).toBe(true);
+
+		await user.click(screen.getByRole("button", { name: "Tocar v2.mp4" }));
+		await vi.waitFor(() =>
+			expect(container.querySelector("video")?.getAttribute("src")).toMatch(
+				/v2\/stream/,
+			),
+		);
+		expect(container.querySelectorAll("video")).toHaveLength(1);
+		expect(
+			screen.getByRole("button", { name: "Tocar v1.mp4" }),
+		).toBeInTheDocument();
 	});
 });
