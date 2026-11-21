@@ -178,6 +178,10 @@ pub fn app(state: AppState, policy: Arc<ClientPolicy>) -> Router {
         .route("/voice/participants", get(routes::voice::participants))
         .route("/voice/screen-token", post(routes::voice::screen_token))
         .route("/voice/test-token", post(routes::voice::test_token))
+        .route(
+            "/voice/state",
+            put(routes::voice::voice_state).delete(routes::voice::leave_voice_state),
+        )
         .route("/voice/move", post(routes::voice::move_member))
         .route("/voice/disconnect", post(routes::voice::disconnect_member))
         .route("/auth/redeem", post(routes::auth::redeem))

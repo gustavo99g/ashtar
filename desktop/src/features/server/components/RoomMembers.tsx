@@ -1,4 +1,4 @@
-import { HeadphoneOffIcon, MicOffIcon } from "lucide-react";
+import { HeadphoneOffIcon, MicOffIcon, VideoIcon } from "lucide-react";
 import { useState } from "react";
 import { Popover, PopoverTrigger } from "@/components/ui/popover";
 import { COLLAPSED_AVATARS } from "@/features/channels";
@@ -129,6 +129,12 @@ function MemberRow({
 				</span>
 				<span className="ml-auto flex shrink-0 items-center gap-1">
 					<ConnectionMark connection={member.connection} className="size-3.5" />
+					{member.camera && (
+						<VideoIcon
+							aria-label="câmera ligada"
+							className="size-3.5 text-muted-foreground"
+						/>
+					)}
 					{member.sharing ? (
 						<LiveBadge />
 					) : member.deafened ? (

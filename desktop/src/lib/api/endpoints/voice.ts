@@ -7,6 +7,8 @@ import type {
 	JoinVoiceResponse,
 	MoveMemberRequest,
 	ParticipantView,
+	VoiceFlags,
+	VoiceStateRequest,
 	VoiceTokenRequest,
 } from "../generated";
 
@@ -61,6 +63,24 @@ export async function moveMember(
 ): Promise<void> {
 	const request: MoveMemberRequest = { user_id: userId, channel_id: channelId };
 	await apiFetch("/api/voice/move", jsonRequest("POST", request));
+}
+
+/**
+ * `PUT /api/voice/state`: o próprio estado na sala do grupo (microfone, áudio, câmera e tela), para
+ * quem está fora dela ver. As ligações privadas não mandam.
+ */
+export async function putVoiceState(
+	channelId: string,
+	flags: VoiceFlags,
+): Promise<void> {
+	const request: VoiceStateRequest = { channel_id: channelId, ...flags };
+	await apiFetch("/api/voice/state", jsonRequest("PUT", request));
+}
+
+/** `DELETE /api/voice/state`: saiu da sala; a API esquece o estado e relê a sala. */
+export async function leaveVoiceState(channelId: string): Promise<void> {
+	const query = new URLSearchParams({ channel_id: channelId });
+	await apiFetch(`/api/voice/state?${query}`, { method: "DELETE" });
 }
 
 /** `POST /api/voice/disconnect`: tira alguém da voz (ADR 0026), com "Mover membros". */

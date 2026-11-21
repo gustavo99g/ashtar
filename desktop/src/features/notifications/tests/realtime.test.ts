@@ -50,7 +50,7 @@ function message(channelId: string, mentions: string[] = [], author = "ana"): Me
 }
 
 function participant(id: string, sharing: boolean): ParticipantView {
-	return { user_id: id, nick: id, display_name: null, screen_sharing: sharing };
+	return { user_id: id, nick: id, display_name: null, screen_sharing: sharing, mic_off: false, deafened: false, camera: false };
 }
 
 let client: QueryClient;

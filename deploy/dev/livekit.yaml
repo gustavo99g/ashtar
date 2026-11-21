@@ -1,0 +1,13 @@
+# O LiveKit local para desenvolver, com o webhook para a API local (é o que atualiza a lista da sala
+# para quem está fora dela, `voice.participants`). Rode na raiz do repositório:
+#
+#   livekit-server --dev --config deploy/dev/livekit.yaml
+#
+# A chave é a do modo dev (`devkey`/`secret`), a mesma do `.env.example`.
+keys:
+  devkey: secret
+
+webhook:
+  api_key: devkey
+  urls:
+    - http://127.0.0.1:3000/webhooks/livekit

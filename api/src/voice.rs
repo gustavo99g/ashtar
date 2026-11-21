@@ -13,7 +13,7 @@ use std::time::Duration;
 use livekit_api::services::room::RoomClient;
 use livekit_api::services::{ServerError, ServerErrorCode, ServiceError};
 use livekit_protocol::{ParticipantInfo, TrackSource};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
 use ts_rs::TS;
 
@@ -21,7 +21,7 @@ use crate::error::ApiError;
 use crate::identity::{User, users};
 
 /// Uma pessoa na sala, com o nick e o nome visível do banco.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, TS)]
 #[ts(export, export_to = "index.ts")]
 pub struct ParticipantView {
     pub user_id: String,
@@ -32,6 +32,35 @@ pub struct ParticipantView {
     /// O id do arquivo da foto de perfil, ou `null` (ADR 0031).
     #[ts(optional = nullable)]
     pub avatar: Option<String>,
+    /// Sem microfone (mutado ou sem trilha), pelo que o app da pessoa contou ([`VoiceFlags`]).
+    pub mic_off: bool,
+    /// Com o áudio desligado (deafen).
+    pub deafened: bool,
+    /// Com a câmera ligada.
+    pub camera: bool,
+}
+
+/// O que o app de cada um conta do próprio estado na sala (v0.7): o LiveKit não avisa a API de
+/// quem muta, e o áudio desligado nem passa por ele. Com isso, quem está fora da sala vê os ícones
+/// também. Enquanto existe, vale mais que o LiveKit, inclusive para a tela: é o app que sabe
+/// primeiro.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize, TS)]
+#[ts(export, export_to = "index.ts")]
+pub struct VoiceFlags {
+    pub mic_off: bool,
+    pub deafened: bool,
+    pub camera: bool,
+    pub sharing: bool,
+}
+
+impl VoiceFlags {
+    /// `view` com o estado que o app contou.
+    pub fn apply(self, view: &mut ParticipantView) {
+        view.mic_off = self.mic_off;
+        view.deafened = self.deafened;
+        view.camera = self.camera;
+        view.screen_sharing = self.sharing;
+    }
 }
 
 /// Quem o LiveKit diz que está na sala: a identidade do token (o id do membro)
@@ -112,6 +141,7 @@ pub async fn join_participants(
                 display_name: user.display_name.clone(),
                 screen_sharing: participant.screen_sharing,
                 avatar: user.avatar_id.clone(),
+                ..ParticipantView::default()
             })
         })
         .collect())

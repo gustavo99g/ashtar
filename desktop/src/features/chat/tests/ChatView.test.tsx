@@ -151,7 +151,7 @@ beforeEach(() => {
 		},
 	]);
 	vi.mocked(listVoiceParticipants).mockResolvedValue([
-		{ user_id: "u1", nick: "kid", display_name: "Kid", screen_sharing: false },
+		{ user_id: "u1", nick: "kid", display_name: "Kid", screen_sharing: false, mic_off: false, deafened: false, camera: false },
 	]);
 	vi.mocked(sendMessage).mockReset();
 	vi.mocked(listPins).mockResolvedValue([]);

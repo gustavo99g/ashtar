@@ -531,7 +531,19 @@ screen_sharing: boolean,
 /**
  * O id do arquivo da foto de perfil, ou `null` (ADR 0031).
  */
-avatar?: string | null, };
+avatar?: string | null, 
+/**
+ * Sem microfone (mutado ou sem trilha), pelo que o app da pessoa contou ([`VoiceFlags`]).
+ */
+mic_off: boolean, 
+/**
+ * Com o áudio desligado (deafen).
+ */
+deafened: boolean, 
+/**
+ * Com a câmera ligada.
+ */
+camera: boolean, };
 
 export type PendingRecovery = { invite_id: string, expires_at: number, };
 
@@ -735,5 +747,18 @@ display_name: string | null, is_owner: boolean,
  * O id do arquivo da foto de perfil, ou `null` (ADR 0031).
  */
 avatar?: string | null, };
+
+/**
+ * O que o app de cada um conta do próprio estado na sala (v0.7): o LiveKit não avisa a API de
+ * quem muta, e o áudio desligado nem passa por ele. Com isso, quem está fora da sala vê os ícones
+ * também. Enquanto existe, vale mais que o LiveKit, inclusive para a tela: é o app que sabe
+ * primeiro.
+ */
+export type VoiceFlags = { mic_off: boolean, deafened: boolean, camera: boolean, sharing: boolean, };
+
+/**
+ * O que o app manda no `PUT /api/voice/state`.
+ */
+export type VoiceStateRequest = { channel_id: string, mic_off: boolean, deafened: boolean, camera: boolean, sharing: boolean, };
 
 export type VoiceTokenRequest = { channel_id: string, };

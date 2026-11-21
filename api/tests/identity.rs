@@ -2708,8 +2708,8 @@ mod sala {
         assert_eq!(
             json,
             json!([
-                { "user_id": carla.id, "nick": "carla", "display_name": null, "screen_sharing": true, "avatar": null },
-                { "user_id": ju.id, "nick": "juliana", "display_name": "juju", "screen_sharing": false, "avatar": null },
+                { "user_id": carla.id, "nick": "carla", "display_name": null, "screen_sharing": true, "avatar": null, "mic_off": false, "deafened": false, "camera": false },
+                { "user_id": ju.id, "nick": "juliana", "display_name": "juju", "screen_sharing": false, "avatar": null, "mic_off": false, "deafened": false, "camera": false },
             ])
         );
     }

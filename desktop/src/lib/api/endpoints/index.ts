@@ -72,5 +72,7 @@ export {
 	disconnectMember,
 	moveMember,
 	createVoiceToken,
+	leaveVoiceState,
 	listVoiceParticipants,
+	putVoiceState,
 } from "./voice";

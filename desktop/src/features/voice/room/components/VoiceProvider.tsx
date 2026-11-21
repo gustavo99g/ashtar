@@ -106,6 +106,7 @@ import { checkSession, requestVoiceToken } from "../queries";
 import { onSystemResumed } from "@/lib/tauri/commands";
 import { clearVoiceOrder, useVoiceOrder } from "../stores/voiceOrderStore";
 import { RoomAudio } from "./RoomAudio";
+import { VoiceStateReport } from "./VoiceStateReport";
 
 export type VoiceConnectionState =
 	| "disconnected"
@@ -722,6 +723,9 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 				{/* muted também cancela a assinatura: quem entrar depois do deafen não é ouvido. */}
 				{/* O deafen cala só as vozes: a transmissão segue no volume do Foco. */}
 				{room && <RoomAudio room={room} deafened={isDeafened} />}
+				{room && voiceKind === "room" && voiceChannelId && (
+					<VoiceStateReport channelId={voiceChannelId} />
+				)}
 				{children}
 			</RoomContext.Provider>
 		</VoiceContext.Provider>

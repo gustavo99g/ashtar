@@ -118,6 +118,7 @@ fn person(id: &str) -> ParticipantView {
         display_name: None,
         screen_sharing: false,
         avatar: None,
+        ..ParticipantView::default()
     }
 }
 

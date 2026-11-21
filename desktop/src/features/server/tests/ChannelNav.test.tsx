@@ -64,7 +64,7 @@ const layout: Layout = {
 };
 
 function person(id: string, sharing = false): ParticipantView {
-	return { user_id: id, nick: id, display_name: null, screen_sharing: sharing };
+	return { user_id: id, nick: id, display_name: null, screen_sharing: sharing, mic_off: false, deafened: false, camera: false };
 }
 
 function renderNav({ manage = false, at = paths.channel("geral") } = {}) {

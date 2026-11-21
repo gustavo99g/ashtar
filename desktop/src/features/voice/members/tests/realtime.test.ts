@@ -9,6 +9,9 @@ const kid: ParticipantView = {
 	nick: "kid",
 	display_name: null,
 	screen_sharing: true,
+	mic_off: false,
+	deafened: false,
+	camera: false,
 };
 
 describe("handleVoiceRealtime", () => {
