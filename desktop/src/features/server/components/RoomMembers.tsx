@@ -135,9 +135,8 @@ function MemberRow({
 							className="size-3.5 text-muted-foreground"
 						/>
 					)}
-					{member.sharing ? (
-						<LiveBadge />
-					) : member.deafened ? (
+					{member.sharing && <LiveBadge />}
+					{member.deafened ? (
 						<HeadphoneOffIcon
 							aria-label="áudio desativado"
 							className="size-3.5 text-destructive-border"
