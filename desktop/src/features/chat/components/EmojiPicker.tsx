@@ -49,17 +49,17 @@ function bare(unicode: string): EmojiEntry {
  * O seletor de emoji (o quadro "Chat — seletor de emoji"): a busca em cima, os botões das seções,
  * as seções com Recentes primeiro, depois os emojis do grupo (`c:<id>`, decisão 31), e embaixo o
  * emoji sob o mouse com o apelido. Escolher guarda nos Recentes e chama `onPick`.
+ *
+ * Das categorias do Unicode, só uma aparece por vez (a dos botões de cima): com as ~1900 de uma
+ * vez, abrir e fechar travava o app. A busca procura em todas.
  */
 export function EmojiPicker({ onPick }: { onPick: (emoji: string) => void }) {
 	const [groups, setGroups] = useState<EmojiGroup[] | null>(null);
 	const [failed, setFailed] = useState(false);
 	const [query, setQuery] = useState("");
 	const [hovered, setHovered] = useState<EmojiEntry | null>(null);
-	/**
-	 * Abrir desenha só as primeiras seções (o que aparece); as outras vêm no quadro seguinte. Sem
-	 * isso, o clique esperava os ~1900 botões ficarem prontos.
-	 */
-	const [all, setAll] = useState(false);
+	/** A categoria do Unicode à vista; `null` é a primeira. */
+	const [picked, setPicked] = useState<string | null>(null);
 	const recent = useRecentEmoji((state) => state.recent);
 	const scroller = useRef<HTMLDivElement>(null);
 	const groupEmojis = useGroupEmojis();
@@ -102,9 +102,9 @@ export function EmojiPicker({ onPick }: { onPick: (emoji: string) => void }) {
 
 	const sections = useMemo(() => {
 		if (!groups) return [];
-		const all: EmojiGroup[] = [];
+		const list: EmojiGroup[] = [];
 		if (recent.length > 0) {
-			all.push({
+			list.push({
 				key: "recent",
 				label: "Recentes",
 				emojis: recent
@@ -113,8 +113,8 @@ export function EmojiPicker({ onPick }: { onPick: (emoji: string) => void }) {
 					.map((e) => byUnicode.get(e) ?? bare(e)),
 			});
 		}
-		if (custom) all.push(custom);
-		return [...all, ...groups];
+		if (custom) list.push(custom);
+		return [...list, ...groups];
 	}, [groups, recent, byUnicode, custom]);
 
 	const results = useMemo(
@@ -134,15 +134,19 @@ export function EmojiPicker({ onPick }: { onPick: (emoji: string) => void }) {
 		onPickRef.current(emoji.unicode);
 	}, []);
 
-	useEffect(() => {
-		if (!groups || all) return;
-		const timer = setTimeout(() => setAll(true), 60);
-		return () => clearTimeout(timer);
-	}, [groups, all]);
+	const current = picked ?? groups?.[0]?.key ?? null;
+	/** O que aparece: Recentes e Do grupo (poucos), e só a categoria escolhida. */
+	const shownSections = sections.filter(
+		(section) =>
+			section.key === "recent" ||
+			section.key === "group" ||
+			section.key === current,
+	);
 
 	function jump(key: string) {
 		setQuery("");
-		setAll(true);
+		const isCategory = key !== "recent" && key !== "group";
+		if (isCategory) setPicked(key);
 		requestAnimationFrame(() => {
 			scroller.current
 				?.querySelector<HTMLElement>(`[data-section="${key}"]`)
@@ -194,9 +198,15 @@ export function EmojiPicker({ onPick }: { onPick: (emoji: string) => void }) {
 								key={section.key}
 								type="button"
 								aria-label={section.label}
+								aria-pressed={section.key === current}
 								title={section.label}
 								onClick={() => jump(section.key)}
-								className="flex size-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
+								className={cn(
+									"flex size-8 items-center justify-center rounded-md hover:bg-accent hover:text-foreground",
+									section.key === current
+										? "bg-accent text-foreground"
+										: "text-muted-foreground",
+								)}
 							>
 								<Icon className="size-4" />
 							</button>
@@ -222,13 +232,11 @@ export function EmojiPicker({ onPick }: { onPick: (emoji: string) => void }) {
 						<div className="pt-2.5">{grid(results)}</div>
 					)
 				) : (
-					(all ? sections : sections.slice(0, 3)).map((section) => (
+					shownSections.map((section) => (
 						<section
 							key={section.key}
 							data-section={section.key}
 							aria-label={section.label}
-							// As seções fora da tela não são desenhadas até chegar nelas.
-							className="[contain-intrinsic-size:auto_400px] [content-visibility:auto]"
 						>
 							<h3 className="px-0.5 pt-2.5 pb-1 text-[11px] font-bold tracking-[0.06em] text-muted-foreground uppercase">
 								{section.label}

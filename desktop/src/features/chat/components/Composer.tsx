@@ -298,7 +298,12 @@ export function Composer({
 						>
 							<SmileIcon className="size-5" />
 						</PopoverTrigger>
-						<PopoverContent side="top" align="end" className="w-auto gap-0 p-0">
+						<PopoverContent
+								side="top"
+								align="end"
+								// Sem a animação de saída: o quadro some na hora, e não no canto da tela.
+								className="w-auto gap-0 p-0 data-closed:animate-none"
+							>
 							<EmojiPicker onPick={insertEmoji} />
 						</PopoverContent>
 					</Popover>

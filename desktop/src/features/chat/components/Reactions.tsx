@@ -100,7 +100,10 @@ export function Reactions({
 					>
 						<SmilePlusIcon className="size-4" />
 					</PopoverTrigger>
-					<PopoverContent align="start" className="w-auto gap-0 p-0">
+					<PopoverContent
+						align="start"
+						className="w-auto gap-0 p-0 data-closed:animate-none"
+					>
 						<EmojiPicker
 							onPick={(emoji) => {
 								setPickerOpen(false);
