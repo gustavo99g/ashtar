@@ -9,11 +9,17 @@ import {
 	getInvite,
 	getMe,
 	type MeResponse,
+	removeAvatar,
 	type Status,
+	setAvatar,
 	setStatus,
 	updateMe,
+	uploadFile,
 } from "@/lib/api";
+import { clearFileCache } from "@/lib/fileCache";
 import { useOptionalQueryClient } from "@/lib/query";
+import { AVATAR_OUTPUT } from "./model/avatarCrop";
+import { clearAvatars, rememberAvatars } from "./stores/avatarStore";
 import { redeemInvite, useSession } from "./stores/sessionStore";
 import { rememberStatus, useLastStatus } from "./stores/statusStore";
 
@@ -23,7 +29,18 @@ import { rememberStatus, useLastStatus } from "./stores/statusStore";
  */
 export function useClearCache() {
 	const queryClient = useQueryClient();
-	return useCallback(() => queryClient.clear(), [queryClient]);
+	return useCallback(() => {
+		queryClient.clear();
+		clearFileCache();
+		clearAvatars();
+	}, [queryClient]);
+}
+
+/** O `/api/me`, guardando a minha foto para o `Avatar`. */
+async function fetchMe(): Promise<MeResponse> {
+	const me = await getMe();
+	rememberAvatars([me.user]);
+	return me;
 }
 
 export const identityKeys = {
@@ -40,7 +57,7 @@ export function useMe() {
 	const connected = useSession().status === "connected";
 	return useQuery({
 		queryKey: identityKeys.me(),
-		queryFn: getMe,
+		queryFn: fetchMe,
 		enabled: connected,
 	});
 }
@@ -55,7 +72,7 @@ export function useOptionalMe(): MeResponse | undefined {
 	return useQuery(
 		{
 			queryKey: identityKeys.me(),
-			queryFn: getMe,
+			queryFn: fetchMe,
 			enabled: connected && present,
 		},
 		client,
@@ -103,6 +120,31 @@ export function useUpdateMe() {
 		mutationFn: (displayName: string | null) =>
 			updateMe({ display_name: displayName }),
 		onSuccess: (me) => queryClient.setQueryData(identityKeys.me(), me),
+	});
+}
+
+/**
+ * Troca a foto de perfil: envia a imagem já recortada (`kind=avatar`) e liga ela ao perfil. Com
+ * `null`, tira a foto. Quem vê recebe o `user.updated`; aqui, o `/api/me` em cache já muda.
+ */
+export function useChangeAvatar() {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: async (image: Blob | null) => {
+			if (!image) return removeAvatar();
+			const extension = image.type === "image/webp" ? "webp" : "png";
+			const file = await uploadFile(image, {
+				kind: "avatar",
+				name: `foto.${extension}`,
+				width: AVATAR_OUTPUT,
+				height: AVATAR_OUTPUT,
+			});
+			return setAvatar(file.id);
+		},
+		onSuccess: (me) => {
+			queryClient.setQueryData(identityKeys.me(), me);
+			rememberAvatars([me.user]);
+		},
 	});
 }
 

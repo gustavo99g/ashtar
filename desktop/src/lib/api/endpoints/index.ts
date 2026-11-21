@@ -34,7 +34,14 @@ export {
 } from "./chat";
 export { listDms, openDm } from "./dms";
 export { createInvite, getInvite, listInvites, revokeInvite } from "./invites";
-export { getMe, setStatus, updateMe } from "./me";
+export { fetchFile, type UploadOptions, uploadFile } from "./files";
+export {
+	getMe,
+	removeAvatar,
+	setAvatar,
+	setStatus,
+	updateMe,
+} from "./me";
 export {
 	createRecoveryInvite,
 	getMemberPermissions,

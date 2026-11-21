@@ -41,8 +41,10 @@ export function handleDmsRealtime(
 				void queryClient.invalidateQueries({ queryKey: dmsKeys.list() });
 			}
 			break;
+		case "user.updated":
 		case "member.left":
-			// A conversa com quem saiu fica só para leitura: a lista traz o `removed`.
+			// A conversa com quem saiu fica só para leitura: a lista traz o `removed`. O nome novo
+			// de alguém também vem na lista.
 			void queryClient.invalidateQueries({ queryKey: dmsKeys.list() });
 			break;
 		case "ready":

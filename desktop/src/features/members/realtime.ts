@@ -16,6 +16,7 @@ export function handleMembersRealtime(
 	const stale =
 		event.type === "member.joined" ||
 		event.type === "member.left" ||
+		event.type === "user.updated" ||
 		(event.type === "ready" && info.resumed);
 	if (stale) {
 		void queryClient.invalidateQueries({ queryKey: membersKeys.list() });

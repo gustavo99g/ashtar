@@ -21,3 +21,16 @@ export function updateMe(request: UpdateMeRequest): Promise<MeResponse> {
 export function setStatus(status: Status): Promise<MeResponse> {
 	return apiJson<MeResponse>("/api/me/status", jsonRequest("PUT", { status }));
 }
+
+/** `PUT /api/me/avatar`: troca a foto por um arquivo `avatar` já enviado. Responde como o `getMe`. */
+export function setAvatar(fileId: string): Promise<MeResponse> {
+	return apiJson<MeResponse>(
+		"/api/me/avatar",
+		jsonRequest("PUT", { file_id: fileId }),
+	);
+}
+
+/** `DELETE /api/me/avatar`: tira a foto (volta a letra e a cor). Responde como o `getMe`. */
+export function removeAvatar(): Promise<MeResponse> {
+	return apiJson<MeResponse>("/api/me/avatar", { method: "DELETE" });
+}

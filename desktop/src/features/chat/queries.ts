@@ -19,7 +19,7 @@ import {
 	useQueryClient,
 } from "@tanstack/react-query";
 import { useCallback, useEffect } from "react";
-import { useSession } from "@/features/identity";
+import { rememberAvatars, useSession } from "@/features/identity";
 import {
 	ApiError,
 	type ChannelHead,
@@ -28,6 +28,7 @@ import {
 	listMessages,
 	listPeople,
 	type Message,
+	type Person,
 	type MessagePage,
 	sendMessage,
 	setReaction,
@@ -415,6 +416,46 @@ export function useMessageActions() {
 	return { edit, remove, react };
 }
 
+/** A lista de pessoas, guardando a foto de cada uma para o `Avatar`. */
+async function fetchPeople(): Promise<Person[]> {
+	const people = await listPeople();
+	rememberAvatars(people);
+	return people;
+}
+
+/**
+ * A foto ou o nome novo de alguém (`user.updated`) nas mensagens em cache, que trazem o autor
+ * inteiro.
+ */
+export function updateAuthor(
+	queryClient: QueryClient,
+	userId: string,
+	change: Pick<Message["author"], "display_name" | "avatar">,
+): void {
+	for (const kind of ["messages", "around"]) {
+		queryClient.setQueriesData<MessagePages>(
+			{ queryKey: [...chatKeys.all, kind] },
+			(data) => {
+				if (!data) return data;
+				let changed = false;
+				const pages = data.pages.map((page) => {
+					if (!page.messages.some((m) => m.author.id === userId)) return page;
+					changed = true;
+					return {
+						...page,
+						messages: page.messages.map((message) =>
+							message.author.id === userId
+								? { ...message, author: { ...message.author, ...change } }
+								: message,
+						),
+					};
+				});
+				return changed ? { ...data, pages } : data;
+			},
+		);
+	}
+}
+
 /** De quanto em quanto tempo a coluna de membros pergunta quem está online, com o tempo real fora. */
 export const PEOPLE_REFRESH_MS = 30_000;
 
@@ -429,7 +470,7 @@ export function usePeople() {
 	const live = useRealtimeOpen();
 	return useQuery({
 		queryKey: chatKeys.people(),
-		queryFn: listPeople,
+		queryFn: fetchPeople,
 		enabled: connected,
 		staleTime: Number.POSITIVE_INFINITY,
 		refetchInterval: visible && !live ? PEOPLE_REFRESH_MS : false,

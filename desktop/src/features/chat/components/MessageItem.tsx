@@ -79,6 +79,7 @@ export function MessageItem({
 						<Avatar
 							nick={author.nick}
 							displayName={author.display_name}
+							avatar={author.avatar}
 							size={40}
 						/>
 					) : (

@@ -142,4 +142,27 @@ describe("handleChatRealtime", () => {
 		expect(client.getQueryState(chatKeys.people())?.isInvalidated).toBe(true);
 		expect(listMessages).toHaveBeenCalledWith("geral", { after: "m1" });
 	});
+
+	it("user.updated troca o nome e a foto na lista de pessoas e nas mensagens", () => {
+		const client = setup();
+		handleChatRealtime(
+			{
+				type: "user.updated",
+				id: "ana",
+				display_name: "Ana Clara",
+				avatar: "f1",
+			},
+			client,
+			first,
+		);
+		expect(people(client)?.[0]).toMatchObject({
+			display_name: "Ana Clara",
+			avatar: "f1",
+		});
+		expect(people(client)?.[1].avatar).toBeUndefined();
+		expect(history(client)?.[0].author).toMatchObject({
+			display_name: "Ana Clara",
+			avatar: "f1",
+		});
+	});
 });

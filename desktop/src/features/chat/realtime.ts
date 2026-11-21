@@ -5,6 +5,7 @@
  */
 import type { QueryClient } from "@tanstack/react-query";
 import type { Person, ServerEvent } from "@/lib/api";
+import { rememberAvatars } from "@/features/identity";
 import type { RealtimeEventInfo } from "@/lib/realtime";
 import {
 	appendMessages,
@@ -13,6 +14,7 @@ import {
 	dropMessage,
 	markAuthorRemoved,
 	replaceMessage,
+	updateAuthor,
 } from "./queries";
 import { removePending } from "./stores/outboxStore";
 import { forgetReplyTo } from "./stores/replyStore";
@@ -59,7 +61,18 @@ export function handleChatRealtime(
 				),
 			);
 			break;
+		case "user.updated": {
+			const change = { display_name: event.display_name, avatar: event.avatar };
+			updatePeople(queryClient, (people) =>
+				people.map((person) =>
+					person.id === event.id ? { ...person, ...change } : person,
+				),
+			);
+			updateAuthor(queryClient, event.id, change);
+			break;
+		}
 		case "member.joined":
+			rememberAvatars([event.person]);
 			updatePeople(queryClient, (people) =>
 				people.some((person) => person.id === event.person.id)
 					? people
