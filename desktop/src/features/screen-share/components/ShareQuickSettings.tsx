@@ -90,7 +90,7 @@ function QuickBody({
 
 			<footer className="flex items-center gap-2 border-t border-border pt-3">
 				<Button
-					variant="ghost"
+					variant="secondary"
 					size="sm"
 					className="mr-auto"
 					onClick={() => {

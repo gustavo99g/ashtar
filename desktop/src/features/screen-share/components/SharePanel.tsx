@@ -123,7 +123,7 @@ function PanelBody({
 				</div>
 				<div className="flex items-center gap-1">
 					<Button
-						variant="ghost"
+						variant="secondary"
 						className="h-9 text-sm font-medium"
 						onClick={() => {
 							onClose();
