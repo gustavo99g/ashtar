@@ -7,6 +7,8 @@ import type {
 	Message,
 	MessagePage,
 	Person,
+	SearchHas,
+	SearchPage,
 	SendMessageRequest,
 } from "../generated";
 
@@ -127,6 +129,26 @@ export function setPinned(messageId: string, on: boolean): Promise<Message> {
 /** `GET /api/channels/{id}/pins`: as fixadas, da fixada mais recente para a mais antiga. */
 export function listPins(channelId: string): Promise<Message[]> {
 	return apiJson<Message[]>(`/api/channels/${encodeURIComponent(channelId)}/pins`);
+}
+
+export interface SearchParams {
+	q?: string;
+	author?: string;
+	channelId?: string;
+	has?: SearchHas;
+	/** A página seguinte: as mais velhas que esta. */
+	before?: string;
+}
+
+/** `GET /api/search`: a busca nos canais de texto, da mais nova para a mais velha, de 25 em 25. */
+export function searchMessages(params: SearchParams): Promise<SearchPage> {
+	const query = new URLSearchParams();
+	if (params.q) query.set("q", params.q);
+	if (params.author) query.set("author", params.author);
+	if (params.channelId) query.set("channel_id", params.channelId);
+	if (params.has) query.set("has", params.has);
+	if (params.before) query.set("before", params.before);
+	return apiJson<SearchPage>(`/api/search?${query.toString()}`);
 }
 
 /** `GET /api/people`: quem está no grupo, com quem está online. */

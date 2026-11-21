@@ -31,6 +31,8 @@ export {
 	listPeople,
 	listPins,
 	type PageCursor,
+	type SearchParams,
+	searchMessages,
 	sendMessage,
 	setPinned,
 	setReaction,

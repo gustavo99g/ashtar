@@ -31,6 +31,8 @@ import {
 	type Message,
 	type MessagePage,
 	type Person,
+	type SearchParams,
+	searchMessages,
 	sendMessage,
 	setPinned,
 	setReaction,
@@ -59,7 +61,30 @@ export const chatKeys = {
 	around: (channelId: string, anchor: string) =>
 		[...chatKeys.all, "around", channelId, anchor] as const,
 	pins: (channelId: string) => [...chatKeys.all, "pins", channelId] as const,
+	search: (params: SearchParams | null) =>
+		[...chatKeys.all, "search", params] as const,
 };
+
+/**
+ * A busca (`GET /api/search`), de 25 em 25, da mais nova para a mais velha. `null` não busca. Não
+ * fica em dia pelo tempo real: buscar de novo traz o que mudou.
+ */
+export function useSearch(params: SearchParams | null) {
+	const connected = useSession().status === "connected";
+	const query = useInfiniteQuery({
+		queryKey: chatKeys.search(params),
+		queryFn: ({ pageParam }) =>
+			searchMessages({ ...params, ...(pageParam ? { before: pageParam } : {}) }),
+		initialPageParam: null as string | null,
+		getNextPageParam: (last) =>
+			last.has_more ? (last.messages[last.messages.length - 1]?.id ?? null) : null,
+		enabled: connected && params !== null,
+		staleTime: 30_000,
+		gcTime: 60_000,
+	});
+	const messages = query.data?.pages.flatMap((page) => page.messages);
+	return { ...query, messages };
+}
 
 /** As fixadas do canal (`GET /api/channels/{id}/pins`); o tempo real mantém em dia (`syncPin`). */
 export function usePins(channelId: string) {

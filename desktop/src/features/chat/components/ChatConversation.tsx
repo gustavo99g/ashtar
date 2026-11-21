@@ -3,6 +3,7 @@ import {
 	type DragEvent,
 	type ReactNode,
 	useCallback,
+	useEffect,
 	useMemo,
 	useState,
 } from "react";
@@ -26,6 +27,7 @@ import {
 } from "../queries";
 import { addDraftFiles, type DraftFile } from "../stores/attachmentStore";
 import { usePending } from "../stores/outboxStore";
+import { clearJump, useJumpStore } from "../stores/jumpStore";
 import { cancelReply, startReply, useReplyStore } from "../stores/replyStore";
 import { Composer } from "./Composer";
 import { DeleteMessageDialog } from "./DeleteMessageDialog";
@@ -125,6 +127,16 @@ export function ChatConversation({
 		},
 		[shown],
 	);
+
+	// Um resultado da busca pedindo para ir até uma mensagem desta conversa.
+	const jump = useJumpStore((state) =>
+		state.request?.channelId === channelId ? state.request.messageId : null,
+	);
+	useEffect(() => {
+		if (jump === null) return;
+		clearJump();
+		jumpTo(jump);
+	}, [jump, jumpTo]);
 
 	const removeNow = useCallback(
 		(message: Message) => {

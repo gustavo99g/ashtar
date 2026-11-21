@@ -23,6 +23,7 @@ import { usePeople } from "../queries";
 import { setDraft } from "../stores/draftStore";
 import { paths } from "@/lib/paths";
 import { ChatConversation } from "./ChatConversation";
+import { SearchBox } from "./SearchBox";
 
 /**
  * A tela de um canal de texto: o cabeçalho com o nome e o tópico, a conversa e o campo de
@@ -74,6 +75,7 @@ export function ChatView({ channelId }: { channelId: string }) {
 					{channel.name}
 				</h1>
 				<ChannelTopic channel={channel} />
+				<SearchBox channelId={channel.id} />
 			</header>
 			<ChatConversation
 				channelId={channel.id}

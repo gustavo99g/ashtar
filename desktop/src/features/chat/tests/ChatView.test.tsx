@@ -15,6 +15,7 @@ import {
 	listPins,
 	listVoiceParticipants,
 	type Message,
+	searchMessages,
 	sendMessage,
 	setPinned,
 	type UserView,
@@ -30,6 +31,7 @@ vi.mock("@/lib/api", async (importOriginal) => ({
 	listPeople: vi.fn(),
 	listPins: vi.fn(),
 	listVoiceParticipants: vi.fn(),
+	searchMessages: vi.fn(),
 	sendMessage: vi.fn(),
 	setPinned: vi.fn(),
 }));
@@ -300,6 +302,50 @@ describe("ChatView", () => {
 			expect(
 				screen.queryByRole("button", { name: /mensagem fixada/ }),
 			).not.toBeInTheDocument(),
+		);
+	});
+
+	it("a busca sugere o filtro, mostra o resultado com o termo e vai até a mensagem", async () => {
+		const user = userEvent.setup();
+		vi.mocked(listPeople).mockResolvedValue([]);
+		vi.mocked(searchMessages).mockResolvedValue({
+			messages: [message("m9", "Você vai jogar hoje?")],
+			has_more: false,
+		});
+		renderChat();
+		const field = await screen.findByRole("combobox", {
+			name: "Buscar no grupo",
+		});
+		await user.type(field, "tem:im");
+		await user.click(await screen.findByRole("option", { name: "imagem" }));
+		expect(field).toHaveValue("tem:imagem ");
+		await user.type(field, "voce{Enter}");
+		const box = await screen.findByRole("dialog", { name: "Resultados" });
+		expect(searchMessages).toHaveBeenCalledWith({
+			q: "voce",
+			has: "image",
+			channelId: "geral",
+		});
+		expect(within(box).getByText("Você").tagName).toBe("MARK");
+
+		await user.click(within(box).getByRole("radio", { name: "Todo o grupo" }));
+		await vi.waitFor(() =>
+			expect(searchMessages).toHaveBeenLastCalledWith({
+				q: "voce",
+				has: "image",
+			}),
+		);
+		await user.click(
+			await within(box).findByRole("button", { name: /jogar hoje/ }),
+		);
+		await vi.waitFor(() =>
+			expect(
+				screen.queryByRole("dialog", { name: "Resultados" }),
+			).not.toBeInTheDocument(),
+		);
+		// Não está no histórico carregado: abre o histórico em volta dela.
+		await vi.waitFor(() =>
+			expect(listMessages).toHaveBeenCalledWith("geral", { around: "m9" }),
 		);
 	});
 
