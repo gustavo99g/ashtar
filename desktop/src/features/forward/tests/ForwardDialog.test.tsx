@@ -1,3 +1,4 @@
+import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -99,7 +100,9 @@ function renderDialog() {
 	client.setQueryData(dmsKeys.list(), [conversation]);
 	render(
 		<QueryClientProvider client={client}>
-			<ForwardDialog />
+			<MemoryRouter>
+				<ForwardDialog />
+			</MemoryRouter>
 		</QueryClientProvider>,
 	);
 }
