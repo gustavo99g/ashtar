@@ -144,6 +144,7 @@ describe("o registro da ligação no histórico", () => {
 			reactions: [],
 			pinned_at: null,
 			attachments: [],
+			previews: [],
 			call: { id: "c1", outcome, duration },
 		};
 	}

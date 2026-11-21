@@ -26,6 +26,7 @@ export {
 export {
 	deleteMessage,
 	editMessage,
+	hidePreviews,
 	listMessages,
 	listPeople,
 	type PageCursor,

@@ -36,6 +36,7 @@ function message(id: string, channelId: string): Message {
 		reactions: [],
 		pinned_at: null,
 		attachments: [],
+		previews: [],
 		call: null,
 	};
 }

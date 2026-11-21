@@ -95,6 +95,7 @@ function message(
 		reactions: [],
 		pinned_at: null,
 		attachments: [],
+		previews: [],
 		call: null,
 		...extra,
 	};

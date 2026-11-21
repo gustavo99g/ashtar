@@ -40,6 +40,7 @@ function message(id: string, authorId = "ana", channelId = "geral"): Message {
 		reactions: [],
 		pinned_at: null,
 		attachments: [],
+		previews: [],
 		call: null,
 	};
 }

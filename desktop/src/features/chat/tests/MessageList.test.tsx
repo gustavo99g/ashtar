@@ -58,6 +58,7 @@ function message(id: string): Message {
 		reactions: [],
 		pinned_at: null,
 		attachments: [],
+		previews: [],
 		call: null,
 	};
 }

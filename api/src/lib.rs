@@ -12,6 +12,7 @@ pub mod files;
 pub mod identity;
 pub mod limiter;
 pub mod logs;
+pub mod previews;
 pub mod realtime;
 pub mod routes;
 pub mod secret;
@@ -69,6 +70,8 @@ pub struct AppState {
     pub files: Arc<files::FileStore>,
     /// Quando o dono foi avisado do disco cheio pela última vez (no máximo uma vez por dia).
     pub disk_alerted_at: Arc<std::sync::atomic::AtomicI64>,
+    /// As regras da busca das prévias de link (a VPS só vai a endereços públicos).
+    pub previews: Arc<previews::Guard>,
 }
 
 impl AppState {
@@ -89,6 +92,7 @@ impl AppState {
             started_at: db::now(),
             files: Arc::new(files::FileStore::from_env(&logs::data_dir_from_env())),
             disk_alerted_at: Arc::new(std::sync::atomic::AtomicI64::new(0)),
+            previews: Arc::new(previews::Guard::default()),
         }
     }
 
@@ -109,6 +113,9 @@ pub const FILE_MAINTENANCE_EVERY: std::time::Duration = std::time::Duration::fro
 /// 80%, avisa o dono (no máximo uma vez por dia).
 pub async fn maintain_files(state: &AppState) {
     let now = db::now();
+    if let Err(error) = previews::sweep(&state.db, &state.files, now).await {
+        eprintln!("limpeza das prévias: {error}");
+    }
     match files::sweep(&state.db, &state.files, now).await {
         Ok(0) => {}
         Ok(n) => println!("Arquivos não usados apagados: {n}"),
@@ -202,6 +209,10 @@ pub fn app(state: AppState, policy: Arc<ClientPolicy>) -> Router {
         .route(
             "/messages/{id}",
             patch(routes::messages::edit).delete(routes::messages::delete),
+        )
+        .route(
+            "/messages/{id}/previews",
+            delete(routes::messages::hide_previews),
         )
         .route(
             "/messages/{id}/reactions/{emoji}",

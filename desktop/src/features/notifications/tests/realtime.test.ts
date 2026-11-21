@@ -43,6 +43,7 @@ function message(channelId: string, mentions: string[] = [], author = "ana"): Me
 		reactions: [],
 		pinned_at: null,
 		attachments: [],
+		previews: [],
 		call: null,
 	};
 }

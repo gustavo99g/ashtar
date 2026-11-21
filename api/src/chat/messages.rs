@@ -12,6 +12,7 @@ use crate::error::{ApiError, unique_violation};
 use crate::files::{self, FileView};
 use crate::identity::User;
 use crate::limiter::SendLimiter;
+use crate::previews::{self, LinkPreview};
 
 pub const BODY_MAX: usize = 2000;
 /// Quebras de linha seguidas que ainda valem.
@@ -88,6 +89,8 @@ pub struct Message {
     pub pinned_at: Option<i64>,
     /// Os anexos, na ordem em que foram escolhidos (até [`ATTACHMENTS_MAX`]).
     pub attachments: Vec<FileView>,
+    /// Os cartões dos links do texto (até 3), que chegam depois, num `message.updated`.
+    pub previews: Vec<LinkPreview>,
 }
 
 /// Quantos arquivos uma mensagem leva.
@@ -213,6 +216,7 @@ impl From<MessageRow> for Message {
             reactions: Vec::new(),
             pinned_at: row.pinned_at,
             attachments: Vec::new(),
+            previews: Vec::new(),
         }
     }
 }
@@ -498,7 +502,15 @@ pub async fn find(db: &SqlitePool, id: &str) -> Result<Option<Message>, ApiError
 /// Preenche as reações e os anexos de `messages`.
 async fn attach_extras(db: &SqlitePool, messages: &mut [Message]) -> Result<(), ApiError> {
     attach_reactions(db, messages).await?;
-    attach_files(db, messages).await
+    attach_files(db, messages).await?;
+    let ids: Vec<&str> = messages.iter().map(|m| m.id.as_str()).collect();
+    let found = previews::of_messages(db, &ids).await?;
+    for (message_id, preview) in found {
+        if let Some(message) = messages.iter_mut().find(|m| m.id == message_id) {
+            message.previews.push(preview);
+        }
+    }
+    Ok(())
 }
 
 /// Preenche os anexos de `messages` com uma consulta só.
@@ -824,6 +836,7 @@ pub async fn delete(db: &SqlitePool, message_id: &str) -> Result<Vec<String>, Ap
         "DELETE FROM mentions WHERE message_id = ?",
         "DELETE FROM reactions WHERE message_id = ?",
         "DELETE FROM message_files WHERE message_id = ?",
+        "DELETE FROM message_previews WHERE message_id = ?",
         "DELETE FROM messages WHERE id = ?",
     ] {
         sqlx::query(sql).bind(message_id).execute(&mut *tx).await?;

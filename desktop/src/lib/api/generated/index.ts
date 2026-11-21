@@ -297,6 +297,19 @@ export type LayoutRequest = {
  */
 version: number, top: Array<string>, categories: Array<CategoryOrder>, };
 
+/**
+ * O cartão de um link, como a `Message` leva.
+ */
+export type LinkPreview = { 
+/**
+ * O endereço como estava na mensagem.
+ */
+url: string, site: string | null, title: string | null, description: string | null, 
+/**
+ * O arquivo da imagem (`kind = preview`), se a página tem uma.
+ */
+image_id: string | null, };
+
 export type LiveKitStatus = { ok: boolean, 
 /**
  * Quanto levou para responder, em ms.
@@ -402,7 +415,11 @@ pinned_at: number | null,
 /**
  * Os anexos, na ordem em que foram escolhidos (até [`ATTACHMENTS_MAX`]).
  */
-attachments: Array<FileView>, };
+attachments: Array<FileView>, 
+/**
+ * Os cartões dos links do texto (até 3), que chegam depois, num `message.updated`.
+ */
+previews: Array<LinkPreview>, };
 
 /**
  * O tipo da mensagem: o texto de alguém, ou o registro de uma ligação.

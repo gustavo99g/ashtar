@@ -61,6 +61,7 @@ beforeEach(() => {
 						reactions: [],
 						pinned_at: null,
 						attachments: [],
+						previews: [],
 						call: null,
 					},
 				],

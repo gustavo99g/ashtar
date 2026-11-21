@@ -60,6 +60,7 @@ function message(id: string, channelId: string, authorId: string, body: string):
 		reactions: [],
 		pinned_at: null,
 		attachments: [],
+		previews: [],
 		call: null,
 	};
 }

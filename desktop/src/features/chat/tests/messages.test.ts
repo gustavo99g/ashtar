@@ -40,6 +40,7 @@ function message(authorId: string, created_at: number): Message {
 		reactions: [],
 		pinned_at: null,
 		attachments: [],
+		previews: [],
 		call: null,
 	};
 }

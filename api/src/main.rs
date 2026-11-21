@@ -32,7 +32,12 @@ async fn main() {
 
     println!("Endereço público: {public_url}");
 
-    let state = AppState::new(pool, &public_url);
+    let mut state = AppState::new(pool, &public_url);
+    // A prévia de links nunca busca a própria VPS.
+    state.previews = std::sync::Arc::new(api::previews::Guard {
+        own: api::previews::own_addresses(&public_url).await,
+        ..Default::default()
+    });
     println!("Arquivos: {}", state.files.root().display());
     // A limpeza dos arquivos não usados e o aviso do disco, de hora em hora (ADR 0031).
     let maintenance = state.clone();

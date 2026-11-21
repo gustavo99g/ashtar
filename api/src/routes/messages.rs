@@ -133,11 +133,45 @@ pub async fn send(
             message: message.clone(),
         };
         publish(&state, &channel, &event).await?;
+        spawn_previews(&state, &channel, &message);
         StatusCode::CREATED
     } else {
         StatusCode::OK
     };
     Ok((status, Json(message)))
+}
+
+/// Busca as prévias dos links de `message` em segundo plano (decisão 22 do plano da v0.7) e,
+/// se mudaram, manda a mensagem inteira num `message.updated`.
+fn spawn_previews(state: &AppState, channel: &Readable, message: &Message) {
+    let had = !message.previews.is_empty();
+    if !had && crate::previews::meta::links(&message.body).is_empty() {
+        return;
+    }
+    let state = state.clone();
+    let channel = channel.clone();
+    let id = message.id.clone();
+    tokio::spawn(async move {
+        let result = async {
+            if !crate::previews::refresh(&state.db, &state.files, &state.previews, &id, now())
+                .await?
+            {
+                return Ok(());
+            }
+            let Some(message) = messages::find(&state.db, &id).await? else {
+                return Ok(());
+            };
+            let event = ServerEvent::MessageUpdated {
+                message,
+                new_mentions: Vec::new(),
+            };
+            publish(&state, &channel, &event).await
+        }
+        .await;
+        if let Err(error) = result {
+            eprintln!("prévias da mensagem {id}: {error}");
+        }
+    });
 }
 
 /// Manda `event` para quem lê `channel`: num canal de texto, quem acessa o canal
@@ -196,7 +230,29 @@ pub async fn edit(
         new_mentions: edited.new_mentions,
     };
     publish(&state, &channel, &event).await?;
+    spawn_previews(&state, &channel, &edited.message);
     Ok(Json(edited.message))
+}
+
+/// `DELETE /api/messages/{id}/previews`: o autor tira as prévias da mensagem, de vez (o X no
+/// cartão). Responde com a mensagem, que vai também no `message.updated`.
+pub async fn hide_previews(
+    State(state): State<AppState>,
+    CurrentUser(user): CurrentUser,
+    Path(id): Path<String>,
+) -> Result<Json<Message>, ApiError> {
+    let (channel, message) = readable_message(&state, &user, &id).await?;
+    if message.author.id != user.id {
+        return Err(ApiError::Forbidden);
+    }
+    crate::previews::hide(&state.db, &message.id).await?;
+    let message = messages::get(&state.db, &message.id).await?;
+    let event = ServerEvent::MessageUpdated {
+        message: message.clone(),
+        new_mentions: Vec::new(),
+    };
+    publish(&state, &channel, &event).await?;
+    Ok(Json(message))
 }
 
 /// `DELETE /api/messages/{id}`: 204. O autor, ou o dono numa mensagem de canal.

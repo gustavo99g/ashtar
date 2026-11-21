@@ -104,6 +104,16 @@ export function setReaction(
 	);
 }
 
+/**
+ * `DELETE /api/messages/{id}/previews`: o autor tira os cartões dos links, de vez. Devolve a
+ * mensagem sem eles.
+ */
+export function hidePreviews(messageId: string): Promise<Message> {
+	return apiJson<Message>(`${messagePath(messageId)}/previews`, {
+		method: "DELETE",
+	});
+}
+
 /** `GET /api/people`: quem está no grupo, com quem está online. */
 export function listPeople(): Promise<Person[]> {
 	return apiJson<Person[]>("/api/people");

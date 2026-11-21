@@ -12,6 +12,7 @@ import type { Mentionable } from "../model/mentions";
 import { authorName, stampLabel, timeLabel } from "../model/messages";
 import type { PendingMessage } from "../stores/outboxStore";
 import { Attachments, PendingFiles } from "./Attachments";
+import { LinkPreviews } from "./LinkPreviews";
 import { MessageMenuItems, MessageToolbar } from "./MessageActions";
 import { MessageBody } from "./MessageBody";
 import { MessageEditor } from "./MessageEditor";
@@ -124,6 +125,7 @@ export function MessageItem({
 						/>
 					)}
 					<Attachments files={message.attachments ?? []} />
+					<LinkPreviews message={message} mine={message.author.id === myId} />
 					<Reactions message={message} actions={actions} />
 				</div>
 			</div>

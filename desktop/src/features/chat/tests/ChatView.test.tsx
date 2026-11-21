@@ -75,6 +75,7 @@ function message(id: string, body: string, clientId = id): Message {
 		reactions: [],
 		pinned_at: null,
 		attachments: [],
+		previews: [],
 		call: null,
 	};
 }
