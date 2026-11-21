@@ -110,7 +110,7 @@ function MemberRow({
 				{...(drag.enabled ? drag.listeners : {})}
 				className={cn(
 					drag.isDragging && "opacity-50",
-					"mx-2 flex w-[calc(100%-16px)] items-center gap-2 rounded-md py-[3px] pr-2 pl-[42px] text-left text-[13px]",
+					"mx-2 flex w-[calc(100%-16px)] items-center gap-2 rounded-md py-[3px] pr-2 pl-6 text-left text-[13px]",
 					"text-muted-foreground hover:bg-secondary hover:text-foreground data-popup-open:bg-secondary",
 					isMe && "text-foreground",
 				)}
