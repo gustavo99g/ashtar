@@ -59,6 +59,7 @@ function message(id: string): Message {
 		pinned_at: null,
 		attachments: [],
 		previews: [],
+		forwarded: null,
 		call: null,
 	};
 }

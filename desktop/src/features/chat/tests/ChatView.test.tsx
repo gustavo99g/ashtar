@@ -76,6 +76,7 @@ function message(id: string, body: string, clientId = id): Message {
 		pinned_at: null,
 		attachments: [],
 		previews: [],
+		forwarded: null,
 		call: null,
 	};
 }

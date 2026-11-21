@@ -50,6 +50,7 @@ function message(
 		pinned_at: null,
 		attachments: [],
 		previews: [],
+		forwarded: null,
 		call: null,
 	};
 }
@@ -111,6 +112,7 @@ describe("as não lidas", () => {
 			pinned_at: null,
 			attachments: [],
 			previews: [],
+			forwarded: null,
 			call: { id: `c-${id}`, outcome, duration: null },
 		});
 		created(record("m7", "declined"));

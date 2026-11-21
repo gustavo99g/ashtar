@@ -96,6 +96,7 @@ function message(
 		pinned_at: null,
 		attachments: [],
 		previews: [],
+		forwarded: null,
 		call: null,
 		...extra,
 	};

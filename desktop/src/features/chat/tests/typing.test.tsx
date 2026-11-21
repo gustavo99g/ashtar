@@ -90,6 +90,7 @@ describe("o digitando", () => {
 			pinned_at: null,
 			attachments: [],
 			previews: [],
+			forwarded: null,
 			call: null,
 		} satisfies Message;
 		handleChatRealtime({ type: "message.created", message }, client, info);

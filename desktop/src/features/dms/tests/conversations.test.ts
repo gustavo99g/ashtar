@@ -23,6 +23,7 @@ function message(id: string, authorId: string, body = "oi"): Message {
 		pinned_at: null,
 		attachments: [],
 		previews: [],
+		forwarded: null,
 		call: null,
 	};
 }
@@ -119,6 +120,7 @@ describe("a lista de conversas", () => {
 				pinned_at: null,
 				attachments: [],
 				previews: [],
+				forwarded: null,
 				call: { id: "c", outcome, duration: outcome === "answered" ? 60 : null },
 			});
 		expect(preview(call("missed", "ana"), "eu")).toBe("Chamada perdida");

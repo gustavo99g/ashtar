@@ -1,6 +1,6 @@
 //! Mensagens: o texto que vale, o envio sem duplicar e o histórico em páginas.
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, SqlitePool};
 use ts_rs::TS;
 use uuid::Uuid;
@@ -91,6 +91,22 @@ pub struct Message {
     pub attachments: Vec<FileView>,
     /// Os cartões dos links do texto (até 3), que chegam depois, num `message.updated`.
     pub previews: Vec<LinkPreview>,
+    /// De onde veio, se foi encaminhada (decisão 29 do plano da v0.7).
+    pub forwarded: Option<ForwardedFrom>,
+}
+
+/// O resumo da original de uma mensagem encaminhada, guardado na hora: a encaminhada continua
+/// igual se a original mudar ou for excluída.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "index.ts")]
+pub struct ForwardedFrom {
+    pub message_id: String,
+    pub author_id: String,
+    /// O nome de quem escreveu, como aparecia.
+    pub author_name: String,
+    /// O canal da original (`#nome`); `None` numa conversa privada.
+    pub channel_name: Option<String>,
+    pub created_at: i64,
 }
 
 /// Quantos arquivos uma mensagem leva.
@@ -159,6 +175,7 @@ struct MessageRow {
     reply_display_name: Option<String>,
     reply_removed_at: Option<i64>,
     reply_avatar_id: Option<String>,
+    forwarded: Option<String>,
 }
 
 impl From<MessageRow> for Message {
@@ -217,6 +234,10 @@ impl From<MessageRow> for Message {
             pinned_at: row.pinned_at,
             attachments: Vec::new(),
             previews: Vec::new(),
+            forwarded: row
+                .forwarded
+                .as_deref()
+                .and_then(|json| serde_json::from_str(json).ok()),
         }
     }
 }
@@ -256,7 +277,7 @@ macro_rules! select_message {
                     m.edited_at, m.pinned_at, m.reply_to AS reply_id, r.body AS reply_body,
                     ru.id AS reply_author_id, ru.nick AS reply_nick,
                     ru.display_name AS reply_display_name, ru.removed_at AS reply_removed_at,
-                    ru.avatar_id AS reply_avatar_id
+                    ru.avatar_id AS reply_avatar_id, m.forwarded
              FROM messages m JOIN users u ON u.id = m.author_id
              LEFT JOIN calls k ON k.id = m.call_id
              LEFT JOIN messages r ON r.id = m.reply_to AND r.channel_id = m.channel_id
@@ -411,6 +432,89 @@ pub async fn create(
             .await?;
     }
     files::mark_used(&mut tx, attachments, now).await?;
+    read::advance(&mut tx, &author.id, channel_id, &id).await?;
+    tx.commit().await?;
+    Ok((get(db, &id).await?, true))
+}
+
+/// Encaminha `original` (de `from`, que quem encaminha lê) para `channel`, como mensagem nova de
+/// `author`: o mesmo texto, os mesmos arquivos (sem copiar os bytes) e o resumo da original. Não
+/// leva as reações, a resposta nem as menções (ninguém é notificado de novo). O mesmo `client_id`
+/// devolve a que já existe, como no [`create`].
+#[allow(clippy::too_many_arguments)]
+pub async fn forward(
+    db: &SqlitePool,
+    limiter: &SendLimiter,
+    channel: &Readable,
+    author: &User,
+    client_id: &str,
+    original: &Message,
+    from: &Readable,
+    now: i64,
+) -> Result<(Message, bool), ApiError> {
+    validate_client_id(client_id)?;
+    if original.kind != MessageKind::Text {
+        return Err(ApiError::InvalidRequest(
+            "Só dá para encaminhar uma mensagem de texto.".into(),
+        ));
+    }
+    let channel_id = channel.id();
+    if let Some(existing) = find_existing(db, channel_id, author, client_id).await? {
+        return Ok((existing, false));
+    }
+    limiter.try_send(&author.id)?;
+    let summary = ForwardedFrom {
+        message_id: original.id.clone(),
+        author_id: original.author.id.clone(),
+        author_name: original
+            .author
+            .display_name
+            .clone()
+            .filter(|name| !name.trim().is_empty())
+            .unwrap_or_else(|| original.author.nick.clone()),
+        channel_name: match from {
+            Readable::Text(text) => Some(text.name.clone()),
+            Readable::Dm(_) => None,
+        },
+        created_at: original.created_at,
+    };
+    let summary = serde_json::to_string(&summary)
+        .map_err(|error| ApiError::InvalidRequest(error.to_string()))?;
+
+    let id = Uuid::now_v7().to_string();
+    let mut tx = db.begin_with("BEGIN IMMEDIATE").await?;
+    let inserted = sqlx::query(
+        "INSERT INTO messages (id, channel_id, author_id, client_id, body, created_at, forwarded)
+         VALUES (?, ?, ?, ?, ?, ?, ?)",
+    )
+    .bind(&id)
+    .bind(channel_id)
+    .bind(&author.id)
+    .bind(client_id)
+    .bind(&original.body)
+    .bind(now)
+    .bind(&summary)
+    .execute(&mut *tx)
+    .await;
+    match inserted {
+        Ok(_) => {}
+        Err(error) if unique_violation(&error).is_some() => {
+            drop(tx);
+            let existing = find_existing(db, channel_id, author, client_id).await?;
+            return existing
+                .map(|m| (m, false))
+                .ok_or(ApiError::Internal(error));
+        }
+        Err(error) => return Err(error.into()),
+    }
+    sqlx::query(
+        "INSERT INTO message_files (message_id, file_id, position)
+         SELECT ?, file_id, position FROM message_files WHERE message_id = ?",
+    )
+    .bind(&id)
+    .bind(&original.id)
+    .execute(&mut *tx)
+    .await?;
     read::advance(&mut tx, &author.id, channel_id, &id).await?;
     tx.commit().await?;
     Ok((get(db, &id).await?, true))

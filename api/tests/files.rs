@@ -859,3 +859,126 @@ async fn send_with_range(
         .to_vec();
     (status, headers, bytes)
 }
+
+#[tokio::test]
+async fn encaminhar_leva_o_texto_e_os_mesmos_arquivos() {
+    let ctx = setup().await;
+    let bia = join(&ctx, "Bia", 2, false).await;
+    let cadu = join(&ctx, "Cadu", 3, false).await;
+    let cadu_id = users::get_active_by_nick(&ctx.db, "Cadu").await.unwrap().id;
+    let (_, doc) = upload(
+        &ctx,
+        &bia,
+        "kind=attachment&name=notas.txt",
+        "text/plain",
+        b"oi".to_vec(),
+    )
+    .await;
+    let doc_id = doc["id"].as_str().unwrap().to_owned();
+    let dm = json_call(
+        &ctx,
+        "POST",
+        "/api/dms",
+        &bia,
+        json!({ "user_id": cadu_id }),
+    )
+    .await;
+    let dm_id = dm["id"].as_str().unwrap().to_owned();
+    let original = json_call(
+        &ctx,
+        "POST",
+        &format!("/api/channels/{dm_id}/messages"),
+        &bia,
+        json!({ "client_id": "c-1", "body": "as notas", "attachments": [doc_id] }),
+    )
+    .await;
+    let original_id = original["id"].as_str().unwrap().to_owned();
+    json_call(
+        &ctx,
+        "PUT",
+        &format!("/api/messages/{original_id}/reactions/👍"),
+        &cadu,
+        Value::Null,
+    )
+    .await;
+
+    // O dono não lê a conversa: não encaminha (404, como se não existisse).
+    let (status, _) = post_message(
+        &ctx,
+        &ctx.owner_token,
+        json!({ "client_id": "f-0", "body": "", "forward": original_id }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+
+    // O Cadu encaminha para #geral: o texto, o arquivo e o resumo, sem a reação.
+    let (status, forwarded) = post_message(
+        &ctx,
+        &cadu,
+        json!({ "client_id": "f-1", "body": "ignorado", "forward": original_id }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED);
+    assert_eq!(forwarded["body"], "as notas");
+    assert_eq!(forwarded["reactions"], json!([]));
+    assert_eq!(forwarded["attachments"][0]["id"], doc["id"]);
+    assert_eq!(forwarded["forwarded"]["message_id"], original["id"]);
+    assert_eq!(forwarded["forwarded"]["author_name"], "Bia");
+    assert_eq!(forwarded["forwarded"]["channel_name"], Value::Null);
+    // O mesmo client_id não duplica.
+    let (status, again) = post_message(
+        &ctx,
+        &cadu,
+        json!({ "client_id": "f-1", "body": "", "forward": original_id }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(again["id"], forwarded["id"]);
+
+    // Agora o dono vê o arquivo, por #geral.
+    let uri = format!("/api/files/{}", doc["id"].as_str().unwrap());
+    let (status, _, _) = send(
+        &ctx,
+        "GET",
+        &uri,
+        Some(&ctx.owner_token),
+        None,
+        Body::empty(),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+
+    // Excluir a original não apaga o arquivo da encaminhada; excluir as duas apaga.
+    let (status, _, _) = send(
+        &ctx,
+        "DELETE",
+        &format!("/api/messages/{original_id}"),
+        Some(&bia),
+        None,
+        Body::empty(),
+    )
+    .await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+    assert_eq!(files_on_disk(&ctx), 1);
+    let (status, _, _) = send(
+        &ctx,
+        "GET",
+        &uri,
+        Some(&ctx.owner_token),
+        None,
+        Body::empty(),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    let (status, _, _) = send(
+        &ctx,
+        "DELETE",
+        &format!("/api/messages/{}", forwarded["id"].as_str().unwrap()),
+        Some(&cadu),
+        None,
+        Body::empty(),
+    )
+    .await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+    assert_eq!(files_on_disk(&ctx), 0);
+}

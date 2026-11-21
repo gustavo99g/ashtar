@@ -387,6 +387,7 @@ async function deliver(
 			reply_to: pending.reply?.id,
 			reply_mention: pending.reply?.mention,
 			...(attachments.length > 0 ? { attachments } : {}),
+			...(pending.forward ? { forward: pending.forward } : {}),
 		});
 		appendMessages(queryClient, pending.channel_id, [message]);
 		removePending(clientId);
@@ -440,7 +441,23 @@ export function useSendMessage() {
 		(clientId: string) => void deliver(queryClient, clientId),
 		[queryClient],
 	);
-	return { send, retry, discard: removePending };
+	/** Encaminha `original` para `channelId` (aparece na hora, como um envio). */
+	const forward = useCallback(
+		(channelId: string, original: Message) => {
+			const clientId = newClientId();
+			addPending({
+				client_id: clientId,
+				channel_id: channelId,
+				body: original.body,
+				forward: original.id,
+				created_at: Math.floor(Date.now() / 1000),
+				status: "sending",
+			});
+			void deliver(queryClient, clientId);
+		},
+		[queryClient],
+	);
+	return { send, retry, discard: removePending, forward };
 }
 
 /**

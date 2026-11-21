@@ -145,6 +145,7 @@ describe("o registro da ligação no histórico", () => {
 			pinned_at: null,
 			attachments: [],
 			previews: [],
+			forwarded: null,
 			call: { id: "c1", outcome, duration },
 		};
 	}

@@ -232,6 +232,20 @@ path: string, expires_at: number, };
 export type FileView = { id: string, kind: FileKind, name: string, mime: string, size: number, width: number | null, height: number | null, duration_ms: number | null, thumbnail_id: string | null, };
 
 /**
+ * O resumo da original de uma mensagem encaminhada, guardado na hora: a encaminhada continua
+ * igual se a original mudar ou for excluída.
+ */
+export type ForwardedFrom = { message_id: string, author_id: string, 
+/**
+ * O nome de quem escreveu, como aparecia.
+ */
+author_name: string, 
+/**
+ * O canal da original (`#nome`); `None` numa conversa privada.
+ */
+channel_name: string | null, created_at: number, };
+
+/**
  * Se a linha é uma [`Permission`] (o dono pode ligar e desligar) ou uma
  * [`Action`] (hoje, só do dono).
  */
@@ -428,7 +442,11 @@ attachments: Array<FileView>,
 /**
  * Os cartões dos links do texto (até 3), que chegam depois, num `message.updated`.
  */
-previews: Array<LinkPreview>, };
+previews: Array<LinkPreview>, 
+/**
+ * De onde veio, se foi encaminhada (decisão 29 do plano da v0.7).
+ */
+forwarded: ForwardedFrom | null, };
 
 /**
  * O tipo da mensagem: o texto de alguém, ou o registro de uma ligação.
@@ -584,7 +602,12 @@ reply_mention?: boolean,
  * Os ids dos arquivos já enviados (`POST /api/files`), até 10. Com anexo, o texto pode
  * ser vazio.
  */
-attachments?: Array<string>, };
+attachments?: Array<string>, 
+/**
+ * Encaminhar: o id da mensagem original, que quem envia precisa poder ler. Com ele, o
+ * `body`, a resposta e os anexos do pedido não valem: vai o texto e os arquivos da original.
+ */
+forward?: string, };
 
 /**
  * Tudo o que a API manda pelo WebSocket. O `type` é o nome do evento.

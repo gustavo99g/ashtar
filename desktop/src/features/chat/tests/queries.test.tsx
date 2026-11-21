@@ -41,6 +41,7 @@ function message(id: string, authorId = "ana", channelId = "geral"): Message {
 		pinned_at: null,
 		attachments: [],
 		previews: [],
+		forwarded: null,
 		call: null,
 	};
 }

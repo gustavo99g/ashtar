@@ -61,6 +61,7 @@ function message(id: string, channelId: string, authorId: string, body: string):
 		pinned_at: null,
 		attachments: [],
 		previews: [],
+		forwarded: null,
 		call: null,
 	};
 }

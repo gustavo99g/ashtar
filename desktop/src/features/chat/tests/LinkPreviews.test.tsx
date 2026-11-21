@@ -29,6 +29,7 @@ const message: Message = {
 	reactions: [],
 	pinned_at: null,
 	attachments: [],
+	forwarded: null,
 	previews: [
 		{
 			url: "https://exemplo.com/",

@@ -90,6 +90,11 @@ pub struct SendMessageRequest {
     #[serde(default)]
     #[ts(optional)]
     pub attachments: Option<Vec<String>>,
+    /// Encaminhar: o id da mensagem original, que quem envia precisa poder ler. Com ele, o
+    /// `body`, a resposta e os anexos do pedido não valem: vai o texto e os arquivos da original.
+    #[serde(default)]
+    #[ts(optional)]
+    pub forward: Option<String>,
 }
 
 /// `POST /api/channels/{id}/messages`: 201 com a mensagem nova, ou 200 com a
@@ -110,21 +115,36 @@ pub async fn send(
             return Err(ApiError::Conflict("Essa pessoa saiu do grupo.".into()));
         }
     }
-    let (message, created) = messages::create(
-        &state.db,
-        &state.send_limiter,
-        &channel,
-        &user,
-        &request.client_id,
-        &request.body,
-        request.reply_to.as_deref().map(|id| messages::ReplyTo {
-            id,
-            mention: request.reply_mention.unwrap_or(true),
-        }),
-        request.attachments.as_deref().unwrap_or_default(),
-        now(),
-    )
-    .await?;
+    let (message, created) = if let Some(original) = &request.forward {
+        let (from, original) = readable_message(&state, &user, original).await?;
+        messages::forward(
+            &state.db,
+            &state.send_limiter,
+            &channel,
+            &user,
+            &request.client_id,
+            &original,
+            &from,
+            now(),
+        )
+        .await?
+    } else {
+        messages::create(
+            &state.db,
+            &state.send_limiter,
+            &channel,
+            &user,
+            &request.client_id,
+            &request.body,
+            request.reply_to.as_deref().map(|id| messages::ReplyTo {
+                id,
+                mention: request.reply_mention.unwrap_or(true),
+            }),
+            request.attachments.as_deref().unwrap_or_default(),
+            now(),
+        )
+        .await?
+    };
     let status = if created {
         // Só a nova vai para o WebSocket: a repetida quem devia já recebeu.
         // A de um canal de texto vai para quem acessa o canal (todos, se ele

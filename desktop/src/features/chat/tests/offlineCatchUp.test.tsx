@@ -62,6 +62,7 @@ beforeEach(() => {
 						pinned_at: null,
 						attachments: [],
 						previews: [],
+						forwarded: null,
 						call: null,
 					},
 				],

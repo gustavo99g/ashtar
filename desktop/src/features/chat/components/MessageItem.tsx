@@ -1,3 +1,4 @@
+import { ForwardIcon } from "lucide-react";
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -111,6 +112,18 @@ export function MessageItem({
 							</time>
 						</div>
 					)}
+					{message.forwarded && (
+						<p className="flex items-center gap-1.5 pt-0.5 text-xs text-muted-foreground">
+							<ForwardIcon aria-hidden="true" className="size-3.5 shrink-0" />
+							<span className="truncate">
+								Encaminhada · {message.forwarded.author_name}
+								{message.forwarded.channel_name
+									? ` em #${message.forwarded.channel_name}`
+									: ""}{" "}
+								· {stampLabel(message.forwarded.created_at)}
+							</span>
+						</p>
+					)}
 					{editing && actions ? (
 						<MessageEditor
 							message={message}
@@ -179,6 +192,12 @@ export function PendingItem({
 					message.status === "sending" && "opacity-50",
 				)}
 			>
+				{message.forward && (
+					<p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+						<ForwardIcon aria-hidden="true" className="size-3.5" />
+						Encaminhando…
+					</p>
+				)}
 				<MessageBody body={message.body} />
 				<PendingFiles files={message.files ?? []} />
 				{message.status === "failed" && (

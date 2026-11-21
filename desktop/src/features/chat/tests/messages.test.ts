@@ -41,6 +41,7 @@ function message(authorId: string, created_at: number): Message {
 		pinned_at: null,
 		attachments: [],
 		previews: [],
+		forwarded: null,
 		call: null,
 	};
 }

@@ -37,6 +37,7 @@ function message(id: string, authorId = "ana"): Message {
 		pinned_at: null,
 		attachments: [],
 		previews: [],
+		forwarded: null,
 		call: null,
 	};
 }

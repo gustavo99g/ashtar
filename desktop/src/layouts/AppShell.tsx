@@ -2,6 +2,7 @@ import { Outlet } from "react-router-dom";
 import { CallBridge } from "@/features/calls";
 import { ChannelDialogs } from "@/features/channels";
 import { DmDock, showDm } from "@/features/dms";
+import { ForwardDialog } from "@/features/forward";
 import { LogsNotices } from "@/features/admin";
 import { JoinNotices } from "@/features/members";
 import { NotificationsBridge, RoomSounds } from "@/features/notifications";
@@ -71,6 +72,8 @@ function AppFrame() {
 			<SideDock />
 			{/* Os diálogos de criar, editar e arquivar canais: abrem pela lista ou pelo cabeçalho do chat. */}
 			<ChannelDialogs />
+			{/* O Encaminhar do menu da mensagem: escolher o canal ou a conversa. */}
+			<ForwardDialog />
 			{/* Os avisos: a regra, o ponto de não lido e o clique num cartão. Não desenha nada. */}
 			<NotificationsBridge />
 			<RoomSounds />

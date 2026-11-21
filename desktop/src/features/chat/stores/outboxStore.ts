@@ -31,6 +31,8 @@ export interface PendingMessage {
 	reply?: PendingReply;
 	/** Os anexos, que sobem antes de a mensagem ir. */
 	files?: PendingFile[];
+	/** Encaminhar: o id da original (o `body` é o texto dela, só para mostrar). */
+	forward?: string;
 	/** Em segundos, como o `created_at` da API. */
 	created_at: number;
 	status: "sending" | "failed";

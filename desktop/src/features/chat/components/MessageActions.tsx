@@ -1,5 +1,6 @@
 import {
 	CopyIcon,
+	ForwardIcon,
 	MoreHorizontalIcon,
 	PencilIcon,
 	ReplyIcon,
@@ -27,6 +28,7 @@ import {
 	type MessageActionsValue,
 	QUICK_REACTIONS,
 } from "./messageContext";
+import { requestForward } from "../stores/forwardStore";
 
 /** Se quem lê já reagiu com `emoji`. */
 export function reacted(
@@ -96,6 +98,10 @@ export function MessageMenuItems({
 					Editar mensagem
 				</DropdownMenuItem>
 			)}
+			<DropdownMenuItem onClick={() => requestForward(message)}>
+				<ForwardIcon />
+				Encaminhar
+			</DropdownMenuItem>
 			<DropdownMenuSeparator />
 			<DropdownMenuItem onClick={() =>
 					void navigator.clipboard.writeText(message.body).catch(() => {})

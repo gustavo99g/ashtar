@@ -44,6 +44,7 @@ function message(channelId: string, mentions: string[] = [], author = "ana"): Me
 		pinned_at: null,
 		attachments: [],
 		previews: [],
+		forwarded: null,
 		call: null,
 	};
 }
