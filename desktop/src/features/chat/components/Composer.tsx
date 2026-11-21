@@ -1,6 +1,13 @@
-import { AtSignIcon, PlusIcon, XIcon } from "lucide-react";
-import { useLayoutEffect, useRef, useState } from "react";
+import { AtSignIcon, CirclePlusIcon, SmileIcon, XIcon } from "lucide-react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import {
+	Popover,
+	PopoverContent,
+	PopoverTrigger,
+} from "@/components/ui/popover";
+import { customId, useEmojiById } from "@/features/emojis";
 import { cn } from "@/lib/utils";
+import { preloadEmojiGroups } from "../model/emoji";
 import type { Mentionable } from "../model/mentions";
 import {
 	authorName,
@@ -22,6 +29,7 @@ import {
 } from "../stores/replyStore";
 import { useTypingSignal } from "../hooks/useTypingSignal";
 import { AttachmentDrafts } from "./AttachmentDrafts";
+import { EmojiPicker } from "./EmojiPicker";
 import { TypingLine } from "./TypingLine";
 import { EmojiSuggest, useEmojiSuggest } from "./EmojiSuggest";
 import { MentionPicker, useMentionPicker } from "./MentionPicker";
@@ -112,6 +120,28 @@ export function Composer({
 		if (replyId) ref.current?.focus();
 	}, [replyId]);
 
+	const [emojiOpen, setEmojiOpen] = useState(false);
+	const emojiById = useEmojiById();
+	// O seletor abre na hora: os emojis já vêm carregados quando o app fica parado.
+	useEffect(() => preloadEmojiGroups(), []);
+
+	/** Põe o emoji escolhido onde está o cursor (o do grupo entra como `:nome:`). */
+	function insertEmoji(emoji: string) {
+		const id = customId(emoji);
+		const custom = id ? emojiById.get(id) : undefined;
+		const text = custom ? `:${custom.name}: ` : emoji;
+		const field = ref.current;
+		const start = field?.selectionStart ?? draft.length;
+		const end = field?.selectionEnd ?? draft.length;
+		setDraft(channelId, draft.slice(0, start) + text + draft.slice(end));
+		setEmojiOpen(false);
+		requestAnimationFrame(() => {
+			const at = start + text.length;
+			ref.current?.focus();
+			ref.current?.setSelectionRange(at, at);
+		});
+	}
+
 	function attach(picked: readonly File[]) {
 		if (picked.length === 0) return;
 		setProblem(addDraftFiles(channelId, picked));
@@ -168,7 +198,7 @@ export function Composer({
 					</button>
 				</div>
 			)}
-			<div className="relative flex flex-col rounded-[10px] border border-border bg-secondary pr-3.5 pl-1.5 focus-within:border-primary">
+			<div className="relative flex flex-col rounded-[10px] border border-border bg-secondary pr-2 pl-1.5 focus-within:border-primary">
 				<AttachmentDrafts channelId={channelId} files={files} />
 				<div className="flex items-end">
 					<button
@@ -176,9 +206,9 @@ export function Composer({
 						aria-label="Anexar arquivos"
 						title="Anexar arquivos"
 						onClick={() => fileInput.current?.click()}
-						className="mb-[11px] flex size-6 shrink-0 items-center justify-center rounded-full bg-muted-foreground text-secondary hover:bg-foreground"
+						className="mb-[5px] flex size-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground"
 					>
-						<PlusIcon className="size-4 stroke-[2.5]" />
+						<CirclePlusIcon className="size-5 stroke-[1.75]" />
 					</button>
 					<input
 						ref={fileInput}
@@ -260,6 +290,18 @@ export function Composer({
 							{length}/{BODY_MAX}
 						</span>
 					)}
+					<Popover open={emojiOpen} onOpenChange={setEmojiOpen}>
+						<PopoverTrigger
+							aria-label="Inserir emoji"
+							title="Inserir emoji"
+							className="mb-[5px] flex size-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground data-popup-open:bg-accent data-popup-open:text-foreground"
+						>
+							<SmileIcon className="size-5" />
+						</PopoverTrigger>
+						<PopoverContent side="top" align="end" className="w-auto gap-0 p-0">
+							<EmojiPicker onPick={insertEmoji} />
+						</PopoverContent>
+					</Popover>
 				</div>
 			</div>
 			{problem && (

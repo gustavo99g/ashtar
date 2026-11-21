@@ -13,7 +13,7 @@ import {
 	TrophyIcon,
 	UtensilsIcon,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Spinner } from "@/components/ui/spinner";
 import { CustomEmoji, customId, useEmojiById, useGroupEmojis } from "@/features/emojis";
 import { cn } from "@/lib/utils";
@@ -120,10 +120,14 @@ export function EmojiPicker({ onPick }: { onPick: (emoji: string) => void }) {
 		[groups, query, custom],
 	);
 
-	function pick(emoji: EmojiEntry) {
+	// Estável: as grades não desenham de novo a cada emoji sob o mouse (eram ~1900 botões, e o
+	// rodapé mudando refazia todos).
+	const onPickRef = useRef(onPick);
+	onPickRef.current = onPick;
+	const pick = useCallback((emoji: EmojiEntry) => {
 		rememberEmoji(emoji.unicode);
-		onPick(emoji.unicode);
-	}
+		onPickRef.current(emoji.unicode);
+	}, []);
 
 	function jump(key: string) {
 		setQuery("");
@@ -136,21 +140,12 @@ export function EmojiPicker({ onPick }: { onPick: (emoji: string) => void }) {
 
 	function grid(emojis: EmojiEntry[]) {
 		return (
-			<div className="grid grid-cols-8 gap-0.5">
-				{emojis.map((emoji) => (
-					<button
-						key={emoji.unicode}
-						type="button"
-						aria-label={emoji.label}
-						onClick={() => pick(emoji)}
-						onMouseEnter={() => setHovered(emoji)}
-						onFocus={() => setHovered(emoji)}
-						className="flex h-9 items-center justify-center rounded-md text-[22px] hover:bg-accent focus-visible:bg-accent focus-visible:outline-none"
-					>
-						<EmojiGlyph entry={emoji} byId={customById} />
-					</button>
-				))}
-			</div>
+			<EmojiGrid
+				emojis={emojis}
+				byId={customById}
+				onPick={pick}
+				onHover={setHovered}
+			/>
 		);
 	}
 
@@ -220,6 +215,8 @@ export function EmojiPicker({ onPick }: { onPick: (emoji: string) => void }) {
 							key={section.key}
 							data-section={section.key}
 							aria-label={section.label}
+							// As seções fora da tela não são desenhadas até chegar nelas.
+							className="[contain-intrinsic-size:auto_400px] [content-visibility:auto]"
 						>
 							<h3 className="px-0.5 pt-2.5 pb-1 text-[11px] font-bold tracking-[0.06em] text-muted-foreground uppercase">
 								{section.label}
@@ -259,3 +256,33 @@ function EmojiGlyph({
 	if (emoji) return <CustomEmoji emoji={emoji} className="size-7 align-middle" />;
 	return <>{entry.unicode}</>;
 }
+
+const EmojiGrid = memo(function EmojiGrid({
+	emojis,
+	byId,
+	onPick,
+	onHover,
+}: {
+	emojis: EmojiEntry[];
+	byId: ReadonlyMap<string, { name: string; file_id: string }>;
+	onPick: (emoji: EmojiEntry) => void;
+	onHover: (emoji: EmojiEntry) => void;
+}) {
+	return (
+		<div className="grid grid-cols-8 gap-0.5">
+			{emojis.map((emoji) => (
+				<button
+					key={emoji.unicode}
+					type="button"
+					aria-label={emoji.label}
+					onClick={() => onPick(emoji)}
+					onMouseEnter={() => onHover(emoji)}
+					onFocus={() => onHover(emoji)}
+					className="flex h-9 items-center justify-center rounded-md text-[22px] hover:bg-accent focus-visible:bg-accent focus-visible:outline-none"
+				>
+					<EmojiGlyph entry={emoji} byId={byId} />
+				</button>
+			))}
+		</div>
+	);
+});

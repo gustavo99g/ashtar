@@ -4,6 +4,7 @@
  * a mais antiga, cada uma com Ir até a mensagem e, para quem pode, Desafixar.
  */
 import { PinIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { useState } from "react";
 import {
 	Popover,
@@ -88,15 +89,23 @@ export function PinsBar({
 	const [open, setOpen] = useState(false);
 	if (pins.length === 0) return null;
 	return (
-		<div className={compact ? "px-2.5 pt-1.5" : "px-4 pt-2"}>
-			<Popover open={open} onOpenChange={setOpen}>
-				<PopoverTrigger className="flex h-8 w-full items-center gap-2 rounded-lg border border-border bg-card px-3 text-left text-[13px] text-secondary-foreground hover:bg-secondary hover:text-foreground">
-					<PinIcon aria-hidden="true" className="size-3.5 shrink-0 text-gold" />
-					<span className="truncate">
-						{pinCount(pins.length)} · clique para ver
-					</span>
-				</PopoverTrigger>
-				<PopoverContent
+		<Popover open={open} onOpenChange={setOpen}>
+			<PopoverTrigger
+				aria-label={`${pinCount(pins.length)} · clique para ver`}
+				className={cn(
+					"flex w-full shrink-0 items-center gap-2 border-b border-border bg-card py-2 text-left text-[13px] text-muted-foreground hover:bg-secondary",
+					compact ? "px-3" : "px-4",
+				)}
+			>
+				<PinIcon aria-hidden="true" className="size-3.5 shrink-0 text-link" />
+				<span className="truncate">
+					<strong className="font-semibold text-foreground">
+						{pinCount(pins.length)}
+					</strong>{" "}
+					· clique para ver
+				</span>
+			</PopoverTrigger>
+			<PopoverContent
 					align="start"
 					className="max-h-[min(70vh,520px)] w-[min(420px,calc(100vw-2rem))] overflow-hidden p-0"
 				>
@@ -116,8 +125,7 @@ export function PinsBar({
 							/>
 						))}
 					</ul>
-				</PopoverContent>
-			</Popover>
-		</div>
+			</PopoverContent>
+		</Popover>
 	);
 }

@@ -140,11 +140,13 @@ export function SearchBox({ channelId }: { channelId: string }) {
 	}
 
 	return (
-		<div ref={anchor} className="relative ml-auto w-[min(240px,40%)] shrink-0">
-			<SearchIcon
-				aria-hidden="true"
-				className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground"
-			/>
+		<div ref={anchor} className="relative ml-1 w-[min(180px,40%)] shrink-0">
+			{!text && (
+				<SearchIcon
+					aria-hidden="true"
+					className="pointer-events-none absolute top-1/2 right-2 size-3.5 -translate-y-1/2 text-muted-foreground"
+				/>
+			)}
 			<input
 				ref={input}
 				type="search"
@@ -153,7 +155,7 @@ export function SearchBox({ channelId }: { channelId: string }) {
 				aria-expanded={shown !== null}
 				aria-controls={shown ? "search-suggestions" : undefined}
 				aria-autocomplete="list"
-				placeholder="Buscar no grupo"
+				placeholder="Buscar"
 				title="Filtros: de:nick, em:#canal, tem:anexo, tem:imagem, tem:video, tem:link"
 				value={text}
 				onChange={(event) => {
@@ -161,7 +163,7 @@ export function SearchBox({ channelId }: { channelId: string }) {
 					setSelected(0);
 				}}
 				onKeyDown={onKeyDown}
-				className="h-8 w-full rounded-lg border border-border bg-background pr-7 pl-8 text-[13px] text-foreground placeholder:text-muted-foreground focus-visible:border-focus focus-visible:outline-none [&::-webkit-search-cancel-button]:hidden"
+				className="h-7 w-full rounded-md border border-transparent bg-rail pr-7 pl-2 text-[13px] text-foreground placeholder:text-muted-foreground focus-visible:border-focus focus-visible:outline-none [&::-webkit-search-cancel-button]:hidden"
 			/>
 			{text && (
 				<button

@@ -121,3 +121,17 @@ export function searchEmoji(
 	}
 	return found;
 }
+
+/**
+ * Carrega os emojis quando o app fica parado, para o seletor abrir sem esperar. Devolve o que
+ * cancela (para o `useEffect`).
+ */
+export function preloadEmojiGroups(delayMs = 4000): () => void {
+	if (loading) return () => {};
+	const timer = setTimeout(() => {
+		const run = () => void loadEmojiGroups().catch(() => {});
+		if ("requestIdleCallback" in window) window.requestIdleCallback(run);
+		else run();
+	}, delayMs);
+	return () => clearTimeout(timer);
+}
