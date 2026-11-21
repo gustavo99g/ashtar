@@ -3,6 +3,7 @@ import {
 	MoreHorizontalIcon,
 	PencilIcon,
 	ReplyIcon,
+	SmilePlusIcon,
 	Trash2Icon,
 } from "lucide-react";
 import type { MouseEvent } from "react";
@@ -13,7 +14,13 @@ import {
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+	Popover,
+	PopoverContent,
+	PopoverTrigger,
+} from "@/components/ui/popover";
 import type { Message } from "@/lib/api";
+import { EmojiPicker } from "./EmojiPicker";
 import {
 	canDelete,
 	canEdit,
@@ -45,10 +52,13 @@ export function MessageMenuItems({
 	message,
 	actions,
 	withReactions,
+	onOpenPicker,
 }: {
 	message: Message;
 	actions: MessageActionsValue;
 	withReactions: boolean;
+	/** Abre o seletor de emoji da barra (o Reagir do menu). */
+	onOpenPicker?: () => void;
 }) {
 	const { myId } = actions;
 	const deletable = canDelete(message, myId, actions.canModerate);
@@ -69,6 +79,12 @@ export function MessageMenuItems({
 						</DropdownMenuItem>
 					))}
 				</div>
+			)}
+			{onOpenPicker && (
+				<DropdownMenuItem onClick={onOpenPicker}>
+					<SmilePlusIcon />
+					Reagir
+				</DropdownMenuItem>
 			)}
 			<DropdownMenuItem onClick={() => actions.reply(message)}>
 				<ReplyIcon />
@@ -108,18 +124,31 @@ export function MessageMenuItems({
 const TOOL =
 	"flex size-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground";
 
+/** Escolher no seletor reage, ou tira a reação se quem lê já tinha reagido com aquele emoji. */
+export function pickReaction(
+	message: Message,
+	actions: MessageActionsValue,
+	emoji: string,
+): void {
+	actions.react(message, emoji, !reacted(message, emoji, actions.myId));
+}
+
 /**
  * A barra que aparece em cima da mensagem ao passar o mouse (ou com o foco dentro dela): três
- * reações rápidas, Responder e o "..." com o resto.
+ * reações rápidas, Reagir (o seletor), Responder e o "..." com o resto.
  */
 export function MessageToolbar({
 	message,
 	actions,
 	onMenuOpenChange,
+	pickerOpen,
+	onPickerOpenChange,
 }: {
 	message: Message;
 	actions: MessageActionsValue;
 	onMenuOpenChange: (open: boolean) => void;
+	pickerOpen: boolean;
+	onPickerOpenChange: (open: boolean) => void;
 }) {
 	return (
 		<div
@@ -146,6 +175,23 @@ export function MessageToolbar({
 				</button>
 			))}
 			<span aria-hidden="true" className="mx-0.5 h-5 w-px bg-border-strong" />
+			<Popover open={pickerOpen} onOpenChange={onPickerOpenChange}>
+				<PopoverTrigger aria-label="Reagir" title="Reagir" className={TOOL}>
+					<SmilePlusIcon className="size-[18px]" />
+				</PopoverTrigger>
+				<PopoverContent
+					side="left"
+					align="start"
+					className="w-auto gap-0 p-0"
+				>
+					<EmojiPicker
+						onPick={(emoji) => {
+							onPickerOpenChange(false);
+							pickReaction(message, actions, emoji);
+						}}
+					/>
+				</PopoverContent>
+			</Popover>
 			<button
 				type="button"
 				aria-label="Responder"

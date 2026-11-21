@@ -44,6 +44,7 @@ export function MessageItem({
 }) {
 	const actions = useMessageActionsContext();
 	const [menuOpen, setMenuOpen] = useState(false);
+	const [pickerOpen, setPickerOpen] = useState(false);
 	const { author } = message;
 	const name = authorName(author);
 	const mentioned = message.mentions
@@ -57,7 +58,7 @@ export function MessageItem({
 		<li
 			data-message-id={message.id}
 			data-mentions-me={mentionsMe || undefined}
-			data-menu-open={menuOpen || undefined}
+			data-menu-open={menuOpen || pickerOpen || undefined}
 			className={cn(
 				"group relative px-4",
 				mentionsMe
@@ -128,6 +129,8 @@ export function MessageItem({
 					message={message}
 					actions={actions}
 					onMenuOpenChange={setMenuOpen}
+					pickerOpen={pickerOpen}
+					onPickerOpenChange={setPickerOpen}
 				/>
 			)}
 		</li>
@@ -138,7 +141,12 @@ export function MessageItem({
 		<ContextMenu onOpenChange={setMenuOpen}>
 			<ContextMenuTrigger render={row} />
 			<ContextMenuContent aria-label={`Mensagem de ${name}`}>
-				<MessageMenuItems message={message} actions={actions} withReactions />
+				<MessageMenuItems
+					message={message}
+					actions={actions}
+					withReactions
+					onOpenPicker={() => setPickerOpen(true)}
+				/>
 			</ContextMenuContent>
 		</ContextMenu>
 	);

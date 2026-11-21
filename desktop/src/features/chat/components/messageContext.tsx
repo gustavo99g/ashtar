@@ -50,12 +50,16 @@ export function canDelete(
 	);
 }
 
-/** As reações rápidas da barra da mensagem e do menu (o canvas "Chat — menu da mensagem"). */
+/**
+ * As reações rápidas da barra da mensagem e do menu (o canvas "Chat — menu da mensagem"). O texto é
+ * o mesmo do `emojibase-data` (o polegar e o coração com o seletor de variação `FE0F`), para a
+ * rápida e a do seletor serem a mesma reação.
+ */
 export const QUICK_REACTIONS: readonly { emoji: string; label: string }[] = [
-	{ emoji: "👍", label: "polegar" },
-	{ emoji: "❤️", label: "coração" },
-	{ emoji: "😂", label: "risada" },
-	{ emoji: "😮", label: "surpresa" },
-	{ emoji: "😢", label: "choro" },
-	{ emoji: "🔥", label: "fogo" },
+	{ emoji: "\u{1F44D}\u{FE0F}", label: "polegar" },
+	{ emoji: "\u{2764}\u{FE0F}", label: "coração" },
+	{ emoji: "\u{1F602}", label: "risada" },
+	{ emoji: "\u{1F62E}", label: "surpresa" },
+	{ emoji: "\u{1F622}", label: "choro" },
+	{ emoji: "\u{1F525}", label: "fogo" },
 ];

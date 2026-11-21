@@ -23,7 +23,10 @@ import { chatKeys } from "../queries";
 import { handleChatRealtime } from "../realtime";
 import { useDrafts } from "../stores/draftStore";
 import { useOutbox } from "../stores/outboxStore";
+import { useRecentEmoji } from "../stores/recentEmojiStore";
 import { useReplyStore } from "../stores/replyStore";
+
+const THUMBS = "\u{1F44D}\u{FE0F}";
 
 vi.mock("@/lib/api", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/lib/api")>()),
@@ -142,6 +145,7 @@ beforeEach(() => {
 	useDrafts.setState({ drafts: {} });
 	useOutbox.setState({ pending: [] });
 	useReplyStore.setState({ byChannel: {} });
+	useRecentEmoji.setState({ recent: [] });
 	vi.mocked(getChannelLayout).mockResolvedValue(layout);
 	vi.mocked(listMessages).mockResolvedValue({
 		messages: [fromAna, fromKid],
@@ -321,7 +325,7 @@ describe("as ações da mensagem", () => {
 	it("uma reação rápida da barra chama a API e aparece embaixo", async () => {
 		vi.mocked(setReaction).mockResolvedValue({
 			...fromAna,
-			reactions: [{ emoji: "👍", users: ["u1"] }],
+			reactions: [{ emoji: THUMBS, users: ["u1"] }],
 		});
 		const user = userEvent.setup();
 		renderChat();
@@ -332,12 +336,42 @@ describe("as ações da mensagem", () => {
 			}),
 		);
 
-		expect(setReaction).toHaveBeenCalledWith("m1", "👍", true);
-		expect(
-			await screen.findByRole("button", {
-				name: "Reação 👍, 1 pessoa, incluindo você",
+		expect(setReaction).toHaveBeenCalledWith("m1", THUMBS, true);
+		const chip = await screen.findByRole("button", {
+			name: `Reação ${THUMBS}, 1 pessoa, incluindo você`,
+		});
+		expect(chip).toHaveAttribute("aria-pressed", "true");
+
+		// Clicar de novo tira.
+		vi.mocked(setReaction).mockResolvedValue(fromAna);
+		await user.click(chip);
+		expect(setReaction).toHaveBeenLastCalledWith("m1", THUMBS, false);
+	});
+
+	it("o seletor busca sem acento, reage e guarda nos Recentes", async () => {
+		vi.mocked(setReaction).mockResolvedValue(fromAna);
+		const user = userEvent.setup();
+		renderChat();
+
+		await user.click(
+			within(await row("quem joga hoje?")).getByRole("button", {
+				name: "Reagir",
 			}),
-		).toHaveAttribute("aria-pressed", "true");
+		);
+		const picker = await screen.findByRole("dialog", { name: "Escolher emoji" });
+		await user.type(
+			within(picker).getByRole("searchbox", { name: "Buscar emoji" }),
+			"cafe",
+		);
+		await user.click(await within(picker).findByRole("button", { name: "café" }));
+
+		expect(setReaction).toHaveBeenCalledWith("m1", "☕️", true);
+		expect(useRecentEmoji.getState().recent[0]).toBe("☕️");
+		await waitFor(() =>
+			expect(
+				screen.queryByRole("dialog", { name: "Escolher emoji" }),
+			).not.toBeInTheDocument(),
+		);
 	});
 });
 
