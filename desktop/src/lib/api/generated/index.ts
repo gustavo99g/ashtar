@@ -80,6 +80,13 @@ export type CategoryView = { id: string, name: string,
 channels: Array<ChannelView>, };
 
 /**
+ * Um anexo e a mensagem em que ele está.
+ */
+export type ChannelFile = { message_id: string, author: Author, created_at: number, file: FileView, };
+
+export type ChannelFilesPage = { files: Array<ChannelFile>, has_more: boolean, };
+
+/**
  * Um canal de texto ou conversa como o `ready` do tempo real leva: a mensagem
  * mais nova e o estado de quem conectou. Na volta de uma queda, o app compara
  * o `last_message_id` com a última que tem e só chama o `?after=` dos que
@@ -380,6 +387,8 @@ can_manage_channels: boolean,
  * das salas se arrastam.
  */
 can_move_members: boolean, };
+
+export type MediaFilter = "media" | "files";
 
 /**
  * Quem criou, o alvo da recuperação ou quem entrou: id, nick e nome visível.

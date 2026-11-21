@@ -15,6 +15,7 @@ use super::auth::CurrentUser;
 use super::extract::ApiJson;
 use crate::AppState;
 use crate::chat::access::{self, Readable};
+use crate::chat::media::{self, ChannelFilesPage, MediaQuery};
 use crate::chat::messages::{
     self, CATCH_UP_MAX, Cursor, Message, MessagePage, PAGE_DEFAULT, PAGE_MAX,
 };
@@ -391,4 +392,17 @@ pub async fn search(
     let Query(query) = query
         .map_err(|_| ApiError::InvalidRequest("O pedido não está no formato esperado.".into()))?;
     Ok(Json(search::search(&state.db, &user, &query).await?))
+}
+
+/// `GET /api/channels/{id}/files`: a mídia do canal ou da conversa, com o acesso das mensagens.
+pub async fn channel_files(
+    State(state): State<AppState>,
+    CurrentUser(user): CurrentUser,
+    Path(channel_id): Path<String>,
+    query: Result<Query<MediaQuery>, QueryRejection>,
+) -> Result<Json<ChannelFilesPage>, ApiError> {
+    let Query(query) = query
+        .map_err(|_| ApiError::InvalidRequest("O pedido não está no formato esperado.".into()))?;
+    let channel = access::readable(&state.db, &user, &channel_id).await?;
+    Ok(Json(media::list(&state.db, channel.id(), &query).await?))
 }

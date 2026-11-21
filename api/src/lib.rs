@@ -224,6 +224,7 @@ pub fn app(state: AppState, policy: Arc<ClientPolicy>) -> Router {
         )
         .route("/channels/{id}/pins", get(routes::messages::pins))
         .route("/search", get(routes::messages::search))
+        .route("/channels/{id}/files", get(routes::messages::channel_files))
         .route(
             "/messages/{id}/previews",
             delete(routes::messages::hide_previews),

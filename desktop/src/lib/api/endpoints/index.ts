@@ -27,6 +27,7 @@ export {
 	deleteMessage,
 	editMessage,
 	hidePreviews,
+	listChannelFiles,
 	listMessages,
 	listPeople,
 	listPins,

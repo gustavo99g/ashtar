@@ -3,7 +3,9 @@
  */
 import { apiFetch, apiJson, jsonRequest } from "../client";
 import type {
+	ChannelFilesPage,
 	EditMessageRequest,
+	MediaFilter,
 	Message,
 	MessagePage,
 	Person,
@@ -149,6 +151,22 @@ export function searchMessages(params: SearchParams): Promise<SearchPage> {
 	if (params.has) query.set("has", params.has);
 	if (params.before) query.set("before", params.before);
 	return apiJson<SearchPage>(`/api/search?${query.toString()}`);
+}
+
+/**
+ * `GET /api/channels/{id}/files`: os anexos do canal ou da conversa, da mensagem mais nova para a
+ * mais velha, até 50 por página (a página acaba numa mensagem inteira).
+ */
+export function listChannelFiles(
+	channelId: string,
+	filter: MediaFilter,
+	before?: string,
+): Promise<ChannelFilesPage> {
+	const query = new URLSearchParams({ filter });
+	if (before) query.set("before", before);
+	return apiJson<ChannelFilesPage>(
+		`/api/channels/${encodeURIComponent(channelId)}/files?${query.toString()}`,
+	);
 }
 
 /** `GET /api/people`: quem está no grupo, com quem está online. */

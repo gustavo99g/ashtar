@@ -7,7 +7,7 @@ import {
 	clearMissed,
 	ReturnToRoom,
 } from "@/features/calls";
-import { ChatConversation } from "@/features/chat";
+import { ChatConversation, MediaButton } from "@/features/chat";
 import { useSession } from "@/features/identity";
 import { setChannelMuted, useReadState } from "@/features/unread";
 import type { Conversation, Shown } from "@/lib/api";
@@ -81,6 +81,7 @@ export function DmWindow({
 					presence={presence}
 					resolveDm={() => Promise.resolve(conversation.id)}
 				/>
+				<MediaButton channelId={conversation.id} className="size-[30px]" />
 				<HeaderButton
 					label="Silenciar conversa"
 					pressed={muted}

@@ -23,6 +23,7 @@ import { usePeople } from "../queries";
 import { setDraft } from "../stores/draftStore";
 import { paths } from "@/lib/paths";
 import { ChatConversation } from "./ChatConversation";
+import { MediaButton } from "./MediaButton";
 import { SearchBox } from "./SearchBox";
 
 /**
@@ -76,6 +77,7 @@ export function ChatView({ channelId }: { channelId: string }) {
 				</h1>
 				<ChannelTopic channel={channel} />
 				<SearchBox channelId={channel.id} />
+				<MediaButton channelId={channel.id} />
 			</header>
 			<ChatConversation
 				channelId={channel.id}

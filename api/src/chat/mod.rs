@@ -8,6 +8,7 @@ pub mod categories;
 pub mod channels;
 pub mod dms;
 pub mod layout;
+pub mod media;
 pub mod mentions;
 pub mod messages;
 pub mod read;

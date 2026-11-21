@@ -8,8 +8,10 @@ import { channelsKeys, useChannelDialog } from "@/features/channels";
 import { identityKeys, useSessionStore } from "@/features/identity";
 import {
 	ApiError,
+	fetchFile,
 	getChannelLayout,
 	type Layout,
+	listChannelFiles,
 	listMessages,
 	listPeople,
 	listPins,
@@ -26,7 +28,9 @@ import { useOutbox } from "../stores/outboxStore";
 
 vi.mock("@/lib/api", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/lib/api")>()),
+	fetchFile: vi.fn(),
 	getChannelLayout: vi.fn(),
+	listChannelFiles: vi.fn(),
 	listMessages: vi.fn(),
 	listPeople: vi.fn(),
 	listPins: vi.fn(),
@@ -347,6 +351,68 @@ describe("ChatView", () => {
 		await vi.waitFor(() =>
 			expect(listMessages).toHaveBeenCalledWith("geral", { around: "m9" }),
 		);
+	});
+
+	it("a mídia do canal mostra a grade e os arquivos, e a imagem vai até a mensagem", async () => {
+		const user = userEvent.setup();
+		vi.mocked(fetchFile).mockResolvedValue(new Blob(["x"]));
+		const author = { id: "u2", nick: "ana", display_name: null, removed: false };
+		const file = (id: string, name: string, mime: string, thumb: string | null) => ({
+			id,
+			kind: "attachment" as const,
+			name,
+			mime,
+			size: 2048,
+			width: 800,
+			height: 600,
+			duration_ms: null,
+			thumbnail_id: thumb,
+		});
+		vi.mocked(listChannelFiles).mockImplementation(async (_channel, filter) =>
+			filter === "media"
+				? {
+						files: [
+							{
+								message_id: "m7",
+								author,
+								created_at: 10,
+								file: file("f1", "foto.png", "image/png", "t1"),
+							},
+						],
+						has_more: false,
+					}
+				: {
+						files: [
+							{
+								message_id: "m8",
+								author,
+								created_at: 10,
+								file: file("f2", "notas.pdf", "application/pdf", null),
+							},
+						],
+						has_more: false,
+					},
+		);
+		renderChat();
+		await user.click(await screen.findByRole("button", { name: "Mídia do canal" }));
+		const box = await screen.findByRole("dialog", { name: "Mídia" });
+		await user.click(
+			await within(box).findByRole("button", { name: "Abrir foto.png" }),
+		);
+		await user.click(
+			await screen.findByRole("button", { name: "Ir até a mensagem" }),
+		);
+		await vi.waitFor(() =>
+			expect(listMessages).toHaveBeenCalledWith("geral", { around: "m7" }),
+		);
+
+		await user.click(screen.getByRole("button", { name: "Mídia do canal" }));
+		const again = await screen.findByRole("dialog", { name: "Mídia" });
+		await user.click(within(again).getByRole("radio", { name: "Arquivos" }));
+		expect(
+			await within(again).findByRole("button", { name: "Baixar notas.pdf" }),
+		).toBeInTheDocument();
+		expect(listChannelFiles).toHaveBeenCalledWith("geral", "files", undefined);
 	});
 
 	it("canal arquivado oferece voltar para o #geral", async () => {

@@ -25,9 +25,11 @@ import {
 	type ChannelHead,
 	deleteMessage,
 	editMessage,
+	listChannelFiles,
 	listMessages,
 	listPeople,
 	listPins,
+	type MediaFilter,
 	type Message,
 	type MessagePage,
 	type Person,
@@ -61,9 +63,36 @@ export const chatKeys = {
 	around: (channelId: string, anchor: string) =>
 		[...chatKeys.all, "around", channelId, anchor] as const,
 	pins: (channelId: string) => [...chatKeys.all, "pins", channelId] as const,
+	files: (channelId: string, filter: MediaFilter) =>
+		[...chatKeys.all, "files", channelId, filter] as const,
 	search: (params: SearchParams | null) =>
 		[...chatKeys.all, "search", params] as const,
 };
+
+/**
+ * A mídia do canal (`GET /api/channels/{id}/files`), de 50 em 50. Busca de novo a cada vez que a
+ * caixa abre (`staleTime` 0), em vez de seguir o tempo real.
+ */
+export function useChannelFiles(
+	channelId: string,
+	filter: MediaFilter,
+	enabled = true,
+) {
+	const connected = useSession().status === "connected";
+	const query = useInfiniteQuery({
+		queryKey: chatKeys.files(channelId, filter),
+		queryFn: ({ pageParam }) =>
+			listChannelFiles(channelId, filter, pageParam ?? undefined),
+		initialPageParam: null as string | null,
+		getNextPageParam: (last) =>
+			last.has_more ? (last.files[last.files.length - 1]?.message_id ?? null) : null,
+		enabled: connected && enabled,
+		staleTime: 0,
+		gcTime: 60_000,
+	});
+	const files = query.data?.pages.flatMap((page) => page.files);
+	return { ...query, files };
+}
 
 /**
  * A busca (`GET /api/search`), de 25 em 25, da mais nova para a mais velha. `null` não busca. Não

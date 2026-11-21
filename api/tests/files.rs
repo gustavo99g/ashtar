@@ -1053,3 +1053,149 @@ async fn fixar_no_canal_e_quem_gerencia_e_na_conversa_os_dois() {
         String::from_utf8_lossy(&body)
     );
 }
+
+#[tokio::test]
+async fn a_midia_do_canal_separa_imagens_de_arquivos_e_pagina_por_mensagem() {
+    let ctx = setup().await;
+    let bia = join(&ctx, "Bia", 2, false).await;
+    let (_, thumb) = upload(
+        &ctx,
+        &bia,
+        "kind=attachment&name=mini.png",
+        "image/png",
+        PNG.to_vec(),
+    )
+    .await;
+    let (_, image) = upload(
+        &ctx,
+        &bia,
+        &format!(
+            "kind=attachment&name=foto.png&width=800&height=600&thumbnail={}",
+            thumb["id"].as_str().unwrap()
+        ),
+        "image/png",
+        PNG.to_vec(),
+    )
+    .await;
+    let (_, doc) = upload(
+        &ctx,
+        &bia,
+        "kind=attachment&name=notas.txt",
+        "text/plain",
+        b"oi".to_vec(),
+    )
+    .await;
+    let (status, message) = post_message(
+        &ctx,
+        &bia,
+        json!({ "client_id": "c-1", "body": "olha", "attachments": [image["id"], doc["id"]] }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "{message}");
+
+    let media = json_call(&ctx, "GET", "/api/channels/geral/files", &bia, Value::Null).await;
+    assert_eq!(media["files"].as_array().unwrap().len(), 1);
+    assert_eq!(media["files"][0]["file"]["id"], image["id"]);
+    assert_eq!(media["files"][0]["message_id"], message["id"]);
+    assert_eq!(media["files"][0]["author"]["nick"], "Bia");
+    let others = json_call(
+        &ctx,
+        "GET",
+        "/api/channels/geral/files?filter=files",
+        &bia,
+        Value::Null,
+    )
+    .await;
+    assert_eq!(others["files"].as_array().unwrap().len(), 1);
+    assert_eq!(others["files"][0]["file"]["name"], "notas.txt");
+    assert_eq!(others["has_more"], false);
+
+    // Sete mensagens com oito arquivos cada: a página não corta uma mensagem no meio (48, e não
+    // 50) e a seguinte traz o resto. Os ids "pagina-*" vêm depois do UUID v7 na ordem do texto.
+    let author = users::get_active_by_nick(&ctx.db, "Bia").await.unwrap().id;
+    for m in 0..7 {
+        let message_id = format!("pagina-{m}");
+        sqlx::query(
+            "INSERT INTO messages (id, channel_id, author_id, client_id, body, created_at)
+             VALUES (?, 'geral', ?, ?, '', 1)",
+        )
+        .bind(&message_id)
+        .bind(&author)
+        .bind(&message_id)
+        .execute(&ctx.db)
+        .await
+        .unwrap();
+        for p in 0..8 {
+            let file_id = format!("arquivo-{m}-{p}");
+            sqlx::query(
+                "INSERT INTO files (id, uploader_id, kind, name, mime, size, created_at, used_at)
+                 VALUES (?, ?, 'attachment', 'a.zip', 'application/zip', 1, 1, 1)",
+            )
+            .bind(&file_id)
+            .bind(&author)
+            .execute(&ctx.db)
+            .await
+            .unwrap();
+            sqlx::query(
+                "INSERT INTO message_files (message_id, file_id, position) VALUES (?, ?, ?)",
+            )
+            .bind(&message_id)
+            .bind(&file_id)
+            .bind(p)
+            .execute(&ctx.db)
+            .await
+            .unwrap();
+        }
+    }
+    let page = json_call(
+        &ctx,
+        "GET",
+        "/api/channels/geral/files?filter=files&before=z",
+        &bia,
+        Value::Null,
+    )
+    .await;
+    let files = page["files"].as_array().unwrap();
+    assert_eq!(files.len(), 48);
+    assert_eq!(page["has_more"], true);
+    assert_eq!(files[0]["message_id"], "pagina-6");
+    assert_eq!(files[0]["file"]["id"], "arquivo-6-0");
+    let last = files[47]["message_id"].as_str().unwrap();
+    assert_eq!(last, "pagina-1");
+    let next = json_call(
+        &ctx,
+        "GET",
+        &format!("/api/channels/geral/files?filter=files&before={last}"),
+        &bia,
+        Value::Null,
+    )
+    .await;
+    // Os oito da pagina-0 e o notas.txt.
+    assert_eq!(next["files"].as_array().unwrap().len(), 9);
+    assert_eq!(next["has_more"], false);
+
+    // Quem não lê a conversa não vê a mídia dela.
+    let cadu = join(&ctx, "Cadu", 3, false).await;
+    let cadu_id = users::get_active_by_nick(&ctx.db, "Cadu").await.unwrap().id;
+    let dm = json_call(
+        &ctx,
+        "POST",
+        "/api/dms",
+        &bia,
+        json!({ "user_id": cadu_id }),
+    )
+    .await;
+    let uri = format!("/api/channels/{}/files", dm["id"].as_str().unwrap());
+    let (status, _, _) = send(&ctx, "GET", &uri, Some(&cadu), None, Body::empty()).await;
+    assert_eq!(status, StatusCode::OK);
+    let (status, _, _) = send(
+        &ctx,
+        "GET",
+        &uri,
+        Some(&ctx.owner_token),
+        None,
+        Body::empty(),
+    )
+    .await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+}

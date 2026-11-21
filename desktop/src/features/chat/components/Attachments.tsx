@@ -31,7 +31,7 @@ import type { PendingFile } from "../stores/outboxStore";
 import { FileThumb } from "./AttachmentDrafts";
 
 /** O Baixar de um arquivo: o progresso (0 a 1, ou `null` sem o total) enquanto baixa. */
-function useDownload(file: FileView) {
+export function useDownload(file: FileView) {
 	const [progress, setProgress] = useState<number | null | undefined>();
 	async function start() {
 		if (progress !== undefined) return;
@@ -54,7 +54,7 @@ function useDownload(file: FileView) {
 	return { downloading: progress !== undefined, progress, start };
 }
 
-function ProgressBar({
+export function ProgressBar({
 	value,
 	label,
 }: {
@@ -113,24 +113,35 @@ function FileCard({ file }: { file: FileView }) {
 	);
 }
 
-/** O visualizador: o original, grande, com o nome e Baixar. */
-function ImageViewer({
+/**
+ * O visualizador: o original, grande, com o nome e Baixar. Aberto da mídia do canal, também com
+ * Ir até a mensagem (`onJump`).
+ */
+export function ImageViewer({
 	file,
 	onClose,
+	onJump,
 }: {
 	file: FileView | null;
 	onClose: () => void;
+	onJump?: () => void;
 }) {
 	return (
 		<Dialog open={file !== null} onOpenChange={(open) => !open && onClose()}>
 			<DialogContent className="flex max-h-[calc(100vh-4rem)] w-auto max-w-[calc(100vw-4rem)] flex-col gap-3 bg-rail p-3 sm:max-w-[calc(100vw-4rem)]">
-				{file && <ViewerContent file={file} />}
+				{file && <ViewerContent file={file} onJump={onJump} />}
 			</DialogContent>
 		</Dialog>
 	);
 }
 
-function ViewerContent({ file }: { file: FileView }) {
+function ViewerContent({
+	file,
+	onJump,
+}: {
+	file: FileView;
+	onJump?: () => void;
+}) {
 	const url = useFileUrl(file.id);
 	const download = useDownload(file);
 	return (
@@ -139,6 +150,11 @@ function ViewerContent({ file }: { file: FileView }) {
 				<DialogTitle className="min-w-0 flex-1 truncate text-sm font-medium">
 					{file.name}
 				</DialogTitle>
+				{onJump && (
+					<Button variant="ghost" size="sm" onClick={onJump}>
+						Ir até a mensagem
+					</Button>
+				)}
 				<Button
 					variant="ghost"
 					size="sm"

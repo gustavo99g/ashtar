@@ -1,5 +1,6 @@
 export { ChatConversation } from "./components/ChatConversation";
 export { ChatView } from "./components/ChatView";
+export { MediaButton } from "./components/MediaButton";
 export { PeopleList, type PersonActions } from "./components/PeopleList";
 export { plainText } from "./model/markdown";
 export { authorName } from "./model/messages";
