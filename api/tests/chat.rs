@@ -619,10 +619,10 @@ async fn reacoes() {
     assert_eq!(status, StatusCode::OK);
     assert_eq!(body["reactions"][0]["users"], json!([ctx.owner.id]));
 
-    // Emoji do grupo e emoji inválido.
+    // Emoji do grupo que não existe e emoji inválido.
     let custom = format!("{}/reactions/c:abc-123", message_uri(&message));
     let (status, _) = call(&ctx.router, "PUT", &custom, Some(&bia), None).await;
-    assert_eq!(status, StatusCode::OK);
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
     let invalid = format!("{}/reactions/oi", message_uri(&message));
     let (status, _) = call(&ctx.router, "PUT", &invalid, Some(&bia), None).await;
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);

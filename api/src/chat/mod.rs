@@ -7,6 +7,7 @@ pub mod access;
 pub mod categories;
 pub mod channels;
 pub mod dms;
+pub mod emojis;
 pub mod layout;
 pub mod media;
 pub mod mentions;

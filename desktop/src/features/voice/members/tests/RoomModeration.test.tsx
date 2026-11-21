@@ -28,7 +28,7 @@ const me = (canMove: boolean): MeResponse => ({
 	can_create_invite: false,
 	can_view_panel: false,
 	can_manage_channels: false,
-	can_move_members: canMove,
+	can_move_members: canMove, can_manage_emojis: false,
 });
 
 const room = (id: string, name: string) => ({

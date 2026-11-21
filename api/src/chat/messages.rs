@@ -1067,6 +1067,14 @@ pub async fn react(
     now: i64,
 ) -> Result<Message, ApiError> {
     validate_emoji(emoji)?;
+    if on
+        && let Some(id) = emoji.strip_prefix("c:")
+        && !super::emojis::exists(db, id).await?
+    {
+        return Err(ApiError::InvalidRequest(
+            "Esse emoji do grupo não existe mais.".into(),
+        ));
+    }
     if on {
         let known = message.reactions.iter().any(|r| r.emoji == emoji);
         if !known && message.reactions.len() as i64 >= REACTIONS_MAX {

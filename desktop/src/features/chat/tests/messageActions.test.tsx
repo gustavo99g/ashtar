@@ -117,7 +117,7 @@ function renderChat() {
 		can_create_invite: true,
 		can_view_panel: true,
 		can_manage_channels: true,
-		can_move_members: true,
+		can_move_members: true, can_manage_emojis: false,
 	});
 	render(
 		<QueryClientProvider client={client}>

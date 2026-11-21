@@ -148,6 +148,11 @@ pub enum ServerEvent {
     /// recarrega o `GET /api/channels`.
     #[serde(rename = "channels.changed")]
     ChannelsChanged { version: i64 },
+    /// Os emojis do grupo mudaram (um novo, um nome, uma exclusão): a lista inteira.
+    #[serde(rename = "emojis.changed")]
+    EmojisChanged {
+        emojis: Vec<crate::chat::emojis::Emoji>,
+    },
     /// O estado de um canal ou conversa mudou para a pessoa (leu, marcou tudo
     /// como lido, silenciou). Só vai para as conexões dela: é o que zera o
     /// número no outro computador.
@@ -201,6 +206,7 @@ impl ServerEvent {
             | Self::MemberLeft { .. }
             | Self::LogsReceived { .. }
             | Self::DiskAlert { .. }
+            | Self::EmojisChanged { .. }
             | Self::ChannelsChanged { .. } => false,
         }
     }

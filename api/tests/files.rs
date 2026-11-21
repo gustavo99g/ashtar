@@ -1199,3 +1199,178 @@ async fn a_midia_do_canal_separa_imagens_de_arquivos_e_pagina_por_mensagem() {
     .await;
     assert_eq!(status, StatusCode::NOT_FOUND);
 }
+
+#[tokio::test]
+async fn os_emojis_do_grupo_nome_limite_tamanho_e_reacao() {
+    let ctx = setup().await;
+    let bia = join(&ctx, "Bia", 2, false).await;
+    let kid = ctx.owner_token.clone();
+    let mut rx = ctx.state.hub.subscribe();
+    let file = emoji_file(&ctx, &kid, PNG.to_vec(), "image/png").await;
+
+    // Sem a permissão, 403.
+    let (status, _, _) = send(
+        &ctx,
+        "POST",
+        "/api/emojis",
+        Some(&bia),
+        Some("application/json"),
+        Body::from(json!({ "name": "kekw", "file_id": file["id"] }).to_string()),
+    )
+    .await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+
+    let emoji = json_call(
+        &ctx,
+        "POST",
+        "/api/emojis",
+        &kid,
+        json!({ "name": ":kekw:", "file_id": file["id"] }),
+    )
+    .await;
+    assert_eq!(emoji["name"], "kekw");
+    assert_eq!(emoji["animated"], false);
+    let mut saw_event = false;
+    while let Ok(signal) = rx.try_recv() {
+        if let api::realtime::Signal::Event { json, .. } = signal {
+            saw_event |= json.as_str().contains("\"emojis.changed\"");
+        }
+    }
+    assert!(saw_event);
+    // Todo mundo vê a imagem.
+    let (status, _, _) = send(
+        &ctx,
+        "GET",
+        &format!("/api/files/{}", file["id"].as_str().unwrap()),
+        Some(&bia),
+        None,
+        Body::empty(),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+
+    // O nome repetido.
+    let other = emoji_file(&ctx, &kid, PNG.to_vec(), "image/png").await;
+    let (status, _, _) = send(
+        &ctx,
+        "POST",
+        "/api/emojis",
+        Some(&kid),
+        Some("application/json"),
+        Body::from(json!({ "name": "kekw", "file_id": other["id"] }).to_string()),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CONFLICT);
+
+    // O GIF acima de 256 KB.
+    let mut gif = b"GIF89a".to_vec();
+    gif.resize(300 * 1024, 0);
+    let big = emoji_file(&ctx, &kid, gif, "image/gif").await;
+    let (status, _, _) = send(
+        &ctx,
+        "POST",
+        "/api/emojis",
+        Some(&kid),
+        Some("application/json"),
+        Body::from(json!({ "name": "grande", "file_id": big["id"] }).to_string()),
+    )
+    .await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+
+    // A reação com o emoji, e depois de excluído.
+    let (_, message) = post_message(&ctx, &bia, json!({ "client_id": "c-1", "body": "oi" })).await;
+    let reaction = format!(
+        "/api/messages/{}/reactions/c:{}",
+        message["id"].as_str().unwrap(),
+        emoji["id"].as_str().unwrap()
+    );
+    let reacted = json_call(&ctx, "PUT", &reaction, &bia, Value::Null).await;
+    assert_eq!(reacted["reactions"].as_array().unwrap().len(), 1);
+    let (status, _, _) = send(
+        &ctx,
+        "DELETE",
+        &format!("/api/emojis/{}", emoji["id"].as_str().unwrap()),
+        Some(&kid),
+        None,
+        Body::empty(),
+    )
+    .await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+    let list = json_call(&ctx, "GET", "/api/emojis", &bia, Value::Null).await;
+    assert_eq!(list, json!([]));
+    let page = json_call(
+        &ctx,
+        "GET",
+        "/api/channels/geral/messages",
+        &bia,
+        Value::Null,
+    )
+    .await;
+    let last = page["messages"].as_array().unwrap().last().unwrap().clone();
+    assert_eq!(last["reactions"], json!([]));
+    let (status, _, _) = send(&ctx, "PUT", &reaction, Some(&bia), None, Body::empty()).await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+
+    // O limite de 100.
+    let owner = ctx.owner.id.clone();
+    for i in 0..100 {
+        let id = format!("e-{i}");
+        sqlx::query(
+            "INSERT INTO files (id, uploader_id, kind, name, mime, size, created_at, used_at)
+             VALUES (?, ?, 'emoji', 'e.png', 'image/png', 1, 1, 1)",
+        )
+        .bind(&id)
+        .bind(&owner)
+        .execute(&ctx.db)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO emojis (id, name, file_id, created_by, created_at) VALUES (?, ?, ?, ?, 1)",
+        )
+        .bind(&id)
+        .bind(format!("e_{i}"))
+        .bind(&id)
+        .bind(&owner)
+        .execute(&ctx.db)
+        .await
+        .unwrap();
+    }
+    let (status, _, _) = send(
+        &ctx,
+        "POST",
+        "/api/emojis",
+        Some(&kid),
+        Some("application/json"),
+        Body::from(json!({ "name": "mais_um", "file_id": other["id"] }).to_string()),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CONFLICT);
+
+    // Renomear para um nome que existe.
+    let (status, _, _) = send(
+        &ctx,
+        "PATCH",
+        "/api/emojis/e-1",
+        Some(&kid),
+        Some("application/json"),
+        Body::from(json!({ "name": "e_2" }).to_string()),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CONFLICT);
+    let (status, _, _) = send(
+        &ctx,
+        "PATCH",
+        "/api/emojis/e-1",
+        Some(&kid),
+        Some("application/json"),
+        Body::from(json!({ "name": "novo" }).to_string()),
+    )
+    .await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+}
+
+async fn emoji_file(ctx: &Ctx, token: &str, bytes: Vec<u8>, mime: &str) -> Value {
+    let (status, file) = upload(ctx, token, "kind=emoji&name=e.png", mime, bytes).await;
+    assert_eq!(status, StatusCode::CREATED, "{file}");
+    file
+}

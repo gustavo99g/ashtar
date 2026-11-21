@@ -96,6 +96,8 @@ pub struct MeResponse {
     /// Se o cartão mostra "Mover para" e "Desconectar da voz", e se os avatares
     /// das salas se arrastam.
     pub can_move_members: bool,
+    /// Se o Painel mostra a tela Emojis.
+    pub can_manage_emojis: bool,
 }
 
 #[derive(Debug, Deserialize, TS)]
@@ -272,6 +274,9 @@ async fn me_response(state: &AppState, user: &User) -> Result<MeResponse, ApiErr
             .iter()
             .any(|(p, _)| *p == Permission::ManageChannels),
         can_move_members: effective.iter().any(|(p, _)| *p == Permission::MoveMembers),
+        can_manage_emojis: effective
+            .iter()
+            .any(|(p, _)| *p == Permission::ManageEmojis),
     })
 }
 

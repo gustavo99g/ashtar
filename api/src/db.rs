@@ -119,6 +119,7 @@ mod tests {
                 "channel_state",
                 "channels",
                 "devices",
+                "emojis",
                 "files",
                 "invite_uses",
                 "invites",

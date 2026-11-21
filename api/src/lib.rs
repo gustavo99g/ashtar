@@ -224,6 +224,14 @@ pub fn app(state: AppState, policy: Arc<ClientPolicy>) -> Router {
         )
         .route("/channels/{id}/pins", get(routes::messages::pins))
         .route("/search", get(routes::messages::search))
+        .route(
+            "/emojis",
+            get(routes::emojis::list).post(routes::emojis::create),
+        )
+        .route(
+            "/emojis/{id}",
+            patch(routes::emojis::rename).delete(routes::emojis::delete),
+        )
         .route("/channels/{id}/files", get(routes::messages::channel_files))
         .route(
             "/messages/{id}/previews",

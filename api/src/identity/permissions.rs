@@ -28,13 +28,16 @@ pub enum Permission {
     ManageChannels,
     /// Move alguém para outra sala de voz e desconecta da voz (ADR 0026).
     MoveMembers,
+    /// Sobe, renomeia e exclui os emojis do grupo (v0.7).
+    ManageEmojis,
 }
 
 impl Permission {
-    pub const ALL: [Permission; 3] = [
+    pub const ALL: [Permission; 4] = [
         Permission::BetaUpdates,
         Permission::ManageChannels,
         Permission::MoveMembers,
+        Permission::ManageEmojis,
     ];
 
     pub fn key(self) -> &'static str {
@@ -42,6 +45,7 @@ impl Permission {
             Self::BetaUpdates => "atualizacoes.beta",
             Self::ManageChannels => "canais.gerenciar",
             Self::MoveMembers => "membros.mover",
+            Self::ManageEmojis => "emojis.gerenciar",
         }
     }
 
@@ -51,6 +55,7 @@ impl Permission {
             Self::BetaUpdates => "Receber o beta",
             Self::ManageChannels => "Gerenciar canais",
             Self::MoveMembers => "Mover membros",
+            Self::ManageEmojis => "Gerenciar emojis",
         }
     }
 

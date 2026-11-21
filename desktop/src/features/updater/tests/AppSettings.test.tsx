@@ -38,7 +38,7 @@ function meWith(
 		can_create_invite: isOwner,
 		can_view_panel: isOwner,
 		can_manage_channels: isOwner,
-		can_move_members: isOwner,
+		can_move_members: isOwner, can_manage_emojis: false,
 	};
 }
 

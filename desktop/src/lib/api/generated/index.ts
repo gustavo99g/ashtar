@@ -172,6 +172,12 @@ category_id?: string, topic?: string,
  */
 restricted?: boolean, member_ids?: Array<string>, };
 
+export type CreateEmojiRequest = { name: string, 
+/**
+ * Um arquivo `emoji` enviado antes pelo `POST /api/files`.
+ */
+file_id: string, };
+
 export type CreateInviteRequest = { preset: Preset, 
 /**
  * Só no `custom`: validade em segundos (de 60 a 30 dias).
@@ -203,6 +209,16 @@ export type DisconnectReason = "moderator" | "no_access";
 export type DiskStatus = { free_bytes: number, total_bytes: number, };
 
 export type EditMessageRequest = { body: string, };
+
+export type Emoji = { id: string, name: string, 
+/**
+ * A imagem (`GET /api/files/{id}`).
+ */
+file_id: string, 
+/**
+ * GIF: o app não congela.
+ */
+animated: boolean, created_by: string, created_at: number, };
 
 /**
  * O corpo de toda resposta de erro.
@@ -386,7 +402,11 @@ can_manage_channels: boolean,
  * Se o cartão mostra "Mover para" e "Desconectar da voz", e se os avatares
  * das salas se arrastam.
  */
-can_move_members: boolean, };
+can_move_members: boolean, 
+/**
+ * Se o Painel mostra a tela Emojis.
+ */
+can_manage_emojis: boolean, };
 
 export type MediaFilter = "media" | "files";
 
@@ -581,6 +601,8 @@ export type RealtimeTicket = { ticket: string,
  */
 expires_in: number, };
 
+export type RenameEmojiRequest = { name: string, };
+
 /**
  * A citação da resposta: a original, ou só o id se ela foi excluída.
  */
@@ -636,7 +658,7 @@ export type ServerEvent = { "type": "ready", user_id: string, status: Status, on
 /**
  * O nome de quem moveu, para o aviso.
  */
-by_name: string, } | { "type": "voice.disconnected", by: string, by_name: string, reason: DisconnectReason, } | { "type": "typing", channel_id: string, user_id: string, } | { "type": "member.joined", person: Person, } | { "type": "user.updated", id: string, display_name: string | null, avatar: string | null, } | { "type": "member.left", user_id: string, } | { "type": "logs.received", report: LogReportView, } | { "type": "channels.changed", version: number, } | { "type": "channel.state", channel_id: string, state: ReadState, } | { "type": "call.ringing", call: CallView, } | { "type": "call.accepted", call: CallView, } | { "type": "call.ended", call_id: string, channel_id: string, outcome: CallOutcome, duration: number | null, };
+by_name: string, } | { "type": "voice.disconnected", by: string, by_name: string, reason: DisconnectReason, } | { "type": "typing", channel_id: string, user_id: string, } | { "type": "member.joined", person: Person, } | { "type": "user.updated", id: string, display_name: string | null, avatar: string | null, } | { "type": "member.left", user_id: string, } | { "type": "logs.received", report: LogReportView, } | { "type": "channels.changed", version: number, } | { "type": "emojis.changed", emojis: Array<Emoji>, } | { "type": "channel.state", channel_id: string, state: ReadState, } | { "type": "call.ringing", call: CallView, } | { "type": "call.accepted", call: CallView, } | { "type": "call.ended", call_id: string, channel_id: string, outcome: CallOutcome, duration: number | null, };
 
 export type ServerStatus = { api: ApiStatus, livekit: LiveKitStatus, 
 /**

@@ -3,6 +3,7 @@ pub mod auth;
 pub mod calls;
 pub mod channels;
 pub mod dms;
+pub mod emojis;
 pub mod extract;
 pub mod files;
 pub mod invites;
