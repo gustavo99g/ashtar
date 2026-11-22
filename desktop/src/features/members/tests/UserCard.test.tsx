@@ -26,10 +26,10 @@ describe("o cartão do usuário", () => {
 		expect(whereLabel({ online: false, status: "busy", room: null })).toBe("Offline");
 		expect(
 			whereLabel({ online: true, room: { name: "Sala", sharing: false } }),
-		).toBe("Na Sala");
+		).toBe("Em Sala");
 		expect(
 			whereLabel({ online: true, room: { name: "Sala", sharing: true } }),
-		).toBe("Na Sala · transmitindo");
+		).toBe("Em Sala · transmitindo");
 	});
 
 	it("mostra o nome visível, o nick e onde ela está", () => {
@@ -41,7 +41,7 @@ describe("o cartão do usuário", () => {
 
 		expect(screen.getByText("Júlia")).toBeVisible();
 		expect(screen.getByText("juju")).toBeVisible();
-		expect(screen.getByText("Na Sala · transmitindo")).toBeVisible();
+		expect(screen.getByText("Em Sala · transmitindo")).toBeVisible();
 	});
 
 	it("as seções entram embaixo do cabeçalho, na ordem em que vêm", () => {

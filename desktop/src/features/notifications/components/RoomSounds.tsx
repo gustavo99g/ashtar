@@ -1,8 +1,9 @@
 /*
  * Quando cada som da sala toca (v0.5, ADR 0027). Só na sala de voz do grupo, não na ligação:
  *
- * - entrar numa sala (ou trocar para outra) toca o de entrar uma vez, sem um som por quem já estava;
- *   sair da voz toca o de sair. Trocar não toca a saída de ninguém da sala velha;
+ * - entrar numa sala toca o de entrar uma vez, sem um som por quem já estava; sair da voz toca o de
+ *   sair; trocar de sala toca os dois, o de sair no clique e o de entrar quando a nova conecta. Não
+ *   toca a saída de ninguém da sala velha;
  * - alguém entrando ou saindo da sua sala, pelos eventos da conexão. A conexão `:screen` de uma
  *   transmissão (ADR 0017) é o começar e o parar de transmitir, menos a sua;
  * - com o áudio desligado (surdo), nada dos outros toca: só os sons dos próprios botões e o de
@@ -29,19 +30,21 @@ export function RoomSounds() {
 	const deafened = useRef(isDeafened);
 	deafened.current = isDeafened;
 
-	// Entrar, trocar e sair.
+	// Entrar, trocar e sair. Trocar toca o de sair na hora do clique e o de entrar quando a sala
+	// nova fica pronta (`room`, que só chega depois de o microfone abrir). Os próprios não têm o
+	// intervalo: trocar rápido de sala toca cada um.
 	const joined = useRef<string | null>(null);
+	const ready = state === "connected" && room !== null;
 	useEffect(() => {
-		if (channelId === null) {
-			if (joined.current !== null) playRoomSound("leave");
+		if (joined.current !== null && joined.current !== channelId) {
+			playRoomSound("leave", { gap: false });
 			joined.current = null;
-			return;
 		}
-		if (state === "connected" && joined.current !== channelId) {
+		if (channelId !== null && ready && joined.current === null) {
 			joined.current = channelId;
-			playRoomSound("join");
+			playRoomSound("join", { gap: false });
 		}
-	}, [channelId, state]);
+	}, [channelId, ready]);
 
 	// Quem entra e sai da sala, e as transmissões.
 	useEffect(() => {

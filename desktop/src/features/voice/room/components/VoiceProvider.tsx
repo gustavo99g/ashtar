@@ -41,8 +41,10 @@ import { RoomContext } from "@livekit/components-react";
 import {
 	ConnectionState,
 	DisconnectReason,
+	LogLevel,
 	Room,
 	RoomEvent,
+	setLogLevel,
 	Track,
 } from "livekit-client";
 import {
@@ -107,6 +109,9 @@ import { onSystemResumed } from "@/lib/tauri/commands";
 import { clearVoiceOrder, useVoiceOrder } from "../stores/voiceOrderStore";
 import { RoomAudio } from "./RoomAudio";
 import { VoiceStateReport } from "./VoiceStateReport";
+
+// O LiveKit escreve cada passo da conexão no console; só avisos e erros ficam.
+setLogLevel(LogLevel.warn);
 
 export type VoiceConnectionState =
 	| "disconnected"
@@ -429,6 +434,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 				toast.add({
 					title: "A sala foi arquivada",
 					description: "Você saiu da voz.",
+					data: { tone: "info" },
 				});
 				return;
 			}
@@ -559,6 +565,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 			toast.add({
 				title: `${order.byName} moveu você`,
 				description: `Agora você está na ${name}.`,
+				data: { tone: "info" },
 			});
 		} else {
 			reconnect.current.reset();
@@ -569,10 +576,12 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 					? {
 							title: "Você não tem mais acesso a esta sala",
 							description: `${order.byName} mudou quem tem acesso.`,
+							data: { tone: "warning" },
 						}
 					: {
 							title: "Você foi desconectado da voz",
 							description: `Quem desconectou foi ${order.byName}.`,
+							data: { tone: "warning" },
 						},
 			);
 		}
@@ -724,7 +733,10 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 				{/* O deafen cala só as vozes: a transmissão segue no volume do Foco. */}
 				{room && <RoomAudio room={room} deafened={isDeafened} />}
 				{room && voiceKind === "room" && voiceChannelId && (
-					<VoiceStateReport channelId={voiceChannelId} />
+					<VoiceStateReport
+						channelId={voiceChannelId}
+						screenShare={screenShare}
+					/>
 				)}
 				{children}
 			</RoomContext.Provider>

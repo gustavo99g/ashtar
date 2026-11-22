@@ -100,7 +100,7 @@ export default tseslint.config(
 					policies: [
 						{
 							to: { element: { type: "feature" } },
-							disallow: { to: { element: { fileInternalPath: "!index.ts" } } },
+							disallow: { to: { element: { fileInternalPath: "!{index,window}.ts" } } },
 							message:
 								"Outra feature só entra pelo index.ts dela: importe de @/features/<nome>.",
 						},

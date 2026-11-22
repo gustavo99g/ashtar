@@ -42,8 +42,14 @@ const FILES: Record<RoomSoundId, string> = {
 
 const lastPlayed = new Map<RoomSoundId, number>();
 
-/** Toca o arquivo na saída escolhida. Falhar (sem saída, sem permissão) é silêncio. */
-function play(url: string): void {
+/** Quanto esperar para tentar de novo um som que não tocou. */
+export const RETRY_MS = 400;
+
+/**
+ * Toca o arquivo na saída escolhida. Se não tocar (a saída mudando enquanto o microfone abre ou
+ * fecha), tenta mais uma vez um pouco depois; falhando de novo, é silêncio.
+ */
+function play(url: string, retry = true): void {
 	const audio = new Audio(url) as HTMLAudioElement & {
 		setSinkId?: (id: string) => Promise<void>;
 	};
@@ -53,7 +59,11 @@ function play(url: string): void {
 		output && audio.setSinkId
 			? audio.setSinkId(output).catch(() => {})
 			: Promise.resolve();
-	void ready.then(() => audio.play()).catch(() => {});
+	void ready
+		.then(() => audio.play())
+		.catch(() => {
+			if (retry) setTimeout(() => play(url, false), RETRY_MS);
+		});
 }
 
 /**

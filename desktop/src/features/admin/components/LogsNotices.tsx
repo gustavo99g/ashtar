@@ -49,6 +49,7 @@ export function LogsNotices() {
 					title: "O disco do servidor está quase cheio",
 					description: `Sobram ${size(alert.free_bytes)} de ${size(alert.total_bytes)}. Com menos de 1 GB, ninguém consegue mandar arquivos.`,
 					data: {
+						tone: "warning",
 						media: (
 							<span className="flex size-9 items-center justify-center rounded-full bg-warning/20 text-warning [&_svg]:size-[18px]">
 								<HardDriveIcon aria-hidden="true" />

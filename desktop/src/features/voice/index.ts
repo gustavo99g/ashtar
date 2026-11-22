@@ -2,7 +2,11 @@ export { useGuardedJoin } from "./call/components/LeaveCallDialog";
 export { LiveBadge } from "./call/components/LiveBadge";
 export { MiniShare } from "./call/components/MiniShare";
 export { VoiceRoom } from "./call/components/VoiceRoom";
-export { stopWatching, watchShare } from "./call/stores/roomViewStore";
+export {
+	focusShare,
+	stopWatching,
+	watchShare,
+} from "./call/stores/roomViewStore";
 export { VoiceSettings } from "./devices/components/VoiceSettings";
 export { VoiceDock } from "./dock/components/VoiceDock";
 export {
@@ -20,6 +24,7 @@ export {
 	type ChannelMember,
 	memberFromApi,
 	peopleNowLabel,
+	type ShareSummary,
 } from "./members/model/members";
 export { useVoiceParticipants } from "./members/queries";
 export {

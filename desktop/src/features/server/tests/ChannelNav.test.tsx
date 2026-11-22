@@ -258,7 +258,7 @@ describe("a coluna de canais", () => {
 		await user.click(within(squad).getByRole("button", { name: /ana/ }));
 
 		const card = await screen.findByRole("dialog", { name: "Perfil de ana" });
-		expect(within(card).getByText("Na Squad · transmitindo")).toBeVisible();
+		expect(within(card).getByText("Em Squad · transmitindo")).toBeVisible();
 	});
 
 	it("sem Gerenciar canais, o canal de texto só tem o Marcar como lido e o Silenciar, e a sala nada", async () => {

@@ -234,6 +234,23 @@ describe("ChatView", () => {
 		expect(screen.getAllByText("bora jogar?")).toHaveLength(1);
 	});
 
+	it("arrastar arquivos mostra o Solte para enviar, e sair dela o esconde", async () => {
+		renderChat();
+		const list = await screen.findByText("oi, grupo");
+		const file = new File(["x"], "foto.png", { type: "image/png" });
+		const dataTransfer = {
+			types: ["Files"],
+			items: [{ kind: "file" }, { kind: "file" }],
+			files: [file],
+			dropEffect: "none",
+		};
+		fireEvent.dragEnter(list, { dataTransfer });
+		expect(screen.getByText("Solte para enviar em #geral")).toBeInTheDocument();
+		expect(screen.getByText(/^2 arquivos/)).toBeInTheDocument();
+		fireEvent.dragLeave(list, { dataTransfer, relatedTarget: document.body });
+		expect(screen.queryByText("Solte para enviar em #geral")).toBeNull();
+	});
+
 	it("Shift+Enter quebra a linha, e campo vazio não manda", async () => {
 		renderChat();
 		const field = await screen.findByRole("textbox", {

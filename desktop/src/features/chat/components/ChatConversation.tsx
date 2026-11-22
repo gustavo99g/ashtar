@@ -1,4 +1,4 @@
-import { ArrowRightIcon, ClockIcon } from "lucide-react";
+import { ArrowRightIcon, ClockIcon, UploadIcon } from "lucide-react";
 import {
 	type DragEvent,
 	type ReactNode,
@@ -8,11 +8,7 @@ import {
 	useState,
 } from "react";
 import { toast } from "@/components/ui/toast";
-import {
-	ErrorState,
-	LoadingState,
-	OfflineState,
-} from "@/components/ui/states";
+import { ErrorState, LoadingState, OfflineState } from "@/components/ui/states";
 import { useOptionalMe, useSession } from "@/features/identity";
 import { useMarkRead, useUnreadMarker } from "@/features/unread";
 import { ApiError, isApiError, type Message, type Person } from "@/lib/api";
@@ -145,6 +141,7 @@ export function ChatConversation({
 					title: "Não deu para excluir a mensagem",
 					description:
 						error instanceof ApiError ? error.message : "Tente de novo.",
+					data: { tone: "error" },
 				}),
 			);
 		},
@@ -170,6 +167,7 @@ export function ChatConversation({
 						title: "Não deu para reagir",
 						description:
 							error instanceof ApiError ? error.message : "Tente de novo.",
+						data: { tone: "error" },
 					}),
 				);
 			},
@@ -181,6 +179,7 @@ export function ChatConversation({
 						title: on ? "Não deu para fixar" : "Não deu para desafixar",
 						description:
 							error instanceof ApiError ? error.message : "Tente de novo.",
+						data: { tone: "error" },
 					}),
 				);
 			},
@@ -225,122 +224,156 @@ export function ChatConversation({
 		setAnchor(null);
 	}
 
-	/** Arrastar arquivos para a conversa anexa, como o botão +. */
+	/**
+	 * Arrastar arquivos para a conversa anexa, como o botão +. Enquanto eles estão em cima, o
+	 * "Solte para enviar" cobre a conversa. `dragging` é quantos arquivos vêm (0: nenhum arrasto).
+	 */
+	const [dragging, setDragging] = useState(0);
+
 	function acceptDrag(event: DragEvent<HTMLDivElement>) {
 		if (readOnly || !event.dataTransfer.types.includes("Files")) return;
 		event.preventDefault();
 		event.dataTransfer.dropEffect = "copy";
+		const count = Math.max(
+			1,
+			[...event.dataTransfer.items].filter((item) => item.kind === "file")
+				.length,
+		);
+		setDragging(count);
+	}
+
+	function leaveDrag(event: DragEvent<HTMLDivElement>) {
+		// Sair para um filho não é sair da conversa.
+		const next = event.relatedTarget;
+		if (next instanceof Node && event.currentTarget.contains(next)) return;
+		setDragging(0);
 	}
 
 	function drop(event: DragEvent<HTMLDivElement>) {
+		setDragging(0);
 		if (readOnly || event.dataTransfer.files.length === 0) return;
 		event.preventDefault();
 		const problem = addDraftFiles(channelId, [...event.dataTransfer.files]);
-		if (problem) toast.add({ title: problem });
+		if (problem) toast.add({ title: problem, data: { tone: "error" } });
 	}
 
 	return (
 		<MessageActionsContext.Provider value={actions}>
-			<div className="contents" onDragOver={acceptDrag} onDrop={drop}>
-			<PinsBar channelId={channelId} actions={actions} compact={compact} />
-			{anchor !== null && around.messages ? (
-				<MessageList
-					key={`around:${anchor}`}
-					label={listLabel}
-					start={start}
-					messages={around.messages}
-					pending={NO_PENDING}
-					ownerId={ownerId}
-					people={byId}
-					myId={myId}
-					hasOlder={around.hasPreviousPage}
-					loadingOlder={around.isFetchingPreviousPage}
-					onLoadOlder={() => void around.fetchPreviousPage()}
-					hasNewer={around.hasNextPage}
-					loadingNewer={around.isFetchingNextPage}
-					onLoadNewer={() => void around.fetchNextPage()}
-					onRetry={retry}
-					onDiscard={discard}
-					renderCall={renderCall}
-					focusId={focus?.id ?? anchor}
-					focusKey={focus?.key}
-				/>
-			) : anchor !== null && around.isError ? (
-				<Centered>
-					<ErrorState onRetry={() => setAnchor(null)} />
-				</Centered>
-			) : anchor !== null ? (
-				<Centered>
-					<LoadingState />
-				</Centered>
-			) : query.messages ? (
-				<MessageList
-					key="live"
-					label={listLabel}
-					start={start}
-					messages={query.messages}
-					pending={pending}
-					ownerId={ownerId}
-					people={byId}
-					myId={myId}
-					hasOlder={query.hasPreviousPage}
-					loadingOlder={query.isFetchingPreviousPage}
-					onLoadOlder={() => void query.fetchPreviousPage()}
-					onRetry={retry}
-					onDiscard={discard}
-					unreadAfter={unreadAfter}
-					onSeeingEndChange={setSeeingEnd}
-					renderCall={renderCall}
-					focusId={focus?.id}
-					focusKey={focus?.key}
-				/>
-			) : query.isError ? (
-				<Centered>
-					{isApiError(query.error, "network") ? (
-						<OfflineState onRetry={() => void query.refetch()} />
-					) : (
-						<ErrorState onRetry={() => void query.refetch()} />
-					)}
-				</Centered>
-			) : (
-				<Centered>
-					<LoadingState />
-				</Centered>
-			)}
-			{anchor !== null && (
-				<div className={compact ? "px-2.5" : "px-4"}>
-					<div
-						role="status"
-						className="mb-1.5 flex h-9 items-center gap-2.5 rounded-[10px] border border-border-strong bg-card pr-1.5 pl-3.5 text-[13px] text-secondary-foreground"
-					>
-						<ClockIcon className="size-[15px] shrink-0" />
-						<span className="truncate">Você está vendo mensagens antigas</span>
-						<button
-							type="button"
-							onClick={() => {
-								setAnchor(null);
-								setFocus(null);
-							}}
-							className="ml-auto flex h-7 shrink-0 items-center gap-1.5 rounded-md bg-primary px-3 text-[13px] font-semibold text-primary-foreground hover:bg-primary-hover"
+			<div
+				className="relative flex min-h-0 flex-1 flex-col"
+				onDragEnter={acceptDrag}
+				onDragOver={acceptDrag}
+				onDragLeave={leaveDrag}
+				onDrop={drop}
+			>
+				<PinsBar channelId={channelId} actions={actions} compact={compact} />
+				{anchor !== null && around.messages ? (
+					<MessageList
+						key={`around:${anchor}`}
+						label={listLabel}
+						start={start}
+						messages={around.messages}
+						pending={NO_PENDING}
+						ownerId={ownerId}
+						people={byId}
+						myId={myId}
+						hasOlder={around.hasPreviousPage}
+						loadingOlder={around.isFetchingPreviousPage}
+						onLoadOlder={() => void around.fetchPreviousPage()}
+						hasNewer={around.hasNextPage}
+						loadingNewer={around.isFetchingNextPage}
+						onLoadNewer={() => void around.fetchNextPage()}
+						onRetry={retry}
+						onDiscard={discard}
+						renderCall={renderCall}
+						focusId={focus?.id ?? anchor}
+						focusKey={focus?.key}
+					/>
+				) : anchor !== null && around.isError ? (
+					<Centered>
+						<ErrorState onRetry={() => setAnchor(null)} />
+					</Centered>
+				) : anchor !== null ? (
+					<Centered>
+						<LoadingState />
+					</Centered>
+				) : query.messages ? (
+					<MessageList
+						key="live"
+						label={listLabel}
+						start={start}
+						messages={query.messages}
+						pending={pending}
+						ownerId={ownerId}
+						people={byId}
+						myId={myId}
+						hasOlder={query.hasPreviousPage}
+						loadingOlder={query.isFetchingPreviousPage}
+						onLoadOlder={() => void query.fetchPreviousPage()}
+						onRetry={retry}
+						onDiscard={discard}
+						unreadAfter={unreadAfter}
+						onSeeingEndChange={setSeeingEnd}
+						renderCall={renderCall}
+						focusId={focus?.id}
+						focusKey={focus?.key}
+					/>
+				) : query.isError ? (
+					<Centered>
+						{isApiError(query.error, "network") ? (
+							<OfflineState onRetry={() => void query.refetch()} />
+						) : (
+							<ErrorState onRetry={() => void query.refetch()} />
+						)}
+					</Centered>
+				) : (
+					<Centered>
+						<LoadingState />
+					</Centered>
+				)}
+				{anchor !== null && (
+					<div className={compact ? "px-2.5" : "px-4"}>
+						<div
+							role="status"
+							className="mb-1.5 flex h-9 items-center gap-2.5 rounded-[10px] border border-border-strong bg-card pr-1.5 pl-3.5 text-[13px] text-secondary-foreground"
 						>
-							Ir para o presente
-							<ArrowRightIcon className="size-3.5" />
-						</button>
+							<ClockIcon className="size-[15px] shrink-0" />
+							<span className="truncate">
+								Você está vendo mensagens antigas
+							</span>
+							<button
+								type="button"
+								onClick={() => {
+									setAnchor(null);
+									setFocus(null);
+								}}
+								className="ml-auto flex h-7 shrink-0 items-center gap-1.5 rounded-md bg-primary px-3 text-[13px] font-semibold text-primary-foreground hover:bg-primary-hover"
+							>
+								Ir para o presente
+								<ArrowRightIcon className="size-3.5" />
+							</button>
+						</div>
 					</div>
-				</div>
-			)}
-			{aboveComposer}
-			{readOnly ?? (
-				<Composer
-					channelId={channelId}
-					label={composerLabel}
-					compact={compact}
-					mentionable={mentionable ?? people.data ?? NO_PEOPLE}
-					myId={myId}
-					onSend={sendHere}
-					onEditLast={editLast}
-				/>
-			)}
+				)}
+				{aboveComposer}
+				{readOnly ?? (
+					<Composer
+						channelId={channelId}
+						label={composerLabel}
+						compact={compact}
+						mentionable={mentionable ?? people.data ?? NO_PEOPLE}
+						myId={myId}
+						onSend={sendHere}
+						onEditLast={editLast}
+					/>
+				)}
+				{dragging > 0 && (
+					<DropOverlay
+						target={composerLabel.replace(/^Mensagem para /, "")}
+						count={dragging}
+						compact={compact}
+					/>
+				)}
 			</div>
 			<DeleteMessageDialog
 				message={deleting}
@@ -358,6 +391,45 @@ function Centered({ children }: { children: ReactNode }) {
 	return (
 		<div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4 p-6">
 			{children}
+		</div>
+	);
+}
+
+/** O "Solte para enviar" em cima da conversa enquanto arquivos são arrastados para ela. */
+function DropOverlay({
+	target,
+	count,
+	compact,
+}: {
+	target: string;
+	count: number;
+	compact: boolean;
+}) {
+	return (
+		<div
+			aria-hidden="true"
+			className={`pointer-events-none absolute inset-2 z-20 flex flex-col items-center justify-center rounded-[14px] border-2 border-dashed border-primary bg-background/90 p-4 text-center ${compact ? "gap-2.5" : "gap-3.5"}`}
+		>
+			<span
+				className={`flex items-center justify-center rounded-[18px] bg-primary/40 text-primary-foreground ${compact ? "size-14" : "size-[72px]"}`}
+			>
+				<UploadIcon
+					strokeWidth={1.75}
+					className={compact ? "size-7" : "size-[34px]"}
+				/>
+			</span>
+			<span
+				className={`font-bold text-foreground ${compact ? "text-lg" : "text-[22px]"}`}
+			>
+				Solte para enviar {compact ? "para" : "em"} {target}
+			</span>
+			<span className="text-sm text-secondary-foreground">
+				{count === 1 ? "1 arquivo" : `${count} arquivos`} · você ainda pode
+				escrever um texto antes de mandar
+			</span>
+			<span className="text-xs text-muted-foreground">
+				Até 10 arquivos de até 100 MB cada
+			</span>
 		</div>
 	);
 }

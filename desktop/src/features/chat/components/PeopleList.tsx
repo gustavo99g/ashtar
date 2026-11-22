@@ -24,7 +24,7 @@ import { usePeople } from "../queries";
  * em ordem de nome. O Dono (com a coroa), sempre no topo, esteja online ou não; o Resto, que é quem
  * mais está online; e o Offline, com quem está fora. Quem está online tem a bolinha verde no
  * avatar; quem está offline fica com o avatar e o nome apagados (`OFFLINE_DIM`), mas com as mesmas
- * cores, o dono inclusive. Embaixo do nome, "Na Sala" ou "Transmitindo na Sala" para quem está na
+ * cores, o dono inclusive. Embaixo do nome, "Em Sala" ou "Transmitindo em Sala" para quem está na
  * sala de voz (a mesma lista da Etapa 5 da v0.2.3, que chega pelo tempo real).
  *
  * Cada linha é um botão que abre o cartão da pessoa (`UserCardPopup`, ADR 0020), à esquerda da
@@ -163,8 +163,8 @@ function PersonRow({
 						{place && (
 							<span className="truncate text-xs text-muted-foreground">
 								{place.sharing
-									? `Transmitindo na ${place.roomName}`
-									: `Na ${place.roomName}`}
+									? `Transmitindo em ${place.roomName}`
+									: `Em ${place.roomName}`}
 							</span>
 						)}
 					</span>

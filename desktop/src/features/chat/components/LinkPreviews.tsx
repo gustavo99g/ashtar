@@ -97,6 +97,7 @@ function PreviewList({ message, mine }: LinkPreviewsProps) {
 			toast.add({
 				title: "Não deu para tirar as prévias",
 				description: error instanceof ApiError ? error.message : "Tente de novo.",
+				data: { tone: "error" },
 			});
 		}
 	}

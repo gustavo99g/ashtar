@@ -78,6 +78,7 @@ export function DeviceNotices() {
 			title: "Microfone indisponível",
 			description: microphoneProblem,
 			data: {
+				tone: "warning",
 				media: (
 					<NoticeIcon tone="warning">
 						<MicOffIcon />
@@ -112,6 +113,7 @@ function show(
 				title,
 				description: name ? `Usando o padrão do Windows: ${name}` : fallback,
 				data: {
+					tone: "warning",
 					media: (
 						<NoticeIcon tone="warning">
 							{notice.device === "input" ? <MicOffIcon /> : <SpeakerIcon />}
@@ -132,6 +134,7 @@ function show(
 				title: "Um microfone foi conectado",
 				description: "Você entrou sem microfone e continua mutado.",
 				data: {
+					tone: "info",
 					media: (
 						<NoticeIcon tone="info">
 							<MicIcon />

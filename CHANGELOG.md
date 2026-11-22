@@ -1,5 +1,22 @@
 # O que há de novo no Ashtar
 
+## 0.7.1
+
+- Assistir pela lista: passe o mouse em quem está AO VIVO na lista de salas, à esquerda, para ver o que a pessoa transmite (o que está sendo transmitido, a qualidade, há quanto tempo e quantos assistem) e clicar em Assistir. Fora da sala, você entra nela e a transmissão já abre em foco.
+- Na transmissão em foco, o AO VIVO, o nome e os botões só aparecem com o mouse em cima: parado, a imagem fica limpa.
+- Clique com o botão direito numa imagem do chat para Copiar imagem ou Baixar. O visualizador em tela cheia também ganhou o Copiar.
+- As mensagens fixadas mostram as imagens, e clicar numa abre o visualizador.
+- Depois de anexar um arquivo, pelo +, arrastando ou colando, o campo fica pronto: é só apertar Enter para enviar.
+- Arrastar arquivos para a conversa mostra o "Solte para enviar", com quantos arquivos vêm.
+- O seletor de emoji abre mais rápido e, no campo de escrever, fica aberto para escolher vários seguidos, com o foco de volta no campo: é só continuar escrevendo e mandar com Enter.
+- Trocar de sala toca o som de sair e o de entrar, mesmo trocando rápido.
+- Os avisos no canto ganharam um tipo: certo, erro, aviso ou informação, com o ícone e a barra de tempo na cor dele e o título em negrito. O erro fica 12 s na tela, e as confirmações curtas, como "Imagem copiada", viram uma linha só. O "Salvo em Downloads" tem o "Abrir pasta", que mostra o arquivo no Explorer.
+- O menu da sala diz "Editar sala" em vez de "Renomear sala": ali também se muda quem tem acesso e se a sala é restrita.
+- A tela cheia da transmissão não deixa mais uma faixa branca na tela ao entrar de novo.
+- Na tela cheia, quem está na sala aparece por cima da parte de baixo da imagem. Com o mouse parado, a fileira, os botões e o cursor somem, e fica só a transmissão.
+- O número de menções nos canais e a linha Novas mensagens voltaram ao dourado.
+- A lista de membros diz "Em Sala" e "Transmitindo em Sala", que funciona com qualquer nome de sala.
+
 ## 0.7.0
 
 - A 0.7.0 é a primeira versão publicada com o que está na 0.6.0: quem vem da 0.5 ganha as duas de uma vez.

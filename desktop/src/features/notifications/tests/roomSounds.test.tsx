@@ -8,6 +8,7 @@ import { RoomSounds } from "../components/RoomSounds";
 import {
 	playPttSound,
 	playRoomSound,
+	RETRY_MS,
 	resetRoomSounds,
 } from "../model/roomSounds";
 
@@ -126,20 +127,73 @@ describe("os sons da sala", () => {
 		await flush();
 		expect(names()).toEqual([]);
 
-		// Trocar de sala: só o de entrar da nova.
-		resetRoomSounds();
+		// Trocar de sala: o de sair no clique, o de entrar quando a nova conecta, mesmo logo depois
+		// de outro (trocar rápido).
 		played.length = 0;
-		voice = { ...voice, voiceChannelId: "squad", connectionState: "connecting" };
-		rerender(<RoomSounds />);
-		voice = { ...voice, connectionState: "connected" };
+		voice = { ...voice, voiceChannelId: "squad", connectionState: "connecting", room: null };
 		rerender(<RoomSounds />);
 		await flush();
-		expect(names()).toEqual(["join"]);
+		expect(names()).toEqual(["leave"]);
+		voice = { ...voice, connectionState: "connected", room };
+		rerender(<RoomSounds />);
+		await flush();
+		expect(names()).toEqual(["leave", "join"]);
 
 		voice = { ...voice, voiceKind: null as never, voiceChannelId: null as never };
 		rerender(<RoomSounds />);
 		await flush();
-		expect(names()).toEqual(["join", "leave"]);
+		expect(names()).toEqual(["leave", "join", "leave"]);
+	});
+
+	it("o de entrar espera a sala ficar pronta, e o som que não toca tenta de novo", async () => {
+		const room = Object.assign(new EventEmitter(), {
+			localParticipant: { identity: "kid" },
+		});
+		let voice = {
+			voiceKind: "room",
+			voiceChannelId: "sala",
+			connectionState: "connected",
+			room: null as unknown,
+			isMuted: false,
+			isDeafened: false,
+		};
+		vi.mocked(useMaybeVoice).mockImplementation(() => voice as never);
+		// O primeiro play falha (a saída mudando), o segundo toca.
+		let fails = 1;
+		vi.stubGlobal(
+			"Audio",
+			class {
+				volume = 1;
+				constructor(src: string) {
+					audios.push(this);
+					this.src = src;
+				}
+				src: string;
+				play() {
+					if (fails-- > 0) return Promise.reject(new Error("NotAllowed"));
+					played.push(this.src.split("/").pop() ?? this.src);
+					return Promise.resolve();
+				}
+			},
+		);
+		vi.useFakeTimers();
+		const { rerender } = render(<RoomSounds />);
+		// Conectada, mas o microfone ainda abrindo: nada ainda.
+		await flush();
+		expect(audios).toHaveLength(0);
+
+		voice = { ...voice, room };
+		rerender(<RoomSounds />);
+		await flush();
+		expect(audios).toHaveLength(1);
+		expect(names()).toEqual([]);
+		await act(async () => {
+			vi.advanceTimersByTime(RETRY_MS);
+			await Promise.resolve();
+		});
+		await flush();
+		vi.useRealTimers();
+		expect(names()).toEqual(["join"]);
 	});
 
 	it("mutar e ficar surdo fora da voz também tocam, e numa ligação não", async () => {

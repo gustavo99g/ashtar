@@ -126,7 +126,7 @@ function ManageItems({
 				onClick={() => openChannelDialog({ kind: "editChannel", channel })}
 			>
 				<PencilIcon className="size-[15px]" />
-				{channel.kind === "text" ? "Editar canal" : "Renomear sala"}
+				{channel.kind === "text" ? "Editar canal" : "Editar sala"}
 			</DropdownMenuItem>
 			<DropdownMenuSub>
 				<DropdownMenuSubTrigger>

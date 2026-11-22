@@ -14,8 +14,10 @@ import {
 } from "@/components/ui/popover";
 import { Avatar } from "@/features/identity";
 import { toast } from "@/components/ui/toast";
-import { ApiError, type Message } from "@/lib/api";
-import { attachmentsLabel } from "../model/attachments";
+import { ApiError, type FileView, type Message } from "@/lib/api";
+import { useFileUrl } from "@/lib/fileCache";
+import { attachmentsLabel, isImage } from "../model/attachments";
+import { ImageViewer } from "./Attachments";
 import { plainText } from "../model/markdown";
 import { authorName, stampLabel } from "../model/messages";
 import { useMessageActions, usePins } from "../queries";
@@ -30,14 +32,20 @@ function PinnedItem({
 	message,
 	onUnpin,
 	onJump,
+	onOpenImage,
 }: {
 	message: Message;
 	/** Desafixar; sem isto (quem não pode), o botão não aparece. */
 	onUnpin?: () => void;
 	onJump: () => void;
+	onOpenImage: (file: FileView) => void;
 }) {
+	const images = (message.attachments ?? []).filter(
+		(file) => isImage(file.mime) && file.thumbnail_id,
+	);
 	const text =
-		plainText(message.body) || attachmentsLabel(message.attachments ?? []);
+		plainText(message.body) ||
+		(images.length > 0 ? "" : attachmentsLabel(message.attachments ?? []));
 	return (
 		<li className="flex flex-col gap-1.5 rounded-lg border border-border bg-card p-3">
 			<div className="flex items-center gap-2">
@@ -54,9 +62,22 @@ function PinnedItem({
 					{stampLabel(message.created_at)}
 				</span>
 			</div>
-			<p className="line-clamp-3 text-sm whitespace-pre-wrap text-secondary-foreground">
-				{text}
-			</p>
+			{text && (
+				<p className="line-clamp-3 text-sm whitespace-pre-wrap text-secondary-foreground">
+					{text}
+				</p>
+			)}
+			{images.length > 0 && (
+				<div className="flex flex-wrap gap-1.5">
+					{images.map((file) => (
+						<PinnedImage
+							key={file.id}
+							file={file}
+							onOpen={() => onOpenImage(file)}
+						/>
+					))}
+				</div>
+			)}
 			<div className="flex gap-3 text-xs font-semibold">
 				<button
 					type="button"
@@ -76,6 +97,28 @@ function PinnedItem({
 				)}
 			</div>
 		</li>
+	);
+}
+
+/** A miniatura de uma imagem da fixada; o clique abre o visualizador. */
+function PinnedImage({ file, onOpen }: { file: FileView; onOpen: () => void }) {
+	const url = useFileUrl(file.thumbnail_id ?? file.id);
+	return (
+		<button
+			type="button"
+			aria-label={`Abrir ${file.name}`}
+			onClick={onOpen}
+			className="h-20 overflow-hidden rounded-md bg-secondary focus-visible:outline-2 focus-visible:outline-focus"
+			style={{
+				aspectRatio:
+					file.width && file.height
+						? `${file.width} / ${file.height}`
+						: "4 / 3",
+				maxWidth: "100%",
+			}}
+		>
+			{url && <img src={url} alt="" className="size-full object-cover" />}
+		</button>
 	);
 }
 
@@ -111,7 +154,9 @@ export function PinsBar({
 			<PinsPopup
 				pins={pins}
 				align="start"
-				onUnpin={actions.canPin ? (message) => actions.pin(message, false) : undefined}
+				onUnpin={
+					actions.canPin ? (message) => actions.pin(message, false) : undefined
+				}
 				onJump={(message) => {
 					setOpen(false);
 					actions.jumpTo(message.id);
@@ -133,31 +178,37 @@ function PinsPopup({
 	onUnpin?: (message: Message) => void;
 	onJump: (message: Message) => void;
 }) {
+	// Fora da caixa: o visualizador continua aberto mesmo se a caixa fechar.
+	const [viewing, setViewing] = useState<FileView | null>(null);
 	return (
-		<PopoverContent
-			align={align}
-			className="max-h-[min(70vh,520px)] w-[min(420px,calc(100vw-2rem))] overflow-hidden p-0"
-		>
-			<PopoverTitle className="border-b border-border px-4 py-3 text-sm font-bold">
-				Mensagens fixadas
-			</PopoverTitle>
-			{pins.length === 0 ? (
-				<p className="px-4 pb-5 text-center text-[13px] text-muted-foreground">
-					Nenhuma mensagem fixada neste canal.
-				</p>
-			) : (
-				<ul className="flex flex-col gap-2 overflow-y-auto px-3 pb-3">
-					{pins.map((message) => (
-						<PinnedItem
-							key={message.id}
-							message={message}
-							onUnpin={onUnpin && (() => onUnpin(message))}
-							onJump={() => onJump(message)}
-						/>
-					))}
-				</ul>
-			)}
-		</PopoverContent>
+		<>
+			<ImageViewer file={viewing} onClose={() => setViewing(null)} />
+			<PopoverContent
+				align={align}
+				className="max-h-[min(70vh,520px)] w-[min(420px,calc(100vw-2rem))] overflow-hidden p-0"
+			>
+				<PopoverTitle className="border-b border-border px-4 py-3 text-sm font-bold">
+					Mensagens fixadas
+				</PopoverTitle>
+				{pins.length === 0 ? (
+					<p className="px-4 pb-5 text-center text-[13px] text-muted-foreground">
+						Nenhuma mensagem fixada neste canal.
+					</p>
+				) : (
+					<ul className="flex flex-col gap-2 overflow-y-auto px-3 pb-3">
+						{pins.map((message) => (
+							<PinnedItem
+								key={message.id}
+								message={message}
+								onUnpin={onUnpin && (() => onUnpin(message))}
+								onJump={() => onJump(message)}
+								onOpenImage={setViewing}
+							/>
+						))}
+					</ul>
+				)}
+			</PopoverContent>
+		</>
 	);
 }
 
@@ -194,7 +245,10 @@ export function PinsButton({
 									toast.add({
 										title: "Não deu para desafixar",
 										description:
-											error instanceof ApiError ? error.message : "Tente de novo.",
+											error instanceof ApiError
+												? error.message
+												: "Tente de novo.",
+										data: { tone: "error" },
 									}),
 								)
 						: undefined

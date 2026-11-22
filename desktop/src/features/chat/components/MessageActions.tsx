@@ -22,7 +22,8 @@ import {
 	PopoverContent,
 	PopoverTrigger,
 } from "@/components/ui/popover";
-import type { Message } from "@/lib/api";
+import type { FileView, Message } from "@/lib/api";
+import { ImageMenuItems } from "./Attachments";
 import { EmojiPicker } from "./EmojiPicker";
 import {
 	canDelete,
@@ -40,9 +41,7 @@ export function reacted(
 ): boolean {
 	return (
 		myId !== null &&
-		(message.reactions
-			.find((r) => r.emoji === emoji)
-			?.users.includes(myId) ??
+		(message.reactions.find((r) => r.emoji === emoji)?.users.includes(myId) ??
 			false)
 	);
 }
@@ -56,11 +55,14 @@ export function MessageMenuItems({
 	message,
 	actions,
 	withReactions,
+	image,
 	onOpenPicker,
 }: {
 	message: Message;
 	actions: MessageActionsValue;
 	withReactions: boolean;
+	/** A imagem em que o botão direito caiu: o menu começa com Copiar imagem e Baixar. */
+	image?: FileView | null;
 	/** Abre o seletor de emoji da barra (o Reagir do menu). */
 	onOpenPicker?: () => void;
 }) {
@@ -68,6 +70,12 @@ export function MessageMenuItems({
 	const deletable = canDelete(message, myId, actions.canModerate);
 	return (
 		<>
+			{image && (
+				<>
+					<ImageMenuItems file={image} />
+					<DropdownMenuSeparator />
+				</>
+			)}
 			{withReactions && (
 				<div className="flex justify-between px-1 pt-1 pb-2">
 					{QUICK_REACTIONS.map(({ emoji, label }) => (
@@ -113,9 +121,11 @@ export function MessageMenuItems({
 				Encaminhar
 			</DropdownMenuItem>
 			<DropdownMenuSeparator />
-			<DropdownMenuItem onClick={() =>
+			<DropdownMenuItem
+				onClick={() =>
 					void navigator.clipboard.writeText(message.body).catch(() => {})
-				}>
+				}
+			>
 				<CopyIcon />
 				Copiar texto
 			</DropdownMenuItem>
@@ -198,7 +208,7 @@ export function MessageToolbar({
 				<PopoverContent
 					side="left"
 					align="start"
-					className="w-auto gap-0 p-0 data-closed:animate-none"
+					className="w-auto gap-0 p-0 data-open:zoom-in-100 data-closed:hidden"
 				>
 					<EmojiPicker
 						onPick={(emoji) => {
@@ -218,11 +228,7 @@ export function MessageToolbar({
 				<ReplyIcon className="size-[18px]" />
 			</button>
 			<DropdownMenu onOpenChange={onMenuOpenChange}>
-				<DropdownMenuTrigger
-					aria-label="Mais"
-					title="Mais"
-					className={TOOL}
-				>
+				<DropdownMenuTrigger aria-label="Mais" title="Mais" className={TOOL}>
 					<MoreHorizontalIcon className="size-[18px]" />
 				</DropdownMenuTrigger>
 				<DropdownMenuContent align="end" className="w-[236px]">

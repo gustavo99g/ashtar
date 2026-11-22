@@ -131,7 +131,7 @@ describe("PeopleList", () => {
 		// o Offline segue como estava.
 		const owner = await screen.findByRole("region", { name: "Dono" });
 		expect(within(owner).getByText("Kid")).toBeInTheDocument();
-		expect(await within(owner).findByText("Na Sala")).toBeInTheDocument();
+		expect(await within(owner).findByText("Em Sala")).toBeInTheDocument();
 		expect(within(owner).queryByText("ana")).not.toBeInTheDocument();
 		const rest = screen.getByRole("region", { name: "Resto" });
 		expect(within(rest).getByText("ana")).toBeInTheDocument();
@@ -155,13 +155,13 @@ describe("PeopleList", () => {
 		const user = userEvent.setup();
 		renderPeople();
 		const owner = await screen.findByRole("region", { name: "Dono" });
-		await within(owner).findByText("Na Sala");
+		await within(owner).findByText("Em Sala");
 
 		await user.click(within(owner).getByRole("button", { name: /Kid/ }));
 
 		const card = await screen.findByRole("dialog", { name: "Perfil de Kid" });
 		expect(within(card).getByText("kid")).toBeVisible();
-		expect(within(card).getByText("Na Sala")).toBeVisible();
+		expect(within(card).getByText("Em Sala")).toBeVisible();
 
 		// Quem está offline também abre, e o cartão diz isso.
 		await user.keyboard("{Escape}");
@@ -176,10 +176,10 @@ describe("PeopleList", () => {
 		renderPeople();
 		const rest = await screen.findByRole("region", { name: "Resto" });
 		expect(
-			await within(rest).findByText("Transmitindo na Squad"),
+			await within(rest).findByText("Transmitindo em Squad"),
 		).toBeInTheDocument();
 		const owner = screen.getByRole("region", { name: "Dono" });
-		expect(await within(owner).findByText("Na Sala")).toBeInTheDocument();
+		expect(await within(owner).findByText("Em Sala")).toBeInTheDocument();
 	});
 
 	it("o dono fica sempre no topo, mesmo offline", async () => {

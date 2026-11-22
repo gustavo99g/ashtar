@@ -71,6 +71,15 @@ interface ScreenStageProps {
 	onToggleFullscreen: () => void;
 }
 
+/**
+ * O que fica por cima da imagem (o AO VIVO, quem transmite, quem assiste e os botões) só aparece com
+ * o mouse em cima, com o foco do teclado dentro ou com um popover dele aberto: parado, a tela fica
+ * limpa. Na tela cheia o mouse está sempre em cima, então lá eles somem também com o mouse parado
+ * (o `data-idle` do palco, ver `VoiceRoom`).
+ */
+const ON_HOVER =
+	"opacity-0 transition-opacity group-hover/stage:opacity-100 group-focus-within/stage:opacity-100 group-has-[[data-popup-open]]/stage:opacity-100 group-data-idle/full:opacity-0!";
+
 export function ScreenStage({
 	share,
 	sharer,
@@ -110,12 +119,17 @@ export function ScreenStage({
 				<Spinner className="size-6 text-primary" />
 			)}
 			{ready && <PausedCover share={share} />}
-			<div className="absolute top-3.5 left-3.5 flex items-center gap-2">
+			<div
+				className={cn(
+					"absolute top-3.5 left-3.5 flex items-center gap-2",
+					ON_HOVER,
+				)}
+			>
 				<LiveBadge size="md" />
 			</div>
 			<ShareViewers
 				owner={owner}
-				className="absolute top-3.5 right-3.5 opacity-0 transition-opacity group-hover/stage:opacity-100 group-focus-within/stage:opacity-100"
+				className={cn("absolute top-3.5 right-3.5", ON_HOVER)}
 			/>
 			{camera && (
 				<div
@@ -129,7 +143,12 @@ export function ScreenStage({
 					<CameraVideo trackRef={camera} />
 				</div>
 			)}
-			<div className="absolute bottom-3.5 left-3.5 flex min-w-0 items-center gap-2 rounded-lg bg-rail/85 py-1.5 pr-2.5 pl-1.5">
+			<div
+				className={cn(
+					"absolute bottom-3.5 left-3.5 flex min-w-0 items-center gap-2 rounded-lg bg-rail/85 py-1.5 pr-2.5 pl-1.5",
+					ON_HOVER,
+				)}
+			>
 				<Avatar nick={sharer.nick} displayName={sharer.name} size={26} />
 				<span className="truncate text-[13px] font-semibold text-foreground">
 					{sharer.name}
@@ -140,7 +159,12 @@ export function ScreenStage({
 					</span>
 				)}
 			</div>
-			<div className="absolute right-3.5 bottom-3.5 flex items-center gap-2">
+			<div
+				className={cn(
+					"absolute right-3.5 bottom-3.5 flex items-center gap-2",
+					ON_HOVER,
+				)}
+			>
 				{inFocus && ready && (
 					<>
 						<InboundStatsButton share={share} />

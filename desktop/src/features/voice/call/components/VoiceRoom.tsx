@@ -1,11 +1,5 @@
 import type { TrackReference } from "@livekit/components-react";
-import {
-	type ReactNode,
-	type RefObject,
-	useEffect,
-	useRef,
-	useState,
-} from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { Minimize2Icon } from "lucide-react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -25,6 +19,10 @@ import {
 import { paths } from "@/lib/paths";
 import { cn } from "@/lib/utils";
 import type { CaptureSource } from "@/lib/tauri/commands";
+import {
+	setWindowFullscreen,
+	watchWindowFullscreen,
+} from "@/lib/tauri/window";
 import {
 	CameraVideo,
 	cameraTrackOf,
@@ -223,8 +221,8 @@ function ConnectedRoom({
 	}, [stage]);
 
 	// O palco inteiro (as transmissões e a faixa de quem está na chamada) vai para a tela cheia.
-	const stageView = useRef<HTMLDivElement>(null);
-	const fullscreen = useFullscreen(stageView);
+	const fullscreen = useFullscreen();
+	const idle = useIdle(fullscreen.active);
 
 	const firstOpen = open[0] ? memberOf(open[0]) : undefined;
 	const subtitle = camMember
@@ -277,8 +275,12 @@ function ConnectedRoom({
 		>
 			{stage ? (
 				<div
-					ref={stageView}
-					className="flex min-h-0 flex-1 flex-col items-center gap-4 px-6 pt-5 pb-4 [&:fullscreen]:bg-background"
+					data-idle={idle || undefined}
+					className={cn(
+						"flex min-h-0 flex-1 flex-col items-center gap-4 px-6 pt-5 pb-4",
+						fullscreen.active &&
+							"group/full fixed inset-0 z-40 bg-background data-idle:cursor-none data-idle:**:cursor-none",
+					)}
 				>
 					{camMember ? (
 						<CameraStage member={camMember} onExit={() => focusCamera(null)} />
@@ -313,7 +315,13 @@ function ConnectedRoom({
 					)}
 					<div
 						aria-label="Participantes"
-						className="flex max-w-full shrink-0 items-center gap-2 overflow-x-auto"
+						className={cn(
+							"flex max-w-full shrink-0 items-center gap-2 overflow-x-auto",
+							// Na tela cheia a fileira fica por cima da parte de baixo da imagem, entre o
+							// nome e os botões, e some com o mouse parado, junto com eles.
+							fullscreen.active &&
+								"absolute inset-x-0 bottom-8 z-10 mx-auto w-fit max-w-[calc(100%-24rem)] transition-opacity group-data-idle/full:pointer-events-none group-data-idle/full:opacity-0",
+						)}
 					>
 						{(camMember ? open : layout.strip).map((id) => {
 							const share = shareOf(id);
@@ -483,25 +491,69 @@ function WatchedShare({
 	);
 }
 
-/** A tela cheia do `target` (a do próprio webview): se está nela, e o botão que entra e sai. */
-function useFullscreen(target: RefObject<HTMLElement | null>) {
+/**
+ * A tela cheia do palco: a janela vai para a tela cheia pelo Tauri e o palco cobre a janela inteira
+ * (`fixed inset-0`). Não é a do WebView2 (`requestFullscreen`): numa janela sem a borda do Windows,
+ * ela deixava uma faixa branca a cada segunda vez no mesmo monitor. Esc sai, e sair por fora (um
+ * atalho do Windows) também desliga aqui.
+ */
+function useFullscreen() {
 	const [active, setActive] = useState(false);
 	useEffect(() => {
-		const onChange = () =>
-			setActive(
-				document.fullscreenElement !== null &&
-					document.fullscreenElement === target.current,
-			);
-		document.addEventListener("fullscreenchange", onChange);
-		return () => document.removeEventListener("fullscreenchange", onChange);
-	}, [target]);
-	return {
-		active,
-		toggle: () => {
-			if (document.fullscreenElement) void document.exitFullscreen();
-			else void target.current?.requestFullscreen();
-		},
-	};
+		if (!active) return;
+		setWindowFullscreen(true);
+		// Na captura, antes de o menu tratar o Esc: com um menu ou popover aberto, o Esc fecha só ele.
+		const onKey = (event: KeyboardEvent) => {
+			if (event.key !== "Escape" || event.defaultPrevented) return;
+			if (document.querySelector("[data-popup-open]")) return;
+			setActive(false);
+		};
+		window.addEventListener("keydown", onKey, true);
+		const stopWatching = watchWindowFullscreen((fullscreen) => {
+			if (!fullscreen) setActive(false);
+		});
+		return () => {
+			window.removeEventListener("keydown", onKey, true);
+			stopWatching();
+			setWindowFullscreen(false);
+		};
+	}, [active]);
+	return { active, toggle: () => setActive((on) => !on) };
+}
+
+/** Quanto tempo o mouse fica parado na tela cheia até os botões e a fileira sumirem. */
+const IDLE_MS = 2500;
+
+/**
+ * Se o mouse e o teclado estão parados há `IDLE_MS` (só enquanto `on`). Com um menu aberto (um
+ * popover da transmissão) não conta como parado.
+ */
+function useIdle(on: boolean) {
+	const [idle, setIdle] = useState(false);
+	useEffect(() => {
+		if (!on) {
+			setIdle(false);
+			return;
+		}
+		let timer = 0;
+		const wake = () => {
+			setIdle(false);
+			window.clearTimeout(timer);
+			timer = window.setTimeout(sleep, IDLE_MS);
+		};
+		const sleep = () => {
+			if (document.querySelector("[data-popup-open]")) wake();
+			else setIdle(true);
+		};
+		wake();
+		const events = ["mousemove", "pointerdown", "keydown", "wheel"] as const;
+		for (const name of events) window.addEventListener(name, wake);
+		return () => {
+			window.clearTimeout(timer);
+			for (const name of events) window.removeEventListener(name, wake);
+		};
+	}, [on]);
+	return idle;
 }
 
 /** O lugar da própria transmissão: a imagem que está indo, os ajustes e o parar. */

@@ -20,8 +20,21 @@ export interface ChannelMember {
 	deafened?: boolean;
 	/** Fora da chamada: está com a câmera ligada (dentro, o bloco mostra a própria câmera). */
 	camera?: boolean;
+	/** O que está transmitindo, pelo que o app da pessoa contou à API (o cartão de Assistir). */
+	share?: ShareSummary;
 	/** Só dentro da chamada, e só quando está ruim: a qualidade que o LiveKit dá (decisão 15). */
 	connection?: ConnectionTrouble;
+}
+
+export interface ShareSummary {
+	/** A tela ou o título da janela. */
+	title: string;
+	window: boolean;
+	/** A chave do preset (`1080p60`...). */
+	quality: string;
+	/** `Date.now()` de quando começou. */
+	startedAt: number;
+	viewers: number;
 }
 
 /** `unstable`: a qualidade `poor` do LiveKit (laranja); `bad`: `lost` (vermelho). */
@@ -37,6 +50,15 @@ export function memberFromApi(participant: ParticipantView): ChannelMember {
 		micOff: participant.mic_off,
 		deafened: participant.deafened,
 		camera: participant.camera,
+		share: participant.share
+			? {
+					title: participant.share.title,
+					window: participant.share.window,
+					quality: participant.share.quality,
+					startedAt: participant.share.started_at,
+					viewers: participant.share.viewers,
+				}
+			: undefined,
 	};
 }
 

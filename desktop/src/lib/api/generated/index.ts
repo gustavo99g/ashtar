@@ -574,7 +574,12 @@ deafened: boolean,
 /**
  * Com a câmera ligada.
  */
-camera: boolean, };
+camera: boolean, 
+/**
+ * O que a pessoa está transmitindo, pelo que o app dela contou ([`ShareInfo`]). Só enquanto
+ * transmite.
+ */
+share?: ShareInfo | null, };
 
 export type PendingRecovery = { invite_id: string, expires_at: number, };
 
@@ -739,6 +744,33 @@ export type SetPermissionRequest = { enabled: boolean, };
 export type SetStatusRequest = { status: Status, };
 
 /**
+ * A transmissão de alguém, para o cartão de Assistir de quem está fora da sala (v0.7): a fonte,
+ * o preset, desde quando e quantos assistem. Quem está fora não recebe a imagem nem os dados da
+ * LiveKit, então é o app de quem transmite que conta.
+ */
+export type ShareInfo = { 
+/**
+ * O nome da fonte: a tela ("Tela 1") ou o título da janela.
+ */
+title: string, 
+/**
+ * Se é uma janela (`true`) ou a tela inteira.
+ */
+window: boolean, 
+/**
+ * A chave do preset (`720p60`, `1080p60`, `1080p30`).
+ */
+quality: string, 
+/**
+ * Quando começou, em milissegundos desde 1970.
+ */
+started_at: number, 
+/**
+ * Quantos estão assistindo agora.
+ */
+viewers: number, };
+
+/**
  * O status como os outros veem quem está online.
  */
 export type Shown = "available" | "away" | "busy";
@@ -785,11 +817,19 @@ avatar?: string | null, };
  * também. Enquanto existe, vale mais que o LiveKit, inclusive para a tela: é o app que sabe
  * primeiro.
  */
-export type VoiceFlags = { mic_off: boolean, deafened: boolean, camera: boolean, sharing: boolean, };
+export type VoiceFlags = { mic_off: boolean, deafened: boolean, camera: boolean, sharing: boolean, 
+/**
+ * O que está transmitindo; vale só com `sharing`.
+ */
+share?: ShareInfo | null, };
 
 /**
  * O que o app manda no `PUT /api/voice/state`.
  */
-export type VoiceStateRequest = { channel_id: string, mic_off: boolean, deafened: boolean, camera: boolean, sharing: boolean, };
+export type VoiceStateRequest = { channel_id: string, mic_off: boolean, deafened: boolean, camera: boolean, sharing: boolean, 
+/**
+ * O que está transmitindo; vale só com `sharing`.
+ */
+share?: ShareInfo | null, };
 
 export type VoiceTokenRequest = { channel_id: string, };

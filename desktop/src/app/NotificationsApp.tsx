@@ -4,7 +4,7 @@
  * janela principal, que manda cada cartão pelo Rust.
  */
 import "@/styles/App.css";
-import { NotificationStack } from "@/features/notifications";
+import { NotificationStack } from "@/features/notifications/window";
 import { useApplyTheme } from "@/features/settings";
 
 export function NotificationsApp() {

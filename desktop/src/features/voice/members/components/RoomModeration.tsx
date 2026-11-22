@@ -63,6 +63,7 @@ export function requestMove(
 			title: `Não deu para mover ${name}`,
 			description:
 				error instanceof Error ? error.message : "Tente de novo em instantes.",
+			data: { tone: "error" },
 		});
 	});
 }
@@ -96,6 +97,7 @@ export function RoomModeration({
 						error instanceof Error
 							? error.message
 							: "Tente de novo em instantes.",
+					data: { tone: "error" },
 				});
 			})
 			.finally(() => setBusy(false));

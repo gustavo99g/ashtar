@@ -36,6 +36,7 @@ export function LinkWatcher() {
 						title: "Você já está no Ashtar",
 						description:
 							"Esse convite não foi usado. Ele continua valendo para outra pessoa.",
+						data: { tone: "info" },
 					});
 					return;
 				}

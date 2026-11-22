@@ -5,7 +5,13 @@
  *
  * Na mensagem que ainda está subindo (`PendingFiles`), os cartões mostram a barra de progresso.
  */
-import { DownloadIcon, FileIcon, PlayIcon, XIcon } from "lucide-react";
+import {
+	CopyIcon,
+	DownloadIcon,
+	FileIcon,
+	PlayIcon,
+	XIcon,
+} from "lucide-react";
 import { useState } from "react";
 import { create } from "zustand";
 import { Button } from "@/components/ui/button";
@@ -19,6 +25,14 @@ import { toast } from "@/components/ui/toast";
 import { ApiError, apiUrl, type FileView, fileLink } from "@/lib/api";
 import { useFileUrl } from "@/lib/fileCache";
 import { downloadFile } from "@/lib/tauri/commands";
+import { revealFile } from "@/lib/tauri/opener";
+import {
+	ContextMenu,
+	ContextMenuContent,
+	ContextMenuTrigger,
+} from "@/components/ui/context-menu";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import { copyImageFile } from "../model/copyImage";
 import { cn } from "@/lib/utils";
 import {
 	durationLabel,
@@ -40,18 +54,61 @@ export function useDownload(file: FileView) {
 			const path = await downloadFile(file.id, file.name, (p) =>
 				setProgress(p.total ? p.received / p.total : null),
 			);
-			toast.add({ title: "Salvo em Downloads", description: path });
+			toast.add({
+				title: "Salvo em Downloads",
+				description: path,
+				data: { tone: "success", compact: true },
+				actionProps: {
+					children: "Abrir pasta",
+					onClick: () => revealFile(path),
+				},
+			});
 		} catch (error) {
 			toast.add({
 				title: `Não deu para baixar ${file.name}`,
 				description:
 					error instanceof ApiError ? error.message : "Tente de novo.",
+				data: { tone: "error" },
 			});
 		} finally {
 			setProgress(undefined);
 		}
 	}
 	return { downloading: progress !== undefined, progress, start };
+}
+
+/** Copia a imagem e avisa como foi. */
+export function copyImage(file: FileView): void {
+	copyImageFile(file.id).then(
+		() =>
+			toast.add({
+				title: "Imagem copiada",
+				data: { tone: "success", compact: true },
+			}),
+		() =>
+			toast.add({
+				title: "Não deu para copiar a imagem",
+				description: "Tente de novo.",
+				data: { tone: "error" },
+			}),
+	);
+}
+
+/** Copiar imagem e Baixar, no botão direito de uma imagem (no chat e no visualizador). */
+export function ImageMenuItems({ file }: { file: FileView }) {
+	const download = useDownload(file);
+	return (
+		<>
+			<DropdownMenuItem onClick={() => copyImage(file)}>
+				<CopyIcon />
+				Copiar imagem
+			</DropdownMenuItem>
+			<DropdownMenuItem onClick={() => void download.start()}>
+				<DownloadIcon />
+				Baixar imagem
+			</DropdownMenuItem>
+		</>
+	);
 }
 
 export function ProgressBar({
@@ -88,11 +145,17 @@ function FileCard({ file }: { file: FileView }) {
 		<div className="flex w-[min(100%,420px)] items-center gap-3 rounded-lg border border-border bg-card px-3 py-2.5">
 			<FileIcon aria-hidden="true" className="size-8 shrink-0 text-link" />
 			<div className="flex min-w-0 flex-1 flex-col gap-0.5">
-				<span className="truncate text-sm font-medium text-foreground" title={file.name}>
+				<span
+					className="truncate text-sm font-medium text-foreground"
+					title={file.name}
+				>
 					{file.name}
 				</span>
 				{download.downloading ? (
-					<ProgressBar value={download.progress} label={`Baixando ${file.name}`} />
+					<ProgressBar
+						value={download.progress}
+						label={`Baixando ${file.name}`}
+					/>
 				) : (
 					<span className="text-xs text-muted-foreground">
 						{fileCaption(file.mime, file.name, file.size)}
@@ -155,6 +218,10 @@ function ViewerContent({
 						Ir até a mensagem
 					</Button>
 				)}
+				<Button variant="ghost" size="sm" onClick={() => copyImage(file)}>
+					<CopyIcon className="size-4" />
+					Copiar
+				</Button>
 				<Button
 					variant="ghost"
 					size="sm"
@@ -172,11 +239,20 @@ function ViewerContent({
 			</div>
 			<div className="flex min-h-0 flex-1 items-center justify-center">
 				{url ? (
-					<img
-						src={url}
-						alt={file.name}
-						className="max-h-[calc(100vh-9rem)] max-w-full rounded-md object-contain"
-					/>
+					<ContextMenu>
+						<ContextMenuTrigger
+							render={
+								<img
+									src={url}
+									alt={file.name}
+									className="max-h-[calc(100vh-9rem)] max-w-full rounded-md object-contain"
+								/>
+							}
+						/>
+						<ContextMenuContent aria-label={file.name}>
+							<ImageMenuItems file={file} />
+						</ContextMenuContent>
+					</ContextMenu>
 				) : (
 					<div
 						className="animate-pulse rounded-md bg-secondary"
@@ -202,6 +278,7 @@ function ImageAttachment({
 		<button
 			type="button"
 			aria-label={`Abrir ${file.name}`}
+			data-image-id={file.id}
 			onClick={onOpen}
 			className="block max-w-full overflow-hidden rounded-lg bg-secondary focus-visible:outline-2 focus-visible:outline-focus"
 			style={{ width: box.width, aspectRatio: `${box.width} / ${box.height}` }}
@@ -237,13 +314,17 @@ function VideoAttachment({ file }: { file: FileView }) {
 				title: `Não deu para tocar ${file.name}`,
 				description:
 					error instanceof ApiError ? error.message : "Tente de novo.",
+				data: { tone: "error" },
 			});
 		} finally {
 			setLoading(false);
 		}
 	}
 
-	const style = { width: box.width, aspectRatio: `${box.width} / ${box.height}` };
+	const style = {
+		width: box.width,
+		aspectRatio: `${box.width} / ${box.height}`,
+	};
 	if (playing && src) {
 		return (
 			<video
@@ -269,7 +350,9 @@ function VideoAttachment({ file }: { file: FileView }) {
 			{cover && <img src={cover} alt="" className="size-full object-cover" />}
 			<span className="absolute inset-0 flex items-center justify-center">
 				<span className="flex size-12 items-center justify-center rounded-full bg-black/60 text-white group-hover/video:bg-black/80">
-					<PlayIcon className={cn("size-6 fill-current", loading && "animate-pulse")} />
+					<PlayIcon
+						className={cn("size-6 fill-current", loading && "animate-pulse")}
+					/>
 				</span>
 			</span>
 			{file.duration_ms != null && (

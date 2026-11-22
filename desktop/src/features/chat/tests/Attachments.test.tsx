@@ -54,6 +54,32 @@ describe("os anexos na mensagem", () => {
 		await vi.waitFor(() => expect(fetchFile).toHaveBeenCalledWith("f1"));
 	});
 
+	it("no visualizador, o botão direito na imagem tem Copiar imagem e Baixar", async () => {
+		const user = userEvent.setup();
+		vi.mocked(downloadFile).mockResolvedValue("C:/Downloads/foto.png");
+		render(<Attachments files={[file({})]} />);
+		await user.click(screen.getByRole("button", { name: "Abrir foto.png" }));
+		const dialog = await screen.findByRole("dialog", { name: "foto.png" });
+		expect(screen.getByRole("button", { name: "Copiar" })).toBeInTheDocument();
+		const image = await vi.waitFor(() => {
+			const found = dialog.querySelector("img");
+			if (!found) throw new Error("sem imagem");
+			return found;
+		});
+		await user.pointer({ keys: "[MouseRight]", target: image });
+		expect(
+			await screen.findByRole("menuitem", { name: "Copiar imagem" }),
+		).toBeInTheDocument();
+		await user.click(screen.getByRole("menuitem", { name: "Baixar imagem" }));
+		await vi.waitFor(() =>
+			expect(downloadFile).toHaveBeenCalledWith(
+				"f1",
+				"foto.png",
+				expect.any(Function),
+			),
+		);
+	});
+
 	it("o resto é o cartão com o tipo, o tamanho e Baixar", async () => {
 		const user = userEvent.setup();
 		vi.mocked(downloadFile).mockResolvedValue("C:/Downloads/notas.pdf");

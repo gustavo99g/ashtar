@@ -86,7 +86,11 @@ export function CallButton({
 						: "Não foi possível ligar agora.";
 				// No cabeçalho e no histórico não há onde escrever: o motivo vai no aviso do canto.
 				if (variant !== "card") {
-					toast.add({ title: "Não deu para ligar", description: message });
+					toast.add({
+						title: "Não deu para ligar",
+						description: message,
+						data: { tone: "error" },
+					});
 				} else {
 					setFailure(message);
 				}

@@ -6,6 +6,7 @@ import {
 	PopoverTrigger,
 } from "@/components/ui/popover";
 import { customId, useEmojiById } from "@/features/emojis";
+import { focusWindow } from "@/lib/tauri/window";
 import { cn } from "@/lib/utils";
 import { preloadEmojiGroups } from "../model/emoji";
 import type { Mentionable } from "../model/mentions";
@@ -120,12 +121,28 @@ export function Composer({
 		if (replyId) ref.current?.focus();
 	}, [replyId]);
 
+	// Anexou (pelo +, arrastando ou colando): o campo fica com o foco, para o Enter já enviar. O
+	// arquivo que vem do Explorer chega com a janela inativa, então ela é trazida para a frente.
+	const attached = files.length;
+	const lastAttached = useRef(attached);
+	useEffect(() => {
+		const grew = attached > lastAttached.current;
+		lastAttached.current = attached;
+		if (!grew) return;
+		focusWindow();
+		requestAnimationFrame(() => ref.current?.focus());
+	}, [attached]);
+
 	const [emojiOpen, setEmojiOpen] = useState(false);
 	const emojiById = useEmojiById();
 	// O seletor abre na hora: os emojis já vêm carregados quando o app fica parado.
 	useEffect(() => preloadEmojiGroups(), []);
 
-	/** Põe o emoji escolhido onde está o cursor (o do grupo entra como `:nome:`). */
+	/**
+	 * Põe o emoji escolhido onde está o cursor (o do grupo entra como `:nome:`). O seletor fica
+	 * aberto para escolher mais de um, e o foco volta para o campo: dá para continuar escrevendo e
+	 * mandar com Enter, que fecha o seletor.
+	 */
 	function insertEmoji(emoji: string) {
 		const id = customId(emoji);
 		const custom = id ? emojiById.get(id) : undefined;
@@ -134,7 +151,6 @@ export function Composer({
 		const start = field?.selectionStart ?? draft.length;
 		const end = field?.selectionEnd ?? draft.length;
 		setDraft(channelId, draft.slice(0, start) + text + draft.slice(end));
-		setEmojiOpen(false);
 		requestAnimationFrame(() => {
 			const at = start + text.length;
 			ref.current?.focus();
@@ -145,7 +161,6 @@ export function Composer({
 	function attach(picked: readonly File[]) {
 		if (picked.length === 0) return;
 		setProblem(addDraftFiles(channelId, picked));
-		ref.current?.focus();
 	}
 
 	function submit() {
@@ -159,6 +174,7 @@ export function Composer({
 		onSend(draft, takeDraftFiles(channelId));
 		setDraft(channelId, "");
 		setProblem(null);
+		setEmojiOpen(false);
 	}
 
 	return (
@@ -232,7 +248,9 @@ export function Composer({
 						placeholder={label}
 						aria-autocomplete="list"
 						aria-controls={list?.listId}
-						aria-activedescendant={list ? list.optionId(list.active) : undefined}
+						aria-activedescendant={
+							list ? list.optionId(list.active) : undefined
+						}
 						onChange={(event) => {
 							setDraft(channelId, event.target.value);
 							if (event.target.value.trim()) signalTyping();
@@ -299,12 +317,14 @@ export function Composer({
 							<SmileIcon className="size-5" />
 						</PopoverTrigger>
 						<PopoverContent
-								side="top"
-								align="end"
-								// Sem a animação de saída: o quadro some na hora, e não no canto da tela.
-								className="w-auto gap-0 p-0 data-closed:animate-none"
-							>
-							<EmojiPicker onPick={insertEmoji} />
+							side="top"
+							align="end"
+							// Sem a animação de saída: o quadro some na hora, e não no canto da tela. E a entrada só
+							// esmaece, sem o zoom: com a escala mudando, o WebView redesenhava os ~180 emojis a cada
+							// quadro (era o grosso do tempo de abrir).
+							className="w-auto gap-0 p-0 data-open:zoom-in-100 data-closed:hidden"
+						>
+							<EmojiPicker onPick={insertEmoji} keepFocus />
 						</PopoverContent>
 					</Popover>
 				</div>

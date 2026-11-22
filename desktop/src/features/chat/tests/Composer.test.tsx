@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Composer } from "../components/Composer";
@@ -157,5 +157,30 @@ describe("os anexos no campo", () => {
 		expect(screen.getByRole("alert")).toHaveTextContent(
 			"Uma mensagem leva até 10 arquivos.",
 		);
+	});
+});
+
+describe("o seletor de emoji no campo", () => {
+	it("escolher não fecha: dá para pôr vários, o foco volta para o campo e o Enter manda e fecha", async () => {
+		const user = userEvent.setup();
+		const { field, onSend } = renderComposer();
+		await user.click(screen.getByRole("button", { name: "Inserir emoji" }));
+		const picker = await screen.findByRole("dialog", { name: "Escolher emoji" });
+		const first = (await within(picker).findAllByRole("button", { name: /.+/ }))
+			.filter((button) => button.closest("section"))
+			.slice(0, 2);
+		await user.click(first[0]);
+		await waitFor(() => expect(field).toHaveFocus());
+		await user.click(first[1]);
+		expect(screen.getByRole("dialog", { name: "Escolher emoji" })).toBeInTheDocument();
+		expect((field as HTMLTextAreaElement).value).toBe(
+			`${first[0].textContent}${first[1].textContent}`,
+		);
+		await user.type(field, " oi{Enter}");
+		expect(onSend).toHaveBeenCalledWith(
+			`${first[0].textContent}${first[1].textContent} oi`,
+			[],
+		);
+		expect(screen.queryByRole("dialog", { name: "Escolher emoji" })).toBeNull();
 	});
 });
