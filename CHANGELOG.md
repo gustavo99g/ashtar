@@ -9,8 +9,6 @@
 - Depois de anexar um arquivo, pelo +, arrastando ou colando, o campo fica pronto: é só apertar Enter para enviar.
 - O número de menções nos canais e a linha Novas mensagens voltaram ao dourado.
 - A lista de membros diz "Em Sala" e "Transmitindo em Sala", que funciona com qualquer nome de sala.
-- Os botões Detalhes e Trocar fonte da transmissão ganharam fundo, e o atraso aparece em milissegundos inteiros.
-
 ## 0.7.0
 
 - A 0.7.0 é a primeira versão publicada com o que está na 0.6.0: quem vem da 0.5 ganha as duas de uma vez.
