@@ -123,7 +123,7 @@ function PanelBody({
 				</div>
 				<div className="flex items-center gap-1">
 					<Button
-						variant="secondary"
+						variant="solid"
 						className="h-9 text-sm font-medium"
 						onClick={() => {
 							onClose();
@@ -216,7 +216,7 @@ function PanelBody({
 					{controls.failure && `Não deu para ajustar: ${controls.failure}`}
 				</span>
 				<Button
-					variant="secondary"
+					variant="solid"
 					className="h-10 text-sm"
 					disabled={controls.busy}
 					onClick={() =>
