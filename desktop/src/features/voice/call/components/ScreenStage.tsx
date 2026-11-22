@@ -74,10 +74,11 @@ interface ScreenStageProps {
 /**
  * O que fica por cima da imagem (o AO VIVO, quem transmite, quem assiste e os botões) só aparece com
  * o mouse em cima, com o foco do teclado dentro ou com um popover dele aberto: parado, a tela fica
- * limpa.
+ * limpa. Na tela cheia o mouse está sempre em cima, então lá eles somem também com o mouse parado
+ * (o `data-idle` do palco, ver `VoiceRoom`).
  */
 const ON_HOVER =
-	"opacity-0 transition-opacity group-hover/stage:opacity-100 group-focus-within/stage:opacity-100 group-has-[[data-popup-open]]/stage:opacity-100";
+	"opacity-0 transition-opacity group-hover/stage:opacity-100 group-focus-within/stage:opacity-100 group-has-[[data-popup-open]]/stage:opacity-100 group-data-idle/full:opacity-0!";
 
 export function ScreenStage({
 	share,

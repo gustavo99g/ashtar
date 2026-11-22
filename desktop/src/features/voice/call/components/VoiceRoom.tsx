@@ -222,6 +222,7 @@ function ConnectedRoom({
 
 	// O palco inteiro (as transmissões e a faixa de quem está na chamada) vai para a tela cheia.
 	const fullscreen = useFullscreen();
+	const idle = useIdle(fullscreen.active);
 
 	const firstOpen = open[0] ? memberOf(open[0]) : undefined;
 	const subtitle = camMember
@@ -274,9 +275,11 @@ function ConnectedRoom({
 		>
 			{stage ? (
 				<div
+					data-idle={idle || undefined}
 					className={cn(
 						"flex min-h-0 flex-1 flex-col items-center gap-4 px-6 pt-5 pb-4",
-						fullscreen.active && "fixed inset-0 z-40 bg-background",
+						fullscreen.active &&
+							"group/full fixed inset-0 z-40 bg-background data-idle:cursor-none data-idle:**:cursor-none",
 					)}
 				>
 					{camMember ? (
@@ -312,7 +315,13 @@ function ConnectedRoom({
 					)}
 					<div
 						aria-label="Participantes"
-						className="flex max-w-full shrink-0 items-center gap-2 overflow-x-auto"
+						className={cn(
+							"flex max-w-full shrink-0 items-center gap-2 overflow-x-auto",
+							// Na tela cheia a fileira fica por cima da parte de baixo da imagem, entre o
+							// nome e os botões, e some com o mouse parado, junto com eles.
+							fullscreen.active &&
+								"absolute inset-x-0 bottom-8 z-10 mx-auto w-fit max-w-[calc(100%-24rem)] transition-opacity group-data-idle/full:pointer-events-none group-data-idle/full:opacity-0",
+						)}
 					>
 						{(camMember ? open : layout.strip).map((id) => {
 							const share = shareOf(id);
@@ -507,6 +516,41 @@ function useFullscreen() {
 		};
 	}, [active]);
 	return { active, toggle: () => setActive((on) => !on) };
+}
+
+/** Quanto tempo o mouse fica parado na tela cheia até os botões e a fileira sumirem. */
+const IDLE_MS = 2500;
+
+/**
+ * Se o mouse e o teclado estão parados há `IDLE_MS` (só enquanto `on`). Com um menu aberto (um
+ * popover da transmissão) não conta como parado.
+ */
+function useIdle(on: boolean) {
+	const [idle, setIdle] = useState(false);
+	useEffect(() => {
+		if (!on) {
+			setIdle(false);
+			return;
+		}
+		let timer = 0;
+		const wake = () => {
+			setIdle(false);
+			window.clearTimeout(timer);
+			timer = window.setTimeout(sleep, IDLE_MS);
+		};
+		const sleep = () => {
+			if (document.querySelector("[data-popup-open]")) wake();
+			else setIdle(true);
+		};
+		wake();
+		const events = ["mousemove", "pointerdown", "keydown", "wheel"] as const;
+		for (const name of events) window.addEventListener(name, wake);
+		return () => {
+			window.clearTimeout(timer);
+			for (const name of events) window.removeEventListener(name, wake);
+		};
+	}, [on]);
+	return idle;
 }
 
 /** O lugar da própria transmissão: a imagem que está indo, os ajustes e o parar. */
