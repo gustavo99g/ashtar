@@ -35,13 +35,6 @@ impl OpenGames {
         self.0.iter().find(|open| !hidden(&open.game.id))
     }
 
-    /// Se o processo já está na lista (para não reconhecer o mesmo `.exe` a cada volta).
-    pub fn contains(&self, pid: u32, started_ms: i64) -> bool {
-        self.0
-            .iter()
-            .any(|open| open.pid == pid && open.started_ms == started_ms)
-    }
-
     /// Sobe para o topo o processo que já está na lista. Devolve se achou.
     pub fn refocus(&mut self, pid: u32, started_ms: i64) -> bool {
         let Some(index) = self
@@ -96,7 +89,7 @@ mod tests {
         // Fechou: some.
         games.retain_alive(|pid, _| pid != 1);
         assert_eq!(games.current(|_| false).unwrap().game.id, "b");
-        assert!(!games.contains(1, 10));
+        assert!(!games.refocus(1, 10));
         games.retain_alive(|_, _| false);
         assert!(games.current(|_| false).is_none());
     }
