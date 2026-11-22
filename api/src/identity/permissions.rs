@@ -32,13 +32,17 @@ pub enum Permission {
     ManageEmojis,
     /// Lê e baixa os logs que os membros mandam (v0.7; antes, só o dono).
     ViewLogs,
+    /// Silencia, deixa surdo, desliga a câmera e encerra a transmissão de alguém numa sala de voz
+    /// (v0.8, ADR 0034).
+    ModerateVoice,
 }
 
 impl Permission {
-    pub const ALL: [Permission; 5] = [
+    pub const ALL: [Permission; 6] = [
         Permission::BetaUpdates,
         Permission::ManageChannels,
         Permission::MoveMembers,
+        Permission::ModerateVoice,
         Permission::ManageEmojis,
         Permission::ViewLogs,
     ];
@@ -50,6 +54,7 @@ impl Permission {
             Self::MoveMembers => "membros.mover",
             Self::ManageEmojis => "emojis.gerenciar",
             Self::ViewLogs => "logs.ver",
+            Self::ModerateVoice => "voz.moderar",
         }
     }
 
@@ -61,6 +66,7 @@ impl Permission {
             Self::MoveMembers => "Mover membros",
             Self::ManageEmojis => "Gerenciar emojis",
             Self::ViewLogs => "Ver logs",
+            Self::ModerateVoice => "Moderar voz",
         }
     }
 

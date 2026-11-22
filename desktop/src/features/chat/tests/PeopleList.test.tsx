@@ -108,6 +108,8 @@ beforeEach(() => {
 						mic_off: false,
 						deafened: false,
 						camera: false,
+						server_muted: false,
+						server_deafened: false,
 					},
 				]
 			: [
@@ -119,6 +121,8 @@ beforeEach(() => {
 						mic_off: false,
 						deafened: false,
 						camera: false,
+						server_muted: false,
+						server_deafened: false,
 					},
 				],
 	);

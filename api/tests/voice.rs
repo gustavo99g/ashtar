@@ -444,3 +444,149 @@ async fn o_estado_que_o_app_conta_vai_para_quem_esta_fora() {
         false
     );
 }
+
+/// Dá "Moderar voz" a `user_id`, como o dono faria em Membros.
+async fn grant_moderation(ctx: &Ctx, user_id: &str) {
+    sqlx::query(
+        "INSERT INTO user_permissions (user_id, permission, granted_at) VALUES (?, 'voz.moderar', 0)",
+    )
+    .bind(user_id)
+    .execute(&ctx.db)
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+async fn silenciar_confere_a_permissao_o_dono_e_a_sala() {
+    let ctx = setup().await;
+    let ana = join(&ctx, "Ana", 2, false).await;
+    let ana_id = member_id(&ctx, &ana).await;
+    let beto = join(&ctx, "Beto", 3, false).await;
+    let beto_id = member_id(&ctx, &beto).await;
+    let moderate = |method: &'static str, token: String, path: String| {
+        let router = ctx.router.clone();
+        async move { call(&router, method, &path, Some(&token), None).await.0 }
+    };
+    let mute = |id: &str| format!("/api/voice/moderation/{id}/mute");
+
+    // Fora de qualquer sala de voz do grupo (numa ligação privada também): 404.
+    assert_eq!(
+        moderate("PUT", ctx.owner_token.clone(), mute(&ana_id)).await,
+        StatusCode::NOT_FOUND
+    );
+    ctx.hub.publish_voice_participants(
+        "sala".into(),
+        vec![person(&ana_id), person(&beto_id), person(&ctx.owner.id)],
+        Audience::Everyone,
+    );
+    // Sem "Moderar voz": 403. Nem "Mover membros" serve.
+    assert_eq!(
+        moderate("PUT", beto.clone(), mute(&ana_id)).await,
+        StatusCode::FORBIDDEN
+    );
+    grant_moderation(&ctx, &beto_id).await;
+    let (_, me) = call(&ctx.router, "GET", "/api/me", Some(&beto), None).await;
+    assert_eq!(me["can_moderate_voice"], true);
+    // Ninguém modera o dono, nem a si mesmo; membro inventado é 404.
+    assert_eq!(
+        moderate("PUT", beto.clone(), mute(&ctx.owner.id)).await,
+        StatusCode::CONFLICT
+    );
+    assert_eq!(
+        moderate("PUT", beto.clone(), mute(&beto_id)).await,
+        StatusCode::CONFLICT
+    );
+    assert_eq!(
+        moderate("PUT", beto.clone(), mute("ninguem")).await,
+        StatusCode::NOT_FOUND
+    );
+    for action in ["camera-off", "stop-share"] {
+        assert_eq!(
+            moderate(
+                "POST",
+                beto.clone(),
+                format!("/api/voice/moderation/{}/{action}", ctx.owner.id)
+            )
+            .await,
+            StatusCode::CONFLICT
+        );
+    }
+}
+
+#[tokio::test]
+async fn silenciado_fica_ate_liberar_e_so_o_icone_muda() {
+    let ctx = setup().await;
+    let ana = join(&ctx, "Ana", 2, false).await;
+    let ana_id = member_id(&ctx, &ana).await;
+    ctx.hub.publish_voice_participants(
+        "sala".into(),
+        vec![person(&ana_id), person(&ctx.owner.id)],
+        Audience::Everyone,
+    );
+    let mut rx = ctx.hub.subscribe();
+
+    let path = format!("/api/voice/moderation/{ana_id}/mute");
+    let (status, body) = call(&ctx.router, "PUT", &path, Some(&ctx.owner_token), None).await;
+    assert_eq!(status, StatusCode::NO_CONTENT, "{body}");
+    let events = drain(&mut rx);
+    assert_eq!(events.len(), 2);
+    let (moderated, to) = &events[0];
+    assert!(to.includes(&ana_id) && !to.includes(&ctx.owner.id));
+    assert_eq!(
+        *moderated,
+        json!({
+            "type": "voice.moderated", "action": "mute", "server_muted": true,
+            "server_deafened": false, "by": ctx.owner.id, "by_name": "Kid",
+        })
+    );
+    let (list, to) = &events[1];
+    assert!(to.includes(&ctx.owner.id));
+    assert_eq!(list["type"], "voice.participants");
+    assert_eq!(list["participants"][0]["server_muted"], true);
+    assert_eq!(list["participants"][1]["server_muted"], false);
+
+    // Trocar de sala não solta: o estado está no banco, e a lista nova (do LiveKit) traz ele.
+    let imposed = api::moderation::get(&ctx.db, &ana_id).await.unwrap();
+    assert!(imposed.mic_muted && !imposed.deafened);
+    let room = vec![api::voice::RoomParticipant {
+        identity: ana_id.clone(),
+        screen_sharing: false,
+    }];
+    let views = api::voice::join_participants(&ctx.db, room).await.unwrap();
+    assert!(views[0].server_muted);
+
+    // Liberar vale mesmo fora da sala.
+    ctx.hub
+        .publish_voice_participants("sala".into(), vec![], Audience::Everyone);
+    let (status, _) = call(&ctx.router, "DELETE", &path, Some(&ctx.owner_token), None).await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+    assert!(
+        api::moderation::get(&ctx.db, &ana_id)
+            .await
+            .unwrap()
+            .is_free()
+    );
+}
+
+#[tokio::test]
+async fn encerrar_a_transmissao_avisa_so_quem_transmitia() {
+    let ctx = setup().await;
+    let ana = join(&ctx, "Ana", 2, false).await;
+    let ana_id = member_id(&ctx, &ana).await;
+    ctx.hub
+        .publish_voice_participants("sala".into(), vec![person(&ana_id)], Audience::Everyone);
+    let mut rx = ctx.hub.subscribe();
+    let (status, _) = call(
+        &ctx.router,
+        "POST",
+        &format!("/api/voice/moderation/{ana_id}/stop-share"),
+        Some(&ctx.owner_token),
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+    let events = drain(&mut rx);
+    assert_eq!(events.len(), 1);
+    assert_eq!(events[0].0["action"], "stop_share");
+    assert!(events[0].1.includes(&ana_id) && !events[0].1.includes(&ctx.owner.id));
+}

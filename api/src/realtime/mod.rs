@@ -123,6 +123,17 @@ pub enum ServerEvent {
         by_name: String,
         reason: DisconnectReason,
     },
+    /// A moderação mudou alguma coisa da pessoa na voz (ADR 0034). Só vai para as conexões dela,
+    /// com o estado imposto inteiro: o app trava o microfone e o áudio, desliga a câmera ou para a
+    /// transmissão sem tentar voltar. Silenciar e deixar surdo não mostram aviso.
+    #[serde(rename = "voice.moderated")]
+    VoiceModerated {
+        action: crate::moderation::ModerationAction,
+        server_muted: bool,
+        server_deafened: bool,
+        by: String,
+        by_name: String,
+    },
     /// Alguém está escrevendo no canal ou na conversa (ADR 0027). Vai para quem
     /// pode ler, menos a própria pessoa; o app esquece depois de 6 segundos sem
     /// outro.
@@ -201,6 +212,7 @@ impl ServerEvent {
             | Self::PresenceChanged { .. }
             | Self::StatusChanged { .. }
             | Self::VoiceDisconnected { .. }
+            | Self::VoiceModerated { .. }
             | Self::MemberJoined { .. }
             | Self::UserUpdated { .. }
             | Self::MemberLeft { .. }
@@ -653,6 +665,26 @@ impl Hub {
     /// `list` da sala `room` com o estado que cada app contou (a lista que o LiveKit deu).
     pub fn with_voice_flags(&self, room: &str, list: Vec<ParticipantView>) -> Vec<ParticipantView> {
         self.lock().with_flags(room, list)
+    }
+
+    /// Troca o estado imposto de `user_id` na lista guardada da sala em que ele está. Devolve a sala
+    /// e a lista nova (é só publicar); `None` se a pessoa não está em sala nenhuma.
+    pub fn set_moderated(
+        &self,
+        user_id: &str,
+        server_muted: bool,
+        server_deafened: bool,
+    ) -> Option<(String, Vec<ParticipantView>)> {
+        let mut inner = self.lock();
+        let (room, people) = inner
+            .voice_rooms
+            .iter_mut()
+            .find(|(_, people)| people.iter().any(|p| p.user_id == user_id))?;
+        for person in people.iter_mut().filter(|p| p.user_id == user_id) {
+            person.server_muted = server_muted;
+            person.server_deafened = server_deafened;
+        }
+        Some((room.clone(), people.clone()))
     }
 
     /// Se a releitura `n` ainda é a última pedida para `room`.

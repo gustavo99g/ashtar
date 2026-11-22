@@ -437,7 +437,11 @@ can_manage_emojis: boolean,
 /**
  * Se lê os logs que os membros mandam (Painel › Logs).
  */
-can_view_logs: boolean, };
+can_view_logs: boolean, 
+/**
+ * Se o cartão de quem está numa sala de voz mostra a seção Moderação (v0.8).
+ */
+can_moderate_voice: boolean, };
 
 export type MediaFilter = "media" | "files";
 
@@ -531,6 +535,11 @@ has_more: boolean,
  */
 has_newer?: boolean, };
 
+/**
+ * O que a moderação fez, no `voice.moderated` que vai para a pessoa moderada.
+ */
+export type ModerationAction = "mute" | "unmute" | "deafen" | "undeafen" | "camera_off" | "stop_share";
+
 export type MoveMemberRequest = { user_id: string, channel_id: string, };
 
 export type MuteRequest = { muted: boolean, };
@@ -579,7 +588,15 @@ camera: boolean,
  * O que a pessoa está transmitindo, pelo que o app dela contou ([`ShareInfo`]). Só enquanto
  * transmite.
  */
-share?: ShareInfo | null, };
+share?: ShareInfo | null, 
+/**
+ * Silenciada pela moderação (ADR 0034): o microfone vermelho com o escudo.
+ */
+server_muted: boolean, 
+/**
+ * Com o áudio desligado pela moderação.
+ */
+server_deafened: boolean, };
 
 export type PendingRecovery = { invite_id: string, expires_at: number, };
 
@@ -706,7 +723,7 @@ export type ServerEvent = { "type": "ready", user_id: string, status: Status, on
 /**
  * O nome de quem moveu, para o aviso.
  */
-by_name: string, } | { "type": "voice.disconnected", by: string, by_name: string, reason: DisconnectReason, } | { "type": "typing", channel_id: string, user_id: string, } | { "type": "member.joined", person: Person, } | { "type": "user.updated", id: string, display_name: string | null, avatar: string | null, } | { "type": "member.left", user_id: string, } | { "type": "logs.received", report: LogReportView, } | { "type": "channels.changed", version: number, } | { "type": "emojis.changed", emojis: Array<Emoji>, } | { "type": "channel.state", channel_id: string, state: ReadState, } | { "type": "call.ringing", call: CallView, } | { "type": "call.accepted", call: CallView, } | { "type": "call.ended", call_id: string, channel_id: string, outcome: CallOutcome, duration: number | null, };
+by_name: string, } | { "type": "voice.disconnected", by: string, by_name: string, reason: DisconnectReason, } | { "type": "voice.moderated", action: ModerationAction, server_muted: boolean, server_deafened: boolean, by: string, by_name: string, } | { "type": "typing", channel_id: string, user_id: string, } | { "type": "member.joined", person: Person, } | { "type": "user.updated", id: string, display_name: string | null, avatar: string | null, } | { "type": "member.left", user_id: string, } | { "type": "logs.received", report: LogReportView, } | { "type": "channels.changed", version: number, } | { "type": "emojis.changed", emojis: Array<Emoji>, } | { "type": "channel.state", channel_id: string, state: ReadState, } | { "type": "call.ringing", call: CallView, } | { "type": "call.accepted", call: CallView, } | { "type": "call.ended", call_id: string, channel_id: string, outcome: CallOutcome, duration: number | null, };
 
 export type ServerStatus = { api: ApiStatus, livekit: LiveKitStatus, 
 /**

@@ -12,6 +12,8 @@ describe("memberFromApi", () => {
 				mic_off: true,
 				deafened: false,
 				camera: true,
+				server_muted: false,
+				server_deafened: false,
 			}),
 		).toEqual({
 			id: "u1",
@@ -31,6 +33,8 @@ describe("memberFromApi", () => {
 				mic_off: false,
 				deafened: false,
 				camera: false,
+				server_muted: false,
+				server_deafened: false,
 			}),
 		).toEqual({
 			id: "u2",

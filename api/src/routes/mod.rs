@@ -10,6 +10,7 @@ pub mod invites;
 pub mod logs;
 pub mod members;
 pub mod messages;
+pub mod moderation;
 pub mod pages;
 pub mod people;
 pub mod read;

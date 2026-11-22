@@ -10,15 +10,16 @@ use std::env;
 use std::sync::OnceLock;
 use std::time::Duration;
 
-use livekit_api::services::room::RoomClient;
+use livekit_api::services::room::{RoomClient, UpdateParticipantOptions};
 use livekit_api::services::{ServerError, ServerErrorCode, ServiceError};
-use livekit_protocol::{ParticipantInfo, TrackSource};
+use livekit_protocol::{ParticipantInfo, ParticipantPermission, TrackSource};
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
 use ts_rs::TS;
 
 use crate::error::ApiError;
 use crate::identity::{User, users};
+use crate::moderation::{self, Imposed};
 
 /// Uma pessoa na sala, com o nick e o nome visível do banco.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, TS)]
@@ -43,6 +44,10 @@ pub struct ParticipantView {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[ts(optional = nullable)]
     pub share: Option<ShareInfo>,
+    /// Silenciada pela moderação (ADR 0034): o microfone vermelho com o escudo.
+    pub server_muted: bool,
+    /// Com o áudio desligado pela moderação.
+    pub server_deafened: bool,
 }
 
 /// A transmissão de alguém, para o cartão de Assistir de quem está fora da sala (v0.7): a fonte,
@@ -177,11 +182,15 @@ pub async fn join_participants(
         .into_iter()
         .map(|user| (user.id.clone(), user))
         .collect();
+    let moderated = moderation::all(db).await?;
     Ok(room
         .into_iter()
         .filter_map(|participant| {
             let user = members.get(&participant.identity)?;
+            let imposed = moderated.get(&user.id).copied().unwrap_or_default();
             Some(ParticipantView {
+                server_muted: imposed.mic_muted,
+                server_deafened: imposed.deafened,
                 user_id: user.id.clone(),
                 nick: user.nick.clone(),
                 display_name: user.display_name.clone(),
@@ -246,6 +255,21 @@ pub(crate) trait VoiceRooms {
     async fn names(&self) -> Result<Vec<String>, ServiceError>;
     /// O `RemoveParticipant`: derruba a conexão de `identity` na sala `room`.
     async fn remove(&self, room: &str, identity: &str) -> Result<(), ServiceError>;
+    /// O `GetParticipant`: a conexão de `identity` na sala `room`, com as trilhas.
+    async fn participant(
+        &self,
+        room: &str,
+        identity: &str,
+    ) -> Result<ParticipantInfo, ServiceError>;
+    /// O `UpdateParticipant` só com a permissão: o que `identity` pode publicar e receber.
+    async fn set_permission(
+        &self,
+        room: &str,
+        identity: &str,
+        permission: ParticipantPermission,
+    ) -> Result<(), ServiceError>;
+    /// O `MutePublishedTrack`: muta a trilha `sid` de `identity`.
+    async fn mute_track(&self, room: &str, identity: &str, sid: &str) -> Result<(), ServiceError>;
 }
 
 impl VoiceRooms for RoomClient {
@@ -257,6 +281,132 @@ impl VoiceRooms for RoomClient {
     async fn remove(&self, room: &str, identity: &str) -> Result<(), ServiceError> {
         self.remove_participant(room, identity).await
     }
+
+    async fn participant(
+        &self,
+        room: &str,
+        identity: &str,
+    ) -> Result<ParticipantInfo, ServiceError> {
+        self.get_participant(room, identity).await
+    }
+
+    async fn set_permission(
+        &self,
+        room: &str,
+        identity: &str,
+        permission: ParticipantPermission,
+    ) -> Result<(), ServiceError> {
+        self.update_participant(
+            room,
+            identity,
+            UpdateParticipantOptions {
+                permission: Some(permission),
+                ..Default::default()
+            },
+        )
+        .await
+        .map(|_| ())
+    }
+
+    async fn mute_track(&self, room: &str, identity: &str, sid: &str) -> Result<(), ServiceError> {
+        self.mute_published_track(room, identity, sid, true)
+            .await
+            .map(|_| ())
+    }
+}
+
+/// Aplica na conexão de voz de `identity` na sala `room` o que a moderação impôs (ADR 0034): o
+/// LiveKit para o microfone de quem foi silenciado e corta o áudio de quem ficou surdo, sem
+/// depender do app. Quem já saiu da sala não é erro: o token da próxima entrada já sai travado.
+pub(crate) async fn restrict(
+    rooms: &impl VoiceRooms,
+    room: &str,
+    identity: &str,
+    imposed: Imposed,
+) -> Result<(), ServiceError> {
+    match rooms
+        .set_permission(room, identity, imposed.permission())
+        .await
+    {
+        Err(error) if is_not_found(&error) => Ok(()),
+        result => result,
+    }
+}
+
+/// Muta a câmera de `identity` na sala `room` e devolve quantas trilhas mutou. O app da pessoa
+/// recebe o `voice.moderated` e desliga a câmera de verdade; isto é a garantia.
+pub(crate) async fn mute_camera(
+    rooms: &impl VoiceRooms,
+    room: &str,
+    identity: &str,
+) -> Result<usize, ServiceError> {
+    let info = match rooms.participant(room, identity).await {
+        Ok(info) => info,
+        Err(error) if is_not_found(&error) => return Ok(0),
+        Err(error) => return Err(error),
+    };
+    let mut muted = 0;
+    for track in info
+        .tracks
+        .iter()
+        .filter(|track| track.source() == TrackSource::Camera && !track.muted)
+    {
+        rooms.mute_track(room, identity, &track.sid).await?;
+        muted += 1;
+    }
+    Ok(muted)
+}
+
+/// Roda `job` com o `RoomClient` à parte, como o [`kick_in_background`]: a resposta não espera o
+/// LiveKit. Sem as chaves do LiveKit, não há o que fazer; um erro vai para o log com `what`.
+fn with_client_in_background<F, Fut>(what: String, job: F)
+where
+    F: FnOnce(&'static RoomClient) -> Fut + Send + 'static,
+    Fut: std::future::Future<Output = Result<(), ServiceError>> + Send,
+{
+    tokio::spawn(async move {
+        let client = match room_client() {
+            Ok(client) => client,
+            Err(ApiError::Config(_)) => return,
+            Err(error) => {
+                eprintln!("livekit: não deu para {what}: {error}");
+                return;
+            }
+        };
+        if let Err(error) = job(client).await {
+            eprintln!("livekit: não deu para {what}: {error}");
+        }
+    });
+}
+
+/// O [`restrict`] à parte.
+pub fn restrict_in_background(room: String, identity: String, imposed: Imposed) {
+    with_client_in_background(
+        format!("aplicar a moderação de {identity} na sala {room}"),
+        move |client| async move { restrict(client, &room, &identity, imposed).await },
+    );
+}
+
+/// O [`mute_camera`] à parte.
+pub fn mute_camera_in_background(room: String, identity: String) {
+    with_client_in_background(
+        format!("desligar a câmera de {identity} na sala {room}"),
+        move |client| async move { mute_camera(client, &room, &identity).await.map(|_| ()) },
+    );
+}
+
+/// Derruba só a transmissão de tela de `user_id` (a conexão `{id}:screen`) na sala `room`.
+pub fn stop_share_in_background(room: String, user_id: String) {
+    let screen = screen_identity(&user_id);
+    with_client_in_background(
+        format!("encerrar a transmissão de {user_id} na sala {room}"),
+        move |client| async move {
+            match client.remove_participant(&room, &screen).await {
+                Err(error) if is_not_found(&error) => Ok(()),
+                result => result,
+            }
+        },
+    );
 }
 
 /// Tira `identity` (e a tela dela, `{identity}:screen`) de toda sala em que estiver e devolve
@@ -501,6 +651,80 @@ mod tests {
                 .push(format!("{room}/{identity}"));
             Ok(())
         }
+
+        async fn participant(
+            &self,
+            room: &str,
+            identity: &str,
+        ) -> Result<ParticipantInfo, ServiceError> {
+            let (_, people) = self.rooms.iter().find(|(name, _)| *name == room).unwrap();
+            if !people.contains(&identity) {
+                return Err(twirp(ServerErrorCode::NOT_FOUND));
+            }
+            let mut info = participant(identity, 0, &[TrackSource::Microphone]);
+            // A câmera ligada e uma já mutada: só a ligada é mutada de novo.
+            for (sid, muted) in [("TR_cam", false), ("TR_cam_velha", true)] {
+                info.tracks.push(livekit_protocol::TrackInfo {
+                    sid: sid.into(),
+                    source: TrackSource::Camera as i32,
+                    muted,
+                    ..Default::default()
+                });
+            }
+            Ok(info)
+        }
+
+        async fn set_permission(
+            &self,
+            room: &str,
+            identity: &str,
+            permission: ParticipantPermission,
+        ) -> Result<(), ServiceError> {
+            let (_, people) = self.rooms.iter().find(|(name, _)| *name == room).unwrap();
+            if !people.contains(&identity) {
+                return Err(twirp(ServerErrorCode::NOT_FOUND));
+            }
+            self.removed.lock().unwrap().push(format!(
+                "{room}/{identity} subscribe={} sources={}",
+                permission.can_subscribe,
+                permission.can_publish_sources.len()
+            ));
+            Ok(())
+        }
+
+        async fn mute_track(
+            &self,
+            room: &str,
+            identity: &str,
+            sid: &str,
+        ) -> Result<(), ServiceError> {
+            self.removed
+                .lock()
+                .unwrap()
+                .push(format!("{room}/{identity} mute {sid}"));
+            Ok(())
+        }
+    }
+
+    #[tokio::test]
+    async fn a_moderacao_vai_para_o_livekit() {
+        let rooms = fake(vec![("sala", vec!["kid", "juju"])]);
+        let muted = Imposed {
+            mic_muted: true,
+            deafened: false,
+        };
+        restrict(&rooms, "sala", "juju", muted).await.unwrap();
+        // Quem já saiu da sala não é erro: o próximo token sai travado.
+        restrict(&rooms, "sala", "marcao", muted).await.unwrap();
+        assert_eq!(mute_camera(&rooms, "sala", "juju").await.unwrap(), 1);
+        assert_eq!(mute_camera(&rooms, "sala", "marcao").await.unwrap(), 0);
+        assert_eq!(
+            *rooms.removed.lock().unwrap(),
+            [
+                "sala/juju subscribe=true sources=3",
+                "sala/juju mute TR_cam"
+            ]
+        );
     }
 
     fn fake(rooms: Vec<(&'static str, Vec<&'static str>)>) -> FakeRooms {

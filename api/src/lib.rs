@@ -12,6 +12,7 @@ pub mod files;
 pub mod identity;
 pub mod limiter;
 pub mod logs;
+pub mod moderation;
 pub mod previews;
 pub mod realtime;
 pub mod routes;
@@ -184,6 +185,22 @@ pub fn app(state: AppState, policy: Arc<ClientPolicy>) -> Router {
         )
         .route("/voice/move", post(routes::voice::move_member))
         .route("/voice/disconnect", post(routes::voice::disconnect_member))
+        .route(
+            "/voice/moderation/{id}/mute",
+            put(routes::moderation::mute).delete(routes::moderation::unmute),
+        )
+        .route(
+            "/voice/moderation/{id}/deafen",
+            put(routes::moderation::deafen).delete(routes::moderation::undeafen),
+        )
+        .route(
+            "/voice/moderation/{id}/camera-off",
+            post(routes::moderation::camera_off),
+        )
+        .route(
+            "/voice/moderation/{id}/stop-share",
+            post(routes::moderation::stop_share),
+        )
         .route("/auth/redeem", post(routes::auth::redeem))
         .route("/auth/login", post(routes::auth::login))
         .route("/me", get(routes::auth::me).patch(routes::auth::update_me))

@@ -138,7 +138,8 @@ mod tests {
                 "reactions",
                 "sessions",
                 "user_permissions",
-                "users"
+                "users",
+                "voice_moderation"
             ]
         );
     }

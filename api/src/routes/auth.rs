@@ -100,6 +100,8 @@ pub struct MeResponse {
     pub can_manage_emojis: bool,
     /// Se lê os logs que os membros mandam (Painel › Logs).
     pub can_view_logs: bool,
+    /// Se o cartão de quem está numa sala de voz mostra a seção Moderação (v0.8).
+    pub can_moderate_voice: bool,
 }
 
 #[derive(Debug, Deserialize, TS)]
@@ -302,6 +304,9 @@ async fn me_response(state: &AppState, user: &User) -> Result<MeResponse, ApiErr
             .iter()
             .any(|(p, _)| *p == Permission::ManageEmojis),
         can_view_logs: effective.iter().any(|(p, _)| *p == Permission::ViewLogs),
+        can_moderate_voice: effective
+            .iter()
+            .any(|(p, _)| *p == Permission::ModerateVoice),
     })
 }
 

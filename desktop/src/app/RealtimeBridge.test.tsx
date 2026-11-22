@@ -40,7 +40,7 @@ const me: MeResponse = {
 	can_create_invite: false,
 	can_view_panel: false,
 	can_manage_channels: false,
-	can_move_members: false, can_manage_emojis: false, can_view_logs: false,
+	can_move_members: false, can_manage_emojis: false, can_view_logs: false, can_moderate_voice: false,
 };
 
 /** Monta a ponte. `rerender` desenha de novo, para ela ler o status novo. */
