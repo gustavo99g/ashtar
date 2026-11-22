@@ -8,7 +8,9 @@ import {
 	getChannelLayout,
 	getMe,
 	type MeResponse,
+	moderateStopShare,
 	moveMember,
+	setServerMute,
 } from "@/lib/api";
 import { RoomModeration } from "../components/RoomModeration";
 
@@ -18,9 +20,11 @@ vi.mock("@/lib/api", async (importOriginal) => ({
 	getChannelLayout: vi.fn(),
 	moveMember: vi.fn(),
 	disconnectMember: vi.fn(),
+	setServerMute: vi.fn(),
+	moderateStopShare: vi.fn(),
 }));
 
-const me = (canMove: boolean): MeResponse => ({
+const me = (canMove: boolean, canModerate = false): MeResponse => ({
 	user: { id: "kid", nick: "kid", display_name: null, is_owner: false },
 	permissions: [],
 	update_channel: "stable",
@@ -28,7 +32,7 @@ const me = (canMove: boolean): MeResponse => ({
 	can_create_invite: false,
 	can_view_panel: false,
 	can_manage_channels: false,
-	can_move_members: canMove, can_manage_emojis: false, can_view_logs: false, can_moderate_voice: false,
+	can_move_members: canMove, can_manage_emojis: false, can_view_logs: false, can_moderate_voice: canModerate,
 });
 
 const room = (id: string, name: string) => ({
@@ -41,16 +45,23 @@ const room = (id: string, name: string) => ({
 	restricted: false,
 });
 
-function renderModeration(onDone = vi.fn()) {
+function renderModeration(
+	onDone = vi.fn(),
+	member: { sharing?: boolean; serverMuted?: boolean } = {},
+	people: { id: string; is_owner: boolean }[] = [],
+) {
 	const client = new QueryClient({
 		defaultOptions: { queries: { retry: false } },
 	});
+	client.setQueryData(["chat", "people"], people);
 	render(
 		<QueryClientProvider client={client}>
 			<RoomModeration
 				userId="juju"
 				name="Júlia"
 				roomId="sala"
+				roomName="Jogatina"
+				member={member}
 				onDone={onDone}
 			/>
 		</QueryClientProvider>,
@@ -143,5 +154,59 @@ describe("mover e desconectar pelo cartão", () => {
 		);
 		expect(disconnectMember).toHaveBeenCalledWith("juju");
 		await vi.waitFor(() => expect(onDone).toHaveBeenCalled());
+	});
+});
+
+describe("moderar a voz pelo cartão", () => {
+	beforeEach(() => {
+		vi.mocked(setServerMute).mockResolvedValue();
+		vi.mocked(moderateStopShare).mockResolvedValue();
+	});
+
+	it("Silenciar microfone é uma chave que pede à API", async () => {
+		vi.mocked(getMe).mockResolvedValue(me(false, true));
+		const user = userEvent.setup();
+		renderModeration(vi.fn(), { serverMuted: false });
+		const toggle = await screen.findByRole("switch", {
+			name: "Silenciar microfone",
+		});
+		// Sem "Mover membros", só a moderação.
+		expect(screen.queryByText("Desconectar da voz")).not.toBeInTheDocument();
+		await user.click(toggle);
+		expect(setServerMute).toHaveBeenCalledWith("juju", true);
+		expect(toggle).toBeChecked();
+	});
+
+	it("Encerrar transmissão pergunta antes, e o Shift pula", async () => {
+		vi.mocked(getMe).mockResolvedValue(me(false, true));
+		const user = userEvent.setup();
+		const onDone = renderModeration(vi.fn(), { sharing: true });
+		await user.click(
+			await screen.findByRole("button", { name: "Encerrar transmissão" }),
+		);
+		expect(
+			await screen.findByText("Encerrar a transmissão de Júlia?"),
+		).toBeInTheDocument();
+		expect(moderateStopShare).not.toHaveBeenCalled();
+		await user.click(screen.getByRole("button", { name: "Encerrar" }));
+		expect(moderateStopShare).toHaveBeenCalledWith("juju");
+		await vi.waitFor(() => expect(onDone).toHaveBeenCalled());
+
+		vi.mocked(moderateStopShare).mockClear();
+		await user.keyboard("{Shift>}");
+		await user.click(
+			screen.getByRole("button", { name: "Encerrar transmissão" }),
+		);
+		await user.keyboard("{/Shift}");
+		expect(moderateStopShare).toHaveBeenCalledWith("juju");
+		expect(screen.queryByText("Encerrar a transmissão de Júlia?")).toBeNull();
+	});
+
+	it("ninguém modera o dono", async () => {
+		vi.mocked(getMe).mockResolvedValue(me(true, true));
+		renderModeration(vi.fn(), {}, [{ id: "juju", is_owner: true }]);
+		await vi.waitFor(() => expect(getMe).toHaveBeenCalled());
+		expect(screen.queryByText("Moderação")).not.toBeInTheDocument();
+		expect(screen.queryByText("Mover para")).not.toBeInTheDocument();
 	});
 });

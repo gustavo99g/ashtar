@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import type { ScreenShareController } from "@/features/screen-share";
 import { CameraButton } from "../../camera/components/CameraButton";
+import { ShieldBadge } from "../../members/components/MuteMark";
 import { useVoice } from "../../room/hooks/useVoice";
 import { BarButton } from "./buttons";
 import { ShareButton } from "./ShareButton";
@@ -26,27 +27,58 @@ export function CallControls({
 	/** Na ligação privada: o Sair vira Desligar. */
 	call?: boolean;
 }) {
-	const { isMuted, isDeafened, mute, unmute, deafen, undeafen } = useVoice();
+	const {
+		isMuted,
+		isDeafened,
+		serverMuted,
+		serverDeafened,
+		mute,
+		unmute,
+		deafen,
+		undeafen,
+	} = useVoice();
 
 	return (
 		<div className="flex h-[78px] shrink-0 items-center justify-center gap-2 border-t border-border bg-card">
 			<BarButton
 				label="Microfone"
-				aria-label={isMuted ? "Ativar microfone" : "Desativar microfone"}
+				aria-label={
+					serverMuted
+						? "Silenciado pela moderação"
+						: isMuted
+							? "Ativar microfone"
+							: "Desativar microfone"
+				}
+				title={serverMuted ? "Silenciado pela moderação" : undefined}
 				aria-pressed={isMuted}
 				tone={isMuted ? "off" : "default"}
-				onClick={() => void (isMuted ? unmute() : mute())}
+				onClick={() => {
+					if (serverMuted) return;
+					void (isMuted ? unmute() : mute());
+				}}
 			>
 				{isMuted ? <MicOffIcon /> : <MicIcon />}
+				{serverMuted && <ShieldBadge />}
 			</BarButton>
 			<BarButton
 				label="Áudio"
-				aria-label={isDeafened ? "Ativar áudio" : "Desativar áudio"}
+				aria-label={
+					serverDeafened
+						? "Áudio desligado pela moderação"
+						: isDeafened
+							? "Ativar áudio"
+							: "Desativar áudio"
+				}
+				title={serverDeafened ? "Áudio desligado pela moderação" : undefined}
 				aria-pressed={isDeafened}
 				tone={isDeafened ? "off" : "default"}
-				onClick={() => void (isDeafened ? undeafen() : deafen())}
+				onClick={() => {
+					if (serverDeafened) return;
+					void (isDeafened ? undeafen() : deafen());
+				}}
 			>
 				{isDeafened ? <HeadphoneOffIcon /> : <HeadphonesIcon />}
+				{serverDeafened && <ShieldBadge />}
 			</BarButton>
 			<CameraButton />
 			{controller ? (

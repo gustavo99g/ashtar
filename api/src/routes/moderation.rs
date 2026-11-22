@@ -72,6 +72,11 @@ async fn change(
     }
     let imposed = moderation::set(&state.db, &target.id, imposed, &user.id, now()).await?;
     log(state, user, &target, action, room.as_deref()).await?;
+    // O LiveKit primeiro: liberado, o app da pessoa reabre o microfone assim que recebe o evento, e
+    // a permissão já tem de estar de volta.
+    if let Some(room) = &room {
+        voice::restrict_now(room, &target.id, imposed).await;
+    }
     notify(state, user, &target, action, imposed);
     if let Some((room, list)) =
         state
@@ -80,9 +85,6 @@ async fn change(
     {
         let to = access::audience(&state.db, &room).await?;
         state.hub.publish_voice_participants(room, list, to);
-    }
-    if let Some(room) = room {
-        voice::restrict_in_background(room, target.id, imposed);
     }
     Ok(StatusCode::NO_CONTENT)
 }

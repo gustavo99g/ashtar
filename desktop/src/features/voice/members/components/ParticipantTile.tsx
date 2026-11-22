@@ -1,8 +1,6 @@
 import type { Participant } from "livekit-client";
 import {
-	HeadphoneOffIcon,
 	Maximize2Icon,
-	MicOffIcon,
 	ScreenShareIcon,
 	VideoIcon,
 } from "lucide-react";
@@ -22,6 +20,7 @@ import { useCameraChoice } from "../../camera/stores/cameraChoiceStore";
 import type { ChannelMember } from "../model/members";
 import { ConnectionMark } from "./ConnectionMark";
 import { ConnectionSection } from "./ConnectionSection";
+import { MuteMark } from "./MuteMark";
 import { UserVolume, UserVolumeMark } from "./UserVolume";
 
 /*
@@ -222,19 +221,7 @@ function MemberIcons({
 					className={cn(size, "shrink-0 text-link")}
 				/>
 			)}
-			{member.deafened ? (
-				<HeadphoneOffIcon
-					aria-label="áudio desativado"
-					className={cn(size, "shrink-0 text-destructive-border")}
-				/>
-			) : (
-				member.micOff && (
-					<MicOffIcon
-						aria-label="microfone desativado"
-						className={cn(size, "shrink-0 text-destructive-border")}
-					/>
-				)
-			)}
+			<MuteMark member={member} className={size} />
 		</>
 	);
 }

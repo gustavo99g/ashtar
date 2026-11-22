@@ -379,12 +379,24 @@ where
     });
 }
 
-/// O [`restrict`] à parte.
-pub fn restrict_in_background(room: String, identity: String, imposed: Imposed) {
-    with_client_in_background(
-        format!("aplicar a moderação de {identity} na sala {room}"),
-        move |client| async move { restrict(client, &room, &identity, imposed).await },
-    );
+/// O [`restrict`] com o `RoomClient`, esperando o LiveKit (até 5 segundos). Um erro vai para o log:
+/// o banco já vale, e a próxima entrada sai travada pelo token.
+pub async fn restrict_now(room: &str, identity: &str, imposed: Imposed) {
+    let client = match room_client() {
+        Ok(client) => client,
+        Err(ApiError::Config(_)) => return,
+        Err(error) => {
+            eprintln!(
+                "livekit: não deu para aplicar a moderação de {identity} na sala {room}: {error}"
+            );
+            return;
+        }
+    };
+    if let Err(error) = restrict(client, room, identity, imposed).await {
+        eprintln!(
+            "livekit: não deu para aplicar a moderação de {identity} na sala {room}: {error}"
+        );
+    }
 }
 
 /// O [`mute_camera`] à parte.
@@ -395,12 +407,18 @@ pub fn mute_camera_in_background(room: String, identity: String) {
     );
 }
 
+/// Quanto o app tem para parar a transmissão sozinho antes de a API derrubar a tela.
+const STOP_SHARE_GRACE: Duration = Duration::from_secs(2);
+
 /// Derruba só a transmissão de tela de `user_id` (a conexão `{id}:screen`) na sala `room`.
 pub fn stop_share_in_background(room: String, user_id: String) {
     let screen = screen_identity(&user_id);
     with_client_in_background(
         format!("encerrar a transmissão de {user_id} na sala {room}"),
         move |client| async move {
+            // O app da pessoa recebe o `voice.moderated` e para sozinho; a queda aqui é a garantia,
+            // e esperar um pouco evita que ele a veja antes e tente voltar.
+            tokio::time::sleep(STOP_SHARE_GRACE).await;
             match client.remove_participant(&room, &screen).await {
                 Err(error) if is_not_found(&error) => Ok(()),
                 result => result,

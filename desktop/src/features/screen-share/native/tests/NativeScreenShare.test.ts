@@ -85,6 +85,8 @@ beforeEach(() => {
 	vi.mocked(createScreenToken).mockResolvedValue({
 		url: "wss://sala",
 		token: "tk",
+		server_muted: false,
+		server_deafened: false,
 	});
 	vi.mocked(screenShareStart).mockResolvedValue(7);
 	vi.mocked(screenShareUpdate).mockResolvedValue();
@@ -292,6 +294,8 @@ describe("NativeScreenShare", () => {
 			vi.mocked(createScreenToken).mockResolvedValueOnce({
 				url: "wss://sala",
 				token: "novo",
+				server_muted: false,
+				server_deafened: false,
 			});
 			await vi.advanceTimersByTimeAsync(RETRY_DELAYS_MS[0]);
 

@@ -342,7 +342,15 @@ uses: Array<InviteUseView>, };
 /**
  * A resposta do `voice/token`.
  */
-export type JoinVoiceResponse = { token: string, url: string, };
+export type JoinVoiceResponse = { token: string, url: string, 
+/**
+ * Silenciado pela moderação (ADR 0034): o app entra mutado e não desmuta. Só no token de voz.
+ */
+server_muted: boolean, 
+/**
+ * Com o áudio desligado pela moderação.
+ */
+server_deafened: boolean, };
 
 /**
  * O convite novo com que o membro entrou, e quantos já entraram com ele.

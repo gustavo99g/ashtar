@@ -22,6 +22,8 @@ describe("memberFromApi", () => {
 			sharing: true,
 			micOff: true,
 			deafened: false,
+			serverMuted: false,
+			serverDeafened: false,
 			camera: true,
 		});
 		expect(
@@ -43,6 +45,8 @@ describe("memberFromApi", () => {
 			sharing: false,
 			micOff: false,
 			deafened: false,
+			serverMuted: false,
+			serverDeafened: false,
 			camera: false,
 		});
 	});

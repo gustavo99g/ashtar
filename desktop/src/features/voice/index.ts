@@ -17,6 +17,7 @@ export {
 	useMoveTargets,
 } from "./members/components/RoomModeration";
 export { ConnectionMark } from "./members/components/ConnectionMark";
+export { MuteMark } from "./members/components/MuteMark";
 export { ConnectionSection } from "./members/components/ConnectionSection";
 export { UserVolume } from "./members/components/UserVolume";
 export { useLiveMembers } from "./members/hooks/useLiveMembers";

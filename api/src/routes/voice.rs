@@ -35,6 +35,10 @@ use crate::voice::{
 pub struct JoinVoiceResponse {
     pub token: String,
     pub url: String,
+    /// Silenciado pela moderação (ADR 0034): o app entra mutado e não desmuta. Só no token de voz.
+    pub server_muted: bool,
+    /// Com o áudio desligado pela moderação.
+    pub server_deafened: bool,
 }
 
 #[derive(Debug, Deserialize, TS)]
@@ -76,7 +80,12 @@ pub async fn voice_token(
         imposed,
     )
     .map_err(ApiError::Config)?;
-    Ok(Json(JoinVoiceResponse { token, url }))
+    Ok(Json(JoinVoiceResponse {
+        token,
+        url,
+        server_muted: imposed.mic_muted,
+        server_deafened: imposed.deafened,
+    }))
 }
 
 /// Quanto tempo o token da tela vale para entrar. Depois de entrar, a conexão segue: a LiveKit só
@@ -133,7 +142,12 @@ pub async fn screen_token(
         &user.nick,
     )
     .map_err(ApiError::Config)?;
-    Ok(Json(JoinVoiceResponse { token, url }))
+    Ok(Json(JoinVoiceResponse {
+        token,
+        url,
+        server_muted: false,
+        server_deafened: false,
+    }))
 }
 
 /// Quanto tempo o token do Testar conexão vale: o teste leva uns 10 segundos.
@@ -146,7 +160,12 @@ pub async fn test_token(
 ) -> Result<Json<JoinVoiceResponse>, ApiError> {
     let (api_key, api_secret, url) = livekit_env().map_err(ApiError::Config)?;
     let token = create_test_token(&api_key, &api_secret, &user.id).map_err(ApiError::Config)?;
-    Ok(Json(JoinVoiceResponse { token, url }))
+    Ok(Json(JoinVoiceResponse {
+        token,
+        url,
+        server_muted: false,
+        server_deafened: false,
+    }))
 }
 
 fn create_test_token(api_key: &str, api_secret: &str, user_id: &str) -> Result<String, String> {

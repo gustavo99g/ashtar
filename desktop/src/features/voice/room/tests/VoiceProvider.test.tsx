@@ -230,6 +230,8 @@ describe("VoiceProvider", () => {
 		vi.mocked(createVoiceToken).mockResolvedValue({
 			url: "wss://lk.test",
 			token: "t",
+			server_muted: false,
+			server_deafened: false,
 		});
 		vi.mocked(getMe).mockReturnValue(new Promise(() => {}));
 		render(
@@ -273,6 +275,8 @@ describe("a voz volta sozinha", () => {
 		vi.mocked(createVoiceToken).mockResolvedValue({
 			url: "wss://lk.test",
 			token: "t",
+			server_muted: false,
+			server_deafened: false,
 		});
 		render(
 			<VoiceProvider>
