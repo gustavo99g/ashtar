@@ -6,6 +6,7 @@ import {
 	PopoverTrigger,
 } from "@/components/ui/popover";
 import { customId, useEmojiById } from "@/features/emojis";
+import { focusWindow } from "@/lib/tauri/window";
 import { cn } from "@/lib/utils";
 import { preloadEmojiGroups } from "../model/emoji";
 import type { Mentionable } from "../model/mentions";
@@ -120,6 +121,18 @@ export function Composer({
 		if (replyId) ref.current?.focus();
 	}, [replyId]);
 
+	// Anexou (pelo +, arrastando ou colando): o campo fica com o foco, para o Enter já enviar. O
+	// arquivo que vem do Explorer chega com a janela inativa, então ela é trazida para a frente.
+	const attached = files.length;
+	const lastAttached = useRef(attached);
+	useEffect(() => {
+		const grew = attached > lastAttached.current;
+		lastAttached.current = attached;
+		if (!grew) return;
+		focusWindow();
+		requestAnimationFrame(() => ref.current?.focus());
+	}, [attached]);
+
 	const [emojiOpen, setEmojiOpen] = useState(false);
 	const emojiById = useEmojiById();
 	// O seletor abre na hora: os emojis já vêm carregados quando o app fica parado.
@@ -145,7 +158,6 @@ export function Composer({
 	function attach(picked: readonly File[]) {
 		if (picked.length === 0) return;
 		setProblem(addDraftFiles(channelId, picked));
-		ref.current?.focus();
 	}
 
 	function submit() {
@@ -232,7 +244,9 @@ export function Composer({
 						placeholder={label}
 						aria-autocomplete="list"
 						aria-controls={list?.listId}
-						aria-activedescendant={list ? list.optionId(list.active) : undefined}
+						aria-activedescendant={
+							list ? list.optionId(list.active) : undefined
+						}
 						onChange={(event) => {
 							setDraft(channelId, event.target.value);
 							if (event.target.value.trim()) signalTyping();
@@ -299,11 +313,11 @@ export function Composer({
 							<SmileIcon className="size-5" />
 						</PopoverTrigger>
 						<PopoverContent
-								side="top"
-								align="end"
-								// Sem a animação de saída: o quadro some na hora, e não no canto da tela.
-								className="w-auto gap-0 p-0 data-closed:animate-none"
-							>
+							side="top"
+							align="end"
+							// Sem a animação de saída: o quadro some na hora, e não no canto da tela.
+							className="w-auto gap-0 p-0 data-closed:animate-none"
+						>
 							<EmojiPicker onPick={insertEmoji} />
 						</PopoverContent>
 					</Popover>

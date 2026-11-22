@@ -15,6 +15,14 @@ export function toggleMaximizeWindow(): void {
 	if (isTauri()) void getCurrentWindow().toggleMaximize();
 }
 
+/**
+ * Traz a janela para a frente com o foco do teclado. Soltar um arquivo vindo do Explorer não ativa a
+ * janela: sem isto, o Enter seguinte iria para o Explorer.
+ */
+export function focusWindow(): void {
+	if (isTauri()) void getCurrentWindow().setFocus();
+}
+
 /** Fecha a janela. O Rust a esconde na bandeja (`tray.rs`): o app continua aberto, e só o "Sair" da bandeja o encerra. */
 export function closeWindow(): void {
 	if (isTauri()) void getCurrentWindow().close();
@@ -49,7 +57,9 @@ export function watchWindowMaximized(
  * página: o wry não esconde o webview ao minimizar, então o `document.visibilityState` pode
  * continuar "visible". Devolve a função que para de escutar.
  */
-export function watchWindowMinimized(onChange: (minimized: boolean) => void): () => void {
+export function watchWindowMinimized(
+	onChange: (minimized: boolean) => void,
+): () => void {
 	if (!isTauri()) return () => {};
 
 	const window = getCurrentWindow();
