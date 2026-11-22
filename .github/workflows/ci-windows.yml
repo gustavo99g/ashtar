@@ -1,10 +1,10 @@
 name: CI Windows
 
 # O Rust do desktop (fmt, clippy e testes) só compila de verdade no Windows, que é o job mais
-# lento (25 a 40 min). Por isso só roda quando desktop/src-tauri mudou no PR, e um push novo
-# cancela o anterior. Roda também à mão: Actions > CI Windows > Run workflow.
+# lento (25 a 40 min). Roda só em push na dev e na main quando desktop/src-tauri mudou, e um
+# push novo cancela o anterior. Numa branch de feature, só pelo Run workflow.
 on:
-  pull_request:
+  push:
     branches: [dev, main]
     paths:
       - "desktop/src-tauri/**"

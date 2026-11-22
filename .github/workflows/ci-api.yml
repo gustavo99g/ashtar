@@ -1,9 +1,10 @@
 name: CI API
 
-# Roda só em PR para dev/main e só quando a API (ou o que ela usa) mudou. Push em branch
-# não dispara: o PR já cobre, e a execução dupla gastava minutos à toa.
+# Roda só em push na dev e na main (depois do merge), e só quando a API (ou o que ela usa)
+# mudou. Branch de feature e PR não disparam; para checar uma branch antes do merge, use
+# Actions > CI API > Run workflow, escolhendo a branch.
 on:
-  pull_request:
+  push:
     branches: [dev, main]
     paths:
       - "api/**"

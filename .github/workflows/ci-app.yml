@@ -1,9 +1,9 @@
 name: CI App
 
-# O frontend do desktop (lint, temas, typecheck, build e testes) roda no Ubuntu, onde o minuto
-# custa metade do Windows. Roda em todo push de PR que toca o desktop, inclusive em rascunho.
+# O frontend do desktop (lint, temas, typecheck, build e testes) roda no Ubuntu. Roda só em
+# push na dev e na main quando o desktop mudou; numa branch de feature, só pelo Run workflow.
 on:
-  pull_request:
+  push:
     branches: [dev, main]
     paths:
       - "desktop/**"

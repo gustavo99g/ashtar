@@ -1,19 +1,21 @@
 # CI (GitHub Actions)
 
 O repositório é público, então os minutos dos runners do GitHub (Ubuntu e Windows) são grátis e
-sem cota. Mesmo assim, a esteira roda só o necessário, para o resultado chegar mais rápido:
+sem cota. Mesmo assim, a esteira roda só na dev e na main, e só o que mudou:
 
 | Workflow | Quando roda | Onde |
 | --- | --- | --- |
-| `ci-api.yml` | PR para dev/main que muda `api/` (ou os tipos gerados) | Ubuntu |
-| `ci-app.yml` | PR para dev/main que muda o frontend do `desktop/` | Ubuntu |
-| `ci-windows.yml` | PR para dev/main que muda `desktop/src-tauri/` | Windows |
+| `ci-api.yml` | Push na dev/main que muda `api/` (ou os tipos gerados) | Ubuntu |
+| `ci-app.yml` | Push na dev/main que muda o frontend do `desktop/` | Ubuntu |
+| `ci-windows.yml` | Push na dev/main que muda `desktop/src-tauri/` | Windows |
 | `release.yml` | Push na dev (beta) e na main (estável) | Ubuntu; o beta compila no Windows |
 | `api-image.yml` | Manual | Ubuntu |
 
-- Push em branch de feature não roda nada: o PR já cobre.
-- Um push novo no PR cancela o run anterior do mesmo workflow.
-- Todos os workflows de CI também têm Run workflow para rodar à mão.
+- Push em branch de feature e PR não rodam nada. O CI confere o que entrou na dev ou na main,
+  depois do merge.
+- Para checar uma branch antes do merge (por exemplo, Rust que só compila no Windows), use
+  Actions > (workflow) > Run workflow, escolhendo a branch.
+- Um push novo na mesma branch cancela o run anterior do mesmo workflow.
 
 ## Repositório público: cuidados
 
