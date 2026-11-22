@@ -260,7 +260,26 @@ function WatchPreview({
 		<>
 			<PreviewCard open={hovered && !cardOpen} onOpenChange={setHovered}>
 				<PreviewCardTrigger render={trigger} />
-				<PreviewCardContent aria-label={`Transmissão de ${member.name}`}>
+				<PreviewCardContent
+					aria-label={`Transmissão de ${member.name}`}
+					className="w-80"
+				>
+					{/* Sem a imagem da transmissão (quem está fora não a recebe): o avatar desfocado
+					    faz o fundo, e o Assistir fica no meio. */}
+					<div className="relative flex aspect-video items-center justify-center overflow-hidden rounded-lg bg-rail">
+						<Avatar
+							nick={member.nick}
+							displayName={member.name}
+							size={180}
+							className="pointer-events-none absolute scale-150 opacity-70 blur-2xl"
+						/>
+						<span className="absolute inset-0 bg-background/30" />
+						<LiveBadge size="md" className="absolute top-2 left-2" />
+						<Button className="relative h-9 px-6 text-sm" onClick={watch}>
+							<EyeIcon />
+							Assistir
+						</Button>
+					</div>
 					<div className="flex items-center gap-2.5">
 						<Avatar nick={member.nick} displayName={member.name} size={32} />
 						<div className="flex min-w-0 flex-col">
@@ -271,12 +290,7 @@ function WatchPreview({
 								em {roomName}
 							</span>
 						</div>
-						<LiveBadge className="ml-auto shrink-0" />
 					</div>
-					<Button className="h-9 self-center px-6 text-sm" onClick={watch}>
-						<EyeIcon />
-						Assistir
-					</Button>
 				</PreviewCardContent>
 			</PreviewCard>
 			{dialog}
