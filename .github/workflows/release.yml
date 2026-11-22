@@ -71,6 +71,7 @@ jobs:
     needs: versao
     if: github.ref != 'refs/heads/main' && needs.versao.outputs.publicada == 'false'
     runs-on: windows-latest
+    timeout-minutes: 90
     env:
       VERSION: ${{ needs.versao.outputs.version }}
     steps:
@@ -91,6 +92,8 @@ jobs:
             echo 'FIM_DAS_NOTAS'
           } >> "$GITHUB_OUTPUT"
 
+      # Checagens completas (frontend e Rust) antes de publicar: o CI da dev roda ao mesmo
+      # tempo que este workflow, então o beta não pode contar com ele.
       - uses: ./.github/actions/desktop-checks
 
       - name: Compila, assina e publica como pre-release

@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+# Checagens rápidas antes do push, só nas áreas que mudaram. O CI só roda na dev e na main,
+# então este é o primeiro lugar onde um erro aparece.
+#
+# Ativar (uma vez por clone):  git config core.hooksPath .githooks
+# Pular num push:              git push --no-verify
+set -euo pipefail
+
+raiz=$(git rev-parse --show-toplevel)
+cd "$raiz"
+
+zero=0000000000000000000000000000000000000000
+arquivos=""
+while read -r _ local_sha _ remote_sha; do
+  [ "$local_sha" = "$zero" ] && continue # apagando uma branch remota
+  if [ "$remote_sha" = "$zero" ]; then
+    # Branch nova: compara com a dev do remoto (ou só o último commit, se não houver).
+    base=$(git merge-base "$local_sha" origin/dev 2>/dev/null || echo "$local_sha~1")
+  else
+    base=$remote_sha
+  fi
+  arquivos+=$(git diff --name-only "$base" "$local_sha" 2>/dev/null || true)$'\n'
+done
+
+mudou() { grep -qE "$1" <<< "$arquivos"; }
+
+falhou=0
+roda() {
+  echo "pre-push: $1"
+  shift
+  if ! (eval "$@"); then
+    echo "pre-push: falhou: $*" >&2
+    falhou=1
+  fi
+}
+
+if mudou '^api/'; then
+  roda "API: formatação" "cd api && cargo fmt --check"
+fi
+
+if mudou '^desktop/src-tauri/'; then
+  roda "Desktop (Rust): formatação" "cd desktop/src-tauri && cargo fmt --check"
+fi
+
+if mudou '^desktop/' && grep -vE '^desktop/src-tauri/' <<< "$arquivos" | grep -qE '^desktop/'; then
+  roda "Desktop: lint" "cd desktop && pnpm lint"
+  roda "Desktop: contrato dos temas" "cd desktop && pnpm check:themes"
+  roda "Desktop: typecheck" "cd desktop && pnpm exec tsc"
+  roda "Desktop: testes" "cd desktop && pnpm test"
+fi
+
+if [ "$falhou" -ne 0 ]; then
+  echo "pre-push: corrija os erros acima (ou use git push --no-verify para pular)." >&2
+  exit 1
+fi

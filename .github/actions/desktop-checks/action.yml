@@ -1,6 +1,12 @@
 name: Checagens do desktop
 description: Instala as dependências e roda lint, testes, typecheck, formatação, clippy e testes do Rust do desktop (Windows).
 
+inputs:
+  frontend:
+    description: "Roda também lint, temas e testes do frontend. Com \"false\", só gera o build (o Rust precisa da pasta dist) e roda as checagens do Rust."
+    required: false
+    default: "true"
+
 runs:
   using: composite
   steps:
@@ -24,11 +30,13 @@ runs:
       run: pnpm install --frozen-lockfile
 
     - name: Lint
+      if: inputs.frontend == 'true'
       shell: bash
       working-directory: desktop
       run: pnpm lint
 
     - name: Contrato dos temas
+      if: inputs.frontend == 'true'
       shell: bash
       working-directory: desktop
       run: pnpm check:themes
@@ -49,6 +57,7 @@ runs:
       run: cargo clippy --all-targets -- -D warnings
 
     - name: Testes do frontend
+      if: inputs.frontend == 'true'
       shell: bash
       working-directory: desktop
       run: pnpm test
