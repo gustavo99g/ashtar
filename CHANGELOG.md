@@ -1,5 +1,16 @@
 # O que há de novo no Ashtar
 
+## 0.7.1
+
+- Assistir pela lista: passe o mouse em quem está AO VIVO na lista de salas, à esquerda, para ver o que a pessoa transmite (a janela ou a tela, a qualidade, há quanto tempo e quantos assistem) e clicar em Assistir. Fora da sala, você entra nela e a transmissão já abre em foco.
+- Na transmissão em foco, o AO VIVO, o nome e os botões só aparecem com o mouse em cima: parado, a imagem fica limpa.
+- Clique com o botão direito numa imagem do chat para Copiar imagem ou Baixar. O visualizador em tela cheia também ganhou o Copiar.
+- As mensagens fixadas mostram as imagens, e clicar numa abre o visualizador.
+- Depois de anexar um arquivo, pelo +, arrastando ou colando, o campo fica pronto: é só apertar Enter para enviar.
+- O número de menções nos canais e a linha Novas mensagens voltaram ao dourado.
+- A lista de membros diz "Em Sala" e "Transmitindo em Sala", que funciona com qualquer nome de sala.
+- Os botões Detalhes e Trocar fonte da transmissão ganharam fundo, e o atraso aparece em milissegundos inteiros.
+
 ## 0.7.0
 
 - A 0.7.0 é a primeira versão publicada com o que está na 0.6.0: quem vem da 0.5 ganha as duas de uma vez.
