@@ -315,8 +315,10 @@ export function Composer({
 						<PopoverContent
 							side="top"
 							align="end"
-							// Sem a animação de saída: o quadro some na hora, e não no canto da tela.
-							className="w-auto gap-0 p-0 data-closed:animate-none"
+							// Sem a animação de saída: o quadro some na hora, e não no canto da tela. E a entrada só
+							// esmaece, sem o zoom: com a escala mudando, o WebView redesenhava os ~180 emojis a cada
+							// quadro (era o grosso do tempo de abrir).
+							className="w-auto gap-0 p-0 data-open:zoom-in-100 data-closed:animate-none"
 						>
 							<EmojiPicker onPick={insertEmoji} />
 						</PopoverContent>

@@ -208,7 +208,7 @@ export function MessageToolbar({
 				<PopoverContent
 					side="left"
 					align="start"
-					className="w-auto gap-0 p-0 data-closed:animate-none"
+					className="w-auto gap-0 p-0 data-open:zoom-in-100 data-closed:animate-none"
 				>
 					<EmojiPicker
 						onPick={(emoji) => {
