@@ -322,7 +322,7 @@ export function Composer({
 							// Sem a animação de saída: o quadro some na hora, e não no canto da tela. E a entrada só
 							// esmaece, sem o zoom: com a escala mudando, o WebView redesenhava os ~180 emojis a cada
 							// quadro (era o grosso do tempo de abrir).
-							className="w-auto gap-0 p-0 data-open:zoom-in-100 data-closed:animate-none"
+							className="w-auto gap-0 p-0 data-open:zoom-in-100 data-closed:hidden"
 						>
 							<EmojiPicker onPick={insertEmoji} keepFocus />
 						</PopoverContent>
