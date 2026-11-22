@@ -117,6 +117,7 @@ export function useSetLayout() {
 				description: isApiError(error, "conflict")
 					? "Outra pessoa mexeu ao mesmo tempo. Confira e tente de novo."
 					: error.message,
+				data: { tone: isApiError(error, "conflict") ? "warning" : "error" },
 			});
 		},
 	});
@@ -140,6 +141,7 @@ export function useFinishOrganizing() {
 				toast.add({
 					title: "Não deu para gravar a ordem",
 					description: error.message,
+					data: { tone: "error" },
 				});
 				return;
 			}
@@ -154,12 +156,14 @@ export function useFinishOrganizing() {
 				toast.add({
 					title: "Outra pessoa mudou os canais",
 					description: "Confira a ordem e conclua de novo.",
+					data: { tone: "warning" },
 				});
 			} catch {
 				stopOrganizing();
 				toast.add({
 					title: "Não deu para gravar a ordem",
 					description: "A lista de canais mudou e não deu para buscar a nova.",
+					data: { tone: "error" },
 				});
 			}
 		},

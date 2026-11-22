@@ -250,6 +250,7 @@ describe("o modo Organizar", () => {
 		expect(toast.add).toHaveBeenCalledWith({
 			title: "Outra pessoa mudou os canais",
 			description: "Confira a ordem e conclua de novo.",
+			data: { tone: "warning" },
 		});
 	});
 
@@ -268,6 +269,7 @@ describe("o modo Organizar", () => {
 			expect(toast.add).toHaveBeenCalledWith({
 				title: "Não deu para gravar a ordem",
 				description: "sem rede",
+				data: { tone: "error" },
 			}),
 		);
 		expect(getChannelLayout).not.toHaveBeenCalled();

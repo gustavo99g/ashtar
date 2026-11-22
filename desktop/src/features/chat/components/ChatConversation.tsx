@@ -141,6 +141,7 @@ export function ChatConversation({
 					title: "Não deu para excluir a mensagem",
 					description:
 						error instanceof ApiError ? error.message : "Tente de novo.",
+					data: { tone: "error" },
 				}),
 			);
 		},
@@ -166,6 +167,7 @@ export function ChatConversation({
 						title: "Não deu para reagir",
 						description:
 							error instanceof ApiError ? error.message : "Tente de novo.",
+						data: { tone: "error" },
 					}),
 				);
 			},
@@ -177,6 +179,7 @@ export function ChatConversation({
 						title: on ? "Não deu para fixar" : "Não deu para desafixar",
 						description:
 							error instanceof ApiError ? error.message : "Tente de novo.",
+						data: { tone: "error" },
 					}),
 				);
 			},
@@ -251,7 +254,7 @@ export function ChatConversation({
 		if (readOnly || event.dataTransfer.files.length === 0) return;
 		event.preventDefault();
 		const problem = addDraftFiles(channelId, [...event.dataTransfer.files]);
-		if (problem) toast.add({ title: problem });
+		if (problem) toast.add({ title: problem, data: { tone: "error" } });
 	}
 
 	return (

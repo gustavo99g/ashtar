@@ -176,6 +176,7 @@ function useLostChannel(
 		toast.add({
 			title: `Você não tem mais acesso a #${before.name}`,
 			description: "Ele foi arquivado ou ficou restrito.",
+			data: { tone: "warning" },
 		});
 		void navigate(paths.channel(first), { replace: true });
 	}, [channelId, channel, layout, navigate]);

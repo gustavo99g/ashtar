@@ -10,6 +10,7 @@
 - Arrastar arquivos para a conversa mostra o "Solte para enviar", com quantos arquivos vêm.
 - O seletor de emoji abre mais rápido e, no campo de escrever, fica aberto para escolher vários seguidos, com o foco de volta no campo: é só continuar escrevendo e mandar com Enter.
 - Trocar de sala toca o som de sair e o de entrar, mesmo trocando rápido.
+- Os avisos no canto ganharam um tipo: certo, erro, aviso ou informação, com o ícone e a barra de tempo na cor dele e o título em negrito. O erro fica 12 s na tela, e as confirmações curtas, como "Imagem copiada", viram uma linha só.
 - O menu da sala diz "Editar sala" em vez de "Renomear sala": ali também se muda quem tem acesso e se a sala é restrita.
 - A tela cheia da transmissão não deixa mais uma faixa branca na tela ao entrar de novo.
 - Na tela cheia, quem está na sala aparece por cima da parte de baixo da imagem. Com o mouse parado, a fileira, os botões e o cursor somem, e fica só a transmissão.

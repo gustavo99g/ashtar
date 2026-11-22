@@ -44,6 +44,7 @@ function notice(title: string, description: string): void {
 		title,
 		description,
 		data: {
+			tone: "warning",
 			media: (
 				<NoticeIcon tone="warning">
 					<VideoOffIcon />

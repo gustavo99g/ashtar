@@ -248,6 +248,7 @@ export function PinsButton({
 											error instanceof ApiError
 												? error.message
 												: "Tente de novo.",
+										data: { tone: "error" },
 									}),
 								)
 						: undefined

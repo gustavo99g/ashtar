@@ -31,6 +31,7 @@ export function act(action: () => Promise<void>): void {
 				error instanceof ApiError
 					? error.message
 					: "Tente de novo em instantes.",
+			data: { tone: "error" },
 		}),
 	);
 }

@@ -78,6 +78,7 @@ function SendLogsForm({ onDone }: { onDone: () => void }) {
 								toast.add({
 									title: "Logs enviados",
 									description: "O dono vai ver.",
+									data: { tone: "success" },
 								});
 							},
 						})

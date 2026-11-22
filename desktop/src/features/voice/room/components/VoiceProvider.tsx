@@ -429,6 +429,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 				toast.add({
 					title: "A sala foi arquivada",
 					description: "Você saiu da voz.",
+					data: { tone: "info" },
 				});
 				return;
 			}
@@ -559,6 +560,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 			toast.add({
 				title: `${order.byName} moveu você`,
 				description: `Agora você está na ${name}.`,
+				data: { tone: "info" },
 			});
 		} else {
 			reconnect.current.reset();
@@ -569,10 +571,12 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 					? {
 							title: "Você não tem mais acesso a esta sala",
 							description: `${order.byName} mudou quem tem acesso.`,
+							data: { tone: "warning" },
 						}
 					: {
 							title: "Você foi desconectado da voz",
 							description: `Quem desconectou foi ${order.byName}.`,
+							data: { tone: "warning" },
 						},
 			);
 		}

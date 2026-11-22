@@ -115,6 +115,7 @@ function ForwardForm() {
 						? navigate(paths.channel(target.id))
 						: showDm(target.id),
 			},
+			data: { tone: "success" },
 		});
 	}
 

@@ -59,6 +59,7 @@ function showNotice(
 						? "A janela compartilhada foi fechada."
 						: "A tela compartilhada foi desconectada.",
 				data: {
+					tone: "info",
 					media: (
 						<NoticeIcon tone="info">
 							<ScreenShareOffIcon />
@@ -80,6 +81,7 @@ function showNotice(
 				title: "O áudio do compartilhamento parou",
 				description: "O vídeo continua sendo transmitido.",
 				data: {
+					tone: "warning",
 					media: (
 						<NoticeIcon tone="warning">
 							<VolumeXIcon />
@@ -102,6 +104,7 @@ function showNotice(
 				description:
 					"Quem assiste vê a tela parada. Tentando voltar sozinha.",
 				data: {
+					tone: "warning",
 					media: (
 						<NoticeIcon tone="warning">
 							<WifiOffIcon />
@@ -113,6 +116,7 @@ function showNotice(
 			return toast.add({
 				title: "A transmissão voltou",
 				data: {
+					tone: "info",
 					media: (
 						<NoticeIcon tone="info">
 							<ScreenShareIcon />
@@ -132,6 +136,7 @@ function showNotice(
 						? "A janela foi fechada ou minimizada. Escolha outra ou restaure a janela."
 						: notice.message,
 				data: {
+					tone: "error",
 					media: (
 						<NoticeIcon tone="warning">
 							<TriangleAlertIcon />

@@ -53,12 +53,17 @@ export function useDownload(file: FileView) {
 			const path = await downloadFile(file.id, file.name, (p) =>
 				setProgress(p.total ? p.received / p.total : null),
 			);
-			toast.add({ title: "Salvo em Downloads", description: path });
+			toast.add({
+				title: "Salvo em Downloads",
+				description: path,
+				data: { tone: "success", compact: true },
+			});
 		} catch (error) {
 			toast.add({
 				title: `Não deu para baixar ${file.name}`,
 				description:
 					error instanceof ApiError ? error.message : "Tente de novo.",
+				data: { tone: "error" },
 			});
 		} finally {
 			setProgress(undefined);
@@ -70,11 +75,16 @@ export function useDownload(file: FileView) {
 /** Copia a imagem e avisa como foi. */
 export function copyImage(file: FileView): void {
 	copyImageFile(file.id).then(
-		() => toast.add({ title: "Imagem copiada" }),
+		() =>
+			toast.add({
+				title: "Imagem copiada",
+				data: { tone: "success", compact: true },
+			}),
 		() =>
 			toast.add({
 				title: "Não deu para copiar a imagem",
 				description: "Tente de novo.",
+				data: { tone: "error" },
 			}),
 	);
 }
@@ -299,6 +309,7 @@ function VideoAttachment({ file }: { file: FileView }) {
 				title: `Não deu para tocar ${file.name}`,
 				description:
 					error instanceof ApiError ? error.message : "Tente de novo.",
+				data: { tone: "error" },
 			});
 		} finally {
 			setLoading(false);
