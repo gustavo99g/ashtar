@@ -502,15 +502,18 @@ function useFullscreen() {
 	useEffect(() => {
 		if (!active) return;
 		setWindowFullscreen(true);
+		// Na captura, antes de o menu tratar o Esc: com um menu ou popover aberto, o Esc fecha só ele.
 		const onKey = (event: KeyboardEvent) => {
-			if (event.key === "Escape" && !event.defaultPrevented) setActive(false);
+			if (event.key !== "Escape" || event.defaultPrevented) return;
+			if (document.querySelector("[data-popup-open]")) return;
+			setActive(false);
 		};
-		window.addEventListener("keydown", onKey);
+		window.addEventListener("keydown", onKey, true);
 		const stopWatching = watchWindowFullscreen((fullscreen) => {
 			if (!fullscreen) setActive(false);
 		});
 		return () => {
-			window.removeEventListener("keydown", onKey);
+			window.removeEventListener("keydown", onKey, true);
 			stopWatching();
 			setWindowFullscreen(false);
 		};
