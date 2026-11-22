@@ -279,7 +279,9 @@ pub async fn voice_state(
 ) -> Result<axum::http::StatusCode, ApiError> {
     validate_channel_id(&request.channel_id)?;
     let room = access::joinable(&state.db, &user, &request.channel_id).await?;
-    match state.hub.set_voice_flags(&user.id, &room.id, request.flags) {
+    let mut flags = request.flags;
+    flags.share = flags.share.map(voice::ShareInfo::clamp);
+    match state.hub.set_voice_flags(&user.id, &room.id, flags) {
         Some(list) => {
             let to = access::audience(&state.db, &room.id).await?;
             state.hub.publish_voice_participants(room.id, list, to);

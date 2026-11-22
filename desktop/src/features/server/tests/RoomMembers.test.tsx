@@ -47,7 +47,19 @@ function renderRoom(inCall: boolean) {
 
 const members: ChannelMember[] = [
 	{ id: "kid", nick: "kid", name: "Kid", sharing: false },
-	{ id: "juju", nick: "juju", name: "Júlia", sharing: true },
+	{
+		id: "juju",
+		nick: "juju",
+		name: "Júlia",
+		sharing: true,
+		share: {
+			title: "Valorant",
+			window: true,
+			quality: "1080p60",
+			startedAt: Date.now() - 12 * 60_000,
+			viewers: 2,
+		},
+	},
 ];
 
 async function openCard(name: string, inCall: boolean) {

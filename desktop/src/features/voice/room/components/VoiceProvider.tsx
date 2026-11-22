@@ -724,7 +724,10 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 				{/* O deafen cala só as vozes: a transmissão segue no volume do Foco. */}
 				{room && <RoomAudio room={room} deafened={isDeafened} />}
 				{room && voiceKind === "room" && voiceChannelId && (
-					<VoiceStateReport channelId={voiceChannelId} />
+					<VoiceStateReport
+						channelId={voiceChannelId}
+						screenShare={screenShare}
+					/>
 				)}
 				{children}
 			</RoomContext.Provider>

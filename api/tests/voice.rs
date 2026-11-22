@@ -300,6 +300,67 @@ async fn desconectar_avisa_a_pessoa_de_quem_tirou() {
 }
 
 #[tokio::test]
+async fn a_transmissao_que_o_app_conta_vai_para_quem_esta_fora() {
+    let ctx = setup().await;
+    let ana = join(&ctx, "Ana", 2, false).await;
+    let ana_id = member_id(&ctx, &ana).await;
+    ctx.hub
+        .publish_voice_participants("sala".into(), vec![person(&ana_id)], Audience::Everyone);
+    let mut rx = ctx.hub.subscribe();
+    let long = "x".repeat(300);
+
+    let (status, body) = call(
+        &ctx.router,
+        "PUT",
+        "/api/voice/state",
+        Some(&ana),
+        Some(json!({
+            "channel_id": "sala",
+            "mic_off": false,
+            "deafened": false,
+            "camera": false,
+            "sharing": true,
+            "share": {
+                "title": long,
+                "window": true,
+                "quality": "1080p60",
+                "started_at": 1_700_000_000_000_i64,
+                "viewers": 2,
+            },
+        })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::NO_CONTENT, "{body}");
+    let events = drain(&mut rx);
+    let share = &events[0].0["participants"][0]["share"];
+    assert_eq!(share["quality"], "1080p60");
+    assert_eq!(share["viewers"], 2);
+    assert_eq!(share["started_at"], 1_700_000_000_000_i64);
+    // O título longo é cortado.
+    assert_eq!(share["title"].as_str().unwrap().chars().count(), 120);
+
+    // Parou de transmitir: a transmissão some, mesmo que o app ainda mande os dados.
+    let (status, _) = call(
+        &ctx.router,
+        "PUT",
+        "/api/voice/state",
+        Some(&ana),
+        Some(json!({
+            "channel_id": "sala",
+            "mic_off": false,
+            "deafened": false,
+            "camera": false,
+            "sharing": false,
+            "share": { "title": "Tela 1", "window": false, "quality": "720p60", "started_at": 1, "viewers": 0 },
+        })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+    let events = drain(&mut rx);
+    assert!(events[0].0["participants"][0].get("share").is_none());
+}
+
+#[tokio::test]
 async fn o_estado_que_o_app_conta_vai_para_quem_esta_fora() {
     let ctx = setup().await;
     let ana = join(&ctx, "Ana", 2, false).await;

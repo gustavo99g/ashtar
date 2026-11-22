@@ -38,28 +38,74 @@ pub struct ParticipantView {
     pub deafened: bool,
     /// Com a câmera ligada.
     pub camera: bool,
+    /// O que a pessoa está transmitindo, pelo que o app dela contou ([`ShareInfo`]). Só enquanto
+    /// transmite.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[ts(optional = nullable)]
+    pub share: Option<ShareInfo>,
+}
+
+/// A transmissão de alguém, para o cartão de Assistir de quem está fora da sala (v0.7): a fonte,
+/// o preset, desde quando e quantos assistem. Quem está fora não recebe a imagem nem os dados da
+/// LiveKit, então é o app de quem transmite que conta.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "index.ts")]
+pub struct ShareInfo {
+    /// O nome da fonte: a tela ("Tela 1") ou o título da janela.
+    pub title: String,
+    /// Se é uma janela (`true`) ou a tela inteira.
+    pub window: bool,
+    /// A chave do preset (`720p60`, `1080p60`, `1080p30`).
+    pub quality: String,
+    /// Quando começou, em milissegundos desde 1970.
+    #[ts(type = "number")]
+    pub started_at: i64,
+    /// Quantos estão assistindo agora.
+    pub viewers: u32,
+}
+
+/// O tamanho máximo do título da fonte e da chave do preset; o resto é cortado.
+const SHARE_TITLE_MAX: usize = 120;
+const SHARE_QUALITY_MAX: usize = 16;
+
+impl ShareInfo {
+    /// Corta o que veio do app nos tamanhos máximos.
+    pub fn clamp(mut self) -> Self {
+        self.title = self.title.trim().chars().take(SHARE_TITLE_MAX).collect();
+        self.quality = self.quality.chars().take(SHARE_QUALITY_MAX).collect();
+        self
+    }
 }
 
 /// O que o app de cada um conta do próprio estado na sala (v0.7): o LiveKit não avisa a API de
 /// quem muta, e o áudio desligado nem passa por ele. Com isso, quem está fora da sala vê os ícones
 /// também. Enquanto existe, vale mais que o LiveKit, inclusive para a tela: é o app que sabe
 /// primeiro.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize, TS)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, TS)]
 #[ts(export, export_to = "index.ts")]
 pub struct VoiceFlags {
     pub mic_off: bool,
     pub deafened: bool,
     pub camera: bool,
     pub sharing: bool,
+    /// O que está transmitindo; vale só com `sharing`.
+    #[serde(default)]
+    #[ts(optional = nullable)]
+    pub share: Option<ShareInfo>,
 }
 
 impl VoiceFlags {
     /// `view` com o estado que o app contou.
-    pub fn apply(self, view: &mut ParticipantView) {
+    pub fn apply(&self, view: &mut ParticipantView) {
         view.mic_off = self.mic_off;
         view.deafened = self.deafened;
         view.camera = self.camera;
         view.screen_sharing = self.sharing;
+        view.share = if self.sharing {
+            self.share.clone()
+        } else {
+            None
+        };
     }
 }
 

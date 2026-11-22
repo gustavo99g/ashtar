@@ -181,7 +181,21 @@ function VoiceChannel(props: RowProps) {
 }
 
 function LiveVoiceChannel(props: RowProps) {
-	return <VoiceChannelRow {...props} members={useLiveMembers()} inCall />;
+	const live = useLiveMembers();
+	// O que cada um transmite vem da API (o app de quem transmite conta), não do LiveKit.
+	const { data } = useVoiceParticipants(props.channel.id, { enabled: false });
+	const shares = new Map(
+		(data ?? []).flatMap((participant) => {
+			const share = memberFromApi(participant).share;
+			return share ? [[participant.user_id, share] as const] : [];
+		}),
+	);
+	const members = live.map((member) =>
+		member.sharing && shares.has(member.id)
+			? { ...member, share: shares.get(member.id) }
+			: member,
+	);
+	return <VoiceChannelRow {...props} members={members} inCall />;
 }
 
 function ApiVoiceChannel({ inCall, ...props }: RowProps & { inCall: boolean }) {

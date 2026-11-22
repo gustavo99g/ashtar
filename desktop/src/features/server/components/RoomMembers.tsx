@@ -14,6 +14,7 @@ import { UserCardPopup } from "@/features/members";
 import {
 	type ChannelMember,
 	ConnectionMark,
+	type ShareSummary,
 	ConnectionSection,
 	focusShare,
 	LiveBadge,
@@ -237,6 +238,8 @@ function WatchPreview({
 	const navigate = useNavigate();
 	const onRoom = useMatch(paths.voiceRoom) !== null;
 	const [hovered, setHovered] = useState(false);
+	const share = member.share;
+	const now = Date.now();
 
 	function show() {
 		watchShare(member.id);
@@ -275,6 +278,16 @@ function WatchPreview({
 						/>
 						<span className="absolute inset-0 bg-background/30" />
 						<LiveBadge size="md" className="absolute top-2 left-2" />
+						{share && (
+							<span className="absolute top-2 right-2 rounded bg-background/80 px-1.5 py-0.5 font-mono text-[10px] text-secondary-foreground">
+								{qualitySpec(share.quality)}
+							</span>
+						)}
+						{share && (
+							<span className="absolute bottom-2 left-2 max-w-[calc(100%-1rem)] truncate rounded-md bg-background/80 px-2 py-0.5 text-xs text-foreground">
+								{share.window ? `Janela: ${share.title}` : share.title}
+							</span>
+						)}
 						<Button className="relative h-9 px-6 text-sm" onClick={watch}>
 							<EyeIcon />
 							Assistir
@@ -287,7 +300,7 @@ function WatchPreview({
 								{member.name} está transmitindo
 							</span>
 							<span className="truncate text-xs text-muted-foreground">
-								em {roomName}
+								{shareDetails(roomName, share, now)}
 							</span>
 						</div>
 					</div>
@@ -296,4 +309,35 @@ function WatchPreview({
 			{dialog}
 		</>
 	);
+}
+
+/** "1080p60" → "1080p · 60". */
+export function qualitySpec(quality: string): string {
+	const match = /^(\d+p)(\d+)$/.exec(quality);
+	return match ? `${match[1]} · ${match[2]}` : quality;
+}
+
+/** "em Jogatina · há 12 min · 2 assistindo", com o que a transmissão contou. */
+export function shareDetails(
+	roomName: string,
+	share: ShareSummary | undefined,
+	now: number,
+): string {
+	const parts = [`em ${roomName}`];
+	if (share) {
+		const minutes = Math.floor((now - share.startedAt) / 60_000);
+		parts.push(
+			minutes < 1
+				? "agora"
+				: minutes < 60
+					? `há ${minutes} min`
+					: `há ${Math.floor(minutes / 60)} h`,
+		);
+		if (share.viewers > 0) {
+			parts.push(
+				share.viewers === 1 ? "1 assistindo" : `${share.viewers} assistindo`,
+			);
+		}
+	}
+	return parts.join(" · ");
 }

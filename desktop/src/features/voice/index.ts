@@ -24,6 +24,7 @@ export {
 	type ChannelMember,
 	memberFromApi,
 	peopleNowLabel,
+	type ShareSummary,
 } from "./members/model/members";
 export { useVoiceParticipants } from "./members/queries";
 export {
