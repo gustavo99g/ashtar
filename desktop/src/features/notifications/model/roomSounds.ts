@@ -47,7 +47,7 @@ export const RETRY_MS = 400;
 
 /**
  * Toca o arquivo na saída escolhida. Se não tocar (a saída mudando enquanto o microfone abre ou
- * fecha), tenta mais uma vez um pouco depois; falhando de novo, fica no log e é silêncio.
+ * fecha), tenta mais uma vez um pouco depois; falhando de novo, é silêncio.
  */
 function play(url: string, retry = true): void {
 	const audio = new Audio(url) as HTMLAudioElement & {
@@ -61,21 +61,8 @@ function play(url: string, retry = true): void {
 			: Promise.resolve();
 	void ready
 		.then(() => audio.play())
-		.then(() =>
-			audio.addEventListener?.(
-				"ended",
-				() => console.info("Som da sala terminou:", url),
-				{
-					once: true,
-				},
-			),
-		)
-		.catch((error: unknown) => {
-			if (retry) {
-				setTimeout(() => play(url, false), RETRY_MS);
-			} else {
-				console.warn("O som da sala não tocou:", error);
-			}
+		.catch(() => {
+			if (retry) setTimeout(() => play(url, false), RETRY_MS);
 		});
 }
 
@@ -88,17 +75,12 @@ export function playRoomSound(
 	id: RoomSoundId,
 	{ now = Date.now(), force = false, gap = true } = {},
 ): boolean {
-	if (!force && !useSettingsStore.getState().roomSounds[id]) {
-		console.info(`Som da sala "${id}": desligado nas Notificações`);
-		return false;
-	}
+	if (!force && !useSettingsStore.getState().roomSounds[id]) return false;
 	const last = lastPlayed.get(id);
 	if (!force && gap && last !== undefined && now - last < ROOM_SOUND_GAP_MS) {
-		console.info(`Som da sala "${id}": pulado, acabou de tocar`);
 		return false;
 	}
 	lastPlayed.set(id, now);
-	console.info(`Som da sala "${id}": tocando`);
 	play(FILES[id]);
 	return true;
 }

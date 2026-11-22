@@ -41,8 +41,10 @@ import { RoomContext } from "@livekit/components-react";
 import {
 	ConnectionState,
 	DisconnectReason,
+	LogLevel,
 	Room,
 	RoomEvent,
+	setLogLevel,
 	Track,
 } from "livekit-client";
 import {
@@ -107,6 +109,9 @@ import { onSystemResumed } from "@/lib/tauri/commands";
 import { clearVoiceOrder, useVoiceOrder } from "../stores/voiceOrderStore";
 import { RoomAudio } from "./RoomAudio";
 import { VoiceStateReport } from "./VoiceStateReport";
+
+// O LiveKit escreve cada passo da conexão no console; só avisos e erros ficam.
+setLogLevel(LogLevel.warn);
 
 export type VoiceConnectionState =
 	| "disconnected"
