@@ -8,7 +8,7 @@ sem cota. Mesmo assim, a esteira roda só na dev e na main, e só o que mudou:
 | `ci-api.yml` | Push na dev/main que muda `api/` (ou os tipos gerados) | Ubuntu |
 | `ci-app.yml` | Push na dev/main que muda o frontend do `desktop/` | Ubuntu |
 | `ci-windows.yml` | Push na dev/main que muda `desktop/src-tauri/` | Windows |
-| `release.yml` | Push na dev (beta) e na main (estável) | Ubuntu; o beta compila no Windows |
+| `release.yml` | Push na dev (beta) e na main (estável) | Ubuntu; o beta roda as checagens completas e compila no Windows |
 | `api-image.yml` | Manual | Ubuntu |
 
 - Push em branch de feature e PR não rodam nada. O CI confere o que entrou na dev ou na main,
@@ -27,3 +27,16 @@ sem cota. Mesmo assim, a esteira roda só na dev e na main, e só o que mudou:
   público, qualquer PR de fork pode rodar código nessa máquina.
 - Se o repositório voltar a ser privado, os minutos voltam a contar (Windows em dobro). Aí vale
   rever o job Windows, por exemplo para não rodar em PR rascunho.
+
+## Checagens antes do push
+
+Como branch e PR não rodam o CI, o `.githooks/pre-push` roda as checagens rápidas no seu PC,
+só nas áreas que mudaram desde a dev (ou desde o último push da branch):
+
+- `api/`: `cargo fmt --check`.
+- `desktop/src-tauri/`: `cargo fmt --check`.
+- Resto do `desktop/`: lint, contrato dos temas, typecheck e testes.
+
+Ative uma vez por clone com `git config core.hooksPath .githooks`. Para pular num push,
+use `git push --no-verify`. O clippy e os testes do Rust ficam de fora por serem lentos: rode à
+mão ou pelo Run workflow do CI Windows.
