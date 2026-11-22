@@ -80,14 +80,12 @@ describe("o cartão de quem está na sala", () => {
 		expect(within(card).queryByRole("slider")).toBeNull();
 	});
 
-	it("passar o mouse em quem transmite abre Entrar e assistir, que entra na sala e abre a transmissão", async () => {
+	it("passar o mouse em quem transmite abre Assistir, que entra na sala e abre a transmissão", async () => {
 		const user = userEvent.setup();
 		renderRoom(false);
 		await user.hover(screen.getByRole("button", { name: /Júlia/ }));
 		const card = await screen.findByLabelText("Transmissão de Júlia");
-		await user.click(
-			within(card).getByRole("button", { name: "Entrar e assistir" }),
-		);
+		await user.click(within(card).getByRole("button", { name: "Assistir" }));
 
 		expect(join).toHaveBeenCalledWith("sala");
 		expect(watchShare).toHaveBeenCalledWith("juju");
@@ -103,6 +101,20 @@ describe("o cartão de quem está na sala", () => {
 
 		expect(join).not.toHaveBeenCalled();
 		expect(watchShare).toHaveBeenCalledWith("juju");
+	});
+
+	it("clicar abre o cartão da pessoa e fecha o de assistir", async () => {
+		const user = userEvent.setup();
+		renderRoom(false);
+		const row = screen.getByRole("button", { name: /Júlia/ });
+		await user.hover(row);
+		await screen.findByLabelText("Transmissão de Júlia");
+		await user.click(row);
+
+		await screen.findByRole("dialog", { name: "Perfil de Júlia" });
+		await vi.waitFor(() =>
+			expect(screen.queryByLabelText("Transmissão de Júlia")).toBeNull(),
+		);
 	});
 
 	it("quem não transmite não tem o cartão de assistir", async () => {

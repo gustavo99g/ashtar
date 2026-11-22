@@ -169,6 +169,7 @@ function MemberRow({
 			{member.sharing && !isMe ? (
 				<WatchPreview
 					trigger={trigger}
+					cardOpen={open}
 					member={member}
 					roomId={roomId}
 					roomName={roomName}
@@ -211,18 +212,21 @@ function MemberRow({
 }
 
 /**
- * Passar o mouse em quem está transmitindo abre o cartão com Entrar e assistir (quadro "Canais —
- * assistir pela lista"): entra na sala, se precisar, e abre a transmissão em foco. Já na sala, é só
- * Assistir. O clique na linha continua abrindo o cartão da pessoa.
+ * Passar o mouse em quem está transmitindo abre o cartão com Assistir (quadro "Canais — assistir
+ * pela lista"): entra na sala, se precisar, e abre a transmissão em foco. O clique na linha abre o
+ * cartão da pessoa, e aí este some, para os dois não ficarem abertos juntos.
  */
 function WatchPreview({
 	trigger,
+	cardOpen,
 	member,
 	roomId,
 	roomName,
 	inCall,
 }: {
 	trigger: ReactElement;
+	/** O cartão da pessoa (o clique) está aberto. */
+	cardOpen: boolean;
 	member: ChannelMember;
 	roomId: string;
 	roomName: string;
@@ -232,6 +236,7 @@ function WatchPreview({
 	const { guard, dialog } = useGuardedJoin();
 	const navigate = useNavigate();
 	const onRoom = useMatch(paths.voiceRoom) !== null;
+	const [hovered, setHovered] = useState(false);
 
 	function show() {
 		watchShare(member.id);
@@ -240,6 +245,7 @@ function WatchPreview({
 	}
 
 	function watch() {
+		setHovered(false);
 		if (inCall) {
 			show();
 			return;
@@ -252,7 +258,7 @@ function WatchPreview({
 
 	return (
 		<>
-			<PreviewCard>
+			<PreviewCard open={hovered && !cardOpen} onOpenChange={setHovered}>
 				<PreviewCardTrigger render={trigger} />
 				<PreviewCardContent aria-label={`Transmissão de ${member.name}`}>
 					<div className="flex items-center gap-2.5">
@@ -267,9 +273,9 @@ function WatchPreview({
 						</div>
 						<LiveBadge className="ml-auto shrink-0" />
 					</div>
-					<Button className="h-9 w-full text-sm" onClick={watch}>
+					<Button className="h-9 self-center px-6 text-sm" onClick={watch}>
 						<EyeIcon />
-						{inCall ? "Assistir" : "Entrar e assistir"}
+						Assistir
 					</Button>
 				</PreviewCardContent>
 			</PreviewCard>
