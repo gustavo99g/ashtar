@@ -9,7 +9,7 @@
 - Depois de anexar um arquivo, pelo +, arrastando ou colando, o campo fica pronto: é só apertar Enter para enviar.
 - Arrastar arquivos para a conversa mostra o "Solte para enviar", com quantos arquivos vêm.
 - O seletor de emoji abre mais rápido e, no campo de escrever, fica aberto para escolher vários seguidos, com o foco de volta no campo: é só continuar escrevendo e mandar com Enter.
-- Os sons de entrar e sair da sala não se perdem mais ao trocar de sala.
+- Trocar de sala toca o som de sair e o de entrar, mesmo trocando rápido.
 - A tela cheia da transmissão não deixa mais uma faixa branca na tela ao entrar de novo.
 - Na tela cheia, quem está na sala aparece por cima da parte de baixo da imagem. Com o mouse parado, a fileira, os botões e o cursor somem, e fica só a transmissão.
 - O número de menções nos canais e a linha Novas mensagens voltaram ao dourado.

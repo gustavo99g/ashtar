@@ -4,7 +4,7 @@ import { RoomEvent } from "livekit-client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useSettingsStore } from "@/features/settings";
 import { useMaybeVoice } from "@/features/voice";
-import { LEAVE_DELAY_MS, RoomSounds } from "../components/RoomSounds";
+import { RoomSounds } from "../components/RoomSounds";
 import {
 	playPttSound,
 	playRoomSound,
@@ -127,25 +127,22 @@ describe("os sons da sala", () => {
 		await flush();
 		expect(names()).toEqual([]);
 
-		// Trocar de sala: só o de entrar da nova.
-		resetRoomSounds();
+		// Trocar de sala: o de sair no clique, o de entrar quando a nova conecta, mesmo logo depois
+		// de outro (trocar rápido).
 		played.length = 0;
-		voice = { ...voice, voiceChannelId: "squad", connectionState: "connecting" };
-		rerender(<RoomSounds />);
-		voice = { ...voice, connectionState: "connected" };
+		voice = { ...voice, voiceChannelId: "squad", connectionState: "connecting", room: null };
 		rerender(<RoomSounds />);
 		await flush();
-		expect(names()).toEqual(["join"]);
+		expect(names()).toEqual(["leave"]);
+		voice = { ...voice, connectionState: "connected", room };
+		rerender(<RoomSounds />);
+		await flush();
+		expect(names()).toEqual(["leave", "join"]);
 
-		// Sair: o som espera a sala fechar.
-		vi.useFakeTimers();
 		voice = { ...voice, voiceKind: null as never, voiceChannelId: null as never };
 		rerender(<RoomSounds />);
-		expect(names()).toEqual(["join"]);
-		act(() => vi.advanceTimersByTime(LEAVE_DELAY_MS));
-		vi.useRealTimers();
 		await flush();
-		expect(names()).toEqual(["join", "leave"]);
+		expect(names()).toEqual(["leave", "join", "leave"]);
 	});
 
 	it("o de entrar espera a sala ficar pronta, e o som que não toca tenta de novo", async () => {
