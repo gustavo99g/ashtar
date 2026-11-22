@@ -2,7 +2,7 @@
 
 ## 0.7.1
 
-- Assistir pela lista: passe o mouse em quem está AO VIVO na lista de salas, à esquerda, para ver o que a pessoa transmite (a janela ou a tela, a qualidade, há quanto tempo e quantos assistem) e clicar em Assistir. Fora da sala, você entra nela e a transmissão já abre em foco.
+- Assistir pela lista: passe o mouse em quem está AO VIVO na lista de salas, à esquerda, para ver o que a pessoa transmite (o que está sendo transmitido, a qualidade, há quanto tempo e quantos assistem) e clicar em Assistir. Fora da sala, você entra nela e a transmissão já abre em foco.
 - Na transmissão em foco, o AO VIVO, o nome e os botões só aparecem com o mouse em cima: parado, a imagem fica limpa.
 - Clique com o botão direito numa imagem do chat para Copiar imagem ou Baixar. O visualizador em tela cheia também ganhou o Copiar.
 - As mensagens fixadas mostram as imagens, e clicar numa abre o visualizador.

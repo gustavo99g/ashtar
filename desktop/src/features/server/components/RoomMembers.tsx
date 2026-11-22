@@ -285,7 +285,7 @@ function WatchPreview({
 						)}
 						{share && (
 							<span className="absolute bottom-2 left-2 max-w-[calc(100%-1rem)] truncate rounded-md bg-background/80 px-2 py-0.5 text-xs text-foreground">
-								{share.window ? `Janela: ${share.title}` : share.title}
+								{share.title}
 							</span>
 						)}
 						<Button className="relative h-9 px-6 text-sm" onClick={watch}>
