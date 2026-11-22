@@ -1,8 +1,49 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
-import type { ChannelMember } from "@/features/voice";
+import { MemoryRouter } from "react-router-dom";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+	type ChannelMember,
+	focusShare,
+	useVoice,
+	watchShare,
+} from "@/features/voice";
 import { RoomMembers } from "../components/RoomMembers";
+
+const join = vi.fn();
+vi.mock("@/features/voice", async (importOriginal) => ({
+	...(await importOriginal<typeof import("@/features/voice")>()),
+	useVoice: vi.fn(),
+	useGuardedJoin: () => ({
+		guard: (_name: string, go: () => void) => go(),
+		dialog: null,
+	}),
+	watchShare: vi.fn(),
+	focusShare: vi.fn(),
+}));
+
+beforeEach(() => {
+	join.mockReset();
+	vi.mocked(watchShare).mockReset();
+	vi.mocked(focusShare).mockReset();
+	vi.mocked(useVoice).mockReturnValue({ join } as unknown as ReturnType<
+		typeof useVoice
+	>);
+});
+
+function renderRoom(inCall: boolean) {
+	render(
+		<MemoryRouter>
+			<RoomMembers
+				members={members}
+				myId="kid"
+				roomId="sala"
+				roomName="Sala"
+				inCall={inCall}
+			/>
+		</MemoryRouter>,
+	);
+}
 
 const members: ChannelMember[] = [
 	{ id: "kid", nick: "kid", name: "Kid", sharing: false },
@@ -11,15 +52,7 @@ const members: ChannelMember[] = [
 
 async function openCard(name: string, inCall: boolean) {
 	const user = userEvent.setup();
-	render(
-		<RoomMembers
-			members={members}
-			myId="kid"
-			roomId="sala"
-			roomName="Sala"
-			inCall={inCall}
-		/>,
-	);
+	renderRoom(inCall);
 	await user.click(screen.getByRole("button", { name: new RegExp(name) }));
 	return screen.findByRole("dialog", { name: `Perfil de ${name}` });
 }
@@ -45,5 +78,38 @@ describe("o cartão de quem está na sala", () => {
 		const card = await openCard("Júlia", false);
 
 		expect(within(card).queryByRole("slider")).toBeNull();
+	});
+
+	it("passar o mouse em quem transmite abre Entrar e assistir, que entra na sala e abre a transmissão", async () => {
+		const user = userEvent.setup();
+		renderRoom(false);
+		await user.hover(screen.getByRole("button", { name: /Júlia/ }));
+		const card = await screen.findByLabelText("Transmissão de Júlia");
+		await user.click(
+			within(card).getByRole("button", { name: "Entrar e assistir" }),
+		);
+
+		expect(join).toHaveBeenCalledWith("sala");
+		expect(watchShare).toHaveBeenCalledWith("juju");
+		expect(focusShare).toHaveBeenCalledWith("juju");
+	});
+
+	it("já na sala, é só Assistir, sem entrar de novo", async () => {
+		const user = userEvent.setup();
+		renderRoom(true);
+		await user.hover(screen.getByRole("button", { name: /Júlia/ }));
+		const card = await screen.findByLabelText("Transmissão de Júlia");
+		await user.click(within(card).getByRole("button", { name: "Assistir" }));
+
+		expect(join).not.toHaveBeenCalled();
+		expect(watchShare).toHaveBeenCalledWith("juju");
+	});
+
+	it("quem não transmite não tem o cartão de assistir", async () => {
+		const user = userEvent.setup();
+		renderRoom(false);
+		await user.hover(screen.getByRole("button", { name: /Kid/ }));
+		await new Promise((resolve) => setTimeout(resolve, 400));
+		expect(screen.queryByLabelText(/Transmissão de/)).toBeNull();
 	});
 });
