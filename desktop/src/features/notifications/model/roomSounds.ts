@@ -61,6 +61,15 @@ function play(url: string, retry = true): void {
 			: Promise.resolve();
 	void ready
 		.then(() => audio.play())
+		.then(() =>
+			audio.addEventListener?.(
+				"ended",
+				() => console.info("Som da sala terminou:", url),
+				{
+					once: true,
+				},
+			),
+		)
 		.catch((error: unknown) => {
 			if (retry) {
 				setTimeout(() => play(url, false), RETRY_MS);
@@ -79,12 +88,17 @@ export function playRoomSound(
 	id: RoomSoundId,
 	{ now = Date.now(), force = false, gap = true } = {},
 ): boolean {
-	if (!force && !useSettingsStore.getState().roomSounds[id]) return false;
+	if (!force && !useSettingsStore.getState().roomSounds[id]) {
+		console.info(`Som da sala "${id}": desligado nas Notificações`);
+		return false;
+	}
 	const last = lastPlayed.get(id);
 	if (!force && gap && last !== undefined && now - last < ROOM_SOUND_GAP_MS) {
+		console.info(`Som da sala "${id}": pulado, acabou de tocar`);
 		return false;
 	}
 	lastPlayed.set(id, now);
+	console.info(`Som da sala "${id}": tocando`);
 	play(FILES[id]);
 	return true;
 }
