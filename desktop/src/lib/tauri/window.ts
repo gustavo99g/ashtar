@@ -77,3 +77,34 @@ export function watchWindowMinimized(
 		void unlisten.then((stop) => stop());
 	};
 }
+
+/**
+ * Põe a janela em tela cheia (ou tira). É a tela cheia da transmissão: a do próprio WebView2
+ * (`requestFullscreen`) numa janela sem a borda do Windows deixava, a cada segunda vez no mesmo
+ * monitor, uma faixa branca sem desenhar. Fora do Tauri não faz nada.
+ */
+export function setWindowFullscreen(on: boolean): void {
+	if (isTauri()) void getCurrentWindow().setFullscreen(on);
+}
+
+/**
+ * Avisa quando a janela sai da tela cheia por fora do app (o Windows, um atalho). Devolve a função
+ * que para de escutar.
+ */
+export function watchWindowFullscreen(
+	onChange: (fullscreen: boolean) => void,
+): () => void {
+	if (!isTauri()) return () => {};
+
+	const window = getCurrentWindow();
+	let stopped = false;
+	const unlisten = window.onResized(() => {
+		void window.isFullscreen().then((fullscreen) => {
+			if (!stopped) onChange(fullscreen);
+		});
+	});
+	return () => {
+		stopped = true;
+		void unlisten.then((stop) => stop());
+	};
+}

@@ -1,11 +1,5 @@
 import type { TrackReference } from "@livekit/components-react";
-import {
-	type ReactNode,
-	type RefObject,
-	useEffect,
-	useRef,
-	useState,
-} from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { Minimize2Icon } from "lucide-react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -25,6 +19,10 @@ import {
 import { paths } from "@/lib/paths";
 import { cn } from "@/lib/utils";
 import type { CaptureSource } from "@/lib/tauri/commands";
+import {
+	setWindowFullscreen,
+	watchWindowFullscreen,
+} from "@/lib/tauri/window";
 import {
 	CameraVideo,
 	cameraTrackOf,
@@ -223,8 +221,7 @@ function ConnectedRoom({
 	}, [stage]);
 
 	// O palco inteiro (as transmissões e a faixa de quem está na chamada) vai para a tela cheia.
-	const stageView = useRef<HTMLDivElement>(null);
-	const fullscreen = useFullscreen(stageView);
+	const fullscreen = useFullscreen();
 
 	const firstOpen = open[0] ? memberOf(open[0]) : undefined;
 	const subtitle = camMember
@@ -277,8 +274,10 @@ function ConnectedRoom({
 		>
 			{stage ? (
 				<div
-					ref={stageView}
-					className="flex min-h-0 flex-1 flex-col items-center gap-4 px-6 pt-5 pb-4 [&:fullscreen]:bg-background"
+					className={cn(
+						"flex min-h-0 flex-1 flex-col items-center gap-4 px-6 pt-5 pb-4",
+						fullscreen.active && "fixed inset-0 z-40 bg-background",
+					)}
 				>
 					{camMember ? (
 						<CameraStage member={camMember} onExit={() => focusCamera(null)} />
@@ -483,25 +482,31 @@ function WatchedShare({
 	);
 }
 
-/** A tela cheia do `target` (a do próprio webview): se está nela, e o botão que entra e sai. */
-function useFullscreen(target: RefObject<HTMLElement | null>) {
+/**
+ * A tela cheia do palco: a janela vai para a tela cheia pelo Tauri e o palco cobre a janela inteira
+ * (`fixed inset-0`). Não é a do WebView2 (`requestFullscreen`): numa janela sem a borda do Windows,
+ * ela deixava uma faixa branca a cada segunda vez no mesmo monitor. Esc sai, e sair por fora (um
+ * atalho do Windows) também desliga aqui.
+ */
+function useFullscreen() {
 	const [active, setActive] = useState(false);
 	useEffect(() => {
-		const onChange = () =>
-			setActive(
-				document.fullscreenElement !== null &&
-					document.fullscreenElement === target.current,
-			);
-		document.addEventListener("fullscreenchange", onChange);
-		return () => document.removeEventListener("fullscreenchange", onChange);
-	}, [target]);
-	return {
-		active,
-		toggle: () => {
-			if (document.fullscreenElement) void document.exitFullscreen();
-			else void target.current?.requestFullscreen();
-		},
-	};
+		if (!active) return;
+		setWindowFullscreen(true);
+		const onKey = (event: KeyboardEvent) => {
+			if (event.key === "Escape" && !event.defaultPrevented) setActive(false);
+		};
+		window.addEventListener("keydown", onKey);
+		const stopWatching = watchWindowFullscreen((fullscreen) => {
+			if (!fullscreen) setActive(false);
+		});
+		return () => {
+			window.removeEventListener("keydown", onKey);
+			stopWatching();
+			setWindowFullscreen(false);
+		};
+	}, [active]);
+	return { active, toggle: () => setActive((on) => !on) };
 }
 
 /** O lugar da própria transmissão: a imagem que está indo, os ajustes e o parar. */

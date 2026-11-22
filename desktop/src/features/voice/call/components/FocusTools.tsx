@@ -187,7 +187,6 @@ export function InboundStatsButton({ share }: { share: TrackReference }) {
 			<PopoverContent
 				side="top"
 				align="end"
-				container={document.fullscreenElement as HTMLElement | null ?? undefined}
 			>
 				<PopoverHeader>
 					<PopoverTitle>Como está chegando</PopoverTitle>
