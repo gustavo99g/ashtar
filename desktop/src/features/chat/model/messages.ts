@@ -3,6 +3,7 @@
  * conversa: grupos por autor, separador de dia e a hora.
  */
 import type { Author, Message } from "@/lib/api";
+import { findMentions, type Mentionable } from "./mentions";
 
 export const BODY_MAX = 2000;
 /** Quebras de linha seguidas que ainda valem. */
@@ -42,7 +43,10 @@ function dayKey(seconds: number): string {
 	return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
 }
 
-/** Monta as linhas: grupo novo quando muda o autor, passa de 5 minutos ou muda o dia. */
+/**
+ * Monta as linhas: grupo novo quando muda o autor, passa de 5 minutos ou muda o dia, em volta do
+ * registro de uma ligação, e numa resposta (a citação fica em cima do nome).
+ */
 export function conversationRows(
 	messages: Message[],
 	now = new Date(),
@@ -56,6 +60,10 @@ export function conversationRows(
 			newDay ||
 			previous === null ||
 			previous.author.id !== message.author.id ||
+			// O registro de uma ligação é uma linha à parte: não entra no grupo de ninguém.
+			previous.kind === "call" ||
+			message.kind === "call" ||
+			message.reply_to !== null ||
 			message.created_at - previous.created_at > GROUP_GAP_SECONDS;
 		previous = message;
 		return {
@@ -100,10 +108,11 @@ export function dayLabel(seconds: number, now = new Date()): string {
 		: DAY_YEAR.format(date);
 }
 
-/** Um pedaço do texto: texto comum ou um link. */
+/** Um pedaço do texto: texto comum, um link ou uma menção. */
 export type BodyPart =
 	| { kind: "text"; text: string }
-	| { kind: "link"; url: string };
+	| { kind: "link"; url: string }
+	| { kind: "mention"; text: string; person: Mentionable };
 
 /** Pontuação que costuma colar no fim do link sem fazer parte dele ("veja https://x.com."). */
 const TRAILING = new Set([
@@ -142,19 +151,40 @@ function trimTrailing(url: string): string {
 	return url.slice(0, end);
 }
 
-/** Separa os links `http(s)://` do resto, para virarem clicáveis. */
-export function bodyParts(body: string): BodyPart[] {
+/**
+ * Separa os links `http(s)://` e as menções do resto, para virarem clicáveis e selos. Só vira
+ * menção o `@nick` de quem está em `mentioned` (quem a API confirmou); o resto fica texto.
+ */
+export function bodyParts(
+	body: string,
+	mentioned: readonly Mentionable[] = [],
+): BodyPart[] {
 	const parts: BodyPart[] = [];
 	const pattern = /https?:\/\/[^\s<>]+/gi;
 	let last = 0;
+	const pushText = (end: number) => {
+		if (end <= last) return;
+		const text = body.slice(last, end);
+		let cursor = 0;
+		for (const range of findMentions(text, mentioned)) {
+			if (range.start > cursor) {
+				parts.push({ kind: "text", text: text.slice(cursor, range.start) });
+			}
+			parts.push({
+				kind: "mention",
+				text: text.slice(range.start, range.end),
+				person: range.person,
+			});
+			cursor = range.end;
+		}
+		if (cursor < text.length) parts.push({ kind: "text", text: text.slice(cursor) });
+	};
 	for (const match of body.matchAll(pattern)) {
 		const url = trimTrailing(match[0]);
-		const start = match.index;
-		if (start > last)
-			parts.push({ kind: "text", text: body.slice(last, start) });
+		pushText(match.index);
 		parts.push({ kind: "link", url });
-		last = start + url.length;
+		last = match.index + url.length;
 	}
-	if (last < body.length) parts.push({ kind: "text", text: body.slice(last) });
+	pushText(body.length);
 	return parts;
 }

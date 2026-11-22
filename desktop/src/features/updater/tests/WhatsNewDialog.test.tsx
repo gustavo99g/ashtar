@@ -21,7 +21,7 @@ beforeEach(() => {
 
 describe("WhatsNewDialog", () => {
 	it("mostra a versão e um item por linha da seção do CHANGELOG", async () => {
-		vi.mocked(whatsNew).mockResolvedValue({ version: "0.2.20", notes });
+		vi.mocked(whatsNew).mockResolvedValue({ version: "0.2.20", sections: [{ version: "0.2.20", notes }] });
 		render(<WhatsNewDialog />);
 
 		expect(
@@ -37,7 +37,7 @@ describe("WhatsNewDialog", () => {
 	});
 
 	it("Entendi fecha e guarda a versão como vista", async () => {
-		vi.mocked(whatsNew).mockResolvedValue({ version: "0.2.20", notes });
+		vi.mocked(whatsNew).mockResolvedValue({ version: "0.2.20", sections: [{ version: "0.2.20", notes }] });
 		render(<WhatsNewDialog />);
 
 		await userEvent.click(await screen.findByRole("button", { name: "Entendi" }));
@@ -47,7 +47,7 @@ describe("WhatsNewDialog", () => {
 	});
 
 	it("o ESC também conta como visto", async () => {
-		vi.mocked(whatsNew).mockResolvedValue({ version: "0.2.20", notes });
+		vi.mocked(whatsNew).mockResolvedValue({ version: "0.2.20", sections: [{ version: "0.2.20", notes }] });
 		render(<WhatsNewDialog />);
 		await screen.findByRole("dialog");
 
@@ -61,11 +61,45 @@ describe("WhatsNewDialog", () => {
 
 	it("uma versão que já foi vista não abre de novo", async () => {
 		useUpdaterStore.setState({ lastSeenVersion: "0.2.20" });
-		vi.mocked(whatsNew).mockResolvedValue({ version: "0.2.20", notes });
+		vi.mocked(whatsNew).mockResolvedValue({ version: "0.2.20", sections: [{ version: "0.2.20", notes }] });
 		render(<WhatsNewDialog />);
 
 		await waitFor(() => expect(whatsNew).toHaveBeenCalled());
 		expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+	});
+
+	it("quem pulou versões vê todas, cada uma com o seu título", async () => {
+		useUpdaterStore.setState({ lastSeenVersion: "0.4.0" });
+		vi.mocked(whatsNew).mockResolvedValue({
+			version: "0.4.2",
+			sections: [
+				{ version: "0.4.2", notes: "- Dois." },
+				{ version: "0.4.1", notes: "- Um." },
+			],
+		});
+		render(<WhatsNewDialog />);
+
+		await screen.findByRole("dialog", { name: "O que há de novo na 0.4.2" });
+		expect(whatsNew).toHaveBeenCalledWith("0.4.0");
+		expect(
+			screen.getAllByRole("heading", { level: 3 }).map((h) => h.textContent),
+		).toEqual(["0.4.2", "0.4.1"]);
+		expect(
+			screen.getAllByRole("listitem").map((li) => li.textContent),
+		).toEqual(["Dois.", "Um."]);
+
+		await userEvent.click(screen.getByRole("button", { name: "Entendi" }));
+		expect(useUpdaterStore.getState().lastSeenVersion).toBe("0.4.2");
+	});
+
+	it("uma versão só não ganha título por seção", async () => {
+		vi.mocked(whatsNew).mockResolvedValue({
+			version: "0.2.20",
+			sections: [{ version: "0.2.20", notes }],
+		});
+		render(<WhatsNewDialog />);
+		await screen.findByRole("dialog");
+		expect(screen.queryByRole("heading", { level: 3 })).not.toBeInTheDocument();
 	});
 
 	it("sem notas da versão, não abre", async () => {

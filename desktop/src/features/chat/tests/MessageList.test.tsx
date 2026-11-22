@@ -50,7 +50,17 @@ function message(id: string): Message {
 		client_id: id,
 		author: { id: "u2", nick: "ana", display_name: null, removed: false },
 		body: `mensagem ${id}`,
+		mentions: [],
 		created_at: Math.floor(Date.now() / 1000),
+		kind: "text",
+		edited_at: null,
+		reply_to: null,
+		reactions: [],
+		pinned_at: null,
+		attachments: [],
+		previews: [],
+		forwarded: null,
+		call: null,
 	};
 }
 
@@ -67,11 +77,17 @@ function pendingMessage(clientId: string): PendingMessage {
 function list(
 	messages: Message[],
 	pending: PendingMessage[] = [],
-	extra: { hasOlder?: boolean; onLoadOlder?: () => void } = {},
+	extra: {
+		hasOlder?: boolean;
+		onLoadOlder?: () => void;
+		unreadAfter?: string | null;
+		onSeeingEndChange?: (seeingEnd: boolean) => void;
+	} = {},
 ) {
 	return (
 		<MessageList
-			channelName="geral"
+			label="Mensagens em #geral"
+			start={<p>Bem-vindo a #geral</p>}
 			messages={messages}
 			pending={pending}
 			ownerId={null}
@@ -80,6 +96,8 @@ function list(
 			onLoadOlder={extra.onLoadOlder ?? (() => {})}
 			onRetry={() => {}}
 			onDiscard={() => {}}
+			unreadAfter={extra.unreadAfter}
+			onSeeingEndChange={extra.onSeeingEndChange}
 		/>
 	);
 }
@@ -111,6 +129,43 @@ describe("MessageList: o fim da conversa", () => {
 		expect(
 			screen.queryByRole("button", { name: "Novas mensagens" }),
 		).not.toBeInTheDocument();
+	});
+});
+
+describe("MessageList: o conteúdo que cresce", () => {
+	/** O jsdom não tem `ResizeObserver`: este guarda quem observa, e o teste avisa. */
+	let resized: (() => void)[] = [];
+	beforeEach(() => {
+		resized = [];
+		vi.stubGlobal(
+			"ResizeObserver",
+			class {
+				constructor(callback: () => void) {
+					resized.push(callback);
+				}
+				observe() {}
+				disconnect() {}
+			},
+		);
+	});
+	afterEach(() => vi.unstubAllGlobals());
+
+	it("a prévia que chega depois não esconde o fim de quem estava nele", () => {
+		box.scrollHeight = 500;
+		box.clientHeight = 100;
+		render(list([message("m1"), message("m2")]));
+		expect(box.scrollTop).toBe(500);
+		// O cartão da prévia entrou: a mensagem ficou mais alta.
+		box.scrollHeight = 800;
+		act(() => resized.forEach((callback) => callback()));
+		expect(box.scrollTop).toBe(800);
+	});
+
+	it("quem lê o histórico fica onde está", () => {
+		scrolledUp();
+		box.scrollHeight = 1300;
+		act(() => resized.forEach((callback) => callback()));
+		expect(box.scrollTop).toBe(0);
 	});
 });
 
@@ -150,5 +205,101 @@ describe("MessageList: o histórico antigo", () => {
 		const onLoadOlder = vi.fn();
 		render(list([message("m1")], [], { hasOlder: true, onLoadOlder }));
 		expect(onLoadOlder).not.toHaveBeenCalled();
+	});
+});
+
+describe("MessageList: as novas mensagens", () => {
+	const three = [message("m1"), message("m2"), message("m3")];
+
+	function lineBefore(): string | null | undefined {
+		const line = screen.queryByRole("separator", { name: "Novas mensagens" });
+		return line?.nextElementSibling?.textContent;
+	}
+
+	it("a linha fica antes da primeira não lida; null é antes da primeira de todas", () => {
+		const view = render(list(three, [], { unreadAfter: "m1" }));
+		expect(lineBefore()).toContain("mensagem m2");
+		view.unmount();
+
+		render(list(three, [], { unreadAfter: null }));
+		expect(lineBefore()).toContain("mensagem m1");
+	});
+
+	it("sem marca, ou com tudo lido, não há linha", () => {
+		const view = render(list(three));
+		expect(lineBefore()).toBeUndefined();
+		view.rerender(list(three, [], { unreadAfter: "m3" }));
+		expect(lineBefore()).toBeUndefined();
+	});
+
+	it("abre rolada na linha, e não no fim", () => {
+		box.scrollHeight = 1000;
+		box.clientHeight = 100;
+		const offset = vi
+			.spyOn(HTMLElement.prototype, "offsetTop", "get")
+			.mockReturnValue(500);
+		const seeing = vi.fn();
+		render(list(three, [], { unreadAfter: "m1", onSeeingEndChange: seeing }));
+		offset.mockRestore();
+
+		expect(box.scrollTop).toBe(484);
+		expect(seeing).toHaveBeenCalledWith(false);
+		expect(
+			screen.getByRole("button", { name: "Novas mensagens" }),
+		).toBeInTheDocument();
+	});
+
+	it("avisa quando o fim sai e volta à vista", () => {
+		box.scrollHeight = 1000;
+		box.clientHeight = 100;
+		const seeing = vi.fn();
+		render(list(three, [], { onSeeingEndChange: seeing }));
+		const scroller = screen.getByTestId("message-list");
+
+		box.scrollTop = 0;
+		fireEvent.scroll(scroller);
+		expect(seeing).toHaveBeenLastCalledWith(false);
+
+		box.scrollTop = 900;
+		fireEvent.scroll(scroller);
+		expect(seeing).toHaveBeenLastCalledWith(true);
+		expect(seeing).toHaveBeenCalledTimes(2);
+	});
+});
+
+describe("MessageList: as menções", () => {
+	it("a menção vira selo, e a mensagem que menciona quem lê ganha destaque", () => {
+		const people = new Map([
+			["kid", { id: "kid", nick: "kid", display_name: "Kid" }],
+			["bia", { id: "bia", nick: "bia", display_name: null }],
+		]);
+		render(
+			<MessageList
+				label="Mensagens em #geral"
+				start={null}
+				messages={[
+					{ ...message("m1"), body: "fala @kid", mentions: ["kid"] },
+					{ ...message("m2"), body: "e a @bia", mentions: ["bia"] },
+					{ ...message("m3"), body: "@ninguem aqui" },
+				]}
+				pending={[]}
+				ownerId={null}
+				people={people}
+				myId="kid"
+				hasOlder={false}
+				loadingOlder={false}
+				onLoadOlder={() => {}}
+				onRetry={() => {}}
+				onDiscard={() => {}}
+			/>,
+		);
+		expect(screen.getByText("@Kid").closest("li")).toHaveAttribute(
+			"data-mentions-me",
+			"true",
+		);
+		expect(screen.getByText("@bia").closest("li")).not.toHaveAttribute(
+			"data-mentions-me",
+		);
+		expect(screen.getByText("@ninguem aqui")).toBeInTheDocument();
 	});
 });

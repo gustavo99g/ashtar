@@ -19,23 +19,39 @@ import {
 	useQueryClient,
 } from "@tanstack/react-query";
 import { useCallback, useEffect } from "react";
-import { useSession } from "@/features/identity";
+import { rememberAvatars, useSession } from "@/features/identity";
 import {
 	ApiError,
 	type ChannelHead,
+	deleteMessage,
+	editMessage,
+	listChannelFiles,
 	listMessages,
 	listPeople,
+	listPins,
+	type MediaFilter,
 	type Message,
 	type MessagePage,
+	type Person,
+	type SearchParams,
+	searchMessages,
 	sendMessage,
+	setPinned,
+	setReaction,
+	uploadFile,
 } from "@/lib/api";
 import { useRealtimeOpen } from "@/lib/realtime";
 import { useAppVisible } from "@/lib/visibility";
+import { makeThumbnail, makeVideoCover } from "./model/attachments";
+import type { DraftFile } from "./stores/attachmentStore";
 import {
 	addPending,
 	findPending,
+	type PendingFile,
+	type PendingReply,
 	removePending,
 	updatePending,
+	updatePendingFile,
 } from "./stores/outboxStore";
 
 export const chatKeys = {
@@ -43,7 +59,94 @@ export const chatKeys = {
 	messages: (channelId: string) =>
 		[...chatKeys.all, "messages", channelId] as const,
 	people: () => [...chatKeys.all, "people"] as const,
+	/** O histórico aberto em volta de uma mensagem antiga (a citação, a busca, as fixadas). */
+	around: (channelId: string, anchor: string) =>
+		[...chatKeys.all, "around", channelId, anchor] as const,
+	pins: (channelId: string) => [...chatKeys.all, "pins", channelId] as const,
+	files: (channelId: string, filter: MediaFilter) =>
+		[...chatKeys.all, "files", channelId, filter] as const,
+	search: (params: SearchParams | null) =>
+		[...chatKeys.all, "search", params] as const,
 };
+
+/**
+ * A mídia do canal (`GET /api/channels/{id}/files`), de 50 em 50. Busca de novo a cada vez que a
+ * caixa abre (`staleTime` 0), em vez de seguir o tempo real.
+ */
+export function useChannelFiles(
+	channelId: string,
+	filter: MediaFilter,
+	enabled = true,
+) {
+	const connected = useSession().status === "connected";
+	const query = useInfiniteQuery({
+		queryKey: chatKeys.files(channelId, filter),
+		queryFn: ({ pageParam }) =>
+			listChannelFiles(channelId, filter, pageParam ?? undefined),
+		initialPageParam: null as string | null,
+		getNextPageParam: (last) =>
+			last.has_more ? (last.files[last.files.length - 1]?.message_id ?? null) : null,
+		enabled: connected && enabled,
+		staleTime: 0,
+		gcTime: 60_000,
+	});
+	const files = query.data?.pages.flatMap((page) => page.files);
+	return { ...query, files };
+}
+
+/**
+ * A busca (`GET /api/search`), de 25 em 25, da mais nova para a mais velha. `null` não busca. Não
+ * fica em dia pelo tempo real: buscar de novo traz o que mudou.
+ */
+export function useSearch(params: SearchParams | null) {
+	const connected = useSession().status === "connected";
+	const query = useInfiniteQuery({
+		queryKey: chatKeys.search(params),
+		queryFn: ({ pageParam }) =>
+			searchMessages({ ...params, ...(pageParam ? { before: pageParam } : {}) }),
+		initialPageParam: null as string | null,
+		getNextPageParam: (last) =>
+			last.has_more ? (last.messages[last.messages.length - 1]?.id ?? null) : null,
+		enabled: connected && params !== null,
+		staleTime: 30_000,
+		gcTime: 60_000,
+	});
+	const messages = query.data?.pages.flatMap((page) => page.messages);
+	return { ...query, messages };
+}
+
+/** As fixadas do canal (`GET /api/channels/{id}/pins`); o tempo real mantém em dia (`syncPin`). */
+export function usePins(channelId: string) {
+	const connected = useSession().status === "connected";
+	return useQuery({
+		queryKey: chatKeys.pins(channelId),
+		queryFn: () => listPins(channelId),
+		enabled: connected,
+		staleTime: Number.POSITIVE_INFINITY,
+	});
+}
+
+/**
+ * Põe a mensagem mudada na lista das fixadas: entra se foi fixada, sai se foi desafixada ou
+ * excluída (`null`), e a que continua fixada fica com o texto novo.
+ */
+export function syncPin(
+	queryClient: QueryClient,
+	channelId: string,
+	messageId: string,
+	message: Message | null,
+): void {
+	queryClient.setQueryData<Message[]>(chatKeys.pins(channelId), (pins) => {
+		if (!pins) return pins;
+		const rest = pins.filter((pin) => pin.id !== messageId);
+		if (!message?.pinned_at) {
+			return rest.length === pins.length ? pins : rest;
+		}
+		return [...rest, message].sort(
+			(a, b) => (b.pinned_at ?? 0) - (a.pinned_at ?? 0),
+		);
+	});
+}
 
 export type MessagePages = InfiniteData<MessagePage, string | null>;
 
@@ -64,6 +167,118 @@ export function useMessages(channelId: string) {
 	});
 	const messages = query.data?.pages.flatMap((page) => page.messages);
 	return { ...query, messages };
+}
+
+/** Uma página do histórico em volta de uma mensagem: o cursor diz para que lado ela foi buscada. */
+type AroundParam = { around: string } | { before: string } | { after: string };
+
+/**
+ * O histórico em volta de `anchor` (ADR 0032): a primeira página vem do `?around=`, e dali rola para
+ * os dois lados (`before` no topo, `after` no fim). Fica numa chave separada do histórico de
+ * sempre, que continua recebendo as novas pelo tempo real; "Ir para o presente" só volta para ele.
+ */
+export function useAroundMessages(channelId: string, anchor: string | null) {
+	const connected = useSession().status === "connected";
+	const query = useInfiniteQuery({
+		queryKey: chatKeys.around(channelId, anchor ?? ""),
+		queryFn: ({ pageParam }) => listMessages(channelId, pageParam),
+		initialPageParam: { around: anchor ?? "" } as AroundParam,
+		getPreviousPageParam: (first) =>
+			first.has_more && first.messages[0]
+				? ({ before: first.messages[0].id } as AroundParam)
+				: null,
+		getNextPageParam: (last) => {
+			// A do `around` diz no `has_newer`; as do `after`, no `has_more`.
+			const newer = last.has_newer ?? last.has_more;
+			const newest = last.messages[last.messages.length - 1];
+			return newer && newest ? ({ after: newest.id } as AroundParam) : null;
+		},
+		enabled: connected && anchor !== null,
+		staleTime: Number.POSITIVE_INFINITY,
+		gcTime: 0,
+	});
+	const messages = query.data?.pages.flatMap((page) => page.messages);
+	return { ...query, messages };
+}
+
+/**
+ * Muda as mensagens de `channelId` em todo histórico em cache (o de sempre e os abertos em volta
+ * de uma mensagem).
+ */
+function changeHistories(
+	queryClient: QueryClient,
+	channelId: string,
+	change: (message: Message) => Message | null,
+): void {
+	const update = (data: MessagePages | undefined) => {
+		if (!data) return data;
+		let changed = false;
+		const pages = data.pages.map((page) => {
+			const messages: Message[] = [];
+			for (const message of page.messages) {
+				const next = change(message);
+				if (next !== message) changed = true;
+				if (next) messages.push(next);
+			}
+			return changed ? { ...page, messages } : page;
+		});
+		return changed ? { ...data, pages } : data;
+	};
+	queryClient.setQueriesData<MessagePages>(
+		{ queryKey: chatKeys.messages(channelId) },
+		update,
+	);
+	queryClient.setQueriesData<MessagePages>(
+		{ queryKey: [...chatKeys.all, "around", channelId] },
+		update,
+	);
+}
+
+/** O começo do texto que a citação da resposta mostra (o mesmo corte da API). */
+export function replyExcerpt(body: string): string {
+	const line = body.split(/\s+/).filter(Boolean).join(" ");
+	const chars = [...line];
+	return chars.length > 120 ? `${chars.slice(0, 120).join("")}…` : line;
+}
+
+/**
+ * A mensagem mudou (`message.updated`, ou a resposta de editar ou reagir): troca no cache, e as
+ * respostas a ela passam a citar o texto novo.
+ */
+export function replaceMessage(queryClient: QueryClient, updated: Message): void {
+	syncPin(queryClient, updated.channel_id, updated.id, updated);
+	changeHistories(queryClient, updated.channel_id, (message) => {
+		if (message.id === updated.id) return updated;
+		if (message.reply_to?.id === updated.id && message.reply_to.author) {
+			return {
+				...message,
+				reply_to: { ...message.reply_to, excerpt: replyExcerpt(updated.body) },
+			};
+		}
+		return message;
+	});
+}
+
+/**
+ * A mensagem foi excluída (`message.deleted`): sai do cache, e as respostas a ela passam a mostrar
+ * "Mensagem original excluída".
+ */
+export function dropMessage(
+	queryClient: QueryClient,
+	channelId: string,
+	messageId: string,
+): void {
+	syncPin(queryClient, channelId, messageId, null);
+	changeHistories(queryClient, channelId, (message) => {
+		if (message.id === messageId) return null;
+		if (message.reply_to?.id === messageId && message.reply_to.author) {
+			return {
+				...message,
+				reply_to: { id: messageId, author: null, excerpt: null },
+			};
+		}
+		return message;
+	});
 }
 
 /**
@@ -114,7 +329,7 @@ function cachedHistories(queryClient: QueryClient) {
  */
 export async function catchUp(
 	queryClient: QueryClient,
-	heads?: ChannelHead[],
+	heads?: Pick<ChannelHead, "channel_id" | "last_message_id">[],
 ): Promise<void> {
 	const latest =
 		heads &&
@@ -214,6 +429,37 @@ function failureMessage(error: unknown): string {
 		: "Não foi possível mandar a mensagem.";
 }
 
+/**
+ * Sobe um anexo da caixa de saída: a miniatura (de uma imagem) ou a capa (de um vídeo) antes, se
+ * abre aqui, depois o arquivo, com as dimensões e a duração. Devolve o id e guarda na mensagem,
+ * para o "Tentar de novo" não subir de novo.
+ */
+async function uploadAttachment(
+	clientId: string,
+	pending: PendingFile,
+): Promise<string> {
+	const { file, key } = pending;
+	const thumbnail = (await makeThumbnail(file)) ?? (await makeVideoCover(file));
+	const thumb = thumbnail
+		? await uploadFile(thumbnail.blob, {
+				kind: "attachment",
+				name: "capa.webp",
+			})
+		: null;
+	const uploaded = await uploadFile(file, {
+		kind: "attachment",
+		name: file.name || "arquivo",
+		width: thumbnail?.width,
+		height: thumbnail?.height,
+		durationMs: thumbnail?.durationMs,
+		thumbnail: thumb?.id,
+		onProgress: (progress) =>
+			updatePendingFile(clientId, key, { progress }),
+	});
+	updatePendingFile(clientId, key, { progress: 1, uploaded: uploaded.id });
+	return uploaded.id;
+}
+
 /** Manda (ou manda de novo) uma mensagem que já está na caixa de saída. */
 async function deliver(
 	queryClient: QueryClient,
@@ -223,9 +469,17 @@ async function deliver(
 	if (!pending) return;
 	updatePending(clientId, { status: "sending", error: undefined });
 	try {
+		const attachments: string[] = [];
+		for (const file of pending.files ?? []) {
+			attachments.push(file.uploaded ?? (await uploadAttachment(clientId, file)));
+		}
 		const message = await sendMessage(pending.channel_id, {
 			client_id: clientId,
 			body: pending.body,
+			reply_to: pending.reply?.id,
+			reply_mention: pending.reply?.mention,
+			...(attachments.length > 0 ? { attachments } : {}),
+			...(pending.forward ? { forward: pending.forward } : {}),
 		});
 		appendMessages(queryClient, pending.channel_id, [message]);
 		removePending(clientId);
@@ -247,12 +501,27 @@ async function deliver(
 export function useSendMessage() {
 	const queryClient = useQueryClient();
 	const send = useCallback(
-		(channelId: string, body: string) => {
+		(
+			channelId: string,
+			body: string,
+			reply?: PendingReply,
+			files: readonly DraftFile[] = [],
+		) => {
 			const clientId = newClientId();
 			addPending({
 				client_id: clientId,
 				channel_id: channelId,
 				body: body.trim(),
+				reply,
+				...(files.length > 0
+					? {
+							files: files.map(({ key, file }) => ({
+								key,
+								file,
+								progress: 0,
+							})),
+						}
+					: {}),
 				created_at: Math.floor(Date.now() / 1000),
 				status: "sending",
 			});
@@ -264,7 +533,97 @@ export function useSendMessage() {
 		(clientId: string) => void deliver(queryClient, clientId),
 		[queryClient],
 	);
-	return { send, retry, discard: removePending };
+	/** Encaminha `original` para `channelId` (aparece na hora, como um envio). */
+	const forward = useCallback(
+		(channelId: string, original: Message) => {
+			const clientId = newClientId();
+			addPending({
+				client_id: clientId,
+				channel_id: channelId,
+				body: original.body,
+				forward: original.id,
+				created_at: Math.floor(Date.now() / 1000),
+				status: "sending",
+			});
+			void deliver(queryClient, clientId);
+		},
+		[queryClient],
+	);
+	return { send, retry, discard: removePending, forward };
+}
+
+/**
+ * Editar, excluir e reagir (ADR 0032). Cada um já põe a resposta no cache, sem esperar o
+ * `message.updated` ou o `message.deleted` (que chegam também, e não mudam nada de novo).
+ */
+export function useMessageActions() {
+	const queryClient = useQueryClient();
+	const edit = useCallback(
+		async (message: Message, body: string) => {
+			replaceMessage(queryClient, await editMessage(message.id, { body: body.trim() }));
+		},
+		[queryClient],
+	);
+	const remove = useCallback(
+		async (message: Message) => {
+			await deleteMessage(message.id);
+			dropMessage(queryClient, message.channel_id, message.id);
+		},
+		[queryClient],
+	);
+	const react = useCallback(
+		async (message: Message, emoji: string, on: boolean) => {
+			replaceMessage(queryClient, await setReaction(message.id, emoji, on));
+		},
+		[queryClient],
+	);
+	const pin = useCallback(
+		async (message: Message, on: boolean) => {
+			replaceMessage(queryClient, await setPinned(message.id, on));
+		},
+		[queryClient],
+	);
+	return { edit, remove, react, pin };
+}
+
+/** A lista de pessoas, guardando a foto de cada uma para o `Avatar`. */
+async function fetchPeople(): Promise<Person[]> {
+	const people = await listPeople();
+	rememberAvatars(people);
+	return people;
+}
+
+/**
+ * A foto ou o nome novo de alguém (`user.updated`) nas mensagens em cache, que trazem o autor
+ * inteiro.
+ */
+export function updateAuthor(
+	queryClient: QueryClient,
+	userId: string,
+	change: Pick<Message["author"], "display_name" | "avatar">,
+): void {
+	for (const kind of ["messages", "around"]) {
+		queryClient.setQueriesData<MessagePages>(
+			{ queryKey: [...chatKeys.all, kind] },
+			(data) => {
+				if (!data) return data;
+				let changed = false;
+				const pages = data.pages.map((page) => {
+					if (!page.messages.some((m) => m.author.id === userId)) return page;
+					changed = true;
+					return {
+						...page,
+						messages: page.messages.map((message) =>
+							message.author.id === userId
+								? { ...message, author: { ...message.author, ...change } }
+								: message,
+						),
+					};
+				});
+				return changed ? { ...data, pages } : data;
+			},
+		);
+	}
 }
 
 /** De quanto em quanto tempo a coluna de membros pergunta quem está online, com o tempo real fora. */
@@ -281,7 +640,7 @@ export function usePeople() {
 	const live = useRealtimeOpen();
 	return useQuery({
 		queryKey: chatKeys.people(),
-		queryFn: listPeople,
+		queryFn: fetchPeople,
 		enabled: connected,
 		staleTime: Number.POSITIVE_INFINITY,
 		refetchInterval: visible && !live ? PEOPLE_REFRESH_MS : false,

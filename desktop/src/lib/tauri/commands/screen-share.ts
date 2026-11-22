@@ -87,6 +87,8 @@ export interface ShareOptions {
 	cursor: boolean;
 	/** O nivelador do áudio (`media/leveler.rs`): sobe o som baixo do jogo, sem estourar. */
 	leveler: boolean;
+	/** Codificar na placa de vídeo; `false` manda pela CPU. Ausente, a placa. */
+	hardwareEncoder?: boolean;
 	target: ShareTarget;
 }
 
@@ -144,4 +146,26 @@ export function onScreenShareStats(
 	return listen<ShareStats>("screen-share-stats", (event) =>
 		callback(event.payload),
 	);
+}
+
+/** A conexão `:screen` caiu (`screen-share-link-lost`): a captura segue, esperando a volta. */
+export interface ScreenShareLinkLost {
+	sessionId: number;
+}
+
+/** Escuta a queda da conexão da transmissão. Responda com `screenShareReconnect`. */
+export function onScreenShareLinkLost(
+	callback: (event: ScreenShareLinkLost) => void,
+): Promise<UnlistenFn> {
+	return listen<ScreenShareLinkLost>("screen-share-link-lost", (event) =>
+		callback(event.payload),
+	);
+}
+
+/**
+ * Volta a transmissão para a sala com um token novo, sem parar a captura. Falhando, dá para tentar
+ * de novo; sem voltar em 2 minutos, a transmissão acaba (`screen-share-ended`).
+ */
+export function screenShareReconnect(sessionId: number, target: ShareTarget) {
+	return call<void>("screen_share_reconnect", { sessionId, target });
 }

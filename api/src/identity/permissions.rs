@@ -26,15 +26,30 @@ pub enum Permission {
     BetaUpdates,
     /// Cria, renomeia, arquiva e reordena canais e categorias (ADR 0016).
     ManageChannels,
+    /// Move alguém para outra sala de voz e desconecta da voz (ADR 0026).
+    MoveMembers,
+    /// Sobe, renomeia e exclui os emojis do grupo (v0.7).
+    ManageEmojis,
+    /// Lê e baixa os logs que os membros mandam (v0.7; antes, só o dono).
+    ViewLogs,
 }
 
 impl Permission {
-    pub const ALL: [Permission; 2] = [Permission::BetaUpdates, Permission::ManageChannels];
+    pub const ALL: [Permission; 5] = [
+        Permission::BetaUpdates,
+        Permission::ManageChannels,
+        Permission::MoveMembers,
+        Permission::ManageEmojis,
+        Permission::ViewLogs,
+    ];
 
     pub fn key(self) -> &'static str {
         match self {
             Self::BetaUpdates => "atualizacoes.beta",
             Self::ManageChannels => "canais.gerenciar",
+            Self::MoveMembers => "membros.mover",
+            Self::ManageEmojis => "emojis.gerenciar",
+            Self::ViewLogs => "logs.ver",
         }
     }
 
@@ -43,6 +58,9 @@ impl Permission {
         match self {
             Self::BetaUpdates => "Receber o beta",
             Self::ManageChannels => "Gerenciar canais",
+            Self::MoveMembers => "Mover membros",
+            Self::ManageEmojis => "Gerenciar emojis",
+            Self::ViewLogs => "Ver logs",
         }
     }
 
@@ -305,6 +323,7 @@ mod tests {
             is_owner,
             created_at: 0,
             removed_at: removed.then_some(1),
+            avatar_id: None,
         }
     }
 

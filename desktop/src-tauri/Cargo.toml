@@ -36,15 +36,22 @@ livekit = { version = "0.10.1", features = ["native-tls"] }
 windows-sys = { version = "0.61.2", features = [
     "Win32_Foundation",
     "Win32_UI_WindowsAndMessaging",
+    "Win32_UI_Shell",
+    "Win32_UI_Input_KeyboardAndMouse",
     "Win32_Graphics_Gdi",
     "Win32_Graphics_Dwm",
     "Win32_Storage_Xps",
     "Win32_System_Threading",
+    "Win32_System_LibraryLoader",
+    "Win32_System_Power",
+    "Win32_System_Registry",
     "Win32_System_SystemInformation",
     "Win32_System_Diagnostics_ToolHelp",
     "Win32_Security_Credentials"
 ] }
 sha2 = "0.11.1"
+# O "Enviar logs" junta os arquivos num .zip (o mesmo `zip` que o `webrtc-sys-build` já baixa).
+zip = { version = "9.4.2", default-features = false, features = ["deflate-flate2-zlib-rs"] }
 getrandom = "0.4.3"
 # O WebView2 do Tauri: o mesmo `webview2-com` e `windows` que o `wry` já usa (conferir no Cargo.lock).
 webview2-com = "0.39"
@@ -73,11 +80,15 @@ windows = { version = "0.62", features = [
     "Win32_UI_WindowsAndMessaging",
 ] }
 tauri-plugin-updater = "2.13"
-tokio = { version = "1", features = ["time"] }
+tokio = { version = "1", features = ["time", "fs", "io-util"] }
 tauri-plugin-window-state = "2.5.0"
-reqwest = { version = "0.13.4", default-features = false, features = ["json", "rustls-no-provider"] }
+# Iniciar com o Windows (Configurações › Aplicativo, v0.3.1): a chave fica no registro do usuário.
+tauri-plugin-autostart = "2.7"
+reqwest = { version = "0.13.4", default-features = false, features = ["json", "rustls-no-provider", "stream"] }
 rustls = { version = "0.23.45", default-features = false, features = ["ring", "std"] }
 tauri-plugin-deep-link = "2.6.2"
+# O Baixar do chat (v0.7) lê a resposta em pedaços.
+futures-util = "0.3"
 tauri-plugin-single-instance = { version = "2.5.4", features = ["deep-link"] }
 
 

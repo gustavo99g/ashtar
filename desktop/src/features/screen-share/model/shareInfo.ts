@@ -1,14 +1,10 @@
 /*
- * Uma transmissão por vez. A trilha de tela publicada leva no nome quando começou, a qualidade e
- * o título da fonte (`screen-share:{"t":...,"q":"1080p60","s":"Navegador"}`). O nome vai junto
- * com a publicação para todo mundo na sala, assinada ou não, então todos os apps leem a mesma
- * coisa.
+ * O nome da trilha de tela. A trilha publicada leva no nome quando começou, a qualidade e o título
+ * da fonte (`screen-share:{"t":...,"q":"1080p60","s":"Navegador"}`). O nome vai junto com a
+ * publicação para todo mundo na sala, assinada ou não, então todos os apps leem a mesma coisa.
  *
- * Se duas pessoas começam juntas, cada app vê as duas publicações e calcula `shareWinner` sobre
- * elas: com as mesmas entradas, a mesma função dá a mesma resposta nos dois lados, sem nenhuma
- * conversa entre eles. Continua a que começou antes; o horário é o relógio de quem publicou, e uma
- * diferença entre os relógios só muda quem ganha, nunca faz os dois discordarem. Empate (ou sem
- * horário) fica com a menor identidade, que é única na sala: a ordem é total.
+ * Desde a v0.4 (ADR 0024), várias pessoas transmitem ao mesmo tempo: o horário só ordena as
+ * transmissões (a mais antiga primeiro, `compareShares`), e o limite por sala é da API.
  *
  * O nome não muda depois de publicado. A qualidade pode mudar no meio (o popover e o painel), então
  * quem transmite avisa a nova pela conexão da voz, no tópico `screen-quality` (`{"quality": ...}`),
@@ -60,29 +56,23 @@ export function parseShareTrackName(
 }
 
 export interface ShareCandidate {
-	/** A identidade de quem publicou (o id do usuário). */
+	/** A identidade de quem publicou. */
 	identity: string;
 	/** O nome da trilha de tela publicada. */
 	trackName: string | undefined;
 }
 
 /**
- * A transmissão que continua quando há mais de uma: a que começou antes; sem horário conta como a
- * mais antiga (quem não diz quando começou não sabe ceder); empate, a menor identidade.
+ * A ordem das transmissões: a que começou antes vem primeiro; sem horário conta como a mais antiga;
+ * empate, a menor identidade. Com as mesmas entradas, todo app desenha na mesma ordem.
  */
-export function shareWinner<T extends ShareCandidate>(
-	candidates: readonly T[],
-): T | undefined {
-	const startOf = (candidate: T) =>
+export function compareShares(a: ShareCandidate, b: ShareCandidate): number {
+	const startOf = (candidate: ShareCandidate) =>
 		parseShareTrackName(candidate.trackName)?.startedAt ??
 		Number.NEGATIVE_INFINITY;
-	return candidates.reduce<T | undefined>((best, candidate) => {
-		if (!best) return candidate;
-		const a = startOf(candidate);
-		const b = startOf(best);
-		if (a !== b) return a < b ? candidate : best;
-		return candidate.identity < best.identity ? candidate : best;
-	}, undefined);
+	const byStart = startOf(a) - startOf(b);
+	if (byStart !== 0 && !Number.isNaN(byStart)) return byStart < 0 ? -1 : 1;
+	return a.identity < b.identity ? -1 : a.identity > b.identity ? 1 : 0;
 }
 
 /**

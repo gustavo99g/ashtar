@@ -71,6 +71,8 @@ pub struct VideoConfig {
     pub source: SourceRef,
     pub format: VideoFormat,
     pub cursor: bool,
+    /// A pessoa pediu para não usar o encoder da placa (Configurações › Voz e vídeo): plano B.
+    pub software_encoder: bool,
 }
 
 /// O que dá para mudar com a transmissão no ar. A trilha na LiveKit continua a mesma.
@@ -251,6 +253,11 @@ impl VideoStats {
 ///
 /// Nunca amplia, e devolve sempre lados pares: no NV12 (e no I420) cada amostra de cor cobre um
 /// bloco de 2×2 pixels, e os encoders exigem lados pares.
+/// O nome da placa de vídeo, para o `info.txt` do "Enviar logs".
+pub fn gpu_name() -> Option<String> {
+    super::platform::gpu_name()
+}
+
 pub fn fit_in_box(width: u32, height: u32, max_width: u32, max_height: u32) -> (u32, u32) {
     // Em u64, as multiplicações abaixo não têm como estourar.
     let (w, h) = (u64::from(width), u64::from(height));
@@ -318,7 +325,8 @@ pub fn h264_level(width: u32, height: u32, fps: u32) -> u32 {
 /// Inicia o vídeo da transmissão, entregando cada pacote ao `sink`. Devolve o controle (para os
 /// comandos do meio) e os números.
 ///
-/// Sem encoder de hardware, ou com `ASHTAR_FORCE_SOFTWARE_ENCODER=1` no ambiente, entra o plano B
+/// Sem encoder de hardware, com `software_encoder` no `config`, ou com
+/// `ASHTAR_FORCE_SOFTWARE_ENCODER=1` no ambiente, entra o plano B
 /// (os pacotes saem como `RawFrame`). Uma fonte que não existe falha com `SourceNotFound`.
 ///
 /// # Bloqueia
@@ -330,7 +338,8 @@ pub fn spawn_video(
     on_end: OnEnd,
 ) -> Result<(CaptureHandle, VideoControl, VideoStats), AppError> {
     config.format.validate()?;
-    let force_software = std::env::var("ASHTAR_FORCE_SOFTWARE_ENCODER").is_ok_and(|v| v == "1");
+    let force_software = config.software_encoder
+        || std::env::var("ASHTAR_FORCE_SOFTWARE_ENCODER").is_ok_and(|v| v == "1");
     platform::spawn_video(config, force_software, sink, on_end)
 }
 

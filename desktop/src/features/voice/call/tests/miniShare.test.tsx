@@ -23,7 +23,10 @@ vi.mock("../../members/hooks/useLiveMembers", () => ({
 vi.mock("@/features/screen-share", () => ({ useScreenShares: vi.fn() }));
 vi.mock("@livekit/components-react", () => ({
 	VideoTrack: () => <video aria-label="vídeo" />,
+	useConnectionQualityIndicator: () => ({ quality: quality.current }),
 }));
+/** A qualidade da conexão de quem transmite, como a LiveKit dá. */
+const quality = vi.hoisted(() => ({ current: "excellent" }));
 vi.mock("@/features/screen-share", () => ({
 	useScreenShares: vi.fn(),
 	shareOwner: (identity: string) => identity.replace(/:screen$/, ""),
@@ -62,15 +65,17 @@ beforeEach(() => {
 	localStorage.clear();
 	useMiniShare.setState({ corner: "bottom-right", collapsed: false });
 
-	useRoomView.setState({ watching: null, shown: null });
+	useRoomView.setState({
+		watching: [],
+		focused: null,
+		miniPick: null,
+		shown: {},
+	});
 	vi.mocked(useVoice).mockReturnValue({ room: {} } as never);
 	vi.mocked(useLiveMembers).mockReturnValue([juju] as never);
 	const jujuShare = { track: share, ownerId: "juju", isOwn: false };
 
-	vi.mocked(useScreenShares).mockReturnValue({
-		shares: [jujuShare],
-		winner: jujuShare,
-	});
+	vi.mocked(useScreenShares).mockReturnValue([jujuShare]);
 });
 
 afterEach(() => {
@@ -78,16 +83,27 @@ afterEach(() => {
 });
 
 describe("a miniatura da transmissão", () => {
+	it("a conexão de quem transmite caída mostra que ela está voltando", () => {
+		quality.current = "lost";
+		vi.mocked(useScreenShares).mockReturnValue([
+			{ track: share, ownerId: "juju", isOwn: false },
+		]);
+		act(() => watchShare("juju"));
+		renderAt(paths.channel("geral"));
+
+		expect(
+			screen.getByText("Reconectando a transmissão…"),
+		).toBeInTheDocument();
+		quality.current = "excellent";
+	});
+
 	it("a transmissão pausada (a trilha silenciada) mostra o aviso", () => {
 		const paused = {
 			...share,
 			publication: { ...share.publication, isMuted: true },
 		} as unknown as TrackReference;
 		const pausedShare = { track: paused, ownerId: "juju", isOwn: false };
-		vi.mocked(useScreenShares).mockReturnValue({
-			shares: [pausedShare],
-			winner: pausedShare,
-		});
+		vi.mocked(useScreenShares).mockReturnValue([pausedShare]);
 		act(() => watchShare("juju"));
 		renderAt(paths.channel("geral"));
 
@@ -101,7 +117,7 @@ describe("a miniatura da transmissão", () => {
 		expect(
 			screen.getByRole("region", { name: "Transmissão de Juju, em miniatura" }),
 		).toBeInTheDocument();
-		expect(useRoomView.getState().shown).toBe("juju");
+		expect(useRoomView.getState().shown).toEqual({ juju: "full" });
 	});
 
 	it("não aparece na Grade, na própria sala nem nas configurações", () => {
@@ -116,7 +132,7 @@ describe("a miniatura da transmissão", () => {
 		act(() => void router.navigate(paths.settings.voice));
 		expect(screen.queryByRole("region")).toBeNull();
 		// Nas configurações, nada é baixado.
-		expect(useRoomView.getState().shown).toBeNull();
+		expect(useRoomView.getState().shown).toEqual({});
 	});
 
 	it("Voltar para a sala abre a sala; o X para de assistir", () => {
@@ -128,22 +144,19 @@ describe("a miniatura da transmissão", () => {
 
 		act(() => void router.navigate(paths.channel("geral")));
 		fireEvent.click(screen.getByRole("button", { name: "Parar de assistir" }));
-		expect(useRoomView.getState()).toEqual({ watching: null, shown: null });
+		expect(useRoomView.getState()).toMatchObject({ watching: [], shown: {} });
 		expect(screen.queryByRole("region")).toBeNull();
 	});
 
-	it("a transmissão acabou: para de assistir", () => {
+	it("a transmissão acabou: a miniatura some", () => {
 		act(() => watchShare("juju"));
 		const router = renderAt(paths.channel("geral"));
 		expect(screen.getByRole("region")).toBeInTheDocument();
 
-		vi.mocked(useScreenShares).mockReturnValue({
-			shares: [],
-			winner: undefined,
-		});
+		vi.mocked(useScreenShares).mockReturnValue([]);
 		act(() => void router.navigate(paths.channel("jogos")));
 
-		expect(useRoomView.getState()).toEqual({ watching: null, shown: null });
+		expect(useRoomView.getState().shown).toEqual({});
 		expect(screen.queryByRole("region")).toBeNull();
 	});
 
@@ -217,7 +230,7 @@ describe("a miniatura da transmissão", () => {
 		expect(screen.queryByRole("region")).toBeNull();
 		expect(useMiniShare.getState().collapsed).toBe(true);
 		// Continua assistindo: a tela segue baixada, e o som com ela.
-		expect(useRoomView.getState().shown).toBe("juju");
+		expect(useRoomView.getState().shown).toEqual({ juju: "full" });
 
 		fireEvent.click(
 			screen.getByRole("button", {
@@ -226,5 +239,47 @@ describe("a miniatura da transmissão", () => {
 		);
 		expect(screen.getByRole("region")).toBeInTheDocument();
 		expect(useMiniShare.getState().collapsed).toBe(false);
+	});
+
+	it("com várias abertas, mostra uma e as setas trocam, baixando só a que aparece", () => {
+		const marcao = { ...juju, id: "marcao", nick: "marcao", name: "Marcão" };
+		const marcaoTrack = {
+			...share,
+			participant: { ...share.participant, identity: "marcao:screen" },
+		} as unknown as TrackReference;
+		vi.mocked(useLiveMembers).mockReturnValue([juju, marcao] as never);
+		vi.mocked(useScreenShares).mockReturnValue([
+			{ track: share, ownerId: "juju", isOwn: false },
+			{ track: marcaoTrack, ownerId: "marcao", isOwn: false },
+		]);
+		act(() => {
+			watchShare("juju");
+			watchShare("marcao");
+		});
+		renderAt(paths.channel("geral"));
+
+		expect(screen.getByRole("region")).toHaveAccessibleName(
+			"Transmissão de Juju, em miniatura",
+		);
+		expect(screen.getByText("1/2")).toBeInTheDocument();
+		expect(useRoomView.getState().shown).toEqual({ juju: "full" });
+
+		fireEvent.click(
+			screen.getByRole("button", { name: "Próxima transmissão" }),
+		);
+		expect(screen.getByRole("region")).toHaveAccessibleName(
+			"Transmissão de Marcão, em miniatura",
+		);
+		expect(useRoomView.getState().shown).toEqual({ marcao: "full" });
+		// Trocar não volta para a sala nem fecha a outra.
+		expect(useRoomView.getState().watching).toEqual(["juju", "marcao"]);
+	});
+
+	it("com uma só, as setas somem", () => {
+		act(() => watchShare("juju"));
+		renderAt(paths.channel("geral"));
+		expect(
+			screen.queryByRole("button", { name: "Próxima transmissão" }),
+		).toBeNull();
 	});
 });

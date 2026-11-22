@@ -51,6 +51,8 @@ export type ScreenShareState =
 			paused: boolean;
 			/** `lost`: o áudio caiu sozinho e o vídeo continua. */
 			audio: "off" | "on" | "lost";
+			/** `lost`: a conexão da transmissão caiu; a captura segue, e o app tenta voltar. */
+			link: "ok" | "lost";
 	  }
 	| { status: "error"; kind: string; message: string };
 

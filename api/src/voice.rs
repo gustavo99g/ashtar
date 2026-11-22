@@ -13,7 +13,7 @@ use std::time::Duration;
 use livekit_api::services::room::RoomClient;
 use livekit_api::services::{ServerError, ServerErrorCode, ServiceError};
 use livekit_protocol::{ParticipantInfo, TrackSource};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
 use ts_rs::TS;
 
@@ -21,7 +21,7 @@ use crate::error::ApiError;
 use crate::identity::{User, users};
 
 /// Uma pessoa na sala, com o nick e o nome visível do banco.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, TS)]
 #[ts(export, export_to = "index.ts")]
 pub struct ParticipantView {
     pub user_id: String,
@@ -29,6 +29,84 @@ pub struct ParticipantView {
     pub display_name: Option<String>,
     /// Se está transmitindo a tela (o selo TRANSMITINDO).
     pub screen_sharing: bool,
+    /// O id do arquivo da foto de perfil, ou `null` (ADR 0031).
+    #[ts(optional = nullable)]
+    pub avatar: Option<String>,
+    /// Sem microfone (mutado ou sem trilha), pelo que o app da pessoa contou ([`VoiceFlags`]).
+    pub mic_off: bool,
+    /// Com o áudio desligado (deafen).
+    pub deafened: bool,
+    /// Com a câmera ligada.
+    pub camera: bool,
+    /// O que a pessoa está transmitindo, pelo que o app dela contou ([`ShareInfo`]). Só enquanto
+    /// transmite.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[ts(optional = nullable)]
+    pub share: Option<ShareInfo>,
+}
+
+/// A transmissão de alguém, para o cartão de Assistir de quem está fora da sala (v0.7): a fonte,
+/// o preset, desde quando e quantos assistem. Quem está fora não recebe a imagem nem os dados da
+/// LiveKit, então é o app de quem transmite que conta.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "index.ts")]
+pub struct ShareInfo {
+    /// O nome da fonte: a tela ("Tela 1") ou o título da janela.
+    pub title: String,
+    /// Se é uma janela (`true`) ou a tela inteira.
+    pub window: bool,
+    /// A chave do preset (`720p60`, `1080p60`, `1080p30`).
+    pub quality: String,
+    /// Quando começou, em milissegundos desde 1970.
+    #[ts(type = "number")]
+    pub started_at: i64,
+    /// Quantos estão assistindo agora.
+    pub viewers: u32,
+}
+
+/// O tamanho máximo do título da fonte e da chave do preset; o resto é cortado.
+const SHARE_TITLE_MAX: usize = 120;
+const SHARE_QUALITY_MAX: usize = 16;
+
+impl ShareInfo {
+    /// Corta o que veio do app nos tamanhos máximos.
+    pub fn clamp(mut self) -> Self {
+        self.title = self.title.trim().chars().take(SHARE_TITLE_MAX).collect();
+        self.quality = self.quality.chars().take(SHARE_QUALITY_MAX).collect();
+        self
+    }
+}
+
+/// O que o app de cada um conta do próprio estado na sala (v0.7): o LiveKit não avisa a API de
+/// quem muta, e o áudio desligado nem passa por ele. Com isso, quem está fora da sala vê os ícones
+/// também. Enquanto existe, vale mais que o LiveKit, inclusive para a tela: é o app que sabe
+/// primeiro.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, TS)]
+#[ts(export, export_to = "index.ts")]
+pub struct VoiceFlags {
+    pub mic_off: bool,
+    pub deafened: bool,
+    pub camera: bool,
+    pub sharing: bool,
+    /// O que está transmitindo; vale só com `sharing`.
+    #[serde(default)]
+    #[ts(optional = nullable)]
+    pub share: Option<ShareInfo>,
+}
+
+impl VoiceFlags {
+    /// `view` com o estado que o app contou.
+    pub fn apply(&self, view: &mut ParticipantView) {
+        view.mic_off = self.mic_off;
+        view.deafened = self.deafened;
+        view.camera = self.camera;
+        view.screen_sharing = self.sharing;
+        view.share = if self.sharing {
+            self.share.clone()
+        } else {
+            None
+        };
+    }
 }
 
 /// Quem o LiveKit diz que está na sala: a identidade do token (o id do membro)
@@ -43,6 +121,15 @@ pub struct RoomParticipant {
 /// entra na sala duas vezes, a voz e a tela, e a LiveKit não aceita duas conexões com a mesma
 /// identidade (ADR 0017).
 pub const SCREEN_SUFFIX: &str = ":screen";
+
+/// O começo do nome da sala do Testar conexão (v0.6, decisão 20): `teste:{user_id}`. Nenhum canal
+/// tem `:` no id, e o webhook ignora essas salas (ninguém vê a pessoa "entrar" nelas).
+pub const TEST_ROOM_PREFIX: &str = "teste:";
+
+/// A sala do Testar conexão de `user_id`.
+pub fn test_room(user_id: &str) -> String {
+    format!("{TEST_ROOM_PREFIX}{user_id}")
+}
 
 /// A identidade da tela de `user_id`.
 pub fn screen_identity(user_id: &str) -> String {
@@ -99,6 +186,8 @@ pub async fn join_participants(
                 nick: user.nick.clone(),
                 display_name: user.display_name.clone(),
                 screen_sharing: participant.screen_sharing,
+                avatar: user.avatar_id.clone(),
+                ..ParticipantView::default()
             })
         })
         .collect())
@@ -119,6 +208,17 @@ fn room_client() -> Result<&'static RoomClient, ApiError> {
     let client =
         RoomClient::with_api_key(&url, &api_key, &api_secret).with_request_timeout(LIVEKIT_TIMEOUT);
     Ok(ROOM_CLIENT.get_or_init(|| client))
+}
+
+/// Quanto o LiveKit leva para responder uma consulta pequena (a lista de uma sala que não existe),
+/// para o estado do servidor no Painel. `Err` se ele não responde.
+pub async fn livekit_latency() -> Result<Duration, ApiError> {
+    let started = std::time::Instant::now();
+    room_client()?
+        .list_rooms(vec!["ashtar-status".into()])
+        .await
+        .map_err(|error| ApiError::LiveKit(error.to_string()))?;
+    Ok(started.elapsed())
 }
 
 /// Pergunta ao LiveKit quem está na sala `channel_id`.
@@ -200,6 +300,56 @@ pub fn kick_in_background(identity: String) {
     });
 }
 
+/// Tira `identity` e a tela dela da sala `room`, à parte, como o
+/// [`kick_in_background`], mas só nessa sala (ADR 0026: desconectar e mover).
+/// Quem já saiu não é erro, e sem as chaves do LiveKit não há o que tirar.
+pub fn remove_from_room_in_background(room: String, identity: String) {
+    tokio::spawn(async move {
+        let client = match room_client() {
+            Ok(client) => client,
+            Err(ApiError::Config(_)) => return,
+            Err(error) => {
+                eprintln!("livekit: não deu para tirar {identity} da sala {room}: {error}");
+                return;
+            }
+        };
+        let screen = screen_identity(&identity);
+        for who in [identity.as_str(), screen.as_str()] {
+            match client.remove_participant(&room, who).await {
+                Ok(()) => {}
+                Err(error) if is_not_found(&error) => {}
+                Err(error) => {
+                    eprintln!("livekit: não deu para tirar {who} da sala {room}: {error}");
+                }
+            }
+        }
+    });
+}
+
+/// A sala do LiveKit em que `user_id` está pela voz, perguntando a todas. É o
+/// plano B do [`crate::realtime::Hub::room_of`], que só sabe das salas que
+/// mudaram desde que a API subiu. Sem as chaves do LiveKit, nenhuma.
+pub async fn find_room_of(user_id: &str) -> Result<Option<String>, ApiError> {
+    let client = match room_client() {
+        Ok(client) => client,
+        Err(ApiError::Config(_)) => return Ok(None),
+        Err(error) => return Err(error),
+    };
+    let names = VoiceRooms::names(client)
+        .await
+        .map_err(|error| ApiError::LiveKit(error.to_string()))?;
+    for room in names {
+        if list_room(&room)
+            .await?
+            .iter()
+            .any(|p| p.identity == user_id)
+        {
+            return Ok(Some(room));
+        }
+    }
+    Ok(None)
+}
+
 pub(crate) fn livekit_env() -> Result<(String, String, String), String> {
     let get = |name: &str| env::var(name).map_err(|error| format!("{name}: {error}"));
     Ok((
@@ -207,6 +357,28 @@ pub(crate) fn livekit_env() -> Result<(String, String, String), String> {
         get("LIVEKIT_API_SECRET")?,
         get("LIVEKIT_URL")?,
     ))
+}
+
+/// Apaga a sala `room` no LiveKit, o que derruba quem ainda estiver nela. É o
+/// fim da ligação privada (ADR 0023): quando um dos dois sai, o outro não fica
+/// sozinho na sala. Roda à parte, como o [`kick_in_background`]; sala que já
+/// não existe não é erro, e sem as chaves do LiveKit não há o que apagar.
+pub fn delete_room_in_background(room: String) {
+    tokio::spawn(async move {
+        let client = match room_client() {
+            Ok(client) => client,
+            Err(ApiError::Config(_)) => return,
+            Err(error) => {
+                eprintln!("livekit: não deu para apagar a sala {room}: {error}");
+                return;
+            }
+        };
+        match client.delete_room(&room).await {
+            Ok(()) => {}
+            Err(error) if is_not_found(&error) => {}
+            Err(error) => eprintln!("livekit: não deu para apagar a sala {room}: {error}"),
+        }
+    });
 }
 
 #[cfg(test)]

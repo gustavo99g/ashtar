@@ -7,7 +7,7 @@
  * Só esta pasta abre WebSocket (regra do `eslint.config.js`).
  */
 import { useSyncExternalStore } from "react";
-import { createRealtimeTicket, realtimeUrl } from "@/lib/api";
+import { type ClientEvent, createRealtimeTicket, realtimeUrl } from "@/lib/api";
 import {
 	createRealtime,
 	type RealtimeListener,
@@ -46,9 +46,24 @@ export function restartRealtime(): void {
 	realtime.start();
 }
 
+/** Manda um evento do app pelo socket; `false` com ele fechado. */
+export function sendRealtime(event: ClientEvent): boolean {
+	return realtime.send(event);
+}
+
 /** Assina os eventos. Devolve a função que desfaz. */
 export function subscribeRealtime(listener: RealtimeListener): () => void {
 	return realtime.onEvent(listener);
+}
+
+/** Fora do ar, tenta já ("Tentar agora" da faixa). */
+export function retryRealtimeNow(): void {
+	realtime.retryNow();
+}
+
+/** Quando é a próxima tentativa de voltar, ou `null` fora da espera. */
+export function useRealtimeRetryAt(): number | null {
+	return useSyncExternalStore(realtime.onStatus, realtime.nextRetryAt);
 }
 
 export function useRealtimeStatus(): RealtimeStatus {

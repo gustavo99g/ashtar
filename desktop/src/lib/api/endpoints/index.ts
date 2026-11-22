@@ -1,4 +1,11 @@
 export {
+	getServerStatus,
+	listLogEntries,
+	listLogReports,
+	readLogEntry,
+	sendLogs,
+} from "./admin";
+export {
 	archiveCategory,
 	archiveChannel,
 	createCategory,
@@ -11,9 +18,45 @@ export {
 	unarchiveChannel,
 	updateChannel,
 } from "./channels";
-export { listMessages, listPeople, type PageCursor, sendMessage } from "./chat";
+export {
+	acceptCall,
+	type CallHangup,
+	hangUpCall,
+	startCall,
+} from "./calls";
+export {
+	deleteMessage,
+	editMessage,
+	hidePreviews,
+	listChannelFiles,
+	listMessages,
+	listPeople,
+	listPins,
+	type PageCursor,
+	type SearchParams,
+	searchMessages,
+	sendMessage,
+	setPinned,
+	setReaction,
+} from "./chat";
+export { listDms, openDm } from "./dms";
+export { createEmoji, deleteEmoji, listEmojis, renameEmoji } from "./emojis";
 export { createInvite, getInvite, listInvites, revokeInvite } from "./invites";
-export { getMe, updateMe } from "./me";
+export {
+	fetchFile,
+	fileLink,
+	type UploadOptions,
+	uploadFile,
+} from "./files";
+export {
+	deleteSavedAvatar,
+	getMe,
+	listSavedAvatars,
+	removeAvatar,
+	setAvatar,
+	setStatus,
+	updateMe,
+} from "./me";
 export {
 	createRecoveryInvite,
 	getMemberPermissions,
@@ -23,10 +66,16 @@ export {
 	setMemberPermission,
 	unlinkMember,
 } from "./members";
+export { markAllRead, markRead, setMuted } from "./read";
 export { createRealtimeTicket } from "./realtime";
 
 export {
 	createScreenToken,
+	createTestToken,
+	disconnectMember,
+	moveMember,
 	createVoiceToken,
+	leaveVoiceState,
 	listVoiceParticipants,
+	putVoiceState,
 } from "./voice";

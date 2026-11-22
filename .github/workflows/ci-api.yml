@@ -1,0 +1,53 @@
+name: CI API
+
+# Roda só em push na dev e na main (depois do merge), e só quando a API (ou o que ela usa)
+# mudou. Branch de feature e PR não disparam; para checar uma branch antes do merge, use
+# Actions > CI API > Run workflow, escolhendo a branch.
+on:
+  push:
+    branches: [dev, main]
+    paths:
+      - "api/**"
+      - "desktop/src/lib/api/generated/**"
+      - "rust-toolchain.toml"
+      - ".github/workflows/ci-api.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ci-api-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  api:
+    name: API
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: api
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: api -> target
+
+      - name: Formatação
+        run: cargo fmt --check
+
+      - name: Clippy
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Testes
+        run: cargo test
+
+      # O `cargo test` acima regrava os tipos do TypeScript do app (ts-rs). Se o arquivo mudou, uma
+      # struct da API mudou sem o `cargo test` local e o commit do resultado.
+      - name: Tipos do app em dia
+        run: |
+          if [ -n "$(git status --porcelain -- ../desktop/src/lib/api/generated)" ]; then
+            echo "::error::Os tipos em desktop/src/lib/api/generated estão desatualizados. Rode cargo test em api/ e faça commit do resultado."
+            git status --short -- ../desktop/src/lib/api/generated
+            git diff -- ../desktop/src/lib/api/generated
+            exit 1
+          fi

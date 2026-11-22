@@ -1,18 +1,28 @@
 /**
- * Sobre o próprio app: as novidades, a pasta de logs e o menu da bandeja. Espelha `commands/app.rs`
- * e `tray.rs`.
+ * Sobre o próprio app: as novidades, a pasta de logs, o menu da bandeja e o iniciar com o Windows.
+ * Espelha `commands/app.rs` e `tray.rs`.
  */
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { call } from "./core";
 
-export interface WhatsNew {
+export interface ReleaseNotes {
 	version: string;
 	notes: string;
 }
 
-/** A seção do CHANGELOG.md da versão em execução, ou `null`. */
-export function whatsNew() {
-	return call<WhatsNew | null>("whats_new");
+export interface WhatsNew {
+	/** A versão em execução. */
+	version: string;
+	/** Da mais nova para a mais velha: a instalada e, com `lastSeen`, as que a pessoa pulou. */
+	sections: ReleaseNotes[];
+}
+
+/**
+ * As seções do CHANGELOG.md depois de `lastSeen` até a versão em execução, ou só a dela sem
+ * `lastSeen`. `null` sem nenhuma.
+ */
+export function whatsNew(lastSeen: string | null = null) {
+	return call<WhatsNew | null>("whats_new", { lastSeen });
 }
 
 /** Abre a pasta de logs do app no Explorador de Arquivos. Rejeita com um `AppError`. */
@@ -35,4 +45,34 @@ export function onTrayShare(
 	return listen<TrayShareAction>("tray-share", (event) =>
 		callback(event.payload),
 	);
+}
+
+/** Se o app inicia com o Windows. Rejeita com um `AppError`. */
+export function autostartEnabled() {
+	return call<boolean>("autostart_enabled");
+}
+
+/** Liga ou desliga o iniciar com o Windows (ligado, o app sobe direto na bandeja). */
+export function setAutostart(enabled: boolean) {
+	return call<void>("set_autostart", { enabled });
+}
+
+/** Se a janela usa a placa de vídeo na próxima abertura (Configurações › Aplicativo). */
+export function hardwareAcceleration() {
+	return call<boolean>("hardware_acceleration");
+}
+
+/** Liga ou desliga a aceleração de hardware da janela. Vale ao reiniciar o app. */
+export function setHardwareAcceleration(enabled: boolean) {
+	return call<void>("set_hardware_acceleration", { enabled });
+}
+
+/** Fecha e abre o app de novo. */
+export function restartApp() {
+	return call<void>("restart_app");
+}
+
+/** Os logs dos últimos 2 dias e o `info.txt` num `.zip` ("Enviar logs"), em bytes. */
+export function logsBundle() {
+	return call<ArrayBuffer>("logs_bundle");
 }

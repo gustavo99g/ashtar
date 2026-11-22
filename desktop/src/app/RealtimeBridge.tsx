@@ -16,10 +16,16 @@
  */
 import { type QueryClient, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
+import { handleAdminRealtime } from "@/features/admin";
+import { handleCallsRealtime } from "@/features/calls";
 import { handleChannelsRealtime } from "@/features/channels";
+import { handleEmojisRealtime } from "@/features/emojis";
 import { handleChatRealtime, useOfflineCatchUp } from "@/features/chat";
-import { useSession } from "@/features/identity";
+import { handleDmsRealtime } from "@/features/dms";
+import { handleIdentityRealtime, useSession } from "@/features/identity";
 import { handleMembersRealtime } from "@/features/members";
+import { handleNotificationsRealtime } from "@/features/notifications";
+import { handleUnreadRealtime } from "@/features/unread";
 import { handleVoiceRealtime } from "@/features/voice";
 import { getMe, type ServerEvent } from "@/lib/api";
 import {
@@ -45,10 +51,18 @@ export const RESTART_GAP_MS = 30_000;
 
 /** O `realtime.ts` de cada feature. */
 const HANDLERS: Handler[] = [
+	handleIdentityRealtime,
 	handleVoiceRealtime,
 	handleMembersRealtime,
 	handleChatRealtime,
+	handleDmsRealtime,
+	handleUnreadRealtime,
 	handleChannelsRealtime,
+	handleEmojisRealtime,
+	handleCallsRealtime,
+	handleAdminRealtime,
+	// Por último: a regra dos avisos lê o silenciar e a lista de canais já em dia.
+	handleNotificationsRealtime,
 ];
 
 export function RealtimeBridge() {

@@ -6,11 +6,6 @@ recebê-los segundo o `docs/roadmap.md`.
 
 Ao resolver um item, apague-o daqui e registre o resultado no ADR ou no commit.
 
-## Resto da v0.1 (fora da reorganização)
-
-- [ ] O `fetch` do token (`requestVoiceToken`) não tem timeout: com a API fora do ar (túnel caído), o app
-      pode ficar em "conectando" por bastante tempo. Sem destino definido.
-
 ## Correções fora de ordem
 
 Bugs que saem assim que ficarem prontos, pelo auto-update, sem esperar a entrega da ordem.
@@ -21,8 +16,6 @@ Bugs que saem assim que ficarem prontos, pelo auto-update, sem esperar a entrega
       não consegue abrir o Painel, e esse comando é o único jeito de criar a recuperação dele. Ficariam
       `dono`, `backup`, `recuperacao` e, de preferência, `membros`, só para conferir o banco. Se for feito,
       atualizar o `README.md`, o `scripts/local/admin-shell.ps1` (a lista de comandos) e os testes.
-- [ ] **Subir o `MIN_CLIENT_VERSION`** no `.env` de produção (`0.2.20`, a primeira versão com conta): um
-      app mais velho passa a receber o pedido de atualização, em vez de erro de rota. É só configuração.
 
 ## v0.2.2 — UI nova
 
@@ -41,9 +34,6 @@ Bugs que saem assim que ficarem prontos, pelo auto-update, sem esperar a entrega
 - [ ] Os textos dos presets (`presets.ts`) prometem mais fluidez do que o medido em jogo: o Equilibrado ("sem
       perder fluidez") ficou em 25–34 fps e o Nitidez em 18–25 fps, abaixo dos 30 do próprio nome (ADR 0009). **Adiado para a UI nova (v0.2.2).**
 
-- [ ] Botão "Abrir pasta de logs" e interruptor "receber versões beta", adiados da v0.2.0. Até lá, o canal
-      vem de `ASHTAR_UPDATE_CHANNEL=beta`.
-
 - [ ] Rotas de administração na API e tela de administração na UI, no lugar do `admin` temporário da v0.2.1:
       criar, listar e revogar convite, remover membro, desvincular dispositivo, marcar o beta e ver as
       permissões. Ficam sobre as funções de `identity/`, que já recebem o `actor`. Depois, tirar do `admin` o
@@ -56,17 +46,16 @@ Bugs que saem assim que ficarem prontos, pelo auto-update, sem esperar a entrega
       `model/`; a `voice` em subdomínios e a `server` separada). Feito em 31/10, sem regra de ESLint: é
       convenção. O que difere do plano está na seção "Como ficou" da ADR.
 
-## v0.6 — Voz e vídeo
+## v0.5 — Salas e presença
 
-- [ ] A aba "Voz e vídeo" das configurações saiu na v0.2.2 só com os dispositivos, Entrada e Saída (Etapa
-      5b). O resto do quadro dela fica guardado para a v0.6: as outras opções da supressão de ruído (na
-      v0.2.3 só entra o interruptor liga/desliga do RNNoise), os volumes de entrada e de saída, o teste de microfone, a detecção de voz com a
-      sensibilidade, o pressionar para falar com o atalho, os atalhos globais e os padrões do
-      compartilhamento de tela (qualidade e áudio) na v0.6. O
-      pressionar para falar com um jogo em foco pede um gancho de teclado em Rust: o atalho global comum do
-      Windows prende a tecla, e o jogo deixaria de recebê-la.
-- [ ] "Reconectando" no painel "Voz conectada" e o aviso "Conexão perdida" do compartilhamento ficaram
-      apagados no canvas na v0.2.2; entram com a reconexão da v0.6.
+- [x] No cartão do usuário (ADR 0020), "Mover para outra sala": entrou com as várias salas de voz (ADR 0026), junto do
+      "Desconectar da voz" e do arrastar entre salas.
+
+## v0.8 — Moderação
+
+- [ ] A seção Moderação do cartão do usuário (silenciar o microfone de alguém e deixar surdo, para todos),
+      que está no canvas ("Menu do usuário — com ações") e ficou fora da v0.3: pede uma permissão nova e um
+      comando no servidor de voz.
 
 ## Mais adiante
 
@@ -75,5 +64,12 @@ O aviso de conteúdo protegido está na v0.8 do roadmap (`## Screen Share`); as 
 - [ ] Aviso de possível conteúdo protegido (frames totalmente pretos por vários segundos).
 - [ ] Suporte a Linux (risco principal: WebRTC no WebKitGTK) e versão web.
 - [ ] Qualquer funcionalidade nova de voz além do que já existe.
+- [ ] O overlay em jogos, desenhado no canvas e sem versão (a câmera entrou na v0.4).
+- [ ] `@todos`, silenciar com prazo e grupos privados com mais de duas pessoas (fora da v0.3).
+- [ ] Cópia dos arquivos (fotos, anexos, prévias e emojis) fora da VPS: o R2 como segunda implementação do
+      `FileStore` (ADR 0031) ou uma cópia periódica de `data/files`, ou o snapshot do provedor. Adiado pelo Kid em
+      20/11; até lá os arquivos ficam fora do backup.
+- [ ] O cartão "Evento do grupo" do quadro "Canal de texto — paleta Ashtar" (criar evento, confirmar presença,
+      lembrete), "Ouvindo música" e o player de áudio no chat: sem versão.
 - [ ] Um segundo tema (claro, por exemplo). A troca por `data-theme` já existe desde a v0.2.2 (ADR 0012);
       a opção aparece nas configurações quando o tema existir, com o contraste conferido.

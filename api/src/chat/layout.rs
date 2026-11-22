@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, SqliteConnection, SqlitePool};
 use ts_rs::TS;
 
+use super::access;
 use super::channels::{Channel, ChannelView, select_channel};
 use crate::error::ApiError;
 use crate::identity::User;
@@ -99,6 +100,13 @@ pub async fn bump(conn: &mut SqliteConnection) -> Result<i64, ApiError> {
     )
 }
 
+/// Soma 1 na versão sem mudar a lista: o que cada um vê dela mudou (alguém
+/// ganhou ou perdeu "Gerenciar canais", ADR 0028), e os apps precisam recarregar.
+pub async fn touch(db: &SqlitePool) -> Result<i64, ApiError> {
+    let mut conn = db.acquire().await?;
+    bump(&mut conn).await
+}
+
 pub async fn version(conn: &mut SqliteConnection) -> Result<i64, ApiError> {
     Ok(sqlx::query_scalar("SELECT version FROM channel_layout")
         .fetch_one(conn)
@@ -125,13 +133,18 @@ pub async fn require_open_category(conn: &mut SqliteConnection, id: &str) -> Res
     }
 }
 
-/// A lista aberta: o topo e as categorias, cada coisa na sua ordem.
+/// A lista aberta como `viewer` a vê: o topo e as categorias, cada coisa na sua
+/// ordem. Um canal restrito de que ele não faz parte não aparece, e a categoria
+/// em que ele não vê nenhum dos canais some junto (ADR 0028). Quem gerencia os
+/// canais vê todos. Cada restrito vem com a lista dele, que quem o vê já pode
+/// saber: é o que a sugestão do @ e o "Mover para" usam.
 ///
-/// As três leituras vão numa transação só: no SQLite, ela vê o banco de um
+/// As leituras vão numa transação só: no SQLite, ela vê o banco de um
 /// momento só, e a versão devolvida é sempre a da lista devolvida. Sem isso,
 /// uma mudança entre as leituras daria a versão nova com a lista velha, e o
 /// próximo arrasto do app levaria 422 em vez do 409 que o faz recarregar.
-pub async fn read(db: &SqlitePool) -> Result<Layout, ApiError> {
+pub async fn read(db: &SqlitePool, viewer: &User) -> Result<Layout, ApiError> {
+    let manages = access::manages_channels(db, viewer).await?;
     let mut conn = db.begin().await?;
     let version = version(&mut conn).await?;
     let categories: Vec<Category> = sqlx::query_as(select_category!(
@@ -140,10 +153,24 @@ pub async fn read(db: &SqlitePool) -> Result<Layout, ApiError> {
     .fetch_all(&mut *conn)
     .await?;
     let channels: Vec<Channel> = sqlx::query_as(select_channel!(
-        "WHERE archived_at IS NULL ORDER BY position, created_at"
+        "WHERE archived_at IS NULL AND kind IN ('text', 'voice') ORDER BY position, created_at"
     ))
     .fetch_all(&mut *conn)
     .await?;
+    let listed: Vec<(String, String)> = sqlx::query_as(
+        "SELECT cm.channel_id, cm.user_id FROM channel_members cm
+         JOIN channels c ON c.id = cm.channel_id
+         WHERE c.restricted = 1 AND c.kind IN ('text', 'voice') ORDER BY cm.user_id",
+    )
+    .fetch_all(&mut *conn)
+    .await?;
+    let members_of = |channel_id: &str| -> Vec<String> {
+        listed
+            .iter()
+            .filter(|(c, _)| c == channel_id)
+            .map(|(_, u)| u.clone())
+            .collect()
+    };
 
     let mut top = Vec::new();
     let mut views: Vec<CategoryView> = categories
@@ -154,22 +181,39 @@ pub async fn read(db: &SqlitePool) -> Result<Layout, ApiError> {
             channels: Vec::new(),
         })
         .collect();
+    // As categorias que tinham algum canal antes de tirar os que a pessoa não vê.
+    let mut had_channels: HashSet<String> = HashSet::new();
     for channel in channels {
+        if let Some(category_id) = &channel.category_id {
+            had_channels.insert(category_id.clone());
+        }
+        let members = channel.restricted.then(|| members_of(&channel.id));
+        if let Some(members) = &members
+            && !manages
+            && !members.contains(&viewer.id)
+        {
+            continue;
+        }
+        let mut view = ChannelView::from(channel);
+        view.member_ids = members;
         // Um canal numa categoria arquivada (não deveria acontecer: arquivar a
         // categoria leva os canais para o topo) aparece no topo.
-        let category = channel
+        let category = view
             .category_id
             .as_deref()
             .and_then(|id| views.iter_mut().find(|c| c.id == id));
         match category {
-            Some(category) => category.channels.push(channel.into()),
+            Some(category) => category.channels.push(view),
             None => top.push(ChannelView {
                 category_id: None,
-                ..channel.into()
+                ..view
             }),
         }
     }
     conn.commit().await?;
+    if !manages {
+        views.retain(|c| !c.channels.is_empty() || !had_channels.contains(&c.id));
+    }
     Ok(Layout {
         version,
         top,
@@ -181,7 +225,7 @@ pub async fn read(db: &SqlitePool) -> Result<Layout, ApiError> {
 pub async fn read_archived(db: &SqlitePool, actor: &User) -> Result<Archived, ApiError> {
     require_permission(db, actor, Permission::ManageChannels).await?;
     let channels: Vec<Channel> = sqlx::query_as(select_channel!(
-        "WHERE archived_at IS NOT NULL ORDER BY archived_at DESC"
+        "WHERE archived_at IS NOT NULL AND kind IN ('text', 'voice') ORDER BY archived_at DESC"
     ))
     .fetch_all(db)
     .await?;
@@ -221,12 +265,13 @@ pub async fn apply(
         ));
     }
 
-    let open_channels: HashSet<String> =
-        sqlx::query_scalar("SELECT id FROM channels WHERE archived_at IS NULL")
-            .fetch_all(&mut *tx)
-            .await?
-            .into_iter()
-            .collect();
+    let open_channels: HashSet<String> = sqlx::query_scalar(
+        "SELECT id FROM channels WHERE archived_at IS NULL AND kind IN ('text', 'voice')",
+    )
+    .fetch_all(&mut *tx)
+    .await?
+    .into_iter()
+    .collect();
     let open_categories: HashSet<String> =
         sqlx::query_scalar("SELECT id FROM categories WHERE archived_at IS NULL")
             .fetch_all(&mut *tx)
@@ -261,7 +306,7 @@ pub async fn apply(
     }
     bump(&mut tx).await?;
     tx.commit().await?;
-    read(db).await
+    read(db, actor).await
 }
 
 fn same_set(sent: &[&String], open: &HashSet<String>) -> bool {

@@ -2,6 +2,7 @@ export { Avatar, AvatarBadge } from "./components/Avatar";
 export { PersonName } from "./components/PersonName";
 export { ProfileSettings } from "./components/ProfileSettings";
 export { SessionWatcher } from "./components/SessionWatcher";
+export { StatusDot } from "./components/StatusDot";
 export { avatarInitial, NICK_COLORS, nickColor } from "./model/nickColor";
 export { checkNick, NICK_MAX, NICK_MIN, sameNick } from "./model/nickRules";
 export {
@@ -11,11 +12,21 @@ export {
 	participantPerson,
 } from "./model/participant";
 export {
+	type StatusOption,
+	STATUS_OPTIONS,
+	statusLabel,
+} from "./model/status";
+export {
 	identityKeys,
 	useInvitePreview,
 	useMe,
+	useOptionalMe,
+	useMyStatus,
 	useRedeemInvite,
+	useSetStatus,
 } from "./queries";
+export { handleIdentityRealtime } from "./realtime";
+export { rememberAvatars } from "./stores/avatarStore";
 export {
 	redeemInvite,
 	type Session,

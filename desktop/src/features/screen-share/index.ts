@@ -1,3 +1,4 @@
+export { ShareDefaultsSection } from "./components/ShareDefaultsSection";
 export { ShareQuickSettings } from "./components/ShareQuickSettings";
 export { SourcePickerHost } from "./components/SourcePickerHost";
 export { useScreenShareState } from "./hooks/useScreenShareState";
@@ -11,6 +12,7 @@ export type {
 } from "./model/controller";
 export { type ShareNotice, shareNotice } from "./model/notices";
 export {
+	compareShares,
 	decodeShareQuality,
 	encodeShareQuality,
 	isScreenIdentity,
@@ -19,7 +21,6 @@ export {
 	type ShareInfo,
 	shareOwner,
 	shareSpec,
-	shareWinner,
 } from "./model/shareInfo";
 export { NativeScreenShare } from "./native/NativeScreenShare";
 export {

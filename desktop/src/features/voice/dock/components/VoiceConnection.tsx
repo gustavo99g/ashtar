@@ -10,23 +10,32 @@ import {
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ConnectingState } from "@/components/ui/states";
+import { ShortcutKeys, useShortcuts } from "@/features/settings";
 import { paths } from "@/lib/paths";
 import { cn } from "@/lib/utils";
-import { SALA } from "../../room/model/channel";
+import { useConnectedRoomName } from "../../room/hooks/useRoomName";
 import { pingQuality } from "../model/ping";
 import { stopWatching } from "../../call/stores/roomViewStore";
 import { usePing } from "../hooks/usePing";
 import { useVoice } from "../../room/hooks/useVoice";
+import { useInputChoice } from "../../input/stores/inputStore";
 import { DockButton } from "../../call/components/buttons";
 import { ShareButton } from "../../call/components/ShareButton";
 
 /*
  * O painel "Voz conectada" no pé da coluna, enquanto há chamada: Conectando ou Conectada (com o
- * ping), desconectar, a Câmera apagada (fora do roadmap da 0.2) e o Tela. Reconectando fica para a
- * 0.6: até lá, a volta da conexão aparece como Conectando.
+ * ping), desconectar, a Câmera apagada (fora do roadmap da 0.2) e o Tela. Desde a 0.6, Reconectando
+ * enquanto a voz volta sozinha de uma queda (ADR 0030).
+ *
+ * Na ligação privada (ADR 0023), o painel diz "Em ligação", em azul, com quem, e o botão é o
+ * Desligar. Desligar daqui é sair da sala da ligação, e a `features/calls` encerra para os dois.
  */
 export function VoiceConnection() {
-	const { room, connectionState, screenShare, leave } = useVoice();
+	const { room, connectionState, screenShare, leave, voiceKind, voiceTitle } =
+		useVoice();
+	const roomName = useConnectedRoomName();
+	const place =
+		voiceKind === "call" ? `Ligação com ${voiceTitle ?? ""}` : roomName;
 	const navigate = useNavigate();
 	const { pathname } = useLocation();
 
@@ -45,17 +54,24 @@ export function VoiceConnection() {
 			<div className="flex items-center gap-2">
 				<div className="min-w-0 flex-1">
 					{connectionState === "connected" ? (
-						<Connected />
+						<Connected call={voiceKind === "call"} place={place} />
 					) : connectionState === "error" ||
 						connectionState === "disconnected" ? (
-						<Failed />
+						<Failed call={voiceKind === "call"} place={place} />
+					) : connectionState === "reconnecting" ? (
+						<ConnectingState
+							title="Reconectando…"
+							description="Conexão perdida, tentando de novo"
+						/>
 					) : (
-						<ConnectingState description={`${SALA.name} / Ashtar`} />
+						<ConnectingState description={`${place} / Ashtar`} />
 					)}
 				</div>
 				<button
 					type="button"
-					aria-label="Desconectar da sala"
+					aria-label={
+						voiceKind === "call" ? "Desligar a ligação" : "Desconectar da sala"
+					}
 					onClick={disconnect}
 					className="flex size-[30px] shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-destructive-subtle hover:text-destructive-text"
 				>
@@ -84,7 +100,7 @@ export function VoiceConnection() {
 	);
 }
 
-function Connected() {
+function Connected({ call, place }: { call: boolean; place: string }) {
 	const { room } = useVoice();
 	const ping = usePing(room);
 	const quality = ping === null ? null : pingQuality(ping);
@@ -100,10 +116,10 @@ function Connected() {
 			<WifiIcon aria-hidden="true" className="size-[18px] shrink-0 text-ring" />
 			<div className="flex min-w-0 flex-col whitespace-nowrap">
 				<span className="text-[13px] font-semibold text-ring">
-					Voz conectada
+					{call ? "Em ligação" : "Voz conectada"}
 				</span>
-				<span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-					{SALA.name}
+				<span className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+					<span className="truncate">{place}</span>
 					{ping !== null && (
 						<>
 							<span aria-hidden="true">·</span>
@@ -127,12 +143,33 @@ function Connected() {
 						</>
 					)}
 				</span>
+				<PushToTalkHint />
 			</div>
 		</div>
 	);
 }
 
-function Failed() {
+/** No modo Pressionar para falar, a tecla embaixo do nome da sala (quadro "Voz — você está mutado"). */
+function PushToTalkHint() {
+	const pushToTalk = useInputChoice((state) => state.mode === "ptt");
+	const shortcut = useShortcuts((state) => state.ptt);
+	if (!pushToTalk) return null;
+	return (
+		<span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+			Pressionar para falar:
+			{shortcut ? (
+				<ShortcutKeys
+					label={shortcut.label}
+					className="[&_kbd]:px-[5px] [&_kbd]:py-0 [&_kbd]:text-[11px]"
+				/>
+			) : (
+				<span className="text-warning-text">sem atalho</span>
+			)}
+		</span>
+	);
+}
+
+function Failed({ call, place }: { call: boolean; place: string }) {
 	return (
 		<div role="alert" className="flex items-center gap-2">
 			<TriangleAlertIcon
@@ -141,11 +178,9 @@ function Failed() {
 			/>
 			<div className="flex min-w-0 flex-col whitespace-nowrap">
 				<span className="text-[13px] font-semibold text-destructive-text">
-					Sem conexão com a sala
+					{call ? "Sem conexão com a ligação" : "Sem conexão com a sala"}
 				</span>
-				<span className="text-xs text-muted-foreground">
-					{SALA.name} / Ashtar
-				</span>
+				<span className="text-xs text-muted-foreground">{place} / Ashtar</span>
 			</div>
 		</div>
 	);

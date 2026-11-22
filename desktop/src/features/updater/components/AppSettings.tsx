@@ -1,6 +1,7 @@
 /**
  * Configurações › Aplicativo (quadros "Aplicativo", "Aplicativo (estável)" e "Aplicativo
- * (atualização pronta)"): a versão, o "O que há de novo", o canal e a pasta de logs.
+ * (atualização pronta)"): a versão, o "O que há de novo", o canal, o iniciar com o Windows e a
+ * pasta de logs.
  *
  * O canal só aparece: quem muda é o dono, em Painel de controle › Membros, e o app recebe pelo
  * `/api/me` (ADR 0013). Com uma versão já baixada, "Procurar atualização" vira Reiniciar, que
@@ -14,14 +15,21 @@ import {
 	RefreshCwIcon,
 	SparklesIcon,
 } from "lucide-react";
-import { type ReactNode, useId, useState } from "react";
+import { type ReactNode, useEffect, useId, useState } from "react";
 import logo from "@/assets/ashtar.svg";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import { SendLogs } from "@/features/admin";
 import { useMe } from "@/features/identity";
 import {
+	autostartEnabled,
+	hardwareAcceleration,
+	restartApp,
+	setHardwareAcceleration,
 	checkForUpdateNow,
 	openLogDir,
+	setAutostart,
 	type UpdateCheck,
 } from "@/lib/tauri/commands";
 import { cn } from "@/lib/utils";
@@ -124,6 +132,140 @@ function CheckStatus({
 		<span role="status" className={cn("text-[13px] leading-tight", color)}>
 			{text}
 		</span>
+	);
+}
+
+/**
+ * A chave do iniciar com o Windows, desligada por padrão. Ela pergunta ao Windows (pelo Rust) se
+ * está ligada, em vez de guardar no app: a pessoa pode ter tirado o Ashtar da inicialização pelo
+ * Gerenciador de Tarefas.
+ */
+function StartWithWindows() {
+	const labelId = useId();
+	const [enabled, setEnabled] = useState<boolean | null>(null);
+	const [failed, setFailed] = useState(false);
+
+	useEffect(() => {
+		let alive = true;
+		autostartEnabled()
+			.then((value) => alive && setEnabled(value))
+			.catch(() => alive && setFailed(true));
+		return () => {
+			alive = false;
+		};
+	}, []);
+
+	function change(next: boolean) {
+		const before = enabled;
+		setEnabled(next);
+		setFailed(false);
+		setAutostart(next).catch(() => {
+			setEnabled(before);
+			setFailed(true);
+		});
+	}
+
+	return (
+		<div className={cn(cardClass, "justify-between gap-6 py-4 pr-[18px] pl-5")}>
+			<span className="flex min-w-0 flex-col gap-1">
+				<span
+					id={labelId}
+					className="text-sm leading-tight font-semibold text-foreground"
+				>
+					Iniciar com o Windows
+				</span>
+				<span className="text-xs leading-normal text-muted-foreground">
+					O Ashtar abre junto com o computador, direto na bandeja, e já recebe
+					as mensagens.
+				</span>
+				{failed && (
+					<span role="alert" className="text-xs text-destructive-text">
+						Não deu para mudar a inicialização do Windows. Tente de novo.
+					</span>
+				)}
+			</span>
+			<Switch
+				variant="blue"
+				aria-labelledby={labelId}
+				checked={enabled ?? false}
+				disabled={enabled === null}
+				onCheckedChange={change}
+			/>
+		</div>
+	);
+}
+
+/**
+ * A chave da aceleração de hardware da janela (v0.7): desligada, o WebView2 desenha tudo na CPU.
+ * Vale ao reiniciar; o Reiniciar agora aparece quando a escolha é diferente da abertura.
+ */
+function HardwareAcceleration() {
+	const labelId = useId();
+	const [enabled, setEnabled] = useState<boolean | null>(null);
+	const [atStart, setAtStart] = useState<boolean | null>(null);
+	const [failed, setFailed] = useState(false);
+
+	useEffect(() => {
+		let alive = true;
+		hardwareAcceleration()
+			.then((value) => {
+				if (!alive) return;
+				setEnabled(value);
+				setAtStart(value);
+			})
+			.catch(() => alive && setFailed(true));
+		return () => {
+			alive = false;
+		};
+	}, []);
+
+	function change(next: boolean) {
+		const before = enabled;
+		setEnabled(next);
+		setFailed(false);
+		setHardwareAcceleration(next).catch(() => {
+			setEnabled(before);
+			setFailed(true);
+		});
+	}
+
+	const pending = enabled !== null && atStart !== null && enabled !== atStart;
+	return (
+		<div className={cn(cardClass, "justify-between gap-6 py-4 pr-[18px] pl-5")}>
+			<span className="flex min-w-0 flex-col gap-1">
+				<span
+					id={labelId}
+					className="text-sm leading-tight font-semibold text-foreground"
+				>
+					Aceleração de hardware
+				</span>
+				<span className="text-xs leading-normal text-muted-foreground">
+					Usa a placa de vídeo para desenhar o app. Desligada, tudo vai pelo
+					processador. Vale ao reiniciar o Ashtar.
+				</span>
+				{pending && (
+					<button
+						type="button"
+						onClick={() => void restartApp()}
+						className="self-start text-xs font-semibold text-link hover:underline"
+					>
+						Reiniciar agora
+					</button>
+				)}
+				{failed && (
+					<span role="alert" className="text-xs text-destructive-text">
+						Não deu para mudar a aceleração de hardware. Tente de novo.
+					</span>
+				)}
+			</span>
+			<Switch
+				variant="blue"
+				aria-labelledby={labelId}
+				checked={enabled ?? true}
+				disabled={enabled === null}
+				onCheckedChange={change}
+			/>
+		</div>
 	);
 }
 
@@ -248,6 +390,11 @@ export function AppSettings() {
 				</Section>
 			)}
 
+			<Section title="Inicialização">
+				<StartWithWindows />
+				<HardwareAcceleration />
+			</Section>
+
 			<Section title="Problemas">
 				<div
 					className={cn(cardClass, "justify-between gap-6 py-4 pr-[18px] pl-5")}
@@ -257,8 +404,8 @@ export function AppSettings() {
 							Pasta de logs
 						</span>
 						<span className="text-xs leading-normal text-muted-foreground">
-							Se algo der errado, mande os arquivos dessa pasta para o dono.
-							Ficam os últimos 7 dias.
+							Se algo der errado, use Enviar logs: os dos últimos 2 dias vão
+							para o dono. A pasta guarda os últimos 7 dias.
 						</span>
 						<code className="self-start rounded-sm bg-rail px-1.5 py-0.5 font-mono text-[11px] leading-tight text-secondary-foreground">
 							{LOG_DIR}
@@ -270,10 +417,17 @@ export function AppSettings() {
 							</span>
 						)}
 					</span>
-					<Button variant="outline" className={outlineClass} onClick={openLogs}>
-						<FolderOpenIcon aria-hidden="true" className="size-[15px]" />
-						Abrir pasta
-					</Button>
+					<div className="flex shrink-0 flex-col gap-2">
+						<SendLogs className={outlineClass} />
+						<Button
+							variant="outline"
+							className={outlineClass}
+							onClick={openLogs}
+						>
+							<FolderOpenIcon aria-hidden="true" className="size-[15px]" />
+							Abrir pasta
+						</Button>
+					</div>
 				</div>
 			</Section>
 		</div>

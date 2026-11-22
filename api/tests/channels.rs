@@ -592,3 +592,82 @@ async fn a_voz_so_vale_para_uma_sala_aberta() {
         assert_eq!(status, StatusCode::NOT_FOUND, "{channel}: {body}");
     }
 }
+
+#[tokio::test]
+async fn criar_e_editar_sala_de_voz() {
+    let ctx = setup().await;
+    let owner = &ctx.owner_token;
+    let (status, created) = create_channel(
+        &ctx,
+        owner,
+        json!({ "kind": "voice", "name": "  Squad do Kid ", "category_id": "voz" }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "{created}");
+    assert_eq!(created["kind"], "voice");
+    assert_eq!(created["name"], "Squad do Kid", "o nome é livre");
+    assert_eq!(created["topic"], Value::Null);
+    let list = layout(&ctx, owner).await;
+    assert_eq!(shape(&list), "topo[] Texto[geral] Voz[Sala,Squad do Kid]");
+
+    // Sala de voz não tem tópico, nem ao criar nem ao editar; o nome segue a regra do rótulo.
+    let (status, _) = create_channel(
+        &ctx,
+        owner,
+        json!({ "kind": "voice", "name": "Papo", "topic": "um tópico" }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+    for name in ["", &"a".repeat(33)] {
+        let (status, _) =
+            create_channel(&ctx, owner, json!({ "kind": "voice", "name": name })).await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{name:?}");
+    }
+    let uri = format!("/api/channels/{}", created["id"].as_str().unwrap());
+    let (status, _) = call(
+        &ctx.router,
+        "PATCH",
+        &uri,
+        Some(owner),
+        Some(json!({ "topic": "outro" })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+
+    // Só quem gerencia os canais cria sala de voz.
+    let ana = join(&ctx, "Ana", 2, false).await;
+    let (status, _) = create_channel(&ctx, &ana, json!({ "kind": "voice", "name": "Minha" })).await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+
+    // A sala nova vale para a voz: o token passa da conferência da sala e só
+    // para na falta das chaves do LiveKit, que os testes não têm.
+    let (status, body) = call(
+        &ctx.router,
+        "POST",
+        "/api/voice/token",
+        Some(&ana),
+        Some(json!({ "channel_id": created["id"] })),
+    )
+    .await;
+    assert_ne!(status, StatusCode::NOT_FOUND, "{body}");
+
+    // Arquivada, a sala some da voz.
+    let (status, _) = call(
+        &ctx.router,
+        "POST",
+        &format!("{uri}/archive"),
+        Some(owner),
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+    let (status, _) = call(
+        &ctx.router,
+        "POST",
+        "/api/voice/token",
+        Some(&ana),
+        Some(json!({ "channel_id": created["id"] })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+}

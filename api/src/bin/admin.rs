@@ -10,6 +10,7 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::time::Duration;
 
+use api::chat::access::Readable;
 use api::db::{self, now};
 use api::error::ApiError;
 use api::identity::permissions::{self, Origin, Permission};
@@ -60,13 +61,19 @@ enum Command {
     /// Mostra as permissões de um membro e de onde cada uma vem.
     Permissoes { nick: String },
     /// Só no desenvolvimento: cria três membros de teste e enche o #geral de
-    /// mensagens dos últimos dias, para ver o chat com histórico.
+    /// mensagens dos últimos dias, para ver o chat com histórico. Com
+    /// `--conversa`, também uma conversa privada.
     Semear {
         /// Quantas mensagens (de 1 a 2000).
         #[arg(long, default_value_t = 300, value_parser = clap::value_parser!(u16).range(1..=2000))]
         mensagens: u16,
+        /// Também semeia uma conversa privada entre o dono e a "ana", com 20
+        /// mensagens.
+        #[arg(long)]
+        conversa: bool,
     },
-    /// Copia o banco para a pasta, com data no nome, e apaga as cópias mais antigas.
+    /// Copia o banco para a pasta, com data no nome, e apaga as cópias mais antigas (e os logs
+    /// enviados de mais de 30 dias).
     Backup {
         pasta: PathBuf,
         /// Quantas cópias manter na pasta (pelo menos 1).
@@ -128,7 +135,10 @@ async fn run(db: &SqlitePool, command: Command) -> Result<(), ApiError> {
 
     match command {
         Command::Dono { .. } => unreachable!("tratado acima"),
-        Command::Semear { mensagens } => seed(db, &owner, mensagens.into(), now).await?,
+        Command::Semear {
+            mensagens,
+            conversa,
+        } => seed(db, &owner, mensagens.into(), conversa, now).await?,
         Command::Convite { validade, usos } => {
             let invite = invites::create(
                 db,
@@ -211,6 +221,12 @@ async fn run(db: &SqlitePool, command: Command) -> Result<(), ApiError> {
         Command::Backup { pasta, manter } => {
             let file = backup(db, &pasta, manter).await?;
             println!("Backup em {}", file.display());
+            // Os logs enviados de mais de 30 dias saem junto (v0.6).
+            let data_dir = api::logs::data_dir_from_env();
+            let pruned = api::logs::prune(db, &data_dir, api::db::now()).await?;
+            if pruned > 0 {
+                println!("Logs apagados (mais de 30 dias): {pruned}");
+            }
         }
     }
     Ok(())
@@ -378,7 +394,13 @@ const SEED_LINES: [&str; 8] = [
 
 /// Enche o banco de desenvolvimento. Recusa se a `PUBLIC_URL` não for local:
 /// no computador de casa, isso criaria gente de mentira no grupo de verdade.
-async fn seed(db: &SqlitePool, owner: &User, count: usize, now: i64) -> Result<(), ApiError> {
+async fn seed(
+    db: &SqlitePool,
+    owner: &User,
+    count: usize,
+    with_dm: bool,
+    now: i64,
+) -> Result<(), ApiError> {
     let public_url = std::env::var("PUBLIC_URL").unwrap_or_default();
     if !(public_url.contains("127.0.0.1") || public_url.contains("localhost")) {
         return Err(ApiError::Config(
@@ -406,6 +428,7 @@ async fn seed(db: &SqlitePool, owner: &User, count: usize, now: i64) -> Result<(
              do histórico bater com as datas. Comece de um banco novo."
         )));
     }
+    let channel = Readable::Text(channel);
     // O limite de envio é do app; aqui as mensagens saem todas de uma vez.
     let limiter = SendLimiter::new(usize::MAX, Duration::from_secs(1));
     // Espalhadas pelos últimos três dias, da mais antiga para a mais nova (o id
@@ -422,6 +445,8 @@ async fn seed(db: &SqlitePool, owner: &User, count: usize, now: i64) -> Result<(
             author,
             &format!("semear-{now}-{i}"),
             &format!("{line} ({})", i + 1),
+            None,
+            &[],
             at,
         )
         .await?;
@@ -434,5 +459,32 @@ async fn seed(db: &SqlitePool, owner: &User, count: usize, now: i64) -> Result<(
             .collect::<Vec<_>>()
             .join(", ")
     );
+    if with_dm {
+        // Depois do #geral, para os ids (UUID v7) da conversa virem por último.
+        let ana = &people[1];
+        let (dm, _) = api::chat::dms::open(db, owner, &ana.id, now).await?;
+        let dm = Readable::Dm(dm);
+        let total = 20;
+        for i in 0..total {
+            let author = if i % 3 == 0 { owner } else { ana };
+            let line = SEED_LINES[(i * 3) % SEED_LINES.len()];
+            api::chat::messages::create(
+                db,
+                &limiter,
+                &dm,
+                author,
+                &format!("semear-dm-{now}-{i}"),
+                &format!("{line} ({})", i + 1),
+                None,
+                &[],
+                now - 3600 + (3600 * i as i64) / total as i64,
+            )
+            .await?;
+        }
+        println!(
+            "{total} mensagens na conversa entre {} e {}.",
+            owner.nick, ana.nick
+        );
+    }
     Ok(())
 }

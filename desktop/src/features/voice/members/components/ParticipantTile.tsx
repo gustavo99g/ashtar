@@ -1,41 +1,104 @@
-import { HeadphoneOffIcon, MicOffIcon, ScreenShareIcon } from "lucide-react";
+import type { Participant } from "livekit-client";
+import {
+	HeadphoneOffIcon,
+	Maximize2Icon,
+	MicOffIcon,
+	ScreenShareIcon,
+	VideoIcon,
+} from "lucide-react";
+import {
+	Popover,
+	PopoverContent,
+	PopoverTrigger,
+} from "@/components/ui/popover";
+import type { ReactNode } from "react";
 import { Avatar } from "@/features/identity";
 import { cn } from "@/lib/utils";
+import {
+	CameraVideo,
+	cameraTrackOf,
+} from "../../camera/components/CameraVideo";
+import { useCameraChoice } from "../../camera/stores/cameraChoiceStore";
 import type { ChannelMember } from "../model/members";
+import { ConnectionMark } from "./ConnectionMark";
+import { ConnectionSection } from "./ConnectionSection";
+import { UserVolume, UserVolumeMark } from "./UserVolume";
 
 /*
  * Uma pessoa na chamada: o avatar grande e o nome no canto, com os selos de transmitindo, sem
  * microfone e sem áudio. Quem fala ganha o contorno azul. Na Grade é grande; na faixa do Foco,
  * pequeno.
+ *
+ * Na Grade, clicar no bloco de outra pessoa abre o volume dela, logo abaixo (ADR 0020). Quem não
+ * está em 100% ganha a marca no canto de cima, na Grade e na faixa. No próprio bloco, nada.
+ *
+ * Com a câmera ligada (ADR 0025), o vídeo dela toma o lugar do avatar, com o ícone de câmera ao
+ * lado do nome; o anel de quem fala continua. A própria câmera aparece espelhada se a pessoa
+ * escolheu Espelhar.
+ *
+ * Com a câmera ligada e o `onFocus`, a câmera vai para o foco (v0.7): na Grade, pelo botão que
+ * aparece no canto com o mouse em cima (o bloco já abre o volume); na faixa, clicando no bloco.
  */
 
 interface ParticipantTileProps {
-	member: ChannelMember;
+	/** Com o `participant` (quem está na chamada), o bloco mostra a câmera. */
+	member: ChannelMember & { participant?: Participant };
 	isLocal: boolean;
 	size?: "grid" | "strip";
+	/** Põe a câmera em foco. Só vale com a câmera ligada. */
+	onFocus?: () => void;
 }
 
 export function ParticipantTile({
 	member,
 	isLocal,
 	size = "grid",
+	onFocus,
 }: ParticipantTileProps) {
 	const grid = size === "grid";
-	return (
-		<div
-			className={cn(
-				"relative flex items-center justify-center bg-secondary",
-				grid
-					? "aspect-video w-full rounded-[10px]"
-					: "h-20 w-[140px] shrink-0 rounded-lg",
-				member.speaking && "shadow-[inset_0_0_0_2px_var(--color-speaking)]",
+	const camera = cameraTrackOf(member.participant);
+	const mirror = useCameraChoice((state) => state.mirror) && isLocal;
+	const tileClass = cn(
+		"relative flex items-center justify-center overflow-hidden bg-secondary",
+		grid
+			? "aspect-video w-full rounded-[10px]"
+			: "h-20 w-[140px] shrink-0 rounded-lg",
+		member.speaking && "shadow-[inset_0_0_0_2px_var(--color-speaking)]",
+	);
+	const content = (
+		<>
+			{camera ? (
+				<>
+					<CameraVideo
+						trackRef={camera}
+						mirror={mirror}
+						className="absolute inset-0"
+					/>
+					{/* O anel de quem fala por cima do vídeo. */}
+					{member.speaking && (
+						<span
+							aria-hidden="true"
+							className="pointer-events-none absolute inset-0 rounded-[inherit] shadow-[inset_0_0_0_2px_var(--color-speaking)]"
+						/>
+					)}
+				</>
+			) : (
+				<Avatar
+					nick={member.nick}
+					displayName={member.name}
+					size={grid ? 72 : 32}
+				/>
 			)}
-		>
-			<Avatar
-				nick={member.nick}
-				displayName={member.name}
-				size={grid ? 72 : 32}
-			/>
+			{!isLocal && (
+				<UserVolumeMark
+					userId={member.id}
+					className={
+						grid
+							? "absolute top-2.5 right-2.5 px-2 py-1 text-xs"
+							: "absolute top-1.5 right-1.5 px-1.5 py-0.5 text-[10px]"
+					}
+				/>
+			)}
 			<span
 				className={cn(
 					"absolute flex max-w-[calc(100%-20px)] items-center bg-rail/80 font-semibold text-foreground",
@@ -50,9 +113,96 @@ export function ParticipantTile({
 						<span className="font-normal text-muted-foreground"> (você)</span>
 					)}
 				</span>
+				{camera && (
+					<VideoIcon
+						aria-label="câmera ligada"
+						className={cn(
+							grid ? "size-3.5" : "size-[11px]",
+							"shrink-0 text-muted-foreground",
+						)}
+					/>
+				)}
 				<MemberIcons member={member} size={grid ? "size-3.5" : "size-[11px]"} />
 			</span>
+		</>
+	);
+
+	const focusable = camera !== null && onFocus !== undefined;
+	if (!grid && focusable) {
+		return (
+			<button
+				type="button"
+				aria-label={`Pôr a câmera de ${member.name} em foco`}
+				title="Pôr em foco"
+				onClick={onFocus}
+				className={cn(
+					tileClass,
+					"hover:shadow-[inset_0_0_0_2px_var(--color-border-strong)]",
+				)}
+			>
+				{content}
+			</button>
+		);
+	}
+
+	// O volume abre só na Grade e só no bloco dos outros.
+	const tile =
+		!grid || isLocal ? (
+			<div className={tileClass}>{content}</div>
+		) : (
+			<VolumeTile member={member} tileClass={tileClass}>
+				{content}
+			</VolumeTile>
+		);
+	if (!focusable) return tile;
+	return (
+		<div className="group/tile relative w-full">
+			{tile}
+			<button
+				type="button"
+				aria-label={`Pôr a câmera de ${member.name} em foco`}
+				title="Pôr em foco"
+				onClick={onFocus}
+				className="absolute top-2.5 left-2.5 flex size-8 items-center justify-center rounded-md bg-rail/80 text-foreground opacity-0 group-hover/tile:opacity-100 hover:bg-rail focus-visible:opacity-100"
+			>
+				<Maximize2Icon className="size-4" />
+			</button>
 		</div>
+	);
+}
+
+function VolumeTile({
+	member,
+	tileClass,
+	children,
+}: {
+	member: ChannelMember;
+	tileClass: string;
+	children: ReactNode;
+}) {
+	return (
+		<Popover>
+			<PopoverTrigger
+				aria-label={`Volume de ${member.name}`}
+				className={cn(
+					tileClass,
+					"hover:shadow-[inset_0_0_0_2px_var(--color-border-strong)] data-popup-open:shadow-[inset_0_0_0_2px_var(--color-border-strong)]",
+					member.speaking &&
+						"hover:shadow-[inset_0_0_0_2px_var(--color-speaking)]",
+				)}
+			>
+				{children}
+			</PopoverTrigger>
+			<PopoverContent
+				side="bottom"
+				sideOffset={8}
+				aria-label={`Volume de ${member.name}`}
+				className="w-[260px] gap-2 border-border-strong bg-card px-3.5 py-3"
+			>
+				<UserVolume userId={member.id} name={member.name} />
+				<ConnectionSection userId={member.id} connection={member.connection} />
+			</PopoverContent>
+		</Popover>
 	);
 }
 
@@ -65,6 +215,7 @@ function MemberIcons({
 }) {
 	return (
 		<>
+			<ConnectionMark connection={member.connection} className={size} />
 			{member.sharing && (
 				<ScreenShareIcon
 					aria-label="transmitindo a tela"

@@ -32,7 +32,17 @@ function message(authorId: string, created_at: number): Message {
 			removed: false,
 		},
 		body: "oi",
+		mentions: [],
 		created_at,
+		kind: "text",
+		edited_at: null,
+		reply_to: null,
+		reactions: [],
+		pinned_at: null,
+		attachments: [],
+		previews: [],
+		forwarded: null,
+		call: null,
 	};
 }
 
@@ -152,6 +162,16 @@ describe("bodyParts", () => {
 		]);
 		expect(bodyParts("file:///C:/x")).toEqual([
 			{ kind: "text", text: "file:///C:/x" },
+		]);
+	});
+
+	it("as menções confirmadas viram pedaço próprio; as outras e as de dentro de link, não", () => {
+		const ana = { id: "a", nick: "ana", display_name: "Ana Lima" };
+		expect(bodyParts("oi @Ana, @bia e https://x.com/@ana", [ana])).toEqual([
+			{ kind: "text", text: "oi " },
+			{ kind: "mention", text: "@Ana", person: ana },
+			{ kind: "text", text: ", @bia e " },
+			{ kind: "link", url: "https://x.com/@ana" },
 		]);
 	});
 });

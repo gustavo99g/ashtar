@@ -36,9 +36,11 @@ const me: MeResponse = {
 	user,
 	permissions: [],
 	update_channel: "stable",
+	status: "available",
 	can_create_invite: false,
 	can_view_panel: false,
 	can_manage_channels: false,
+	can_move_members: false, can_manage_emojis: false, can_view_logs: false,
 };
 
 /** Monta a ponte. `rerender` desenha de novo, para ela ler o status novo. */

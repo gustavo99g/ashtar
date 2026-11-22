@@ -27,9 +27,14 @@ import { ServerRoute } from "@/routes/server";
 import {
 	AppSettingsRoute,
 	ArchivedSettingsRoute,
+	EmojisSettingsRoute,
+	LogsSettingsRoute,
+	ServerSettingsRoute,
 	InvitesSettingsRoute,
 	MembersSettingsRoute,
+	NotificationsSettingsRoute,
 	ProfileSettingsRoute,
+	ShortcutsSettingsRoute,
 	VoiceSettingsRoute,
 } from "@/routes/settings";
 import { StartRoute } from "@/routes/start";
@@ -69,10 +74,18 @@ export const routes: RouteObject[] = [
 							{ index: true, element: <Navigate to="profile" replace /> },
 							{ path: "profile", element: <ProfileSettingsRoute /> },
 							{ path: "voice", element: <VoiceSettingsRoute /> },
+							{ path: "shortcuts", element: <ShortcutsSettingsRoute /> },
+							{
+								path: "notifications",
+								element: <NotificationsSettingsRoute />,
+							},
 							{ path: "app", element: <AppSettingsRoute /> },
 							{ path: "invites", element: <InvitesSettingsRoute /> },
 							{ path: "members", element: <MembersSettingsRoute /> },
 							{ path: "archived", element: <ArchivedSettingsRoute /> },
+							{ path: "emojis", element: <EmojisSettingsRoute /> },
+							{ path: "logs", element: <LogsSettingsRoute /> },
+							{ path: "server", element: <ServerSettingsRoute /> },
 						],
 					},
 				],

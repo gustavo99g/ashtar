@@ -4,8 +4,13 @@
  * seu assunto; quem usa continua importando de `@/lib/tauri/commands`.
  */
 export * from "./app";
+export * from "./files";
 export { type AppError, type AppErrorKind, isAppError } from "./core";
 export * from "./identity";
+export * from "./notifications";
+export * from "./power";
+export * from "./presence";
 export * from "./screen-share";
+export * from "./shortcuts";
 export * from "./thumbnails";
 export * from "./updater";

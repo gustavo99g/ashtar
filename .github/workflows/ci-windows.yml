@@ -1,0 +1,30 @@
+name: CI Windows
+
+# O Rust do desktop (fmt, clippy e testes) só compila de verdade no Windows, que é o job mais
+# lento (25 a 40 min). Roda só em push na dev e na main quando desktop/src-tauri mudou, e um
+# push novo cancela o anterior. Numa branch de feature, só pelo Run workflow.
+on:
+  push:
+    branches: [dev, main]
+    paths:
+      - "desktop/src-tauri/**"
+      - "rust-toolchain.toml"
+      - ".github/actions/desktop-checks/**"
+      - ".github/workflows/ci-windows.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ci-windows-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  desktop:
+    name: Desktop (Rust, Windows)
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/desktop-checks
+        with:
+          frontend: "false"

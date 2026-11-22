@@ -15,6 +15,14 @@ export function toggleMaximizeWindow(): void {
 	if (isTauri()) void getCurrentWindow().toggleMaximize();
 }
 
+/**
+ * Traz a janela para a frente com o foco do teclado. Soltar um arquivo vindo do Explorer não ativa a
+ * janela: sem isto, o Enter seguinte iria para o Explorer.
+ */
+export function focusWindow(): void {
+	if (isTauri()) void getCurrentWindow().setFocus();
+}
+
 /** Fecha a janela. O Rust a esconde na bandeja (`tray.rs`): o app continua aberto, e só o "Sair" da bandeja o encerra. */
 export function closeWindow(): void {
 	if (isTauri()) void getCurrentWindow().close();
@@ -49,7 +57,9 @@ export function watchWindowMaximized(
  * página: o wry não esconde o webview ao minimizar, então o `document.visibilityState` pode
  * continuar "visible". Devolve a função que para de escutar.
  */
-export function watchWindowMinimized(onChange: (minimized: boolean) => void): () => void {
+export function watchWindowMinimized(
+	onChange: (minimized: boolean) => void,
+): () => void {
 	if (!isTauri()) return () => {};
 
 	const window = getCurrentWindow();
@@ -62,6 +72,37 @@ export function watchWindowMinimized(onChange: (minimized: boolean) => void): ()
 
 	check();
 	const unlisten = window.onResized(check);
+	return () => {
+		stopped = true;
+		void unlisten.then((stop) => stop());
+	};
+}
+
+/**
+ * Põe a janela em tela cheia (ou tira). É a tela cheia da transmissão: a do próprio WebView2
+ * (`requestFullscreen`) numa janela sem a borda do Windows deixava, a cada segunda vez no mesmo
+ * monitor, uma faixa branca sem desenhar. Fora do Tauri não faz nada.
+ */
+export function setWindowFullscreen(on: boolean): void {
+	if (isTauri()) void getCurrentWindow().setFullscreen(on);
+}
+
+/**
+ * Avisa quando a janela sai da tela cheia por fora do app (o Windows, um atalho). Devolve a função
+ * que para de escutar.
+ */
+export function watchWindowFullscreen(
+	onChange: (fullscreen: boolean) => void,
+): () => void {
+	if (!isTauri()) return () => {};
+
+	const window = getCurrentWindow();
+	let stopped = false;
+	const unlisten = window.onResized(() => {
+		void window.isFullscreen().then((fullscreen) => {
+			if (!stopped) onChange(fullscreen);
+		});
+	});
 	return () => {
 		stopped = true;
 		void unlisten.then((stop) => stop());

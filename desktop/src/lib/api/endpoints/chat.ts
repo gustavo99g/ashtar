@@ -1,11 +1,16 @@
 /**
  * O chat: o histórico e o envio de mensagens, e quem está no grupo para a coluna de membros.
  */
-import { apiJson, jsonRequest } from "../client";
+import { apiFetch, apiJson, jsonRequest } from "../client";
 import type {
+	ChannelFilesPage,
+	EditMessageRequest,
+	MediaFilter,
 	Message,
 	MessagePage,
 	Person,
+	SearchHas,
+	SearchPage,
 	SendMessageRequest,
 } from "../generated";
 
@@ -14,19 +19,28 @@ function messagesPath(channelId: string): string {
 }
 
 /**
- * Para que lado ler. `before` e `after` juntos a API recusa (422), então o tipo também não deixa.
+ * Para que lado ler. Dois cursores juntos a API recusa (422), então o tipo também não deixa.
  */
 export type PageCursor =
 	| {
 			/** As mensagens antes desta (rolar para cima). */
 			before?: string;
 			after?: never;
+			around?: never;
 			limit?: number;
 	  }
 	| {
 			/** As mensagens depois desta (o reencontro depois de uma queda). */
 			after?: string;
 			before?: never;
+			around?: never;
+			limit?: number;
+	  }
+	| {
+			/** Metade antes e metade depois desta, com ela (ir até uma mensagem antiga). */
+			around?: string;
+			before?: never;
+			after?: never;
 			limit?: number;
 	  };
 
@@ -41,6 +55,7 @@ export function listMessages(
 	const query = new URLSearchParams();
 	if (cursor.before) query.set("before", cursor.before);
 	if (cursor.after) query.set("after", cursor.after);
+	if (cursor.around) query.set("around", cursor.around);
 	if (cursor.limit) query.set("limit", String(cursor.limit));
 	const search = query.toString();
 	const suffix = search ? `?${search}` : "";
@@ -58,6 +73,99 @@ export function sendMessage(
 	return apiJson<Message>(
 		messagesPath(channelId),
 		jsonRequest("POST", request),
+	);
+}
+
+function messagePath(messageId: string): string {
+	return `/api/messages/${encodeURIComponent(messageId)}`;
+}
+
+/** `PATCH /api/messages/{id}`: troca o texto. Só o autor (`forbidden`). */
+export function editMessage(
+	messageId: string,
+	request: EditMessageRequest,
+): Promise<Message> {
+	return apiJson<Message>(messagePath(messageId), jsonRequest("PATCH", request));
+}
+
+/** `DELETE /api/messages/{id}`: o autor, ou o dono numa mensagem de canal. */
+export async function deleteMessage(messageId: string): Promise<void> {
+	await apiFetch(messagePath(messageId), { method: "DELETE" });
+}
+
+/**
+ * `PUT` (ou `DELETE`, com `on = false`) `/api/messages/{id}/reactions/{emoji}`: põe ou tira a
+ * reação de quem chama. Devolve a mensagem com as reações de agora.
+ */
+export function setReaction(
+	messageId: string,
+	emoji: string,
+	on: boolean,
+): Promise<Message> {
+	return apiJson<Message>(
+		`${messagePath(messageId)}/reactions/${encodeURIComponent(emoji)}`,
+		{ method: on ? "PUT" : "DELETE" },
+	);
+}
+
+/**
+ * `DELETE /api/messages/{id}/previews`: o autor tira os cartões dos links, de vez. Devolve a
+ * mensagem sem eles.
+ */
+export function hidePreviews(messageId: string): Promise<Message> {
+	return apiJson<Message>(`${messagePath(messageId)}/previews`, {
+		method: "DELETE",
+	});
+}
+
+/**
+ * `PUT` (`on`) ou `DELETE /api/messages/{id}/pin`: fixa ou desafixa. Num canal, só quem gerencia
+ * os canais (`forbidden`); com 50 fixadas, `conflict`. Devolve a mensagem como ficou.
+ */
+export function setPinned(messageId: string, on: boolean): Promise<Message> {
+	return apiJson<Message>(`${messagePath(messageId)}/pin`, {
+		method: on ? "PUT" : "DELETE",
+	});
+}
+
+/** `GET /api/channels/{id}/pins`: as fixadas, da fixada mais recente para a mais antiga. */
+export function listPins(channelId: string): Promise<Message[]> {
+	return apiJson<Message[]>(`/api/channels/${encodeURIComponent(channelId)}/pins`);
+}
+
+export interface SearchParams {
+	q?: string;
+	author?: string;
+	channelId?: string;
+	has?: SearchHas;
+	/** A página seguinte: as mais velhas que esta. */
+	before?: string;
+}
+
+/** `GET /api/search`: a busca nos canais de texto, da mais nova para a mais velha, de 25 em 25. */
+export function searchMessages(params: SearchParams): Promise<SearchPage> {
+	const query = new URLSearchParams();
+	if (params.q) query.set("q", params.q);
+	if (params.author) query.set("author", params.author);
+	if (params.channelId) query.set("channel_id", params.channelId);
+	if (params.has) query.set("has", params.has);
+	if (params.before) query.set("before", params.before);
+	return apiJson<SearchPage>(`/api/search?${query.toString()}`);
+}
+
+/**
+ * `GET /api/channels/{id}/files`: os anexos do canal ou da conversa, da mensagem mais nova para a
+ * mais velha, até 50 por página (a página acaba numa mensagem inteira).
+ */
+export function listChannelFiles(
+	channelId: string,
+	filter: MediaFilter,
+	before?: string,
+): Promise<ChannelFilesPage> {
+	const query = new URLSearchParams({ filter });
+	if (before) query.set("before", before);
+	return apiJson<ChannelFilesPage>(
+		`/api/channels/${encodeURIComponent(channelId)}/files?${query.toString()}`,
 	);
 }
 

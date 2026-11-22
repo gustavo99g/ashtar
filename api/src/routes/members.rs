@@ -15,6 +15,7 @@ use super::auth::CurrentUser;
 use super::extract::ApiJson;
 use super::invites::CreatedInviteView;
 use crate::AppState;
+use crate::chat::layout;
 use crate::db::now;
 use crate::error::ApiError;
 use crate::identity::devices;
@@ -37,6 +38,9 @@ pub struct MemberView {
     pub id: String,
     pub nick: String,
     pub display_name: Option<String>,
+    /// O id do arquivo da foto de perfil, ou `null` (ADR 0031).
+    #[ts(optional = nullable)]
+    pub avatar: Option<String>,
     pub is_owner: bool,
     pub created_at: i64,
     pub removed_at: Option<i64>,
@@ -56,6 +60,7 @@ impl From<MemberDetails> for MemberView {
             id: user.id,
             nick: user.nick,
             display_name: user.display_name,
+            avatar: user.avatar_id,
             is_owner: user.is_owner,
             created_at: user.created_at,
             removed_at: user.removed_at,
@@ -175,6 +180,11 @@ pub async fn set_permission(
         now(),
     )
     .await?;
+    // Quem gerencia os canais vê os restritos: a lista dele muda.
+    if permission == Permission::ManageChannels {
+        let version = layout::touch(&state.db).await?;
+        state.hub.publish(&ServerEvent::ChannelsChanged { version });
+    }
     Ok(StatusCode::NO_CONTENT)
 }
 

@@ -40,3 +40,11 @@ dist-ssr
 *.db-shm
 # O livekit-server baixado pelo desktop/scripts/livekit-dev.ps1
 .livekit
+
+# O cache do tsc
+*.tsbuildinfo
+
+# Os arquivos que a API local guarda (anexos, fotos, emojis, prévias), ao lado do banco. Só
+# estes caminhos: um `files/` solto pegaria também o código em `api/src/files/`.
+/files/
+/api/files/

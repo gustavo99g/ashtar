@@ -1,0 +1,7 @@
+{
+	"$schema": "../gen/schemas/desktop-schema.json",
+	"identifier": "notifications",
+	"description": "A janela dos avisos (notifications.rs): só ouvir os cartões e chamar os comandos do app",
+	"windows": ["notifications"],
+	"permissions": ["core:default"]
+}

@@ -2,7 +2,7 @@
 
 Ashtar é uma aplicação privada de comunicação para uma única comunidade, inspirada no Discord.
 
-> Status atual: **v0.2.1 — Identidade na API** (concluída; a UI nova da v0.2.2 passa a usá-la)
+> Status atual: **v0.3.2 — Ligações privadas** (tocar, atender, recusar, chamada perdida, tela compartilhada e registro; sai junto com a v0.3.0 e a v0.3.1, na `0.3.20`)
 
 ## Funcionalidades
 
@@ -72,8 +72,13 @@ Baixe o `livekit-server` na [página de releases](https://github.com/livekit/liv
 em modo de desenvolvimento:
 
 ```bash
-livekit-server --dev
+livekit-server --dev --config deploy/dev/livekit.yaml
 ```
+
+O `deploy/dev/livekit.yaml` liga o webhook para a API local (`http://127.0.0.1:3000/webhooks/livekit`):
+é ele que avisa quem está fora da sala de quem entra, sai ou liga a tela. Sem ele, o app ainda conta
+a própria entrada e saída para a API (`/api/voice/state`), mas um app que fecha de repente fica na
+lista até alguém entrar ou sair da sala.
 
 ### 3. API
 
@@ -181,13 +186,14 @@ v0.2  → Comunidade
         de ruído → servidor na VPS → publicador nativo
 
 v0.3  → Conversas privadas
-        Mensagens e ligações privadas + não lidas + bandeja
+        Lista de canais nova + mensagens privadas + não lidas, menções e notificações
+        + status + ligações privadas
 
 v0.4  → Transmissões múltiplas
         Várias transmissões simultâneas + experiência de quem assiste
 
-v0.5  → Canais e presença
-        Múltiplos canais e salas + status + menções + sons da voz
+v0.5  → Salas e presença
+        Várias salas de voz + ausente automático + digitando + sons da voz
 
 v0.6  → Confiabilidade e configurações
         Reconexão + estados + tela de configurações + atalhos globais
@@ -302,10 +308,10 @@ máquina tiver problema, os dois se perdem juntos.
 
 ## Status
 
-Em desenvolvimento, na **v0.2**, entregue em partes (veja o [`docs/roadmap.md`](docs/roadmap.md)). A v0.2.0
-(auto-update, canal beta e pipeline de release) e a v0.2.1 (identidade, convites e permissões na API) estão
-prontas; a próxima é a v0.2.2, a UI nova, que passa a usar as rotas de identidade. A estrutura do código está
-em [`ARCHITECTURE.md`](ARCHITECTURE.md).
+Em desenvolvimento, na **v0.5** (veja o [`docs/roadmap.md`](docs/roadmap.md)): várias salas de voz, trocar de
+sala, mover e desconectar alguém, canais e salas restritos, o Ausente, o "digitando…" e os sons da sala, numa
+versão só, a `0.5.0`. O plano da fase está no [`PLAN.md`](PLAN.md), e a estrutura do código em
+[`ARCHITECTURE.md`](ARCHITECTURE.md).
 
 ## Licença
 

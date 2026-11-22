@@ -1,7 +1,8 @@
 # 0016 — Canais e categorias
 
-- **Status:** aceita
+- **Status:** aceita; o "No app" (o arrasto e os menus) foi revisto pela 0020 (v0.3)
 - **Data:** 2026-10
+- **Atualizada por:** 0026 (sala de voz criada como os canais de texto), 0028 (canais e salas restritos) e 0030 (a voz volta sozinha depois de uma queda)
 
 ## Contexto
 

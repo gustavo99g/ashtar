@@ -1,71 +1,93 @@
-# NOTES — pendências da v0.2.4 (publicador nativo)
+# NOTES — pendências da v0.6 (confiabilidade e configurações)
 
-Lista de verificação da fase descrita no [`PLAN.md`](PLAN.md). Cada item deve ser resolvido ou
-conscientemente adiado (marcar como tal) antes de fechar a fase. A lista da fase anterior está arquivada em
-[`docs/plans/v0.2.3-notes.md`](docs/plans/v0.2.3-notes.md).
+Lista de verificação da fase descrita no [`PLAN.md`](PLAN.md).
+Cada item deve ser resolvido ou conscientemente adiado (marcar como tal) antes de fechar a entrega em que ele está.
 
-## Vindos do BACKLOG
+## Antes de começar
 
-- [x] **Publicador de vídeo e áudio nativo em Rust:** as duas peças, a redução na GPU antes de copiar para a
-      memória e o publicador em si, são as Etapas 2 e 3.
-- [x] **Redução da imagem no caminho do IPC** (o `scale` do libyuv, 5–10 ms no 1080p): deixa de existir com o
-      IPC (Etapa 5). O `fast_image_resize` sai do `Cargo.toml`.
-- [x] **Divisão do `capture_frame` em readback, redução e conversão:** sai com o IPC. O caminho novo tem os
-      próprios números e logs (Etapa 3).
-- [ ] **Linha de base de desempenho em release por preset** (CPU, memória e histograma de intervalos entre
-      frames): a medição da Etapa 6, contra a `0.2.30`.
-- [ ] **Medição e comparação estruturada:** a mesma Etapa 6, com o roteiro e os números na ADR 0017.
-- [x] **Janelas minimizadas no seletor:** lista própria por `EnumWindows`, o selo "Minimizada" e a janela
-      restaurada ao escolher (Etapas 1 e 5). Remedir o tempo da lista com muitas janelas: hoje leva ~95 ms com
-      4, por causa dos ícones.
-- [x] **Miniaturas no seletor** (v0.8 do roadmap, adiantadas): pelo WGC, só dos cards visíveis, sem `Vec<u8>` em
-      JSON, pelo `Channel` do Tauri (Etapa 5).
-- [x] **Janela parada custa uma conversão por volta:** o WGC só entrega imagem quando algo muda, e o caminho novo
-      só codifica imagens novas (Etapa 2).
+- [ ] **A v0.5 na beta.** A `0.5.0` sai pela beta; os `[ ]` do `NOTES.md` da v0.5 são conferidos no teste dela. O que
+      sobrar fica marcado como adiado em `docs/plans/v0.5-notes.md`, e o que pede código entra aqui.
+- [ ] **O canvas:** os cinco quadros novos da Etapa 0 (fileira "Confiabilidade (0.6)") desenhados; falta o Kid conferir.
 
-## Antes do beta
+## Parte 1 — configurações e atalhos
 
-- [ ] **Jogo em tela cheia exclusiva:** confere se o WGC captura como janela; se não, o contorno é compartilhar a
-      tela.
-- [ ] **Monitor HDR:** a cor sai lavada na conversão para BT.709?
-- [ ] **Notebook com duas GPUs:** captura, conversão e encoder no mesmo adaptador (decisão 2).
-- [ ] **Janela redimensionada, minimizada e fechada** no meio da transmissão.
-- [ ] **Máquina sem encoder de hardware:** o plano B entra sozinho e o painel mostra "Software".
-- [ ] **Driver atualizado com a transmissão aberta** (dispositivo perdido): a transmissão acaba com aviso, sem
-      fantasma na sala.
-- [ ] **Outras placas do grupo** pelo `encoder-probe.exe` (Etapa 6), principalmente NVIDIA e Intel.
-- [ ] **A API da Etapa 4 no computador de casa** antes de o app ir para o beta.
+### Cadeia do microfone
 
-## Volume da transmissão (Etapa 5c)
+- [ ] **O `AudioWorklet` no WebView2** junto do RNNoise: o custo de CPU dos dois na mesma cadeia.
+- [ ] **O portão não corta o começo das palavras** (10 ms para abrir) nem o fim (300 ms para fechar).
+- [ ] **A sensibilidade automática** com ventilador e com teclado mecânico: não abre com o teclado.
+- [ ] **O volume de entrada acima de 100%** não distorce com o RNNoise depois (o ganho vem antes).
+- [ ] **A migração do `noiseStore`**: quem desligou a supressão continua com ela desligada.
+- [ ] **Eco e ganho automático** trocados no meio da chamada: a trilha é refeita e a cadeia volta.
 
-- [x] **O jogo chegava baixo** para quem assiste: o nivelador (`media/leveler.rs`) sobe o som até +12 dB, com alvo de
-      ~-18 dBFS e um limitador a partir de ~-2 dBFS; vem ligado, com a chave "Nivelar o volume". Quem assiste vai até
-      200%, por um `AudioContext` só acima de 100%.
-- [ ] **Medir na Etapa 6:** anotar o ganho do log (`áudio da transmissão encerrado`) em dois ou três jogos do grupo.
-      Se ficar sempre no máximo, o alvo pode subir; se distorcer, o `LIMIT` pode descer.
-- [ ] **Teste à mão com dois computadores** (roteiro da 5c): o jogo perto da voz, a chave no meio da transmissão, o
-      silêncio sem chiado, "Sem áudio", o volume a 180% e a troca da saída de áudio.
+### Voz e vídeo
 
-## A decidir durante a fase
+- [ ] **O volume de saída** por cima do volume de cada pessoa e do reforço acima de 100% (`boost.ts`).
+- [ ] **Testar microfone** fora da sala devolve o som na saída escolhida; dentro, só o medidor.
+- [ ] **Os padrões da transmissão** chegam ao seletor de fontes, e mudar no seletor não muda o padrão.
 
-- [ ] **Atalho do pausar:** uma tecla global ou só pela bandeja e pelo painel.
-- [x] **Miniaturas em JPEG ou em RGBA cru** pelo `Channel`: JPEG (480×270, qualidade 80): leve o
-      bastante para 24 cards a 8 fps.
-- [x] **Codec do plano B:** VP8 ou H.264 em software. Ficou o VP8, pela
-      `NativeVideoSource` da livekit; quem assiste decodifica os dois.
+### Gancho e atalhos
+
+- [ ] **Um jogo em tela cheia exclusiva** recebe a tecla do pressionar para falar e o Ashtar também.
+- [ ] **Um jogo como administrador** (UIPI): o atalho não chega. Explicar na aba Atalhos.
+- [ ] **Os anti-cheats dos jogos do grupo** não reclamam do gancho.
+- [ ] **O gancho não é desligado pelo Windows** depois de uma hora de uso (o tempo do callback).
+- [ ] **O teclado ABNT2:** os nomes das teclas (Ç, as acentuadas) aparecem certos.
+- [ ] **A tecla segurada** (repetição) dispara o atalho de mutar uma vez só.
+- [ ] **Alt+Tab com a tecla do pressionar para falar apertada:** o portão fecha quando ela solta, mesmo em outra
+      janela.
+- [ ] **Os textos** da aba Atalhos, do aviso de combinação repetida e do "Pressionar para falar: V", revisados.
+
+### Aviso de mutado e som
+
+- [ ] **O clone da trilha** mutada não acende a luz do microfone de novo no Windows nem pesa na CPU.
+- [ ] **O aviso de mutado** não aparece com o barulho de fundo (usa o mesmo limiar do portão).
+- [ ] **O som do pressionar para falar** não vai para a trilha (só quem aperta ouve).
+
+## Parte 2 — confiabilidade
+
+### Voz e transmissão
+
+- [ ] **Quem foi desconectado, movido ou perdeu o acesso** não reconecta.
+- [ ] **A sala arquivada no meio da reconexão:** desiste, com o aviso de arquivada.
+- [ ] **A reconexão durante uma ligação privada** volta para a ligação, e só se a outra pessoa ainda está nela.
+- [ ] **A câmera não volta ligada** depois da reconexão.
+- [ ] **A suspensão do Windows** com a sala aberta: ao voltar, reconecta sem ficar em duas salas.
+- [ ] **A transmissão que volta:** quem assistia continua assistindo, com o mesmo volume e a mesma qualidade.
+- [ ] **O limite de transmissões** (6) não recusa quem está voltando.
+
+### Dispositivos
+
+- [ ] **Bluetooth** que troca de perfil (o fone vira "mãos livres" ao abrir o microfone): não fica em laço de
+      aviso.
+- [ ] **O aviso não repete** quando o mesmo dispositivo some e volta várias vezes seguidas.
+
+### Servidor
+
+- [ ] **A faixa não pisca** em quedas menores que 5 segundos.
+- [ ] **As consultas recarregadas** ao voltar: nada fica velho (não lidas, membros online, canais).
+- [ ] **O `TimeoutLayer`** não corta o WebSocket nem o upload dos logs.
+
+### Qualidade da conexão
+
+- [ ] **O `ConnectionQuality` do LiveKit** chega para todos os participantes, não só para o próprio.
+- [ ] **A mensagem `voice.stats`** não pesa (uma a cada 5 s por pessoa).
+
+### Logs
+
+- [ ] **O tamanho do `.zip`** de 2 dias de log, com uma noite de transmissão.
+- [ ] **O disco da VPS:** a pasta `data/logs/` entra no backup? Decidir (sugestão: não, são de 30 dias).
+- [ ] **O texto do botão** diz que só o dono vê, e que os logs têm nicks.
+
+### Testar conexão e estado do servidor
+
+- [ ] **A sala `teste:{user_id}`** não aparece em lista nenhuma, e o webhook não manda `voice.participants` dela.
+- [ ] **O `ConnectionCheck`** no WebView2: os testes de TURN e de publicar passam com o LiveKit da VPS.
+- [ ] **A pasta `data/backups/`** montada na API (o `compose.yaml`), só para leitura.
 
 ## Riscos e cuidados
 
-- [ ] **Driver da AMD e a ordem da codec API** (decisão 4): uma atualização de driver pode mudar o
-      comportamento. O teste com GPU da Etapa 2 confere o fps gravado no SPS.
-- [ ] **Outras marcas de placa** podem ter as próprias pegadinhas no Media Foundation. O encoder fica atrás de uma
-      interface, para o AMF (SDK da AMD) ou outro entrar se o MF não servir.
-- [ ] **Sem chave para voltar ao IPC:** um problema no beta só se resolve com outra versão. A semana no beta é a
-      rede de segurança.
-- [ ] **Conteúdo com DRM** sai preto também no WGC. O aviso de conteúdo protegido continua na v0.8.
-- [ ] **Cota do LiveKit Cloud:** a `:screen` conta como mais um participante enquanto a VPS não entra (cerca de 1
-      minuto a mais por minuto de transmissão, dos 5.000 do plano gratuito).
-- [ ] **A trava de uma transmissão por vez** continua só no app e agora precisa reconhecer a `:screen` como a
-      transmissão de alguém.
-- [ ] **O `SetForegroundWindow`** só troca o foco se o app estiver em primeiro plano, o que vale no clique de
-      transmitir. Pela bandeja, trocar de fonte pode não trazer a janela para a frente.
+- [ ] **O gancho global vê todas as teclas do computador.** O Rust só compara com a lista de atalhos e não grava nem
+      manda nada além do nome do atalho; nenhuma tecla vai para o log.
+- [ ] **Os logs saem do computador da pessoa.** Só quando ela clica, nunca sozinhos, e o conteúdo é o mesmo da pasta
+      que ela já pode abrir.

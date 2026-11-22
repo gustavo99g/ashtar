@@ -9,7 +9,10 @@
 //! - início atômico: ou o vídeo, a conexão e o áudio pedido sobem, ou nada fica rodando (e a
 //!   `:screen` sai da sala);
 //! - o aviso de fim sai exatamente uma vez, dado por quem removeu a sessão: a parada pelo usuário,
-//!   o fim do vídeo (janela fechada, erro na GPU) ou a queda da conexão;
+//!   o fim do vídeo (janela fechada, erro na GPU) ou a conexão que caiu e não voltou;
+//! - a queda da conexão não encerra (v0.6, ADR 0030): o vídeo continua rodando, o áudio para, e o
+//!   manager avisa `LinkLost`. O app pede um token novo e chama [`ShareManager::reconnect`], que
+//!   entra de novo e retoma o áudio. Sem voltar em [`GIVE_UP`], a transmissão acaba;
 //! - o fim do áudio sozinho não derruba o vídeo;
 //! - pedidos de parada e de ajuste de sessões antigas são ignorados.
 //!
@@ -23,6 +26,7 @@ use std::{
     path::Path,
     sync::{mpsc, Arc, Mutex, MutexGuard, PoisonError},
     thread,
+    time::Duration,
 };
 
 use tracing::{debug, info, warn};
@@ -42,6 +46,9 @@ use crate::{
 // ============================================================================
 // O que entra e o que sai
 // ============================================================================
+
+/// Quanto a transmissão espera a conexão voltar antes de acabar.
+pub const GIVE_UP: Duration = Duration::from_secs(120);
 
 /// Tudo que o início precisa.
 #[derive(Debug, Clone)]
@@ -72,6 +79,8 @@ pub enum ShareEvent {
     Ended { session_id: u64, reason: EndReason },
     /// Só o áudio acabou; o vídeo continua (`screen-share-audio-ended`).
     AudioEnded { session_id: u64, reason: EndReason },
+    /// A conexão caiu; o app pede um token novo e chama o `reconnect` (`screen-share-link-lost`).
+    LinkLost { session_id: u64 },
 }
 
 type OnShareEvent = Box<dyn Fn(ShareEvent) + Send + Sync>;
@@ -89,7 +98,10 @@ pub trait Link: Send + 'static {
     ) -> Result<Option<CaptureHandle>, AppError>;
     /// Tira o áudio da sala (a captura já parou).
     fn stop_audio(&mut self);
-    fn set_paused(&self, paused: bool);
+    fn set_paused(&mut self, paused: bool);
+    /// Entra de novo depois de uma queda e republica a tela (sem o áudio). `on_lost` vale para a
+    /// conexão nova.
+    fn reconnect(&mut self, target: &ShareTarget, on_lost: OnLinkLost) -> Result<(), AppError>;
     /// Liga ou desliga o nivelador do áudio. Vale para o áudio de agora e para os próximos.
     fn set_leveler(&self, enabled: bool);
     /// Sai da sala.
@@ -128,7 +140,17 @@ enum SessionEvent {
     },
     LinkLost {
         session_id: u64,
+        /// Qual conexão da sessão: cada volta é outra.
+        generation: u64,
         message: String,
+        /// Para o aviso do [`GIVE_UP`]. Vem no evento, e não fica no `Shared`, para o canal fechar
+        /// quando o manager sair.
+        events: mpsc::Sender<SessionEvent>,
+    },
+    /// Passou o [`GIVE_UP`] desde a queda `generation`.
+    GiveUp {
+        session_id: u64,
+        generation: u64,
     },
 }
 
@@ -147,6 +169,12 @@ struct Session {
     control: VideoControl,
     stats: VideoStats,
     link: Box<dyn Link>,
+    /// O áudio pedido (o de agora, ou o que volta depois da queda).
+    audio_mode: AudioMode,
+    /// A conexão de agora: começa em 0 e sobe a cada volta.
+    link_generation: u64,
+    /// A conexão caiu e ainda não voltou.
+    link_lost: bool,
 }
 
 impl Session {
@@ -178,6 +206,7 @@ struct State {
 struct Shared {
     state: Mutex<State>,
     on_event: OnShareEvent,
+    give_up: Duration,
 }
 
 impl Shared {
@@ -207,8 +236,24 @@ impl Shared {
             SessionEvent::VideoEnded { session_id, reason } => self.end(session_id, reason),
             SessionEvent::LinkLost {
                 session_id,
+                generation,
                 message,
-            } => self.end(session_id, EndReason::Error(message)),
+                events,
+            } => self.link_lost(session_id, generation, message, events),
+            SessionEvent::GiveUp {
+                session_id,
+                generation,
+            } => {
+                let lost = self.lock().session.as_ref().is_some_and(|s| {
+                    s.id == session_id && s.link_lost && s.link_generation == generation
+                });
+                if lost {
+                    self.end(
+                        session_id,
+                        EndReason::Error("a conexão da transmissão caiu e não voltou".into()),
+                    );
+                }
+            }
             SessionEvent::AudioEnded {
                 session_id,
                 audio_id,
@@ -241,6 +286,56 @@ impl Shared {
     }
 }
 
+impl Shared {
+    /// A conexão `generation` da sessão caiu: o vídeo continua, o áudio para, e o app é avisado
+    /// para pedir um token novo. Sem voltar em [`GIVE_UP`], acaba.
+    fn link_lost(
+        &self,
+        session_id: u64,
+        generation: u64,
+        message: String,
+        events: mpsc::Sender<SessionEvent>,
+    ) {
+        let audio = {
+            let mut state = self.lock();
+            match state.session.as_mut() {
+                Some(session)
+                    if session.id == session_id
+                        && session.link_generation == generation
+                        && !session.link_lost =>
+                {
+                    session.link_lost = true;
+                    session.audio.take()
+                }
+                _ => {
+                    debug!(session_id, "queda de uma conexão que já saiu; ignorada");
+                    return;
+                }
+            }
+        };
+        warn!(session_id, %message, "a conexão da transmissão caiu; esperando voltar");
+        (self.on_event)(ShareEvent::LinkLost { session_id });
+        // Parado por nós: o `AudioEnded` que ele gera não encontra o áudio e não avisa.
+        if let Some(audio) = audio {
+            audio.handle.stop_and_join();
+        }
+        let give_up = self.give_up;
+        let spawned = thread::Builder::new()
+            .name("screen-share-give-up".to_string())
+            .spawn(move || {
+                thread::sleep(give_up);
+                let _ = events.send(SessionEvent::GiveUp {
+                    session_id,
+                    generation,
+                });
+            });
+        if let Err(error) = spawned {
+            warn!(%error, "não deu para contar o tempo da queda; a transmissão acaba agora");
+            self.end(session_id, EndReason::Error(message));
+        }
+    }
+}
+
 // ============================================================================
 // O manager
 // ============================================================================
@@ -258,11 +353,20 @@ impl ShareManager {
     ///
     /// Se o sistema não conseguir criar a thread.
     pub fn new(on_event: impl Fn(ShareEvent) + Send + Sync + 'static) -> Self {
+        Self::with_give_up(on_event, GIVE_UP)
+    }
+
+    /// Como o [`ShareManager::new`], com outra espera pela volta da conexão (os testes).
+    fn with_give_up(
+        on_event: impl Fn(ShareEvent) + Send + Sync + 'static,
+        give_up: Duration,
+    ) -> Self {
+        let (events, rx) = mpsc::channel();
         let shared = Arc::new(Shared {
             state: Mutex::new(State::default()),
             on_event: Box::new(on_event),
+            give_up,
         });
-        let (events, rx) = mpsc::channel();
         let worker = Arc::clone(&shared);
         thread::Builder::new()
             .name("screen-share-events".to_string())
@@ -316,7 +420,7 @@ impl ShareManager {
             mut link,
         } = start(self.ends(id))?;
 
-        let audio = match link.start_audio(audio, self.on_audio_end(id, 1)) {
+        let audio_capture = match link.start_audio(audio, self.on_audio_end(id, 1)) {
             Ok(audio) => audio.map(|handle| Audio { id: 1, handle }),
             Err(error) => {
                 video.request_stop();
@@ -328,19 +432,70 @@ impl ShareManager {
 
         info!(
             session_id = id,
-            audio = audio.is_some(),
+            audio = audio_capture.is_some(),
             "transmissão iniciada"
         );
         state.session = Some(Session {
             id,
             video,
-            audio,
+            audio: audio_capture,
             last_audio: 1,
             control,
             stats,
             link,
+            audio_mode: audio,
+            link_generation: 0,
+            link_lost: false,
         });
         Ok(id)
+    }
+
+    /// Volta a transmissão `session_id` para a sala depois de uma queda, com o token novo de
+    /// `target`, e retoma o áudio pedido. Uma sessão que já saiu, ou que não caiu, não muda.
+    ///
+    /// # Bloqueia
+    ///
+    /// Até entrar e publicar. Só chamar dentro de `spawn_blocking`.
+    pub fn reconnect(&self, session_id: u64, target: &ShareTarget) -> Result<(), AppError> {
+        let mut state = self.shared.lock();
+        let Some(session) = state
+            .session
+            .as_mut()
+            .filter(|s| s.id == session_id && s.link_lost)
+        else {
+            debug!(
+                session_id,
+                "volta de uma transmissão que não caiu; ignorada"
+            );
+            return Ok(());
+        };
+        let generation = session.link_generation + 1;
+        session
+            .link
+            .reconnect(target, self.link_lost(session_id, generation))?;
+        session.link_generation = generation;
+        session.link_lost = false;
+        info!(session_id, "a transmissão voltou para a sala");
+
+        session.last_audio += 1;
+        let audio_id = session.last_audio;
+        let on_end = self.on_audio_end(session_id, audio_id);
+        match session.link.start_audio(session.audio_mode, on_end) {
+            Ok(handle) => {
+                session.audio = handle.map(|handle| Audio {
+                    id: audio_id,
+                    handle,
+                });
+            }
+            Err(error) => {
+                warn!(session_id, %error, "o áudio não voltou com a transmissão");
+                (self.shared.on_event)(ShareEvent::AudioEnded {
+                    session_id,
+                    reason: EndReason::Error(error.to_string()),
+                });
+            }
+        }
+        Ok(())
     }
 
     /// Ajusta a transmissão `session_id`, se ela ainda for a atual.
@@ -371,7 +526,10 @@ impl ShareManager {
                 session.link.set_paused(paused);
             }
             ShareChange::Leveler(enabled) => session.link.set_leveler(enabled),
+            // Caída, a conexão não publica nada: o áudio novo começa quando ela voltar.
+            ShareChange::Audio(mode) if session.link_lost => session.audio_mode = mode,
             ShareChange::Audio(mode) => {
+                session.audio_mode = mode;
                 // Parada por nós: o `AudioEnded` que ela gera não encontra o áudio e não avisa.
                 if let Some(audio) = session.audio.take() {
                     audio.handle.stop_and_join();
@@ -411,7 +569,6 @@ impl ShareManager {
 
     fn ends(&self, id: u64) -> Ends {
         let video = self.events.clone();
-        let link = self.events.clone();
         Ends {
             video: Box::new(move |reason| {
                 let _ = video.send(SessionEvent::VideoEnded {
@@ -419,13 +576,20 @@ impl ShareManager {
                     reason,
                 });
             }),
-            link_lost: Box::new(move |message| {
-                let _ = link.send(SessionEvent::LinkLost {
-                    session_id: id,
-                    message,
-                });
-            }),
+            link_lost: self.link_lost(id, 0),
         }
+    }
+
+    fn link_lost(&self, id: u64, generation: u64) -> OnLinkLost {
+        let events = self.events.clone();
+        Box::new(move |message| {
+            let _ = events.send(SessionEvent::LinkLost {
+                session_id: id,
+                generation,
+                message,
+                events: events.clone(),
+            });
+        })
     }
 
     fn on_audio_end(&self, id: u64, audio_id: u64) -> OnEnd {
@@ -486,8 +650,12 @@ impl Link for NativeLink {
         self.publisher.unpublish_audio();
     }
 
-    fn set_paused(&self, paused: bool) {
+    fn set_paused(&mut self, paused: bool) {
         self.publisher.set_paused(paused);
+    }
+
+    fn reconnect(&mut self, target: &ShareTarget, on_lost: OnLinkLost) -> Result<(), AppError> {
+        self.publisher.reconnect(target, on_lost)
     }
 
     fn set_leveler(&self, enabled: bool) {
@@ -626,6 +794,7 @@ mod tests {
         calls: Arc<Mutex<Vec<String>>>,
         audio: Arc<Mutex<Vec<Fake>>>,
         link_lost: Arc<Mutex<Option<OnLinkLost>>>,
+        fail_reconnect: Arc<Mutex<Option<()>>>,
     }
 
     impl Record {
@@ -666,12 +835,24 @@ mod tests {
         fn stop_audio(&mut self) {
             self.record.calls.lock().unwrap().push("tira áudio".into());
         }
-        fn set_paused(&self, paused: bool) {
+        fn set_paused(&mut self, paused: bool) {
             self.record
                 .calls
                 .lock()
                 .unwrap()
                 .push(format!("pausa {paused}"));
+        }
+        fn reconnect(&mut self, target: &ShareTarget, on_lost: OnLinkLost) -> Result<(), AppError> {
+            if self.record.fail_reconnect.lock().unwrap().take().is_some() {
+                return Err(AppError::Publish("ainda sem rede".into()));
+            }
+            self.record
+                .calls
+                .lock()
+                .unwrap()
+                .push(format!("volta com {}", target.token));
+            *self.record.link_lost.lock().unwrap() = Some(on_lost);
+            Ok(())
         }
         fn set_leveler(&self, enabled: bool) {
             self.record
@@ -823,24 +1004,117 @@ mod tests {
         assert_no_event(&events);
     }
 
+    fn target(token: &str) -> ShareTarget {
+        ShareTarget {
+            url: "wss://teste".into(),
+            token: token.into(),
+            track_name: "screen-share:{}".into(),
+        }
+    }
+
+    fn lose_link(setup: &Setup) {
+        let lost = setup.record.link_lost.lock().unwrap().take().unwrap();
+        lost("o servidor caiu".into());
+    }
+
     #[test]
-    fn queda_da_conexao_encerra_uma_vez() {
+    fn queda_da_conexao_avisa_e_mantem_o_video() {
+        let (manager, events) = manager();
+        let setup = Setup::new();
+        let id = manager.start_with(setup.start(false), SYSTEM).unwrap();
+
+        lose_link(&setup);
+
+        assert!(matches!(
+            next_event(&events),
+            ShareEvent::LinkLost { session_id } if session_id == id
+        ));
+        wait_until("o áudio parar", || setup.record.audio(0).finished());
+        assert!(!setup.video().finished());
+        // O fim do áudio que a queda gera não vira aviso.
+        assert_no_event(&events);
+    }
+
+    #[test]
+    fn a_conexao_volta_com_o_token_novo_e_o_audio_volta_junto() {
+        let (manager, events) = manager();
+        let setup = Setup::new();
+        let id = manager.start_with(setup.start(false), SYSTEM).unwrap();
+        lose_link(&setup);
+        next_event(&events);
+
+        manager.reconnect(id, &target("novo")).unwrap();
+
+        let calls = setup.record.calls();
+        assert_eq!(
+            calls[calls.len() - 2..],
+            ["volta com novo", "publica áudio"]
+        );
+        assert!(!setup.record.audio(1).finished());
+        // Voltou: uma segunda volta não faz nada, e a conexão nova também pode cair.
+        manager.reconnect(id, &target("outro")).unwrap();
+        assert_eq!(setup.record.calls().len(), calls.len());
+        lose_link(&setup);
+        assert!(matches!(next_event(&events), ShareEvent::LinkLost { .. }));
+    }
+
+    #[test]
+    fn uma_volta_que_falha_deixa_tentar_de_novo() {
         let (manager, events) = manager();
         let setup = Setup::new();
         let id = manager
             .start_with(setup.start(false), AudioMode::Off)
             .unwrap();
+        lose_link(&setup);
+        next_event(&events);
+        *setup.record.fail_reconnect.lock().unwrap() = Some(());
 
-        let lost = setup.record.link_lost.lock().unwrap().take().unwrap();
-        lost("o servidor caiu".into());
+        assert!(manager.reconnect(id, &target("a")).is_err());
+        manager.reconnect(id, &target("b")).unwrap();
 
+        assert!(setup.record.calls().contains(&"volta com b".to_string()));
+    }
+
+    #[test]
+    fn sem_voltar_a_tempo_a_transmissao_acaba_uma_vez() {
+        let (tx, events) = mpsc::channel();
+        let manager = ShareManager::with_give_up(
+            move |event| {
+                let _ = tx.send(event);
+            },
+            Duration::from_millis(50),
+        );
+        let setup = Setup::new();
+        let id = manager
+            .start_with(setup.start(false), AudioMode::Off)
+            .unwrap();
+
+        lose_link(&setup);
+
+        assert!(matches!(next_event(&events), ShareEvent::LinkLost { .. }));
         assert!(matches!(
             next_event(&events),
-            ShareEvent::Ended { session_id, reason: EndReason::Error(message) }
-                if session_id == id && message == "o servidor caiu"
+            ShareEvent::Ended { session_id, reason: EndReason::Error(_) } if session_id == id
         ));
         wait_until("o vídeo parar", || setup.video().finished());
         assert_no_event(&events);
+    }
+
+    #[test]
+    fn trocar_o_audio_com_a_conexao_caida_vale_quando_ela_volta() {
+        let (manager, events) = manager();
+        let setup = Setup::new();
+        let id = manager
+            .start_with(setup.start(false), AudioMode::Off)
+            .unwrap();
+        lose_link(&setup);
+        next_event(&events);
+
+        manager.update(id, ShareChange::Audio(SYSTEM)).unwrap();
+        assert!(!setup.record.calls().contains(&"publica áudio".to_string()));
+        manager.reconnect(id, &target("novo")).unwrap();
+
+        assert!(setup.record.calls().contains(&"publica áudio".to_string()));
     }
 
     #[test]

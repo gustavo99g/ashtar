@@ -25,6 +25,11 @@ pub fn spawn_audio_capture(
     Err(AppError::Unsupported("captura de áudio"))
 }
 
+/// Sem implementação de plataforma, não há placa para dizer.
+pub fn gpu_name() -> Option<String> {
+    None
+}
+
 /// Sempre vazia: sem implementação de plataforma, não há janelas para listar.
 pub fn list_windows() -> Vec<WindowEntry> {
     Vec::new()

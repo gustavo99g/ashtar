@@ -197,6 +197,30 @@ describe("createRealtime", () => {
 		expect(getTicket).toHaveBeenCalledTimes(1);
 	});
 
+	it("diz quando é a próxima tentativa, e o Tentar agora não espera", async () => {
+		const { realtime, getTicket } = setup();
+		realtime.start();
+		await flush();
+		expect(realtime.nextRetryAt()).toBeNull();
+		latest().drop();
+		latest().drop();
+		expect(realtime.nextRetryAt()).toBe(Date.now() + 1000);
+
+		realtime.retryNow();
+		await flush();
+		expect(getTicket).toHaveBeenCalledTimes(2);
+		expect(realtime.nextRetryAt()).toBeNull();
+		// A espera de antes não dispara outra tentativa.
+		await vi.advanceTimersByTimeAsync(1000);
+		expect(getTicket).toHaveBeenCalledTimes(2);
+
+		// Conectada, não há o que tentar.
+		latest().open();
+		latest().receive(ready);
+		realtime.retryNow();
+		expect(getTicket).toHaveBeenCalledTimes(2);
+	});
+
 	it("ticket sem rede tenta de novo; recusado por regra encerra", async () => {
 		const network = new ApiError({ status: 0, kind: "network", message: "" });
 		const refused = new ApiError({

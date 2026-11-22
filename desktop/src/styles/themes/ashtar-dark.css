@@ -79,6 +79,8 @@
 	--status-online: var(--green-500);
 	--status-connecting: var(--orange-400);
 	--status-offline: var(--navy-300);
+	--status-busy: var(--red-600);
+	--status-away: var(--gold-500);
 	--speaking: var(--blue-600);
 	--live: var(--gold-500);
 	--live-foreground: var(--navy-900);

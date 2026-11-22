@@ -4,9 +4,26 @@
  * array à mão.
  */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback } from "react";
-import { getInvite, getMe, updateMe } from "@/lib/api";
+import { useCallback, useEffect } from "react";
+import {
+	deleteSavedAvatar,
+	getInvite,
+	getMe,
+	listSavedAvatars,
+	type MeResponse,
+	removeAvatar,
+	type Status,
+	setAvatar,
+	setStatus,
+	updateMe,
+	uploadFile,
+} from "@/lib/api";
+import { clearFileCache } from "@/lib/fileCache";
+import { useOptionalQueryClient } from "@/lib/query";
+import { AVATAR_OUTPUT } from "./model/avatarCrop";
+import { clearAvatars, rememberAvatars } from "./stores/avatarStore";
 import { redeemInvite, useSession } from "./stores/sessionStore";
+import { rememberStatus, useLastStatus } from "./stores/statusStore";
 
 /**
  * Esquece tudo o que a API devolveu (de todos os domínios): quando este computador sai do grupo, o
@@ -14,12 +31,24 @@ import { redeemInvite, useSession } from "./stores/sessionStore";
  */
 export function useClearCache() {
 	const queryClient = useQueryClient();
-	return useCallback(() => queryClient.clear(), [queryClient]);
+	return useCallback(() => {
+		queryClient.clear();
+		clearFileCache();
+		clearAvatars();
+	}, [queryClient]);
+}
+
+/** O `/api/me`, guardando a minha foto para o `Avatar`. */
+async function fetchMe(): Promise<MeResponse> {
+	const me = await getMe();
+	rememberAvatars([me.user]);
+	return me;
 }
 
 export const identityKeys = {
 	all: ["identity"] as const,
 	me: () => [...identityKeys.all, "me"] as const,
+	savedAvatars: () => [...identityKeys.all, "saved-avatars"] as const,
 	invite: (code: string) => [...identityKeys.all, "invite", code] as const,
 };
 
@@ -31,9 +60,26 @@ export function useMe() {
 	const connected = useSession().status === "connected";
 	return useQuery({
 		queryKey: identityKeys.me(),
-		queryFn: getMe,
+		queryFn: fetchMe,
 		enabled: connected,
 	});
+}
+
+/**
+ * O `/api/me` para quem só precisa de uma permissão de enfeite (mostrar ou esconder um botão): o
+ * mesmo do `useMe`, mas sem quebrar fora do `QueryClientProvider`.
+ */
+export function useOptionalMe(): MeResponse | undefined {
+	const connected = useSession().status === "connected";
+	const { client, present } = useOptionalQueryClient();
+	return useQuery(
+		{
+			queryKey: identityKeys.me(),
+			queryFn: fetchMe,
+			enabled: connected && present,
+		},
+		client,
+	).data;
 }
 
 /**
@@ -77,5 +123,116 @@ export function useUpdateMe() {
 		mutationFn: (displayName: string | null) =>
 			updateMe({ display_name: displayName }),
 		onSuccess: (me) => queryClient.setQueryData(identityKeys.me(), me),
+	});
+}
+
+/**
+ * Troca a foto de perfil: envia a imagem já recortada (`kind=avatar`) e liga ela ao perfil. Com
+ * `null`, tira a foto. Quem vê recebe o `user.updated`; aqui, o `/api/me` em cache já muda.
+ */
+export function useChangeAvatar() {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: async (image: Blob | null) => {
+			if (!image) return removeAvatar();
+			const extension = image.type === "image/webp" ? "webp" : "png";
+			const file = await uploadFile(image, {
+				kind: "avatar",
+				name: `foto.${extension}`,
+				width: AVATAR_OUTPUT,
+				height: AVATAR_OUTPUT,
+			});
+			return setAvatar(file.id);
+		},
+		onSuccess: (me) => {
+			queryClient.setQueryData(identityKeys.me(), me);
+			rememberAvatars([me.user]);
+			void queryClient.invalidateQueries({
+				queryKey: identityKeys.savedAvatars(),
+			});
+		},
+	});
+}
+
+/** As fotos que já usei, para voltar a uma delas (a API guarda até 12, contando a de agora). */
+export function useSavedAvatars() {
+	const connected = useSession().status === "connected";
+	return useQuery({
+		queryKey: identityKeys.savedAvatars(),
+		queryFn: listSavedAvatars,
+		enabled: connected,
+	});
+}
+
+/** Volta a uma foto guardada. */
+export function useReuseAvatar() {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: (fileId: string) => setAvatar(fileId),
+		onSuccess: (me) => {
+			queryClient.setQueryData(identityKeys.me(), me);
+			rememberAvatars([me.user]);
+			void queryClient.invalidateQueries({
+				queryKey: identityKeys.savedAvatars(),
+			});
+		},
+	});
+}
+
+/** Apaga uma foto guardada (a de agora não dá). */
+export function useDeleteSavedAvatar() {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: (fileId: string) => deleteSavedAvatar(fileId),
+		onSuccess: () =>
+			queryClient.invalidateQueries({ queryKey: identityKeys.savedAvatars() }),
+	});
+}
+
+/**
+ * O status de quem está usando: o do `GET /api/me` e, antes de ele chegar, o último que este
+ * computador viu. Cada resposta nova fica guardada para a próxima abertura.
+ */
+export function useMyStatus(): Status {
+	const { data: me } = useMe();
+	const last = useLastStatus((state) => state.last);
+	const status = me?.status;
+	useEffect(() => {
+		if (status) rememberStatus(status);
+	}, [status]);
+	return status ?? last;
+}
+
+/** Troca o status do `/api/me` em cache, sem pedido (o tempo real e a troca otimista). */
+export function setCachedStatus(
+	queryClient: ReturnType<typeof useQueryClient>,
+	status: Status,
+): void {
+	queryClient.setQueryData<MeResponse>(identityKeys.me(), (me) =>
+		me ? { ...me, status } : me,
+	);
+	rememberStatus(status);
+}
+
+/**
+ * Trocar o status (`PUT /api/me/status`): muda na hora no painel e, se a API recusar, volta como
+ * estava.
+ */
+export function useSetStatus() {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: (status: Status) => setStatus(status),
+		onMutate: (status) => {
+			const before = queryClient.getQueryData<MeResponse>(identityKeys.me())?.status;
+			setCachedStatus(queryClient, status);
+			return { before };
+		},
+		onError: (_error, _status, context) => {
+			if (context?.before) setCachedStatus(queryClient, context.before);
+		},
+		onSuccess: (me) => {
+			queryClient.setQueryData(identityKeys.me(), me);
+			rememberStatus(me.status);
+		},
 	});
 }

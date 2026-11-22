@@ -15,6 +15,7 @@ export {
 	type ClientErrorKind,
 	isApiError,
 	isRetryable,
+	TIMEOUT_MESSAGE,
 } from "./errors";
 // Os tipos das respostas e dos pedidos, gerados do Rust da API (`cargo test` em `api/`).
 export type * from "./generated";

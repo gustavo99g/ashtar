@@ -5,9 +5,9 @@ import {
 	applyDrop,
 	dragCollision,
 	dragId,
+	dropLine,
 	layoutRequest,
-	moveCategory,
-	moveChannel,
+	moveToCategory,
 	sameOrder,
 } from "../model/tree";
 
@@ -19,6 +19,7 @@ function text(id: string, category_id: string | null = null): ChannelView {
 		topic: null,
 		category_id,
 		archived_at: null,
+		restricted: false,
 	};
 }
 
@@ -43,38 +44,33 @@ function order(next: Layout | null) {
 	return { top, categories };
 }
 
-describe("mover pelo menu", () => {
-	it("sobe e desce dentro do mesmo lugar", () => {
-		expect(
-			order(moveChannel(layout, "cs", -1))?.categories[0].channels,
-		).toEqual(["cs", "lol"]);
-		expect(order(moveChannel(layout, "geral", 1))?.top).toEqual([
-			"sala",
-			"geral",
+describe("mover para outra categoria, pelo menu", () => {
+	it("vai para o fim da categoria escolhida e troca a categoria do canal", () => {
+		const next = moveToCategory(layout, "lol", "avisos");
+		expect(order(next)?.categories).toEqual([
+			{ id: "jogos", channels: ["cs"] },
+			{ id: "avisos", channels: ["regras", "lol"] },
 		]);
+		expect(next?.categories[1].channels[1].category_id).toBe("avisos");
 	});
 
-	it("na ponta, passa para o lugar vizinho e troca a categoria do canal", () => {
-		const up = moveChannel(layout, "lol", -1);
-		expect(order(up)?.top).toEqual(["geral", "sala", "lol"]);
-		expect(up?.top[2].category_id).toBeNull();
-
-		const down = moveChannel(layout, "cs", 1);
-		expect(order(down)?.categories[1].channels).toEqual(["cs", "regras"]);
-		expect(down?.categories[1].channels[0].category_id).toBe("avisos");
+	it("\"Sem categoria\" leva para o fim do topo", () => {
+		const next = moveToCategory(layout, "cs", null);
+		expect(order(next)?.top).toEqual(["geral", "sala", "cs"]);
+		expect(next?.top[2].category_id).toBeNull();
 	});
 
-	it("o primeiro do topo não sobe e o último da lista não desce", () => {
-		expect(moveChannel(layout, "geral", -1)).toBeNull();
-		expect(moveChannel(layout, "regras", 1)).toBeNull();
-	});
-
-	it("categoria sobe e desce, mas não passa das pontas", () => {
+	it("sai do topo para uma categoria", () => {
 		expect(
-			order(moveCategory(layout, "avisos", -1))?.categories.map((c) => c.id),
-		).toEqual(["avisos", "jogos"]);
-		expect(moveCategory(layout, "jogos", -1)).toBeNull();
-		expect(moveCategory(layout, "avisos", 1)).toBeNull();
+			order(moveToCategory(layout, "geral", "jogos"))?.categories[0].channels,
+		).toEqual(["lol", "cs", "geral"]);
+	});
+
+	it("não há o que gravar se ele já está lá, ou se o canal ou a categoria não existem", () => {
+		expect(moveToCategory(layout, "lol", "jogos")).toBeNull();
+		expect(moveToCategory(layout, "geral", null)).toBeNull();
+		expect(moveToCategory(layout, "lol", "sumiu")).toBeNull();
+		expect(moveToCategory(layout, "sumiu", "jogos")).toBeNull();
 	});
 });
 
@@ -127,6 +123,72 @@ describe("soltar depois de arrastar", () => {
 		);
 		expect(next && layoutRequest(next).version).toBe(7);
 		expect(next && sameOrder(layout, next)).toBe(true);
+	});
+});
+
+describe("a linha de onde vai cair", () => {
+	const ch = dragId.channel;
+	const cat = dragId.category;
+
+	it("um canal em cima de outro: a linha fica onde ele vai entrar", () => {
+		// De outra lista, toma o lugar do alvo: a linha fica antes dele.
+		expect(dropLine(layout, ch("regras"), ch("cs"))).toEqual({
+			id: ch("cs"),
+			edge: "before",
+		});
+		// Para baixo na mesma lista, vai para depois do alvo, que era o último.
+		expect(dropLine(layout, ch("lol"), ch("cs"))).toEqual({
+			id: ch("cs"),
+			edge: "after",
+		});
+		// Para cima na mesma lista, antes do alvo.
+		expect(dropLine(layout, ch("cs"), ch("lol"))).toEqual({
+			id: ch("lol"),
+			edge: "before",
+		});
+	});
+
+	it("no nome da categoria ou no fim do topo: depois do último canal de lá", () => {
+		expect(dropLine(layout, ch("geral"), cat("jogos"))).toEqual({
+			id: ch("cs"),
+			edge: "after",
+		});
+		expect(dropLine(layout, ch("lol"), dragId.top)).toEqual({
+			id: ch("sala"),
+			edge: "after",
+		});
+	});
+
+	it("numa categoria vazia, logo depois do nome dela", () => {
+		const empty: Layout = {
+			...layout,
+			categories: [
+				...layout.categories,
+				{ id: "vazia", name: "Vazia", channels: [] },
+			],
+		};
+		expect(dropLine(empty, ch("lol"), cat("vazia"))).toEqual({
+			id: cat("vazia"),
+			edge: "after",
+		});
+	});
+
+	it("uma categoria: antes da que fica embaixo, ou depois da de cima", () => {
+		expect(dropLine(layout, cat("avisos"), cat("jogos"))).toEqual({
+			id: cat("jogos"),
+			edge: "before",
+		});
+		expect(dropLine(layout, cat("jogos"), cat("avisos"))).toEqual({
+			id: cat("avisos"),
+			edge: "after",
+		});
+	});
+
+	it("sem linha quando soltar não muda nada", () => {
+		expect(dropLine(layout, ch("lol"), ch("lol"))).toBeNull();
+		// O `cs` já é o último de Jogos.
+		expect(dropLine(layout, ch("cs"), cat("jogos"))).toBeNull();
+		expect(dropLine(layout, cat("jogos"), ch("regras"))).toBeNull();
 	});
 });
 

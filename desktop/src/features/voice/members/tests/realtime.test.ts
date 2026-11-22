@@ -9,6 +9,9 @@ const kid: ParticipantView = {
 	nick: "kid",
 	display_name: null,
 	screen_sharing: true,
+	mic_off: false,
+	deafened: false,
+	camera: false,
 };
 
 describe("handleVoiceRealtime", () => {
@@ -26,9 +29,13 @@ describe("handleVoiceRealtime", () => {
 	it("o ready da volta de uma queda marca a lista como velha; o primeiro, não", () => {
 		const ready: ServerEvent = {
 			type: "ready",
+			call: null,
 			user_id: "u1",
 			online: [],
+			busy: [], away: [],
+			status: "available",
 			channels: [],
+			dms: [],
 		};
 		const client = new QueryClient();
 		client.setQueryData(voiceKeys.participants("sala"), [kid]);

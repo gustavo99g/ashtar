@@ -2,16 +2,21 @@
 //! (`src/bin/admin.rs`) usam as mesmas regras e o mesmo banco.
 
 pub mod avatar;
+pub mod calls;
 pub mod chat;
 pub mod client_policy;
 pub mod db;
 pub mod download;
 pub mod error;
+pub mod files;
 pub mod identity;
 pub mod limiter;
+pub mod logs;
+pub mod previews;
 pub mod realtime;
 pub mod routes;
 pub mod secret;
+pub mod timeout;
 pub mod voice;
 
 use std::sync::Arc;
@@ -50,6 +55,26 @@ pub struct AppState {
     pub public_url: Arc<str>,
     /// O instalador do "Baixar para Windows", lido do `latest.json`.
     pub download: Arc<DownloadLink>,
+    /// Quanto a ligação toca antes de virar perdida ([`calls::RING_TIMEOUT`];
+    /// os testes usam menos).
+    pub ring_timeout: std::time::Duration,
+    /// Quanto quem foi movido tem para trocar de sala sozinho
+    /// ([`routes::voice::MOVE_GRACE`]; os testes usam menos).
+    pub move_grace: std::time::Duration,
+    /// A pasta dos dados: os logs enviados e os backups ([`logs::data_dir_from_env`]; os testes
+    /// usam uma temporária).
+    pub data_dir: Arc<std::path::Path>,
+    /// Quando a API subiu, para o "no ar há" do Painel.
+    pub started_at: i64,
+    /// Onde ficam os bytes dos arquivos (ADR 0031).
+    pub files: Arc<files::FileStore>,
+    /// Quando o dono foi avisado do disco cheio pela última vez (no máximo uma vez por dia).
+    pub disk_alerted_at: Arc<std::sync::atomic::AtomicI64>,
+    /// As regras da busca das prévias de link (a VPS só vai a endereços públicos).
+    pub previews: Arc<previews::Guard>,
+    /// A chave dos links curtos do vídeo, sorteada a cada vez que a API sobe (um link vale 10
+    /// minutos: reiniciar só faz o app pedir outro).
+    pub link_key: Arc<[u8; 32]>,
 }
 
 impl AppState {
@@ -64,6 +89,18 @@ impl AppState {
                 .map(|verifier| Arc::new(WebhookReceiver::new(verifier))),
             public_url: public_url.trim_end_matches('/').into(),
             download: Arc::new(DownloadLink::default()),
+            ring_timeout: calls::RING_TIMEOUT,
+            move_grace: routes::voice::MOVE_GRACE,
+            data_dir: logs::data_dir_from_env().into(),
+            started_at: db::now(),
+            files: Arc::new(files::FileStore::from_env(&logs::data_dir_from_env())),
+            disk_alerted_at: Arc::new(std::sync::atomic::AtomicI64::new(0)),
+            previews: Arc::new(previews::Guard::default()),
+            link_key: Arc::new({
+                let mut key = [0u8; 32];
+                getrandom::fill(&mut key).expect("o sistema deveria fornecer bytes aleatórios");
+                key
+            }),
         }
     }
 
@@ -74,6 +111,46 @@ impl AppState {
             InviteKind::Recovery => "recovery",
         };
         format!("{}/{path}/{code}", self.public_url)
+    }
+}
+
+/// De quanto em quanto tempo a API limpa os arquivos não usados e olha o disco (ADR 0031).
+pub const FILE_MAINTENANCE_EVERY: std::time::Duration = std::time::Duration::from_secs(60 * 60);
+
+/// Uma rodada da manutenção dos arquivos: apaga os não usados há 24 horas e, com o disco acima de
+/// 80%, avisa o dono (no máximo uma vez por dia).
+pub async fn maintain_files(state: &AppState) {
+    let now = db::now();
+    if let Err(error) = previews::sweep(&state.db, &state.files, now).await {
+        eprintln!("limpeza das prévias: {error}");
+    }
+    match files::sweep(&state.db, &state.files, now).await {
+        Ok(0) => {}
+        Ok(n) => println!("Arquivos não usados apagados: {n}"),
+        Err(error) => eprintln!("limpeza dos arquivos: {error}"),
+    }
+    let Some(disk) =
+        routes::admin::disk(state.files.root()).or_else(|| routes::admin::disk(&state.data_dir))
+    else {
+        return;
+    };
+    let last = state
+        .disk_alerted_at
+        .load(std::sync::atomic::Ordering::Relaxed);
+    if !files::disk_alert(disk.free_bytes, disk.total_bytes, last, now) {
+        return;
+    }
+    if let Ok(Some(owner)) = identity::users::find_owner(&state.db).await {
+        state
+            .disk_alerted_at
+            .store(now, std::sync::atomic::Ordering::Relaxed);
+        state.hub.publish_to(
+            &[owner.id],
+            &realtime::ServerEvent::DiskAlert {
+                free_bytes: disk.free_bytes,
+                total_bytes: disk.total_bytes,
+            },
+        );
     }
 }
 
@@ -100,9 +177,23 @@ pub fn app(state: AppState, policy: Arc<ClientPolicy>) -> Router {
         .route("/voice/token", post(routes::voice::voice_token))
         .route("/voice/participants", get(routes::voice::participants))
         .route("/voice/screen-token", post(routes::voice::screen_token))
+        .route("/voice/test-token", post(routes::voice::test_token))
+        .route(
+            "/voice/state",
+            put(routes::voice::voice_state).delete(routes::voice::leave_voice_state),
+        )
+        .route("/voice/move", post(routes::voice::move_member))
+        .route("/voice/disconnect", post(routes::voice::disconnect_member))
         .route("/auth/redeem", post(routes::auth::redeem))
         .route("/auth/login", post(routes::auth::login))
         .route("/me", get(routes::auth::me).patch(routes::auth::update_me))
+        .route("/me/status", put(routes::auth::set_status))
+        .route(
+            "/me/avatar",
+            put(routes::auth::set_avatar).delete(routes::auth::remove_avatar),
+        )
+        .route("/me/avatars", get(routes::auth::list_avatars))
+        .route("/me/avatars/{id}", delete(routes::auth::delete_avatar))
         .route(
             "/invites",
             get(routes::invites::list).post(routes::invites::create),
@@ -129,7 +220,43 @@ pub fn app(state: AppState, policy: Arc<ClientPolicy>) -> Router {
             "/channels/{id}/messages",
             get(routes::messages::list).post(routes::messages::send),
         )
+        .route(
+            "/messages/{id}",
+            patch(routes::messages::edit).delete(routes::messages::delete),
+        )
+        .route(
+            "/messages/{id}/pin",
+            put(routes::messages::pin).delete(routes::messages::unpin),
+        )
+        .route("/channels/{id}/pins", get(routes::messages::pins))
+        .route("/search", get(routes::messages::search))
+        .route(
+            "/emojis",
+            get(routes::emojis::list).post(routes::emojis::create),
+        )
+        .route(
+            "/emojis/{id}",
+            patch(routes::emojis::rename).delete(routes::emojis::delete),
+        )
+        .route("/channels/{id}/files", get(routes::messages::channel_files))
+        .route(
+            "/messages/{id}/previews",
+            delete(routes::messages::hide_previews),
+        )
+        .route(
+            "/messages/{id}/reactions/{emoji}",
+            put(routes::messages::react).delete(routes::messages::unreact),
+        )
+        .route("/channels/{id}/read", put(routes::read::mark_read))
+        .route("/channels/{id}/mute", put(routes::read::set_muted))
+        .route("/read-all", post(routes::read::mark_all_read))
         .route("/people", get(routes::people::list))
+        .route("/dms", get(routes::dms::list).post(routes::dms::open))
+        .route("/dms/{id}/call", post(routes::calls::start))
+        .route("/dms/{id}/call/accept", post(routes::calls::accept))
+        .route("/dms/{id}/call/decline", post(routes::calls::decline))
+        .route("/dms/{id}/call/cancel", post(routes::calls::cancel))
+        .route("/dms/{id}/call/end", post(routes::calls::end))
         .route(
             "/channels",
             get(routes::channels::list).post(routes::channels::create),
@@ -153,6 +280,36 @@ pub fn app(state: AppState, policy: Arc<ClientPolicy>) -> Router {
             post(routes::channels::unarchive_category),
         )
         .route("/realtime/ticket", post(routes::realtime::ticket))
+        .route("/logs", get(routes::logs::list))
+        .route("/logs/{id}", get(routes::logs::download))
+        .route("/logs/{id}/entries", get(routes::logs::entries))
+        .route("/logs/{id}/entry", get(routes::logs::entry))
+        .route("/admin/status", get(routes::admin::status))
+        .route("/files/{id}", get(routes::files::download))
+        .route("/files/{id}/link", post(routes::files::link))
+        .route("/files/{id}/stream", get(routes::files::stream))
+        .layer(middleware::from_fn_with_state(
+            timeout::REQUEST_TIMEOUT,
+            timeout::limit,
+        ))
+        // O envio dos logs sobe um arquivo: tem mais tempo.
+        .merge(
+            Router::new()
+                .route("/logs", post(routes::logs::upload))
+                .layer(middleware::from_fn_with_state(
+                    timeout::UPLOAD_TIMEOUT,
+                    timeout::limit,
+                )),
+        )
+        // O arquivo do chat: até 100 MB, com 10 minutos.
+        .merge(
+            Router::new()
+                .route("/files", post(routes::files::upload))
+                .layer(middleware::from_fn_with_state(
+                    timeout::FILE_UPLOAD_TIMEOUT,
+                    timeout::limit,
+                )),
+        )
         .layer(middleware::from_fn_with_state(
             policy,
             client_policy::enforce,

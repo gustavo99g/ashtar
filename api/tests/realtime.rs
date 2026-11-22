@@ -155,6 +155,11 @@ async fn next_of(socket: &mut Socket, kind: &str) -> Value {
     }
 }
 
+/// O estado de leitura de um canal, sem menções e sem silenciar.
+fn state(last_read_id: Option<&str>, unread: u32) -> Value {
+    json!({ "last_read_id": last_read_id, "unread": unread, "mentions": 0, "muted": false })
+}
+
 fn user_id(ready: &Value) -> String {
     ready["user_id"].as_str().unwrap().to_owned()
 }
@@ -172,7 +177,7 @@ async fn o_ticket_abre_uma_conexao_so() {
     assert_eq!(ready["online"], json!([ctx.owner.id]));
     assert_eq!(
         ready["channels"],
-        json!([{ "channel_id": "geral", "last_message_id": null }])
+        json!([{ "channel_id": "geral", "last_message_id": null, "state": state(None, 0) }])
     );
 
     // O mesmo ticket de novo, um inventado e nenhum: 401 antes do upgrade.
@@ -210,8 +215,14 @@ async fn o_ready_traz_a_ultima_mensagem_de_cada_canal() {
     let (_, ready) = connect(&ctx, &ctx.owner_token).await;
     assert_eq!(
         ready["channels"],
-        json!([{ "channel_id": "geral", "last_message_id": sent["id"] }])
+        // Quem escreveu já leu até a própria mensagem.
+        json!([{
+            "channel_id": "geral",
+            "last_message_id": sent["id"],
+            "state": state(sent["id"].as_str(), 0),
+        }])
     );
+    assert_eq!(ready["dms"], json!([]));
 }
 
 #[tokio::test]
@@ -284,6 +295,190 @@ async fn a_mensagem_nova_chega_em_todos() {
     assert_eq!(event["type"], "pong");
 }
 
+/// Abre a conversa de quem tem o `token` com `other_id` e devolve o id dela.
+async fn open_dm(ctx: &Ctx, token: &str, other_id: &str) -> String {
+    let (status, body) = post(ctx, "/api/dms", Some(token), json!({ "user_id": other_id })).await;
+    assert!(status == 201 || status == 200, "{body}");
+    body["id"].as_str().unwrap().to_owned()
+}
+
+/// Tudo o que chega em `socket` até o `pong` de um `ping` mandado agora. Como
+/// a conexão escreve na ordem em que o hub publicou, o que foi publicado antes
+/// do `ping` e era dela está aqui. É como os testes provam que um evento **não**
+/// chegou, sem depender de esperar um tempo.
+async fn until_pong(socket: &mut Socket) -> Vec<Value> {
+    socket.send(Message::text("ping")).await.unwrap();
+    let mut events = Vec::new();
+    loop {
+        let event = next(socket).await;
+        if event["type"] == "pong" {
+            return events;
+        }
+        events.push(event);
+    }
+}
+
+#[tokio::test]
+async fn a_mensagem_privada_so_chega_nos_dois() {
+    let ctx = setup().await;
+    let ana = join(&ctx, "Ana", 2, false).await;
+    let bia = join(&ctx, "Bia", 3, false).await;
+    let (mut kid_socket, _) = connect(&ctx, &ctx.owner_token).await;
+    let (mut ana_socket, ana_ready) = connect(&ctx, &ana).await;
+    let (mut bia_socket, _) = connect(&ctx, &bia).await;
+    // Esvazia os avisos de presença das três entradas.
+    for socket in [&mut kid_socket, &mut ana_socket, &mut bia_socket] {
+        until_pong(socket).await;
+    }
+
+    let dm = open_dm(&ctx, &ctx.owner_token, &user_id(&ana_ready)).await;
+    let path = format!("/api/channels/{dm}/messages");
+    let (status, sent) = post(
+        &ctx,
+        &path,
+        Some(&ctx.owner_token),
+        json!({ "client_id": "c1", "body": "segredo" }),
+    )
+    .await;
+    assert_eq!(status, 201, "{sent}");
+
+    for socket in [&mut kid_socket, &mut ana_socket] {
+        let event = next_of(socket, "message.created").await;
+        assert_eq!(event["message"]["id"], sent["id"]);
+        assert_eq!(event["message"]["channel_id"], dm);
+        assert_eq!(event["message"]["body"], "segredo");
+    }
+    // A Bia não recebe nada: nem a mensagem, nem outro evento sobre a conversa.
+    assert_eq!(until_pong(&mut bia_socket).await, Vec::<Value>::new());
+
+    // Uma mensagem num canal de texto continua chegando nos três.
+    let (status, _) = post(
+        &ctx,
+        "/api/channels/geral/messages",
+        Some(&ana),
+        json!({ "client_id": "c2", "body": "oi, todo mundo" }),
+    )
+    .await;
+    assert_eq!(status, 201);
+    for socket in [&mut kid_socket, &mut ana_socket, &mut bia_socket] {
+        let event = next_of(socket, "message.created").await;
+        assert_eq!(event["message"]["body"], "oi, todo mundo");
+    }
+}
+
+#[tokio::test]
+async fn a_mensagem_privada_chega_em_todas_as_conexoes_dos_dois() {
+    let ctx = setup().await;
+    let ana = join(&ctx, "Ana", 2, false).await;
+    let (_kid_socket, kid_ready) = connect(&ctx, &ctx.owner_token).await;
+    // A Ana com o app aberto em dois computadores (duas conexões, mesma pessoa).
+    let (mut first, _) = connect(&ctx, &ana).await;
+    let (mut second, _) = connect(&ctx, &ana).await;
+
+    let dm = open_dm(&ctx, &ana, &user_id(&kid_ready)).await;
+    let (status, _) = post(
+        &ctx,
+        &format!("/api/channels/{dm}/messages"),
+        Some(&ana),
+        json!({ "client_id": "c1", "body": "oi" }),
+    )
+    .await;
+    assert_eq!(status, 201);
+    for socket in [&mut first, &mut second] {
+        let event = next_of(socket, "message.created").await;
+        assert_eq!(event["message"]["body"], "oi");
+    }
+}
+
+#[tokio::test]
+async fn o_ready_so_traz_as_conversas_da_pessoa() {
+    let ctx = setup().await;
+    let ana = join(&ctx, "Ana", 2, false).await;
+    let bia = join(&ctx, "Bia", 3, false).await;
+    let (_, ana_ready) = connect(&ctx, &ana).await;
+    let (_, bia_ready) = connect(&ctx, &bia).await;
+    assert_eq!(ana_ready["dms"], json!([]));
+
+    // Kid e Ana conversam; Kid só abre a conversa com a Bia, sem escrever.
+    let dm = open_dm(&ctx, &ctx.owner_token, &user_id(&ana_ready)).await;
+    open_dm(&ctx, &ctx.owner_token, &user_id(&bia_ready)).await;
+    let (status, sent) = post(
+        &ctx,
+        &format!("/api/channels/{dm}/messages"),
+        Some(&ctx.owner_token),
+        json!({ "client_id": "c1", "body": "oi" }),
+    )
+    .await;
+    assert_eq!(status, 201);
+
+    let (_, kid_ready) = connect(&ctx, &ctx.owner_token).await;
+    let (_, ana_ready) = connect(&ctx, &ana).await;
+    let (_, bia_ready) = connect(&ctx, &bia).await;
+    // A mesma conversa, com o estado de cada um: o Kid escreveu, a Ana não leu.
+    assert_eq!(
+        kid_ready["dms"],
+        json!([{
+            "channel_id": dm,
+            "last_message_id": sent["id"],
+            "state": state(sent["id"].as_str(), 0),
+        }]),
+        "a conversa vazia com a Bia não entra"
+    );
+    assert_eq!(
+        ana_ready["dms"],
+        json!([{ "channel_id": dm, "last_message_id": sent["id"], "state": state(None, 1) }])
+    );
+    assert_eq!(bia_ready["dms"], json!([]));
+    // A conversa não aparece entre os canais de ninguém.
+    for ready in [&kid_ready, &ana_ready, &bia_ready] {
+        assert_eq!(ready["channels"].as_array().unwrap().len(), 1);
+        assert_eq!(ready["channels"][0]["channel_id"], "geral");
+    }
+}
+
+#[tokio::test]
+async fn o_estado_de_leitura_so_vai_para_as_conexoes_da_pessoa() {
+    let ctx = setup().await;
+    let ana = join(&ctx, "Ana", 2, false).await;
+    let (mut kid_socket, _) = connect(&ctx, &ctx.owner_token).await;
+    let (mut first, _) = connect(&ctx, &ana).await;
+    let (mut second, _) = connect(&ctx, &ana).await;
+
+    let (status, sent) = post(
+        &ctx,
+        "/api/channels/geral/messages",
+        Some(&ctx.owner_token),
+        json!({ "client_id": "c1", "body": "oi @ana" }),
+    )
+    .await;
+    assert_eq!(status, 201, "{sent}");
+    let created = next_of(&mut first, "message.created").await;
+    assert_eq!(created["message"]["mentions"].as_array().unwrap().len(), 1);
+    for socket in [&mut kid_socket, &mut first, &mut second] {
+        until_pong(socket).await;
+    }
+
+    // A Ana lê num computador: o outro dela fica sabendo, o Kid não.
+    let response = ctx
+        .http
+        .put(format!("http://{}/api/channels/geral/read", ctx.base))
+        .bearer_auth(&ana)
+        .json(&json!({ "message_id": sent["id"] }))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response.status().as_u16(), 200);
+    let expected = json!({
+        "type": "channel.state",
+        "channel_id": "geral",
+        "state": state(sent["id"].as_str(), 0),
+    });
+    for socket in [&mut first, &mut second] {
+        assert_eq!(next_of(socket, "channel.state").await, expected);
+    }
+    assert_eq!(until_pong(&mut kid_socket).await, Vec::<Value>::new());
+}
+
 #[tokio::test]
 async fn presenca_entra_na_hora_e_sai_depois_do_atraso() {
     let ctx = setup().await;
@@ -295,7 +490,9 @@ async fn presenca_entra_na_hora_e_sai_depois_do_atraso() {
     let online = next_of(&mut kid_socket, "presence.changed").await;
     assert_eq!(
         online,
-        json!({ "type": "presence.changed", "user_id": ana_id, "online": true })
+        json!({
+            "type": "presence.changed", "user_id": ana_id, "online": true, "status": "available"
+        })
     );
 
     let people = get(&ctx, "/api/people", &ctx.owner_token).await;
@@ -319,6 +516,165 @@ async fn presenca_entra_na_hora_e_sai_depois_do_atraso() {
         .find(|p| p["id"] == ana_id.as_str())
         .unwrap();
     assert_eq!(ana_row["online"], false);
+}
+
+async fn set_status(ctx: &Ctx, token: &str, status: &str) {
+    let response = ctx
+        .http
+        .put(format!("http://{}/api/me/status", ctx.base))
+        .bearer_auth(token)
+        .json(&json!({ "status": status }))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response.status().as_u16(), 200);
+}
+
+/// A linha de `id` no `GET /api/people`, vista por quem tem o `token`.
+async fn person(ctx: &Ctx, token: &str, id: &str) -> Value {
+    get(ctx, "/api/people", token)
+        .await
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|p| p["id"] == id)
+        .unwrap()
+        .clone()
+}
+
+#[tokio::test]
+async fn o_ocupado_chega_a_todos() {
+    let ctx = setup().await;
+    let ana = join(&ctx, "Ana", 2, false).await;
+    let (mut kid_socket, _) = connect(&ctx, &ctx.owner_token).await;
+    let (mut ana_socket, ana_ready) = connect(&ctx, &ana).await;
+    let ana_id = user_id(&ana_ready);
+    assert_eq!(ana_ready["status"], "available");
+    assert_eq!(ana_ready["busy"], json!([]));
+
+    set_status(&ctx, &ana, "busy").await;
+    let expected = json!({
+        "type": "presence.changed", "user_id": ana_id, "online": true, "status": "busy"
+    });
+    assert_eq!(
+        next_of(&mut kid_socket, "presence.changed").await["user_id"],
+        ana_id.as_str()
+    );
+    assert_eq!(next_of(&mut kid_socket, "presence.changed").await, expected);
+    // Para ela, o status de verdade; o Kid não recebe esse evento.
+    assert_eq!(
+        next_of(&mut ana_socket, "status.changed").await,
+        json!({ "type": "status.changed", "status": "busy" })
+    );
+    assert!(
+        until_pong(&mut kid_socket)
+            .await
+            .iter()
+            .all(|event| event["type"] != "status.changed")
+    );
+
+    let row = person(&ctx, &ctx.owner_token, &ana_id).await;
+    assert_eq!(
+        (&row["online"], &row["status"]),
+        (&json!(true), &json!("busy"))
+    );
+    // Quem conecta depois já recebe quem está ocupado.
+    let bia = join(&ctx, "Bia", 3, false).await;
+    let (_, bia_ready) = connect(&ctx, &bia).await;
+    assert_eq!(bia_ready["busy"], json!([ana_id]));
+    assert!(
+        bia_ready["online"]
+            .as_array()
+            .unwrap()
+            .contains(&json!(ana_id))
+    );
+}
+
+#[tokio::test]
+async fn o_invisivel_some_para_os_outros() {
+    let ctx = setup().await;
+    let ana = join(&ctx, "Ana", 2, false).await;
+    let (mut kid_socket, _) = connect(&ctx, &ctx.owner_token).await;
+    let (mut ana_socket, ana_ready) = connect(&ctx, &ana).await;
+    let ana_id = user_id(&ana_ready);
+    until_pong(&mut kid_socket).await;
+
+    // Ficar invisível é, para os outros, ficar offline. A palavra não sai.
+    set_status(&ctx, &ana, "invisible").await;
+    let events = until_pong(&mut kid_socket).await;
+    assert_eq!(
+        events,
+        [json!({
+            "type": "presence.changed", "user_id": ana_id, "online": false, "status": "available"
+        })]
+    );
+    assert_eq!(
+        next_of(&mut ana_socket, "status.changed").await["status"],
+        "invisible"
+    );
+    let row = person(&ctx, &ctx.owner_token, &ana_id).await;
+    assert_eq!(
+        (&row["online"], &row["status"]),
+        (&json!(false), &json!("available"))
+    );
+
+    // Quem conecta agora não vê a Ana no `ready`.
+    let bia = join(&ctx, "Bia", 3, false).await;
+    let (_bia_socket, bia_ready) = connect(&ctx, &bia).await;
+    assert!(
+        !bia_ready["online"]
+            .as_array()
+            .unwrap()
+            .contains(&json!(ana_id))
+    );
+    assert_eq!(bia_ready["busy"], json!([]));
+    assert!(!bia_ready.to_string().contains("invisible"));
+    until_pong(&mut kid_socket).await;
+
+    // Ela continua recebendo tudo.
+    let (status, _) = post(
+        &ctx,
+        "/api/channels/geral/messages",
+        Some(&ctx.owner_token),
+        json!({ "client_id": "c1", "body": "oi" }),
+    )
+    .await;
+    assert_eq!(status, 201);
+    assert_eq!(
+        next_of(&mut ana_socket, "message.created").await["message"]["body"],
+        "oi"
+    );
+
+    // O status sobrevive a reconectar: ela cai e volta sem ninguém ver nada.
+    drop(ana_socket);
+    tokio::time::sleep(Duration::from_millis(250)).await;
+    let (mut ana_socket, ana_ready) = connect(&ctx, &ana).await;
+    assert_eq!(ana_ready["status"], "invisible");
+    assert!(
+        !ana_ready["online"]
+            .as_array()
+            .unwrap()
+            .contains(&json!(ana_id))
+    );
+    let seen: Vec<Value> = until_pong(&mut kid_socket)
+        .await
+        .into_iter()
+        .filter(|event| event["type"] == "presence.changed")
+        .collect();
+    assert_eq!(seen, Vec::<Value>::new());
+
+    // Sair do invisível é ficar online.
+    set_status(&ctx, &ana, "available").await;
+    assert_eq!(
+        next_of(&mut kid_socket, "presence.changed").await,
+        json!({
+            "type": "presence.changed", "user_id": ana_id, "online": true, "status": "available"
+        })
+    );
+    assert_eq!(
+        next_of(&mut ana_socket, "status.changed").await["status"],
+        "available"
+    );
 }
 
 #[tokio::test]
@@ -411,4 +767,157 @@ async fn sala_fechada_manda_a_lista_vazia() {
         event,
         json!({ "type": "voice.participants", "channel_id": "sala", "participants": [] })
     );
+}
+
+/// Manda um evento do app pelo socket.
+async fn say(socket: &mut Socket, event: Value) {
+    socket.send(Message::text(event.to_string())).await.unwrap();
+}
+
+#[tokio::test]
+async fn ocioso_aparece_ausente_e_volta_no_primeiro_toque() {
+    let ctx = setup().await;
+    let ana = join(&ctx, "Ana", 2, false).await;
+    let (mut kid_socket, _) = connect(&ctx, &ctx.owner_token).await;
+    let (mut ana_socket, ana_ready) = connect(&ctx, &ana).await;
+    let ana_id = user_id(&ana_ready);
+    next_of(&mut kid_socket, "presence.changed").await;
+
+    say(&mut ana_socket, json!({ "type": "idle", "idle": true })).await;
+    let away = next_of(&mut kid_socket, "presence.changed").await;
+    assert_eq!(
+        away,
+        json!({ "type": "presence.changed", "user_id": ana_id, "online": true, "status": "away" })
+    );
+    assert_eq!(
+        person(&ctx, &ctx.owner_token, &ana_id).await["status"],
+        "away"
+    );
+    // Quem conecta agora recebe a Ana no `away` do `ready`.
+    let (_, ready) = connect(&ctx, &ctx.owner_token).await;
+    assert_eq!(ready["away"], json!([ana_id]));
+
+    // Uma segunda conexão da Ana, ativa, já a deixa Disponível.
+    let (mut ana_other, _) = connect(&ctx, &ana).await;
+    let back = next_of(&mut kid_socket, "presence.changed").await;
+    assert_eq!(back["status"], "available");
+    say(&mut ana_other, json!({ "type": "idle", "idle": true })).await;
+    assert_eq!(
+        next_of(&mut kid_socket, "presence.changed").await["status"],
+        "away"
+    );
+    say(&mut ana_socket, json!({ "type": "idle", "idle": false })).await;
+    assert_eq!(
+        next_of(&mut kid_socket, "presence.changed").await["status"],
+        "available"
+    );
+}
+
+#[tokio::test]
+async fn ocupado_ocioso_continua_ocupado_e_o_ausente_manual_fica() {
+    let ctx = setup().await;
+    let ana = join(&ctx, "Ana", 2, false).await;
+    let (mut kid_socket, _) = connect(&ctx, &ctx.owner_token).await;
+    let (mut ana_socket, ana_ready) = connect(&ctx, &ana).await;
+    let ana_id = user_id(&ana_ready);
+    next_of(&mut kid_socket, "presence.changed").await;
+
+    set_status(&ctx, &ana, "busy").await;
+    assert_eq!(
+        next_of(&mut kid_socket, "presence.changed").await["status"],
+        "busy"
+    );
+    say(&mut ana_socket, json!({ "type": "idle", "idle": true })).await;
+    assert!(
+        until_pong(&mut kid_socket)
+            .await
+            .iter()
+            .all(|e| e["type"] != "presence.changed"),
+        "Ocupado não vira Ausente"
+    );
+
+    set_status(&ctx, &ana, "away").await;
+    assert_eq!(
+        next_of(&mut kid_socket, "presence.changed").await["status"],
+        "away"
+    );
+    say(&mut ana_socket, json!({ "type": "idle", "idle": false })).await;
+    assert!(
+        until_pong(&mut kid_socket)
+            .await
+            .iter()
+            .all(|e| e["type"] != "presence.changed"),
+        "o Ausente manual não volta sozinho"
+    );
+    assert_eq!(
+        person(&ctx, &ctx.owner_token, &ana_id).await["status"],
+        "away"
+    );
+}
+
+#[tokio::test]
+async fn digitando_chega_a_quem_le_menos_a_propria_pessoa() {
+    let ctx = setup().await;
+    let ana = join(&ctx, "Ana", 2, false).await;
+    let bia = join(&ctx, "Bia", 3, false).await;
+    let (mut kid_socket, kid_ready) = connect(&ctx, &ctx.owner_token).await;
+    let (mut ana_socket, ana_ready) = connect(&ctx, &ana).await;
+    let (mut bia_socket, _) = connect(&ctx, &bia).await;
+    let ana_id = user_id(&ana_ready);
+    let kid_id = user_id(&kid_ready);
+    for socket in [&mut kid_socket, &mut ana_socket, &mut bia_socket] {
+        until_pong(socket).await;
+    }
+
+    // No #geral, todos menos a Ana.
+    say(
+        &mut ana_socket,
+        json!({ "type": "typing", "channel_id": "geral" }),
+    )
+    .await;
+    let typing = next_of(&mut kid_socket, "typing").await;
+    assert_eq!(
+        typing,
+        json!({ "type": "typing", "channel_id": "geral", "user_id": ana_id })
+    );
+    next_of(&mut bia_socket, "typing").await;
+    assert!(
+        until_pong(&mut ana_socket)
+            .await
+            .iter()
+            .all(|e| e["type"] != "typing")
+    );
+
+    // Na conversa da Ana com o Kid, a Bia não recebe nada.
+    let dm = open_dm(&ctx, &ana, &kid_id).await;
+    say(
+        &mut ana_socket,
+        json!({ "type": "typing", "channel_id": dm }),
+    )
+    .await;
+    assert_eq!(
+        next_of(&mut kid_socket, "typing").await["channel_id"],
+        dm.as_str()
+    );
+    assert!(
+        until_pong(&mut bia_socket)
+            .await
+            .iter()
+            .all(|e| e["type"] != "typing")
+    );
+
+    // Um canal que não existe é ignorado, e o Invisível não manda nada.
+    say(
+        &mut ana_socket,
+        json!({ "type": "typing", "channel_id": "nao-existe" }),
+    )
+    .await;
+    set_status(&ctx, &bia, "invisible").await;
+    say(
+        &mut bia_socket,
+        json!({ "type": "typing", "channel_id": "geral" }),
+    )
+    .await;
+    let events = until_pong(&mut kid_socket).await;
+    assert!(events.iter().all(|e| e["type"] != "typing"), "{events:?}");
 }

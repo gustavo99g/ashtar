@@ -1,8 +1,11 @@
 import { SourcePickerHost } from "@/features/screen-share";
 import { ShareNotices } from "../../call/components/ShareNotices";
-import { ShareRaceGuard } from "../../room/components/ShareRaceGuard";
+import { ShareStartNotices } from "../../call/components/ShareStartNotices";
+import { WatchJanitor } from "../../call/components/WatchJanitor";
 import { useVoice } from "../../room/hooks/useVoice";
-import { SALA } from "../../room/model/channel";
+import { useConnectedRoomName } from "../../room/hooks/useRoomName";
+import { DeviceNotices } from "./DeviceNotices";
+import { MutedWarning } from "./MutedWarning";
 import { ShareHost } from "./ShareHost";
 import { TrayShare } from "./TrayShare";
 import { UserPanel } from "./UserPanel";
@@ -10,15 +13,17 @@ import { VoiceConnection } from "./VoiceConnection";
 
 /**
  * O pé da coluna do servidor: o painel "Voz conectada" enquanto há chamada e o cartão de quem está
- * usando. O seletor de fonte, o painel da transmissão, os avisos, a regra de uma transmissão por
- * vez e as opções da bandeja moram aqui porque a coluna fica montada em todas as telas da chamada.
+ * usando. O seletor de fonte, o painel da transmissão, os avisos, o fechamento das transmissões que
+ * acabaram e as opções da bandeja moram aqui porque a coluna fica montada em todas as telas da chamada.
  */
 export function VoiceDock() {
 	const { voiceChannelId, room, screenShare } = useVoice();
+	const roomName = useConnectedRoomName();
 
 	return (
 		<div className="shrink-0 px-2 pb-2">
 			<div className="flex flex-col rounded-xl border border-border bg-secondary">
+				{room && <MutedWarning />}
 				{voiceChannelId && <VoiceConnection />}
 				<UserPanel />
 			</div>
@@ -28,13 +33,15 @@ export function VoiceDock() {
 				) : (
 					<SourcePickerHost
 						controller={screenShare}
-						channelName={SALA.name}
+						channelName={roomName}
 						ping={null}
 					/>
 				))}
 			{screenShare && <ShareNotices controller={screenShare} />}
 			{screenShare && <TrayShare controller={screenShare} />}
-			{room && screenShare && <ShareRaceGuard controller={screenShare} />}
+			{room && <WatchJanitor />}
+			{room && <ShareStartNotices />}
+			{room && <DeviceNotices />}
 		</div>
 	);
 }

@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="pt-BR">
+	<head>
+		<meta charset="utf-8" />
+		<title>Ashtar Notify Probe</title>
+		<style>
+			body { margin: 0; padding: 16px; background: #1e1f22; color: #f2f3f5; font: 14px "Segoe UI", sans-serif; }
+			h1 { font-size: 18px; margin: 0 0 4px; }
+			h2 { font-size: 14px; margin: 18px 0 6px; color: #b5bac1; }
+			p { margin: 0 0 8px; color: #b5bac1; }
+			button { background: #5865f2; color: white; border: 0; border-radius: 4px; padding: 6px 12px; margin: 0 6px 6px 0; font: inherit; cursor: pointer; }
+			button.quiet { background: #4e5058; }
+			pre { background: #111214; border-radius: 4px; padding: 8px; height: 220px; overflow: auto; margin: 6px 0 0; white-space: pre-wrap; font: 12px Consolas, monospace; }
+		</style>
+	</head>
+	<body>
+		<h1>Ashtar Notify Probe</h1>
+		<p>Etapa 6 da v0.3. O roteiro e a tabela de respostas estão no README. Os avisos saem com 8 segundos de atraso: dá tempo de fechar a janela (ela vai para a bandeja).</p>
+
+		<h2>1. Notificação do plugin</h2>
+		<button id="perm">Pedir permissão</button>
+		<button id="plugin">Notificar em 8 s (plugin)</button>
+
+		<h2>2 e 3. Clique e botões (API do Windows direto)</h2>
+		<button id="winrt-a">Notificar em 8 s: conversa A</button>
+		<button id="winrt-b">Notificar em 8 s: conversa B</button>
+
+		<h2>4. Ponto de não lido</h2>
+		<button id="unread-on">Ligar (bandeja e barra de tarefas)</button>
+		<button id="unread-off" class="quiet">Desligar</button>
+
+		<h2>5. Iniciar com o Windows</h2>
+		<button id="auto-on">Ligar</button>
+		<button id="auto-off" class="quiet">Desligar</button>
+
+		<h2>6. Som com a janela escondida</h2>
+		<button id="sound-now" class="quiet">Tocar agora</button>
+		<button id="sound-1">Tocar em 1 min</button>
+		<button id="sound-12">Tocar em 12 min</button>
+
+		<h2>Plano B. Aviso próprio</h2>
+		<button id="own">Mostrar em 8 s</button>
+
+		<h2>Registro (também em probe.log)</h2>
+		<pre id="log"></pre>
+
+		<script>
+			const { invoke } = window.__TAURI__.core;
+			const { listen } = window.__TAURI__.event;
+			const notification = window.__TAURI__.notification;
+			const box = document.getElementById("log");
+			const on = (id, run) => document.getElementById(id).addEventListener("click", run);
+			const note = (line) => invoke("log_line", { line });
+
+			listen("probe-log", (event) => {
+				box.textContent += event.payload + "\n";
+				box.scrollTop = box.scrollHeight;
+			});
+			window.addEventListener("error", (event) => note("erro: " + event.message));
+			window.addEventListener("unhandledrejection", (event) => note("erro: " + event.reason));
+
+			// Um bipe de meio segundo pelo Web Audio, sem arquivo. O contexto é criado no primeiro
+			// clique (o WebView exige um gesto) e fica vivo: é ele que tem de tocar 12 minutos depois.
+			let audio = null;
+			function ensureAudio() {
+				if (!audio) audio = new AudioContext();
+				return audio;
+			}
+			async function beep(why) {
+				const context = ensureAudio();
+				const before = context.state;
+				await context.resume();
+				const oscillator = context.createOscillator();
+				const gain = context.createGain();
+				oscillator.frequency.value = 880;
+				gain.gain.value = 0.2;
+				oscillator.connect(gain).connect(context.destination);
+				oscillator.start();
+				oscillator.stop(context.currentTime + 0.5);
+				note(`som (${why}): contexto ${before} -> ${context.state}, document.hidden = ${document.hidden}`);
+			}
+			listen("probe-sound", () => beep("pedido pelo Rust"));
+			document.addEventListener("visibilitychange", () => note("document.hidden = " + document.hidden));
+
+			on("perm", async () => {
+				const granted = await notification.isPermissionGranted();
+				const asked = granted ? "já tinha" : await notification.requestPermission();
+				note(`permissão: isPermissionGranted = ${granted}, pedido = ${asked}`);
+			});
+			on("plugin", () => invoke("notify_plugin", { delaySecs: 8 }));
+			on("winrt-a", () => invoke("notify_winrt", { delaySecs: 8, conversation: "A" }));
+			on("winrt-b", () => invoke("notify_winrt", { delaySecs: 8, conversation: "B" }));
+			on("unread-on", () => invoke("set_unread", { unread: true }));
+			on("unread-off", () => invoke("set_unread", { unread: false }));
+			on("auto-on", () => invoke("set_autostart", { enabled: true }));
+			on("auto-off", () => invoke("set_autostart", { enabled: false }));
+			on("sound-now", () => beep("agora"));
+			on("sound-1", () => { ensureAudio(); invoke("sound_in", { minutes: 1 }); });
+			on("sound-12", () => { ensureAudio(); invoke("sound_in", { minutes: 12 }); });
+			on("own", () => invoke("own_toast", { delaySecs: 8 }));
+		</script>
+	</body>
+</html>

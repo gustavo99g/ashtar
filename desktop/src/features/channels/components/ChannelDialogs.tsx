@@ -1,7 +1,8 @@
-import { ArchiveIcon } from "lucide-react";
+import { ArchiveIcon, HashIcon, Volume2Icon } from "lucide-react";
 import { type FormEvent, useState } from "react";
 import { useMatch, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { ChoiceCard, ChoiceCardGroup } from "@/components/ui/choice-card";
 import {
 	Dialog,
 	DialogClose,
@@ -12,7 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { Spinner } from "@/components/ui/spinner";
 import { TextField } from "@/components/ui/text-field";
-import type { CategoryView, ChannelView } from "@/lib/api";
+import type { CategoryView, ChannelKind, ChannelView } from "@/lib/api";
 import { paths } from "@/lib/paths";
 import {
 	useArchiveCategory,
@@ -28,6 +29,11 @@ import {
 	useChannelDialog,
 } from "../stores/dialogStore";
 import { DEFAULT_CHANNEL_ID } from "../stores/lastChannelStore";
+import {
+	type AccessValue,
+	accessRequest,
+	ChannelAccess,
+} from "./ChannelAccess";
 
 /** Os limites da API (Etapa 4). */
 const NAME_MAX = 32;
@@ -122,17 +128,30 @@ function Footer({
 function CreateChannel({ categoryId }: { categoryId: string | null }) {
 	const create = useCreateChannel();
 	const navigate = useNavigate();
+	const [kind, setKind] = useState<ChannelKind>("text");
 	const [name, setName] = useState("");
 	const [topic, setTopic] = useState("");
+	const [access, setAccess] = useState<AccessValue>({
+		restricted: false,
+		memberIds: [],
+	});
+	const text = kind === "text";
 
 	function onSubmit(event: FormEvent) {
 		event.preventDefault();
 		create.mutate(
-			{ name, category_id: categoryId ?? undefined, topic: topic || undefined },
+			{
+				kind,
+				name,
+				category_id: categoryId ?? undefined,
+				topic: text && topic ? topic : undefined,
+				...(access.restricted ? accessRequest(access) : {}),
+			},
 			{
 				onSuccess: (channel) => {
 					closeChannelDialog();
-					void navigate(paths.channel(channel.id));
+					// O canal de texto abre; a sala de voz só aparece na lista (entrar é um clique nela).
+					if (channel.kind === "text") void navigate(paths.channel(channel.id));
 				},
 			},
 		);
@@ -141,7 +160,28 @@ function CreateChannel({ categoryId }: { categoryId: string | null }) {
 	const shown = previewTextName(name);
 	return (
 		<form onSubmit={onSubmit} className="flex flex-col gap-5">
-			<DialogTitle className="text-base">Criar canal de texto</DialogTitle>
+			<DialogTitle className="text-base">
+				{text ? "Criar canal de texto" : "Criar sala de voz"}
+			</DialogTitle>
+			<ChoiceCardGroup
+				aria-label="Tipo do canal"
+				value={kind}
+				onValueChange={(value) => setKind(value as ChannelKind)}
+				className="grid-cols-2"
+			>
+				<ChoiceCard
+					value="text"
+					icon={<HashIcon className="size-5" />}
+					title="Texto"
+					description="Mensagens e conversa"
+				/>
+				<ChoiceCard
+					value="voice"
+					icon={<Volume2Icon className="size-5" />}
+					title="Voz"
+					description="Voz, câmera e tela"
+				/>
+			</ChoiceCardGroup>
 			<TextField
 				label="Nome"
 				autoFocus
@@ -149,17 +189,25 @@ function CreateChannel({ categoryId }: { categoryId: string | null }) {
 				maxLength={NAME_MAX}
 				showCount
 				onChange={(event) => setName(event.target.value)}
-				description={shown ? `Vai aparecer como #${shown}.` : undefined}
+				description={
+					text && shown ? `Vai aparecer como #${shown}.` : undefined
+				}
 				error={create.error?.message}
 			/>
-			<TextField
-				label="Tópico (opcional)"
-				value={topic}
-				maxLength={TOPIC_MAX}
-				showCount
-				onChange={(event) => setTopic(event.target.value)}
+			{text && (
+				<TextField
+					label="Tópico (opcional)"
+					value={topic}
+					maxLength={TOPIC_MAX}
+					showCount
+					onChange={(event) => setTopic(event.target.value)}
+				/>
+			)}
+			<ChannelAccess value={access} onChange={setAccess} room={!text} />
+			<Footer
+				pending={create.isPending}
+				submit={text ? "Criar canal" : "Criar sala"}
 			/>
-			<Footer pending={create.isPending} submit="Criar canal" />
 		</form>
 	);
 }
@@ -174,12 +222,27 @@ function EditChannel({
 	const update = useUpdateChannel();
 	const [name, setName] = useState(channel.name);
 	const [topic, setTopic] = useState(channel.topic ?? "");
+	const initialAccess: AccessValue = {
+		restricted: channel.restricted,
+		memberIds: channel.member_ids ?? [],
+	};
+	const [access, setAccess] = useState(initialAccess);
 	const text = channel.kind === "text";
+	const accessChanged =
+		access.restricted !== initialAccess.restricted ||
+		(access.restricted &&
+			[...access.memberIds].sort().join() !==
+				[...initialAccess.memberIds].sort().join());
 
 	function onSubmit(event: FormEvent) {
 		event.preventDefault();
 		update.mutate(
-			{ id: channel.id, name, ...(text ? { topic } : {}) },
+			{
+				id: channel.id,
+				name,
+				...(text ? { topic } : {}),
+				...(accessChanged ? accessRequest(access) : {}),
+			},
 			{ onSuccess: closeChannelDialog },
 		);
 	}
@@ -212,6 +275,7 @@ function EditChannel({
 					description="Aparece no cabeçalho do canal. Em branco, some."
 				/>
 			)}
+			<ChannelAccess value={access} onChange={setAccess} room={!text} />
 			<Footer pending={update.isPending} submit="Salvar" />
 		</form>
 	);
@@ -305,8 +369,16 @@ function ArchiveChannel({ channel }: { channel: ChannelView }) {
 		useMatch(paths.channelPattern)?.params.channelId === channel.id;
 	return (
 		<ArchiveBody
-			title={`Arquivar #${channel.name}?`}
-			description="O canal some da lista para todo mundo. As mensagens ficam guardadas, e quem gerencia os canais pode desarquivar nas configurações."
+			title={
+				channel.kind === "text"
+					? `Arquivar #${channel.name}?`
+					: `Arquivar a ${channel.name}?`
+			}
+			description={
+				channel.kind === "text"
+					? "O canal some da lista para todo mundo. As mensagens ficam guardadas, e quem gerencia os canais pode desarquivar nas configurações."
+					: "A sala some da lista para todo mundo, e quem estiver nela sai da voz. Quem gerencia os canais pode desarquivar nas configurações."
+			}
 			error={archive.error?.message}
 			pending={archive.isPending}
 			onConfirm={() =>

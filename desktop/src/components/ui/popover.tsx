@@ -16,19 +16,25 @@ function PopoverContent({
 	alignOffset = 0,
 	side = "bottom",
 	sideOffset = 6,
+	anchor,
+	container,
 	...props
 }: PopoverPrimitive.Popup.Props &
 	Pick<
 		PopoverPrimitive.Positioner.Props,
-		"align" | "alignOffset" | "side" | "sideOffset"
-	>) {
+		"align" | "alignOffset" | "side" | "sideOffset" | "anchor"
+	> & {
+		/** Onde o popover é desenhado; em tela cheia, dentro do elemento dela, ou não aparece. */
+		container?: PopoverPrimitive.Portal.Props["container"];
+	}) {
 	return (
-		<PopoverPrimitive.Portal>
+		<PopoverPrimitive.Portal container={container}>
 			<PopoverPrimitive.Positioner
 				align={align}
 				alignOffset={alignOffset}
 				side={side}
 				sideOffset={sideOffset}
+				anchor={anchor}
 				className="isolate z-50"
 			>
 				<PopoverPrimitive.Popup

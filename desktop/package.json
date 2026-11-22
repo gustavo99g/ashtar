@@ -1,7 +1,7 @@
 {
 	"name": "desktop",
 	"private": true,
-	"version": "0.2.41",
+	"version": "0.7.1",
 	"type": "module",
 	"packageManager": "pnpm@11.24.0",
 	"scripts": {
@@ -32,6 +32,7 @@
 		"@tauri-apps/plugin-opener": "^2.7.0",
 		"class-variance-authority": "^0.7.1",
 		"clsx": "^2.1.1",
+		"emojibase-data": "16.0.3",
 		"livekit-client": "^2.22.3",
 		"lucide-react": "^1.37.0",
 		"react": "^19.1.0",

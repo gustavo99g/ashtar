@@ -57,4 +57,49 @@ describe("Toaster", () => {
 
 		expect(timerOf("pedrin entrou no grupo")).toHaveAttribute("data-paused");
 	});
+
+	it("o tipo dá a cor da barra e o tempo: o erro fica 12 s, a confirmação curta 4 s e sem o X", () => {
+		render(<Toaster />);
+		act(() => {
+			toast.add({ title: "Não deu para reagir", data: { tone: "error" } });
+			toast.add({
+				title: "Imagem copiada",
+				data: { tone: "success", compact: true },
+			});
+			toast.add({ title: "lua entrou no grupo" });
+		});
+		const error = timerOf("Não deu para reagir");
+		expect(error).toHaveClass("bg-destructive");
+		expect(error.style.animationDuration).toBe("12000ms");
+
+		const copied = timerOf("Imagem copiada");
+		expect(copied).toHaveClass("bg-success");
+		expect(copied.style.animationDuration).toBe("4000ms");
+		const compact = screen
+			.getByText("Imagem copiada")
+			.closest("[data-slot=toast]");
+		expect(compact?.querySelector("[aria-label='Fechar aviso']")).toBeNull();
+
+		// Sem tipo, como antes: dourada e 8 s.
+		const plain = timerOf("lua entrou no grupo");
+		expect(plain).toHaveClass("bg-gold");
+		expect(plain.style.animationDuration).toBe("8000ms");
+	});
+
+	it("a curta pode ter a ação na mesma linha (o Abrir pasta do Salvo em Downloads)", () => {
+		const open = vi.fn();
+		render(<Toaster />);
+		act(() => {
+			toast.add({
+				title: "Salvo em Downloads",
+				description: "C:/Downloads/foto.png",
+				data: { tone: "success", compact: true },
+				actionProps: { children: "Abrir pasta", onClick: open },
+			});
+		});
+		// O caminho não aparece na curta.
+		expect(screen.queryByText("C:/Downloads/foto.png")).toBeNull();
+		fireEvent.click(screen.getByRole("button", { name: "Abrir pasta" }));
+		expect(open).toHaveBeenCalled();
+	});
 });

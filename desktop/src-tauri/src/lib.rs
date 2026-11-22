@@ -13,10 +13,15 @@ mod changelog;
 mod commands;
 mod deep_link;
 mod error;
+mod gpu;
 mod identity;
+mod log_bundle;
 pub mod logging;
 mod media;
+mod notifications;
 mod permissions;
+mod power;
+mod shortcuts;
 mod tray;
 mod updater;
 mod webview_process;
@@ -25,6 +30,10 @@ mod window;
 use tauri::{Manager, RunEvent};
 use tauri_plugin_window_state::{AppHandleExt, StateFlags};
 
+/// O argumento com que o Windows abre o app quando ele inicia junto (Configurações › Aplicativo):
+/// o app sobe direto na bandeja, sem mostrar a janela.
+const TRAY_ARG: &str = "--tray";
+
 /// O que a janela lembra entre aberturas: tamanho, posição e se estava maximizada.
 const WINDOW_STATE: StateFlags = StateFlags::SIZE
     .union(StateFlags::POSITION)
@@ -32,9 +41,12 @@ const WINDOW_STATE: StateFlags = StateFlags::SIZE
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run(log_file: logging::LateFile) {
+    let context = tauri::generate_context!();
+    // Sem aceleração de hardware (Configurações › Aplicativo), o WebView2 nasce com `--disable-gpu`.
+    let gpu_disabled = gpu::disabled_at_start(&context.config().identifier);
     std::env::set_var(
         "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS",
-        "--enable-usermedia-screen-capturing --auto-select-desktop-capture-source=Entire screen",
+        gpu::browser_args(gpu_disabled),
     );
 
     let app = tauri::Builder::default()
@@ -44,6 +56,10 @@ pub fn run(log_file: logging::LateFile) {
             window::bring_to_front(app);
         }))
         .plugin(tauri_plugin_deep_link::init())
+        .plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            Some(vec![TRAY_ARG]),
+        ))
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(
             tauri_plugin_window_state::Builder::new()
@@ -60,12 +76,24 @@ pub fn run(log_file: logging::LateFile) {
             app.manage(commands::screen_share::create_manager(app.handle()));
             app.manage(commands::updater::create_auto_update(app.handle()));
             app.manage(commands::thumbnails::Thumbnails::default());
+            app.manage(shortcuts::start(app.handle()));
+            power::watch_resume(app.handle());
 
             updater::spawn_periodic_check(app.handle().clone());
             deep_link::register_schemes(app);
-            permissions::allow_microphone(app);
+            permissions::allow_media(app);
             webview_process::refresh(app.handle());
             tray::create(app);
+            // A janela dos avisos nasce escondida e já carregada (`notifications.rs`).
+            notifications::create(app);
+            // A janela nasce invisível (`tauri.conf.json`) e só aparece aqui, a não ser que o app
+            // tenha subido com o Windows: aí fica na bandeja, sem piscar na tela. O
+            // `single-instance` traz a janela se a pessoa abrir o app de novo.
+            if std::env::args().any(|arg| arg == TRAY_ARG) {
+                tracing::info!("iniciado com o Windows: fica na bandeja");
+            } else {
+                window::bring_to_front(app.handle());
+            }
             // O Ashtar nunca aparece numa captura, nem na da própria transmissão (ADR 0019).
             if let Some(window) = app.get_webview_window("main") {
                 media::focus::exclude_from_capture(&window);
@@ -78,6 +106,7 @@ pub fn run(log_file: logging::LateFile) {
             commands::screen_share::screen_share_start,
             commands::screen_share::screen_share_update,
             commands::screen_share::screen_share_stop,
+            commands::screen_share::screen_share_reconnect,
             commands::thumbnails::thumbnails_start,
             commands::thumbnails::thumbnails_update,
             commands::thumbnails::thumbnails_stop,
@@ -88,12 +117,29 @@ pub fn run(log_file: logging::LateFile) {
             commands::updater::check_for_update_now,
             commands::app::whats_new,
             commands::app::open_log_dir,
+            commands::app::logs_bundle,
             commands::app::tray_share_state,
+            commands::app::autostart_enabled,
+            commands::app::set_autostart,
+            commands::app::hardware_acceleration,
+            commands::app::set_hardware_acceleration,
+            commands::app::restart_app,
+            commands::notifications::notification_show,
+            commands::notifications::notification_layout,
+            commands::notifications::notification_open,
+            commands::notifications::notification_ring,
+            commands::notifications::notification_answer,
+            commands::notifications::set_unread_badge,
+            commands::files::file_download,
             commands::identity::login,
             commands::identity::redeem,
-            commands::identity::account_marker
+            commands::identity::account_marker,
+            commands::presence::idle_seconds,
+            commands::shortcuts::shortcuts_set,
+            commands::shortcuts::shortcuts_record,
+            commands::shortcuts::shortcuts_input
         ])
-        .build(tauri::generate_context!())
+        .build(context)
         .expect("error while running tauri application");
 
     // Antes do `run()`: a janela nasce no começo dele, e o window-state grava o arquivo nessa hora.

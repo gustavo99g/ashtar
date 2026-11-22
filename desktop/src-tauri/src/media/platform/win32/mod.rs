@@ -21,3 +21,10 @@ pub use focus::{bring_to_front, exclude_from_capture};
 pub use pipeline::spawn_video;
 pub use sources::list::{list_monitors, list_windows};
 pub use thumbnails::spawn_thumbnails;
+
+/// O nome da placa de vídeo que a captura usaria, para o `info.txt` do "Enviar logs".
+pub fn gpu_name() -> Option<String> {
+    gpu::GpuDevice::new()
+        .ok()
+        .map(|gpu| gpu.adapter_name().to_owned())
+}

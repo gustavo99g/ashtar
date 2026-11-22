@@ -1,9 +1,12 @@
-import type { ComponentProps, ReactNode } from "react";
+import { type ComponentProps, type ReactNode, useState } from "react";
+import { useFileUrl } from "@/lib/fileCache";
 import { cn } from "@/lib/utils";
 import { avatarInitial, nickColor } from "../model/nickColor";
+import { useAvatarOf } from "../stores/avatarStore";
 
 /*
- * O avatar do canvas: um círculo na cor do nick com a letra do nome. Não há foto na 0.2.2.
+ * O avatar do canvas: a foto de perfil (0.7) ou, sem ela, um círculo na cor do nick com a letra
+ * do nome. A letra também aparece enquanto a foto baixa e se ela não abrir.
  * O tamanho vem em pixels porque o canvas usa muitos (22, 32, 36, 40, 52, 64, 72...); a letra
  * fica com uns 40% dele.
  */
@@ -16,6 +19,11 @@ interface AvatarProps extends Omit<ComponentProps<"span">, "children"> {
 	size?: number;
 	/** O selo no canto, com `AvatarBadge`. */
 	badge?: ReactNode;
+	/**
+	 * O id do arquivo da foto. Sem ele, vale a foto conhecida de quem tem o `nick`; `null` mostra a
+	 * letra mesmo assim.
+	 */
+	avatar?: string | null;
 }
 
 function Avatar({
@@ -23,10 +31,17 @@ function Avatar({
 	displayName,
 	size = 36,
 	badge,
+	avatar,
 	className,
 	style,
 	...props
 }: AvatarProps) {
+	const known = useAvatarOf(nick);
+	const photoId = avatar === undefined ? known : avatar;
+	const url = useFileUrl(photoId);
+	const [broken, setBroken] = useState<string | null>(null);
+	const photo = url && broken !== url ? url : undefined;
+
 	return (
 		<span
 			aria-hidden="true"
@@ -46,7 +61,17 @@ function Avatar({
 			}}
 			{...props}
 		>
-			{avatarInitial(nick, displayName)}
+			{photo ? (
+				<img
+					src={photo}
+					alt=""
+					draggable={false}
+					onError={() => setBroken(photo)}
+					className="size-full rounded-full object-cover"
+				/>
+			) : (
+				avatarInitial(nick, displayName)
+			)}
 			{badge}
 		</span>
 	);

@@ -44,7 +44,17 @@ export default defineConfig(async () => ({
 	// `src-tauri/target/doc` (milhares de .html gerados pelo `cargo doc`)
 	// e estoura o limite de arquivos abertos do SO (EMFILE).
 	optimizeDeps: {
-		entries: ["index.html"],
+		entries: ["index.html", "notifications.html"],
+	},
+
+	// Duas páginas: a janela principal e a janela dos avisos (`notifications.rs`).
+	build: {
+		rollupOptions: {
+			input: {
+				main: path.resolve(__dirname, "index.html"),
+				notifications: path.resolve(__dirname, "notifications.html"),
+			},
+		},
 	},
 
 	// 2. tauri expects a fixed port, fail if that port is not available

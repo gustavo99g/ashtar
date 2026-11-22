@@ -60,6 +60,10 @@ export function SettingsLayout() {
 	const showPanel = useMe().data?.can_view_panel === true;
 	const channel = useMe().data?.update_channel;
 	const showServer = useMe().data?.can_manage_channels === true;
+	// O estado do servidor é só do dono (decisão 17); os logs, de quem tem "Ver logs" (v0.7).
+	const isOwner = useMe().data?.user.is_owner === true;
+	const showEmojis = useMe().data?.can_manage_emojis === true;
+	const showLogs = useMe().data?.can_view_logs === true;
 
 	useEffect(() => {
 		const onKeyDown = (event: KeyboardEvent) => {
@@ -84,6 +88,8 @@ export function SettingsLayout() {
 				<MenuSeparator />
 				<MenuGroup label="Ajustes">
 					<MenuItem to={paths.settings.voice}>Voz e vídeo</MenuItem>
+					<MenuItem to={paths.settings.shortcuts}>Atalhos</MenuItem>
+					<MenuItem to={paths.settings.notifications}>Notificações</MenuItem>
 					<MenuItem to={paths.settings.app}>Aplicativo</MenuItem>
 				</MenuGroup>
 				{showServer && (
@@ -94,7 +100,7 @@ export function SettingsLayout() {
 						</MenuGroup>
 					</>
 				)}
-				{showPanel && (
+				{(showPanel || showEmojis || showLogs) && (
 					<>
 						<MenuSeparator />
 						<MenuGroup
@@ -105,8 +111,21 @@ export function SettingsLayout() {
 								</>
 							}
 						>
-							<MenuItem to={paths.settings.invites}>Convites</MenuItem>
-							<MenuItem to={paths.settings.members}>Membros</MenuItem>
+							{showPanel && (
+								<>
+									<MenuItem to={paths.settings.invites}>Convites</MenuItem>
+									<MenuItem to={paths.settings.members}>Membros</MenuItem>
+								</>
+							)}
+							{showEmojis && (
+								<MenuItem to={paths.settings.emojis}>Emojis</MenuItem>
+							)}
+							{showLogs && (
+								<MenuItem to={paths.settings.logs}>Logs</MenuItem>
+							)}
+							{isOwner && (
+								<MenuItem to={paths.settings.server}>Servidor</MenuItem>
+							)}
 						</MenuGroup>
 					</>
 				)}

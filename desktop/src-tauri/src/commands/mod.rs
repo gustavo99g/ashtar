@@ -10,8 +10,12 @@
 //!   resultado. Lógica de captura e de sessão não mora aqui.
 
 pub mod app;
+pub mod files;
 pub mod identity;
+pub mod notifications;
+pub mod presence;
 pub mod screen_share;
+pub mod shortcuts;
 pub mod thumbnails;
 pub mod updater;
 
