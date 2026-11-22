@@ -221,6 +221,15 @@ export type CreatedInviteView = { id: string, code: string, link: string, expire
  */
 preset: Preset | null, };
 
+/**
+ * Um jogo da lista, como o app recebe.
+ */
+export type DetectableGame = { 
+/**
+ * O fim do caminho do `.exe`, em minúsculas e com `/` (`javaw.exe`, `bin/game.exe`).
+ */
+exe: string, name: string, };
+
 export type DeviceView = { linked_at: number, };
 
 export type DisconnectMemberRequest = { user_id: string, };

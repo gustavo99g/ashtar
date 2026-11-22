@@ -666,3 +666,16 @@ async fn o_registro_guarda_as_acoes_e_so_o_dono_le() {
         .unwrap();
     assert_eq!(api::audit::sweep(&ctx.db, now()).await.unwrap(), 1);
 }
+
+#[tokio::test]
+async fn a_lista_de_jogos_vem_com_etag() {
+    let ctx = setup().await;
+    let owner = Some(ctx.owner_token.as_str());
+    // Antes da primeira busca boa: lista vazia.
+    let (status, body) = call(&ctx.router, "GET", "/api/games/detectable", owner, None).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body, json!([]));
+    // Sem sessão, não.
+    let (status, _) = call(&ctx.router, "GET", "/api/games/detectable", None, None).await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+}

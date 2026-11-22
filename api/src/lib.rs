@@ -10,6 +10,7 @@ pub mod db;
 pub mod download;
 pub mod error;
 pub mod files;
+pub mod games;
 pub mod identity;
 pub mod limiter;
 pub mod logs;
@@ -74,6 +75,8 @@ pub struct AppState {
     pub disk_alerted_at: Arc<std::sync::atomic::AtomicI64>,
     /// As regras da busca das prévias de link (a VPS só vai a endereços públicos).
     pub previews: Arc<previews::Guard>,
+    /// A lista de jogos detectáveis do Discord, buscada uma vez por dia (ADR 0033).
+    pub games: Arc<games::DetectableGames>,
     /// A chave dos links curtos do vídeo, sorteada a cada vez que a API sobe (um link vale 10
     /// minutos: reiniciar só faz o app pedir outro).
     pub link_key: Arc<[u8; 32]>,
@@ -98,6 +101,7 @@ impl AppState {
             files: Arc::new(files::FileStore::from_env(&logs::data_dir_from_env())),
             disk_alerted_at: Arc::new(std::sync::atomic::AtomicI64::new(0)),
             previews: Arc::new(previews::Guard::default()),
+            games: Arc::new(games::DetectableGames::open(&logs::data_dir_from_env())),
             link_key: Arc::new({
                 let mut key = [0u8; 32];
                 getrandom::fill(&mut key).expect("o sistema deveria fornecer bytes aleatórios");
@@ -307,6 +311,7 @@ pub fn app(state: AppState, policy: Arc<ClientPolicy>) -> Router {
         .route("/logs/{id}/entry", get(routes::logs::entry))
         .route("/admin/status", get(routes::admin::status))
         .route("/admin/audit", get(routes::admin::audit))
+        .route("/games/detectable", get(routes::games::detectable))
         .route("/files/{id}", get(routes::files::download))
         .route("/files/{id}/link", post(routes::files::link))
         .route("/files/{id}/stream", get(routes::files::stream))

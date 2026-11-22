@@ -6,6 +6,7 @@ pub mod dms;
 pub mod emojis;
 pub mod extract;
 pub mod files;
+pub mod games;
 pub mod invites;
 pub mod logs;
 pub mod members;
