@@ -36,6 +36,7 @@ import {
 	NotificationsSettingsRoute,
 	ProfileSettingsRoute,
 	ShortcutsSettingsRoute,
+	ActivitySettingsRoute,
 	VoiceSettingsRoute,
 } from "@/routes/settings";
 import { StartRoute } from "@/routes/start";
@@ -76,6 +77,7 @@ export const routes: RouteObject[] = [
 							{ path: "profile", element: <ProfileSettingsRoute /> },
 							{ path: "voice", element: <VoiceSettingsRoute /> },
 							{ path: "shortcuts", element: <ShortcutsSettingsRoute /> },
+							{ path: "activity", element: <ActivitySettingsRoute /> },
 							{
 								path: "notifications",
 								element: <NotificationsSettingsRoute />,

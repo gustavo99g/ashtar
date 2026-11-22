@@ -8,6 +8,7 @@
 import { create } from "zustand";
 import type { CaptureSource } from "@/lib/tauri/commands";
 import type { ScreenShareController, ShareRequest } from "../model/controller";
+import { useShareDefaults } from "./shareDefaultsStore";
 
 /** `start`: começa uma transmissão. `change`: troca a fonte da que está no ar. */
 export type PickerMode = "start" | "change";
@@ -69,4 +70,59 @@ export async function restartShare(
 	const state = controller.getState();
 	if (state.status !== "active") return;
 	await controller.update({ kind: "audio", audio: state.audioMode });
+}
+
+/**
+ * A janela do processo `processId` na lista do seletor: a que não está minimizada, se houver
+ * mais de uma (o jogo e o launcher dele, por exemplo).
+ */
+export function windowOfProcess(
+	sources: CaptureSource[],
+	processId: number,
+): CaptureSource | null {
+	const windows = sources.filter(
+		(source) =>
+			source.source.kind === "window" && source.processId === processId,
+	);
+	return windows.find((source) => !source.minimized) ?? windows[0] ?? null;
+}
+
+/**
+ * O pedido do Transmitir do cartão do jogo (ADR 0033, decisão 6): a qualidade, o áudio e o cursor
+ * do último início pelo seletor, ou o padrão das configurações.
+ */
+export function quickShareRequest(source: CaptureSource): ShareRequest {
+	const last = usePickerStore.getState().lastRequest;
+	const defaults = useShareDefaults.getState();
+	const audio = last?.audio.mode ?? defaults.audio;
+	return {
+		source,
+		quality: last?.quality ?? defaults.quality,
+		audio:
+			audio === "application"
+				? source.processId == null
+					? { mode: "off" }
+					: { mode: "application", processId: source.processId }
+				: { mode: audio },
+		cursor: last?.cursor ?? true,
+		leveler: last?.leveler,
+	};
+}
+
+/**
+ * Transmite a janela do processo `processId` sem abrir o seletor: começa uma transmissão, ou troca
+ * a fonte da que está no ar. Devolve `false` se a janela não está na lista.
+ */
+export async function shareProcessWindow(
+	controller: ScreenShareController,
+	processId: number,
+): Promise<boolean> {
+	const source = windowOfProcess(await controller.listSources(), processId);
+	if (!source) return false;
+	if (controller.getState().status === "active") {
+		await changeSource(controller, source);
+	} else {
+		await startShare(controller, quickShareRequest(source));
+	}
+	return true;
 }

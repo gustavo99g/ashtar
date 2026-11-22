@@ -3,6 +3,7 @@
  * `@tauri-apps/api/core` diretamente. Cada comando Tauri ganha um wrapper tipado, no arquivo do
  * seu assunto; quem usa continua importando de `@/lib/tauri/commands`.
  */
+export * from "./activity";
 export * from "./app";
 export * from "./files";
 export { type AppError, type AppErrorKind, isAppError } from "./core";

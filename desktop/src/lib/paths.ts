@@ -25,6 +25,7 @@ export const paths = {
 		profile: "/settings/profile",
 		voice: "/settings/voice",
 		shortcuts: "/settings/shortcuts",
+		activity: "/settings/activity",
 		notifications: "/settings/notifications",
 		app: "/settings/app",
 		invites: "/settings/invites",

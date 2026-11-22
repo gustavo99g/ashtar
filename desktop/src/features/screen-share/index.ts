@@ -1,6 +1,7 @@
 export { ShareDefaultsSection } from "./components/ShareDefaultsSection";
 export { ShareQuickSettings } from "./components/ShareQuickSettings";
 export { SourcePickerHost } from "./components/SourcePickerHost";
+export { useNow } from "./hooks/useNow";
 export { useScreenShareState } from "./hooks/useScreenShareState";
 export { type ScreenShare, useScreenShares } from "./hooks/useScreenShares";
 export { sharePerson, useShareButton } from "./hooks/useShareButton";
@@ -29,7 +30,9 @@ export {
 	openSharePanel,
 	openSourcePicker,
 	restartShare,
+	shareProcessWindow,
 	useSharePanelOpen,
+	windowOfProcess,
 } from "./stores/pickerStore";
 export {
 	type ShareViewer,

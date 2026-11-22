@@ -82,6 +82,8 @@ pub struct GameView {
     pub name: String,
     pub exe: String,
     pub source: Source,
+    /// O processo do jogo: o app acha a janela dele na lista do seletor para transmitir.
+    pub pid: u32,
     /// Quando o processo abriu, em milissegundos desde 1970.
     pub started_ms: i64,
     /// `data:image/png;base64,...`, ou `None` (o app desenha o controle).
@@ -299,6 +301,7 @@ impl Activity {
             name: open.game.name,
             exe: open.game.exe,
             source: open.game.source,
+            pid: open.pid,
             started_ms: open.started_ms,
             icon,
         })

@@ -89,6 +89,7 @@ export function SettingsLayout() {
 				<MenuGroup label="Ajustes">
 					<MenuItem to={paths.settings.voice}>Voz e vídeo</MenuItem>
 					<MenuItem to={paths.settings.shortcuts}>Atalhos</MenuItem>
+					<MenuItem to={paths.settings.activity}>Atividade</MenuItem>
 					<MenuItem to={paths.settings.notifications}>Notificações</MenuItem>
 					<MenuItem to={paths.settings.app}>Aplicativo</MenuItem>
 				</MenuGroup>

@@ -1,4 +1,5 @@
 import { Outlet } from "react-router-dom";
+import { ActivitySync } from "@/features/activity";
 import { CallBridge } from "@/features/calls";
 import { ChannelDialogs } from "@/features/channels";
 import { DmDock, showDm } from "@/features/dms";
@@ -80,6 +81,7 @@ function AppFrame() {
 			{/* Os avisos: a regra, o ponto de não lido e o clique num cartão. Não desenha nada. */}
 			<NotificationsBridge />
 			<RoomSounds />
+			<ActivitySync />
 			{/* As ligações: a voz segue a ligação, e o cartão dela vai para a janela dos avisos. */}
 			<CallBridge showConversation={showDm} />
 		</div>

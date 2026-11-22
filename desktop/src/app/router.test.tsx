@@ -25,6 +25,11 @@ vi.mock("@/lib/tauri/commands", () => ({
 	onNotificationAnswer: vi.fn(() => Promise.resolve(() => {})),
 	onSystemResumed: vi.fn(() => () => {}),
 	notificationRing: vi.fn(() => Promise.resolve()),
+	// O jogo aberto (`ActivitySync`): nenhum.
+	activityState: vi.fn(() => Promise.resolve(null)),
+	onActivityChanged: vi.fn(() => Promise.resolve(() => {})),
+	activityDetectableEtag: vi.fn(() => Promise.resolve(null)),
+	activitySetDetectable: vi.fn(() => Promise.resolve()),
 	login: vi.fn(),
 	accountMarker: vi.fn(),
 	checkForUpdate: vi.fn(() => Promise.resolve()),
