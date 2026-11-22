@@ -153,6 +153,7 @@ describe("o Painel", () => {
 			title: "Salvo em Downloads",
 			description: "C:/Downloads/ana.zip",
 			data: { tone: "success", compact: true },
+			actionProps: { children: "Abrir pasta", onClick: expect.any(Function) },
 		});
 	});
 

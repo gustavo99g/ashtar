@@ -25,6 +25,7 @@ import { toast } from "@/components/ui/toast";
 import { ApiError, apiUrl, type FileView, fileLink } from "@/lib/api";
 import { useFileUrl } from "@/lib/fileCache";
 import { downloadFile } from "@/lib/tauri/commands";
+import { revealFile } from "@/lib/tauri/opener";
 import {
 	ContextMenu,
 	ContextMenuContent,
@@ -57,6 +58,10 @@ export function useDownload(file: FileView) {
 				title: "Salvo em Downloads",
 				description: path,
 				data: { tone: "success", compact: true },
+				actionProps: {
+					children: "Abrir pasta",
+					onClick: () => revealFile(path),
+				},
 			});
 		} catch (error) {
 			toast.add({

@@ -12,6 +12,7 @@ import { EmptyState, ErrorState, LoadingState } from "@/components/ui/states";
 import { Avatar } from "@/features/identity";
 import { ApiError, type LogReportView } from "@/lib/api";
 import { downloadFile } from "@/lib/tauri/commands";
+import { revealFile } from "@/lib/tauri/opener";
 import { cn } from "@/lib/utils";
 import { size, when } from "../model/format";
 import { useLogEntries, useLogReports, useLogText } from "../queries";
@@ -78,6 +79,10 @@ function LogRow({ report }: { report: LogReportView }) {
 				title: "Salvo em Downloads",
 				description: path,
 				data: { tone: "success", compact: true },
+				actionProps: {
+					children: "Abrir pasta",
+					onClick: () => revealFile(path),
+				},
 			});
 		} catch (error) {
 			toast.add({

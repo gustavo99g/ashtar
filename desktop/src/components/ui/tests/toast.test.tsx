@@ -85,4 +85,21 @@ describe("Toaster", () => {
 		expect(plain).toHaveClass("bg-gold");
 		expect(plain.style.animationDuration).toBe("8000ms");
 	});
+
+	it("a curta pode ter a ação na mesma linha (o Abrir pasta do Salvo em Downloads)", () => {
+		const open = vi.fn();
+		render(<Toaster />);
+		act(() => {
+			toast.add({
+				title: "Salvo em Downloads",
+				description: "C:/Downloads/foto.png",
+				data: { tone: "success", compact: true },
+				actionProps: { children: "Abrir pasta", onClick: open },
+			});
+		});
+		// O caminho não aparece na curta.
+		expect(screen.queryByText("C:/Downloads/foto.png")).toBeNull();
+		fireEvent.click(screen.getByRole("button", { name: "Abrir pasta" }));
+		expect(open).toHaveBeenCalled();
+	});
 });

@@ -172,8 +172,8 @@ function ToastItem({
 				{media && <span className="flex shrink-0">{media}</span>}
 				<div
 					className={cn(
-						"flex min-w-0 flex-1 flex-col gap-0.5",
-						!compact && "pt-px",
+						"flex min-w-0 flex-1 gap-0.5",
+						compact ? "items-center gap-3" : "flex-col pt-px",
 					)}
 				>
 					<ToastPrimitive.Title
@@ -185,9 +185,14 @@ function ToastItem({
 					{!compact && (
 						<ToastPrimitive.Description className="text-xs leading-[1.45] text-muted-foreground" />
 					)}
-					{/* Sem ação, nada de setinha sozinha. */}
-					{!compact && item.actionProps?.children && (
-						<ToastPrimitive.Action className="mt-[5px] flex items-center gap-1 self-start text-xs font-semibold text-link hover:text-link-hover">
+					{/* Sem ação, nada de setinha sozinha. Na curta, a ação fica na mesma linha. */}
+					{item.actionProps?.children && (
+						<ToastPrimitive.Action
+							className={cn(
+								"flex shrink-0 items-center gap-1 self-start text-xs font-semibold whitespace-nowrap text-link hover:text-link-hover",
+								compact ? "self-center" : "mt-[5px]",
+							)}
+						>
 							{item.actionProps.children}
 							<ArrowRightIcon className="size-3" />
 						</ToastPrimitive.Action>
