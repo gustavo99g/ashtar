@@ -66,3 +66,7 @@ pub fn spawn_thumbnails(
 ) -> Result<CaptureHandle, AppError> {
     Err(AppError::Unsupported("miniaturas"))
 }
+
+pub fn exe_icon_png(_path: &str, _size: u32) -> Option<Vec<u8>> {
+    None
+}

@@ -12,9 +12,13 @@ use windows_sys::Win32::{
     Graphics::Gdi::{
         GetDIBits, GetObjectW, BITMAP, BITMAPINFO, BITMAPINFOHEADER, BI_RGB, DIB_RGB_COLORS,
     },
-    UI::WindowsAndMessaging::{
-        GetClassLongPtrW, GetIconInfo, SendMessageTimeoutW, GCLP_HICON, GCLP_HICONSM, HICON,
-        ICONINFO, ICON_BIG, ICON_SMALL, ICON_SMALL2, SMTO_ABORTIFHUNG, WM_GETICON,
+    UI::{
+        Shell::SHDefExtractIconW,
+        WindowsAndMessaging::{
+            DestroyIcon, GetClassLongPtrW, GetIconInfo, SendMessageTimeoutW, GCLP_HICON,
+            GCLP_HICONSM, HICON, ICONINFO, ICON_BIG, ICON_SMALL, ICON_SMALL2, SMTO_ABORTIFHUNG,
+            WM_GETICON,
+        },
     },
 };
 
@@ -164,6 +168,42 @@ fn icon_pixels(icon: HICON) -> Option<(u32, u32, Vec<u8>)> {
         }
     }
     Some((width as u32, height as u32, pixels))
+}
+
+/// O ícone de um `.exe` em PNG, no maior tamanho que ele tiver até `size` pixels (o Windows
+/// escolhe a imagem mais próxima do arquivo e redimensiona; até 256, o "jumbo"). `None` sem ícone.
+///
+/// # Bloqueia
+///
+/// Lê o arquivo do disco. Chamar fora da thread da interface.
+pub fn exe_icon_png(path: &str, size: u32) -> Option<Vec<u8>> {
+    let wide: Vec<u16> = path.encode_utf16().chain(Some(0)).collect();
+    let mut large: HICON = std::ptr::null_mut();
+    // SAFETY: `wide` termina em zero e vive até o fim da chamada; `large` é um ponteiro de saída
+    // válido, e o pequeno pode ser nulo. O tamanho vai no `LOWORD` (o grande).
+    let result = unsafe {
+        SHDefExtractIconW(
+            wide.as_ptr(),
+            0,
+            0,
+            &mut large,
+            std::ptr::null_mut(),
+            size & 0xFFFF,
+        )
+    };
+    if result != 0 || large.is_null() {
+        return None;
+    }
+    let pixels = icon_pixels(large);
+    // SAFETY: o `SHDefExtractIconW` criou o ícone para nós; ele é destruído uma vez só, aqui.
+    unsafe { DestroyIcon(large) };
+    let (width, height, rgba) = pixels?;
+    let image = RgbaImage::from_raw(width, height, rgba)?;
+    let mut png = Vec::new();
+    image
+        .write_to(&mut Cursor::new(&mut png), ImageFormat::Png)
+        .ok()?;
+    Some(png)
 }
 
 fn encode_png_data_url(width: u32, height: u32, rgba: Vec<u8>) -> Option<String> {

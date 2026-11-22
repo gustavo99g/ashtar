@@ -19,6 +19,7 @@ pub mod wgc;
 pub use audio_capture::spawn_audio_capture;
 pub use focus::{bring_to_front, exclude_from_capture};
 pub use pipeline::spawn_video;
+pub use sources::exe_icon_png;
 pub use sources::list::{list_monitors, list_windows};
 pub use thumbnails::spawn_thumbnails;
 

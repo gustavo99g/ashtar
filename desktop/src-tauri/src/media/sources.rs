@@ -252,3 +252,9 @@ mod tests {
         );
     }
 }
+
+/// O ícone de um `.exe` em PNG, até `size` pixels (o do jogo detectado, ADR 0033). Bloqueia: lê o
+/// disco.
+pub fn exe_icon_png(path: &str, size: u32) -> Option<Vec<u8>> {
+    platform::exe_icon_png(path, size)
+}

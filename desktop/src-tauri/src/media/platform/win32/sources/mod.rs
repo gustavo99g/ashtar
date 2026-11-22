@@ -6,6 +6,8 @@ pub mod list;
 mod gdi;
 mod icon;
 
+pub use icon::exe_icon_png;
+
 #[cfg(test)]
 mod window_tests {
     use crate::media::platform::sources::icon::icon_data_url;

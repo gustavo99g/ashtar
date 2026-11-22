@@ -9,6 +9,7 @@
 //! - comandos só traduzem: validam a entrada, chamam `media::` e convertem o
 //!   resultado. Lógica de captura e de sessão não mora aqui.
 
+pub mod activity;
 pub mod app;
 pub mod files;
 pub mod identity;

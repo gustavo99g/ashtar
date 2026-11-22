@@ -8,6 +8,7 @@
 // parte do FFI do projeto mora em `media::platform::win32`.
 #![warn(clippy::undocumented_unsafe_blocks)]
 
+mod activity;
 mod api;
 mod changelog;
 mod commands;
@@ -77,6 +78,7 @@ pub fn run(log_file: logging::LateFile) {
             app.manage(commands::updater::create_auto_update(app.handle()));
             app.manage(commands::thumbnails::Thumbnails::default());
             app.manage(shortcuts::start(app.handle()));
+            app.manage(activity::Activity::start(app.handle()));
             power::watch_resume(app.handle());
 
             updater::spawn_periodic_check(app.handle().clone());
@@ -137,7 +139,16 @@ pub fn run(log_file: logging::LateFile) {
             commands::presence::idle_seconds,
             commands::shortcuts::shortcuts_set,
             commands::shortcuts::shortcuts_record,
-            commands::shortcuts::shortcuts_input
+            commands::shortcuts::shortcuts_input,
+            commands::activity::activity_state,
+            commands::activity::activity_settings,
+            commands::activity::set_activity_enabled,
+            commands::activity::set_game_hidden,
+            commands::activity::add_game,
+            commands::activity::remove_game,
+            commands::activity::activity_windows,
+            commands::activity::activity_detectable_etag,
+            commands::activity::activity_set_detectable
         ])
         .build(context)
         .expect("error while running tauri application");
