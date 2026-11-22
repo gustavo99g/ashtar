@@ -158,7 +158,7 @@ function TextChannel({ channel, collapsed, manage }: RowProps) {
 					<CountBadge
 						count={mentioned}
 						label={mentioned === 1 ? "1 menção" : `${mentioned} menções`}
-						className="ml-auto shrink-0 bg-destructive text-white"
+						className="ml-auto shrink-0"
 					/>
 				</button>
 			</RowFrame>

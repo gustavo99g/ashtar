@@ -257,9 +257,9 @@ export function MessageList({
 									ref={lineRef}
 									role="separator"
 									aria-label="Novas mensagens"
-									className="mx-4 mt-2 flex items-center gap-2 text-[11px] font-bold text-destructive-text uppercase"
+									className="mx-4 mt-2 flex items-center gap-2 text-[11px] font-bold text-gold-text uppercase"
 								>
-									<span className="h-px flex-1 bg-destructive-text/60" />
+									<span className="h-px flex-1 bg-gold/60" />
 									Novas mensagens
 								</li>
 							)}
