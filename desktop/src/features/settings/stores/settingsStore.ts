@@ -32,6 +32,7 @@ export const ROOM_SOUND_IDS = [
 	"shareStart",
 	"shareStop",
 	"ptt",
+	"screenshot",
 ] as const;
 
 export type RoomSoundId = (typeof ROOM_SOUND_IDS)[number];
@@ -49,6 +50,8 @@ export const DEFAULT_ROOM_SOUNDS: RoomSoundPrefs = {
 	shareStop: true,
 	// O clique do pressionar para falar (v0.6, ADR 0029): só quem aperta ouve, e começa desligado.
 	ptt: false,
+	// O clique de câmera do print da transmissão (v0.8).
+	screenshot: true,
 };
 
 /** O volume dos sons do Ashtar (v0.6): de 0 a 100%, para todos os sons do app. */
@@ -101,6 +104,9 @@ interface SettingsState {
 	roomSounds: RoomSoundPrefs;
 	/** O volume dos sons do Ashtar, de 0 a 100 (%). */
 	soundVolume: number;
+	/** "Salvar prints no computador" (v0.8): além da área de transferência, um PNG em Imagens\Ashtar. */
+	saveScreenshots: boolean;
+	setSaveScreenshots: (save: boolean) => void;
 	setSoundVolume: (volume: number) => void;
 	setTheme: (theme: ThemeId) => void;
 	setRoomSound: (id: RoomSoundId, enabled: boolean) => void;
@@ -138,6 +144,8 @@ export const useSettingsStore = create<SettingsState>()(
 			askBeforeSwitchRoom: true,
 			roomSounds: DEFAULT_ROOM_SOUNDS,
 			soundVolume: DEFAULT_SOUND_VOLUME,
+			saveScreenshots: false,
+			setSaveScreenshots: (saveScreenshots) => set({ saveScreenshots }),
 			setSoundVolume: (volume) => set({ soundVolume: readSoundVolume(volume) }),
 			setTheme: (theme) => set({ theme }),
 			setRoomSound: (id, enabled) =>
@@ -162,6 +170,7 @@ export const useSettingsStore = create<SettingsState>()(
 				askBeforeSwitchRoom: state.askBeforeSwitchRoom,
 				roomSounds: state.roomSounds,
 				soundVolume: state.soundVolume,
+				saveScreenshots: state.saveScreenshots,
 			}),
 			// Um tema que saiu do app (ou um valor estranho no disco) volta para o padrão. Quem vem
 			// de antes da 0.3.10 não tem as chaves de notificação: entram ligadas. O "perguntar antes de
@@ -175,6 +184,7 @@ export const useSettingsStore = create<SettingsState>()(
 							askBeforeSwitchRoom?: unknown;
 							roomSounds?: unknown;
 							soundVolume?: unknown;
+							saveScreenshots?: unknown;
 					  }
 					| undefined;
 				return {
@@ -191,6 +201,7 @@ export const useSettingsStore = create<SettingsState>()(
 							: true,
 					roomSounds: readRoomSounds(saved?.roomSounds),
 					soundVolume: readSoundVolume(saved?.soundVolume),
+					saveScreenshots: saved?.saveScreenshots === true,
 				};
 			},
 		},

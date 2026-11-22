@@ -19,6 +19,7 @@ pub mod leveler;
 pub mod platform;
 pub mod publisher;
 pub mod quality;
+pub mod screenshot;
 pub mod share;
 #[cfg(test)]
 mod share_e2e;

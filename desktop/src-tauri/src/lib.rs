@@ -148,7 +148,10 @@ pub fn run(log_file: logging::LateFile) {
             commands::activity::remove_game,
             commands::activity::activity_windows,
             commands::activity::activity_detectable_etag,
-            commands::activity::activity_set_detectable
+            commands::activity::activity_set_detectable,
+            commands::screenshot::screenshot_source,
+            commands::screenshot::screenshot_image,
+            commands::screenshot::open_screenshot_dir
         ])
         .build(context)
         .expect("error while running tauri application");

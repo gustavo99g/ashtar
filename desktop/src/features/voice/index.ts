@@ -1,6 +1,11 @@
 export { useGuardedJoin } from "./call/components/LeaveCallDialog";
 export { LiveBadge } from "./call/components/LiveBadge";
 export { MiniShare } from "./call/components/MiniShare";
+export {
+	screenshotName,
+	screenshotTarget,
+	takeScreenshot,
+} from "./call/screenshot";
 export { VoiceRoom } from "./call/components/VoiceRoom";
 export {
 	focusShare,

@@ -32,6 +32,7 @@ beforeEach(() => {
 			shareStart: true,
 			shareStop: true,
 			ptt: false,
+			screenshot: true,
 		},
 		soundVolume: 100,
 	});

@@ -70,3 +70,11 @@ pub fn spawn_thumbnails(
 pub fn exe_icon_png(_path: &str, _size: u32) -> Option<Vec<u8>> {
     None
 }
+
+pub fn capture_still(_source: SourceRef) -> Result<(Vec<u8>, u32, u32), AppError> {
+    Err(AppError::Unsupported("print"))
+}
+
+pub fn copy_image(_owner: usize, _dib: &[u8], _png: &[u8]) -> Result<(), AppError> {
+    Err(AppError::Unsupported("área de transferência"))
+}

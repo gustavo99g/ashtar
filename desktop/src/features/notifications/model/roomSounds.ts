@@ -15,6 +15,7 @@ import leaveSound from "@/assets/sounds/room-leave.wav";
 import pttOffSound from "@/assets/sounds/ptt-off.wav";
 import pttOnSound from "@/assets/sounds/ptt-on.wav";
 import muteSound from "@/assets/sounds/room-mute.wav";
+import screenshotSound from "@/assets/sounds/screenshot.wav";
 import shareStartSound from "@/assets/sounds/room-share-start.wav";
 import shareStopSound from "@/assets/sounds/room-share-stop.wav";
 import undeafenSound from "@/assets/sounds/room-undeafen.wav";
@@ -38,6 +39,7 @@ const FILES: Record<RoomSoundId, string> = {
 	shareStart: shareStartSound,
 	shareStop: shareStopSound,
 	ptt: pttOnSound,
+	screenshot: screenshotSound,
 };
 
 const lastPlayed = new Map<RoomSoundId, number>();

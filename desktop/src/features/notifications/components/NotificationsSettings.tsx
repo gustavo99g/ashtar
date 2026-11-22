@@ -57,6 +57,7 @@ const ROOM_SOUND_ROWS: { id: RoomSoundId; title: string }[] = [
 	{ id: "shareStart", title: "Alguém começou a transmitir" },
 	{ id: "shareStop", title: "Alguém parou de transmitir" },
 	{ id: "ptt", title: "Som do pressionar para falar" },
+	{ id: "screenshot", title: "Som do print da transmissão" },
 ];
 
 function Row({

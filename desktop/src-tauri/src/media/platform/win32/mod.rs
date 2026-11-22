@@ -5,6 +5,7 @@
 //! tipo de conflito é confuso.
 
 pub mod audio_capture;
+pub mod clipboard;
 pub mod convert;
 pub mod focus;
 pub mod gpu;
@@ -13,14 +14,17 @@ pub mod mf_encoder;
 pub mod pipeline;
 pub mod readback;
 pub mod sources;
+pub mod still;
 pub mod thumbnails;
 pub mod wgc;
 
 pub use audio_capture::spawn_audio_capture;
+pub use clipboard::copy_image;
 pub use focus::{bring_to_front, exclude_from_capture};
 pub use pipeline::spawn_video;
 pub use sources::exe_icon_png;
 pub use sources::list::{list_monitors, list_windows};
+pub use still::capture_still;
 pub use thumbnails::spawn_thumbnails;
 
 /// O nome da placa de vídeo que a captura usaria, para o `info.txt` do "Enviar logs".
