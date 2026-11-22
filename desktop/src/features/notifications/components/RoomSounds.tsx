@@ -17,6 +17,9 @@ import { playRoomSound } from "../model/roomSounds";
 
 const SCREEN_SUFFIX = ":screen";
 
+/** Quanto o som de sair espera a sala fechar (o microfone parar). */
+export const LEAVE_DELAY_MS = 300;
+
 export function RoomSounds() {
 	const voice = useMaybeVoice();
 	const inRoom = voice?.voiceKind === "room";
@@ -29,19 +32,23 @@ export function RoomSounds() {
 	const deafened = useRef(isDeafened);
 	deafened.current = isDeafened;
 
-	// Entrar, trocar e sair.
+	// Entrar, trocar e sair. O de entrar espera a sala ficar pronta (`room`, que só chega depois de
+	// o microfone abrir), e o de sair espera um pouco depois de a sala fechar: no Windows, o som que
+	// começa junto com o microfone abrindo ou fechando às vezes não saía.
 	const joined = useRef<string | null>(null);
+	const ready = state === "connected" && room !== null;
 	useEffect(() => {
 		if (channelId === null) {
-			if (joined.current !== null) playRoomSound("leave");
+			if (joined.current === null) return;
 			joined.current = null;
-			return;
+			const timer = setTimeout(() => playRoomSound("leave"), LEAVE_DELAY_MS);
+			return () => clearTimeout(timer);
 		}
-		if (state === "connected" && joined.current !== channelId) {
+		if (ready && joined.current !== channelId) {
 			joined.current = channelId;
 			playRoomSound("join");
 		}
-	}, [channelId, state]);
+	}, [channelId, ready]);
 
 	// Quem entra e sai da sala, e as transmissões.
 	useEffect(() => {
