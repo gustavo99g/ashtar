@@ -7,6 +7,8 @@
 - Clique com o botão direito numa imagem do chat para Copiar imagem ou Baixar. O visualizador em tela cheia também ganhou o Copiar.
 - As mensagens fixadas mostram as imagens, e clicar numa abre o visualizador.
 - Depois de anexar um arquivo, pelo +, arrastando ou colando, o campo fica pronto: é só apertar Enter para enviar.
+- Arrastar arquivos para a conversa mostra o "Solte para enviar", com quantos arquivos vêm.
+- O seletor de emoji abre mais rápido.
 - O número de menções nos canais e a linha Novas mensagens voltaram ao dourado.
 - A lista de membros diz "Em Sala" e "Transmitindo em Sala", que funciona com qualquer nome de sala.
 
