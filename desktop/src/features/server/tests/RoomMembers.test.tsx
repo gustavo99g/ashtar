@@ -28,7 +28,7 @@ describe("o cartão de quem está na sala", () => {
 	it("na mesma sala que você, o cartão dos outros tem o volume", async () => {
 		const card = await openCard("Júlia", true);
 
-		expect(within(card).getByText("Na Sala · transmitindo")).toBeVisible();
+		expect(within(card).getByText("Em Sala · transmitindo")).toBeVisible();
 		expect(
 			within(card).getByRole("slider", { name: "Volume de Júlia" }),
 		).toBeVisible();
@@ -37,7 +37,7 @@ describe("o cartão de quem está na sala", () => {
 	it("o seu próprio cartão não tem ações", async () => {
 		const card = await openCard("Kid", true);
 
-		expect(within(card).getByText("Na Sala")).toBeVisible();
+		expect(within(card).getByText("Em Sala")).toBeVisible();
 		expect(within(card).queryByRole("slider")).toBeNull();
 	});
 

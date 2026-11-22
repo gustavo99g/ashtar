@@ -30,8 +30,8 @@ export function whereLabel(
 ) {
 	if (person.room) {
 		return person.room.sharing
-			? `Na ${person.room.name} · transmitindo`
-			: `Na ${person.room.name}`;
+			? `Em ${person.room.name} · transmitindo`
+			: `Em ${person.room.name}`;
 	}
 	if (!person.online) return "Offline";
 	if (person.status === "busy") return "Ocupado";
