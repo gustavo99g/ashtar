@@ -590,3 +590,79 @@ async fn encerrar_a_transmissao_avisa_so_quem_transmitia() {
     assert_eq!(events[0].0["action"], "stop_share");
     assert!(events[0].1.includes(&ana_id) && !events[0].1.includes(&ctx.owner.id));
 }
+
+#[tokio::test]
+async fn o_registro_guarda_as_acoes_e_so_o_dono_le() {
+    let ctx = setup().await;
+    let squad = create_squad(&ctx).await;
+    let ana = join(&ctx, "Ana", 2, false).await;
+    let ana_id = member_id(&ctx, &ana).await;
+    ctx.hub.publish_voice_participants(
+        "sala".into(),
+        vec![person(&ana_id), person(&ctx.owner.id)],
+        Audience::Everyone,
+    );
+    let owner = Some(ctx.owner_token.as_str());
+    let path = format!("/api/voice/moderation/{ana_id}/mute");
+    assert_eq!(
+        call(&ctx.router, "PUT", &path, owner, None).await.0,
+        StatusCode::NO_CONTENT
+    );
+    let (status, _) = call(
+        &ctx.router,
+        "POST",
+        "/api/voice/move",
+        owner,
+        Some(json!({ "user_id": ana_id, "channel_id": squad })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+
+    let (status, list) = call(&ctx.router, "GET", "/api/admin/audit", owner, None).await;
+    assert_eq!(status, StatusCode::OK);
+    let actions: Vec<&str> = list
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|entry| entry["action"].as_str().unwrap())
+        .collect();
+    // Da mais nova para a mais velha; criar a Squad também entrou, e as ações do dono contam.
+    assert_eq!(actions, ["voz.mover", "voz.silenciar", "canais.criar"]);
+    assert_eq!(list[0]["target"]["name"], "Ana");
+    assert_eq!(list[0]["actor"]["name"], "Kid");
+    assert_eq!(list[0]["place"], "Sala");
+    assert_eq!(list[0]["detail"], "Squad");
+
+    // O filtro e a página.
+    let (_, voice) = call(
+        &ctx.router,
+        "GET",
+        "/api/admin/audit?kind=voice",
+        owner,
+        None,
+    )
+    .await;
+    assert_eq!(voice.as_array().unwrap().len(), 2);
+    let before = list[0]["id"].as_i64().unwrap();
+    let (_, older) = call(
+        &ctx.router,
+        "GET",
+        &format!("/api/admin/audit?before={before}"),
+        owner,
+        None,
+    )
+    .await;
+    assert_eq!(older[0]["action"], "voz.silenciar");
+
+    // Quem não é dono não lê, nem com todas as permissões.
+    grant_moderation(&ctx, &ana_id).await;
+    let (status, _) = call(&ctx.router, "GET", "/api/admin/audit", Some(&ana), None).await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+
+    // Com mais de 1 ano, a limpeza de hora em hora apaga.
+    sqlx::query("UPDATE audit_log SET at = 0 WHERE action = 'canais.criar'")
+        .execute(&ctx.db)
+        .await
+        .unwrap();
+    assert_eq!(api::audit::sweep(&ctx.db, now()).await.unwrap(), 1);
+}

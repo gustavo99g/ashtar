@@ -1,5 +1,6 @@
 export {
 	getServerStatus,
+	listAudit,
 	listLogEntries,
 	listLogReports,
 	readLogEntry,

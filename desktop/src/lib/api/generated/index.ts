@@ -17,6 +17,21 @@ export type Archived = { channels: Array<ChannelView>, categories: Array<Archive
 export type ArchivedCategory = { id: string, name: string, archived_at: number, };
 
 /**
+ * Uma linha do registro, como o Painel mostra.
+ */
+export type AuditEntry = { id: number, at: number, kind: AuditKind, action: string, actor: AuditPerson, target: AuditPerson | null, place: string | null, detail: string | null, };
+
+/**
+ * De que parte do grupo é a linha: o filtro do Painel › Registro.
+ */
+export type AuditKind = "voice" | "members" | "invites" | "channels";
+
+/**
+ * Alguém numa linha do registro, com o nome de quando a ação aconteceu.
+ */
+export type AuditPerson = { id: string, name: string, };
+
+/**
  * Quem escreveu, como a mensagem leva junto: quem não é dono não lê a lista
  * do Painel, então o app não teria de onde tirar o nome.
  */

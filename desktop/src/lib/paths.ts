@@ -32,6 +32,7 @@ export const paths = {
 		/** Painel › Logs e Servidor: só do dono (v0.6). */
 		logs: "/settings/logs",
 		server: "/settings/server",
+		audit: "/settings/audit",
 		/** Servidor › Arquivados: só no menu de quem gerencia os canais. */
 		archived: "/settings/archived",
 		/** Painel › Emojis: quem tem "Gerenciar emojis" (v0.7). */

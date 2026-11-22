@@ -12,6 +12,7 @@ use axum::http::StatusCode;
 use super::auth::CurrentUser;
 use super::voice::{active_member, voice_room_of};
 use crate::AppState;
+use crate::audit::{self, AuditKind};
 use crate::chat::access;
 use crate::db::now;
 use crate::error::ApiError;
@@ -70,6 +71,7 @@ async fn change(
         ));
     }
     let imposed = moderation::set(&state.db, &target.id, imposed, &user.id, now()).await?;
+    log(state, user, &target, action, room.as_deref()).await?;
     notify(state, user, &target, action, imposed);
     if let Some((room, list)) =
         state
@@ -83,6 +85,33 @@ async fn change(
         voice::restrict_in_background(room, target.id, imposed);
     }
     Ok(StatusCode::NO_CONTENT)
+}
+
+/// Grava a ação no registro, com a sala pelo nome.
+async fn log(
+    state: &AppState,
+    by: &User,
+    target: &User,
+    action: ModerationAction,
+    room: Option<&str>,
+) -> Result<(), ApiError> {
+    let place = match room {
+        Some(room) => audit::channel_name(&state.db, room).await?,
+        None => None,
+    };
+    audit::record(
+        &state.db,
+        audit::Entry {
+            kind: AuditKind::Voice,
+            action: action.key(),
+            actor: by,
+            target: Some(target),
+            place,
+            detail: None,
+        },
+        now(),
+    )
+    .await
 }
 
 /// O `voice.moderated` para as conexões de `target`.
@@ -144,6 +173,14 @@ pub async fn camera_off(
     let target = target(&state, &user, &id).await?;
     let room = room_of(&state, &target).await?;
     let imposed = moderation::get(&state.db, &target.id).await?;
+    log(
+        &state,
+        &user,
+        &target,
+        ModerationAction::CameraOff,
+        Some(&room),
+    )
+    .await?;
     notify(&state, &user, &target, ModerationAction::CameraOff, imposed);
     voice::mute_camera_in_background(room, target.id);
     Ok(StatusCode::NO_CONTENT)
@@ -159,6 +196,14 @@ pub async fn stop_share(
     let target = target(&state, &user, &id).await?;
     let room = room_of(&state, &target).await?;
     let imposed = moderation::get(&state.db, &target.id).await?;
+    log(
+        &state,
+        &user,
+        &target,
+        ModerationAction::StopShare,
+        Some(&room),
+    )
+    .await?;
     notify(&state, &user, &target, ModerationAction::StopShare, imposed);
     voice::stop_share_in_background(room, target.id);
     Ok(StatusCode::NO_CONTENT)

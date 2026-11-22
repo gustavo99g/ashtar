@@ -112,6 +112,7 @@ mod tests {
         assert_eq!(
             tables,
             [
+                "audit_log",
                 "calls",
                 "categories",
                 "channel_layout",

@@ -124,7 +124,10 @@ export function SettingsLayout() {
 								<MenuItem to={paths.settings.logs}>Logs</MenuItem>
 							)}
 							{isOwner && (
-								<MenuItem to={paths.settings.server}>Servidor</MenuItem>
+								<>
+									<MenuItem to={paths.settings.audit}>Registro</MenuItem>
+									<MenuItem to={paths.settings.server}>Servidor</MenuItem>
+								</>
 							)}
 						</MenuGroup>
 					</>

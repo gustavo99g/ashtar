@@ -1,6 +1,13 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+	useInfiniteQuery,
+	useMutation,
+	useQuery,
+	useQueryClient,
+} from "@tanstack/react-query";
+import {
+	type AuditKind,
 	getServerStatus,
+	listAudit,
 	listLogEntries,
 	listLogReports,
 	readLogEntry,
@@ -11,6 +18,7 @@ import { logsBundle } from "@/lib/tauri/commands";
 export const adminKeys = {
 	logs: () => ["admin", "logs"] as const,
 	status: () => ["admin", "status"] as const,
+	audit: (kind: AuditKind | null) => ["admin", "audit", kind] as const,
 	entries: (id: string) => ["admin", "logs", id, "entries"] as const,
 	entry: (id: string, name: string) =>
 		["admin", "logs", id, "entry", name] as const,
@@ -58,4 +66,21 @@ export function useSendLogs() {
 		onSuccess: () =>
 			void queryClient.invalidateQueries({ queryKey: adminKeys.logs() }),
 	});
+}
+
+/** Quantas linhas a API manda por página do registro. */
+export const AUDIT_PAGE = 50;
+
+/** O registro, com o filtro, de 50 em 50 (Carregar mais). Só o dono. */
+export function useAudit(kind: AuditKind | null) {
+	const query = useInfiniteQuery({
+		queryKey: adminKeys.audit(kind),
+		queryFn: ({ pageParam }) => listAudit(kind, pageParam ?? undefined),
+		initialPageParam: null as number | null,
+		getNextPageParam: (last) =>
+			last.length === AUDIT_PAGE ? (last[last.length - 1]?.id ?? null) : null,
+		staleTime: 0,
+	});
+	const entries = query.data?.pages.flat();
+	return { ...query, entries };
 }

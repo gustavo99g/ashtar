@@ -17,6 +17,7 @@ use ts_rs::TS;
 use super::auth::CurrentUser;
 use super::extract::ApiJson;
 use crate::AppState;
+use crate::audit::{self, AuditKind};
 use crate::db::now;
 use crate::error::ApiError;
 use crate::identity::User;
@@ -139,6 +140,24 @@ pub async fn create(
         }
     };
     let created = invites::create_new(&state.db, &user, invite, now()).await?;
+    let detail = match request.preset {
+        Preset::Person => "Para uma pessoa",
+        Preset::Group => "Para o grupo",
+        Preset::Custom => "Do seu jeito",
+    };
+    audit::record(
+        &state.db,
+        audit::Entry {
+            kind: AuditKind::Invites,
+            action: "convites.criar",
+            actor: &user,
+            target: None,
+            place: None,
+            detail: Some(detail.into()),
+        },
+        now(),
+    )
+    .await?;
     Ok((
         StatusCode::CREATED,
         Json(CreatedInviteView::new(&state, InviteKind::New, created)),
@@ -245,5 +264,18 @@ pub async fn revoke(
 ) -> Result<StatusCode, ApiError> {
     require(&user, Action::RevokeInvite)?;
     invites::revoke_by_id(&state.db, &user, &id, now()).await?;
+    audit::record(
+        &state.db,
+        audit::Entry {
+            kind: AuditKind::Invites,
+            action: "convites.revogar",
+            actor: &user,
+            target: None,
+            place: None,
+            detail: None,
+        },
+        now(),
+    )
+    .await?;
     Ok(StatusCode::NO_CONTENT)
 }

@@ -1,6 +1,7 @@
 //! A API do Ashtar como biblioteca: o servidor (`main.rs`) e o `admin`
 //! (`src/bin/admin.rs`) usam as mesmas regras e o mesmo banco.
 
+pub mod audit;
 pub mod avatar;
 pub mod calls;
 pub mod chat;
@@ -122,6 +123,9 @@ pub const FILE_MAINTENANCE_EVERY: std::time::Duration = std::time::Duration::fro
 /// 80%, avisa o dono (no máximo uma vez por dia).
 pub async fn maintain_files(state: &AppState) {
     let now = db::now();
+    if let Err(error) = audit::sweep(&state.db, now).await {
+        eprintln!("limpeza do registro: {error}");
+    }
     if let Err(error) = previews::sweep(&state.db, &state.files, now).await {
         eprintln!("limpeza das prévias: {error}");
     }
@@ -302,6 +306,7 @@ pub fn app(state: AppState, policy: Arc<ClientPolicy>) -> Router {
         .route("/logs/{id}/entries", get(routes::logs::entries))
         .route("/logs/{id}/entry", get(routes::logs::entry))
         .route("/admin/status", get(routes::admin::status))
+        .route("/admin/audit", get(routes::admin::audit))
         .route("/files/{id}", get(routes::files::download))
         .route("/files/{id}/link", post(routes::files::link))
         .route("/files/{id}/stream", get(routes::files::stream))

@@ -1,4 +1,8 @@
-import { LogsSettings, ServerStatusSettings } from "@/features/admin";
+import {
+	AuditSettings,
+	LogsSettings,
+	ServerStatusSettings,
+} from "@/features/admin";
 import { ArchivedSettings } from "@/features/channels";
 import { EmojiSettings } from "@/features/emojis";
 import { ProfileSettings } from "@/features/identity";
@@ -54,6 +58,10 @@ export function EmojisSettingsRoute() {
 
 export function LogsSettingsRoute() {
 	return <LogsSettings />;
+}
+
+export function AuditSettingsRoute() {
+	return <AuditSettings />;
 }
 
 export function ServerSettingsRoute() {

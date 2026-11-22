@@ -15,6 +15,7 @@ use ts_rs::TS;
 use super::auth::CurrentUser;
 use super::extract::ApiJson;
 use crate::AppState;
+use crate::audit::{self, AuditKind};
 use crate::calls;
 use crate::chat::channels::Channel;
 use crate::chat::{access, channels, dms};
@@ -396,6 +397,19 @@ pub async fn move_member(
     if from == destination.id {
         return Err(ApiError::Conflict("Essa pessoa já está nessa sala.".into()));
     }
+    audit::record(
+        &state.db,
+        audit::Entry {
+            kind: AuditKind::Voice,
+            action: "voz.mover",
+            actor: &user,
+            target: Some(&target),
+            place: audit::channel_name(&state.db, &from).await?,
+            detail: Some(destination.name.clone()),
+        },
+        crate::db::now(),
+    )
+    .await?;
     state.hub.publish_to(
         &[&target.id],
         &ServerEvent::VoiceMoved {
@@ -430,6 +444,19 @@ pub async fn disconnect_member(
             "Essa pessoa não está numa sala de voz.".into(),
         ));
     };
+    audit::record(
+        &state.db,
+        audit::Entry {
+            kind: AuditKind::Voice,
+            action: "voz.desconectar",
+            actor: &user,
+            target: Some(&target),
+            place: audit::channel_name(&state.db, &from).await?,
+            detail: None,
+        },
+        crate::db::now(),
+    )
+    .await?;
     state.hub.publish_to(
         &[&target.id],
         &ServerEvent::VoiceDisconnected {
