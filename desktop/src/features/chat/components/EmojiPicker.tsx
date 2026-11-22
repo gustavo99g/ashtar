@@ -53,7 +53,17 @@ function bare(unicode: string): EmojiEntry {
  * Das categorias do Unicode, só uma aparece por vez (a dos botões de cima): com as ~1900 de uma
  * vez, abrir e fechar travava o app. A busca procura em todas.
  */
-export function EmojiPicker({ onPick }: { onPick: (emoji: string) => void }) {
+export function EmojiPicker({
+	onPick,
+	keepFocus = false,
+}: {
+	onPick: (emoji: string) => void;
+	/**
+	 * O clique num emoji não tira o foco de onde ele está (o campo de escrever, que o recebe de volta
+	 * depois da primeira escolha).
+	 */
+	keepFocus?: boolean;
+}) {
 	const [groups, setGroups] = useState<EmojiGroup[] | null>(null);
 	const [failed, setFailed] = useState(false);
 	const [query, setQuery] = useState("");
@@ -161,6 +171,7 @@ export function EmojiPicker({ onPick }: { onPick: (emoji: string) => void }) {
 				byId={customById}
 				onPick={pick}
 				onHover={setHovered}
+				keepFocus={keepFocus}
 			/>
 		);
 	}
@@ -282,11 +293,13 @@ const EmojiGrid = memo(function EmojiGrid({
 	byId,
 	onPick,
 	onHover,
+	keepFocus,
 }: {
 	emojis: EmojiEntry[];
 	byId: ReadonlyMap<string, { name: string; file_id: string }>;
 	onPick: (emoji: EmojiEntry) => void;
 	onHover: (emoji: EmojiEntry) => void;
+	keepFocus: boolean;
 }) {
 	return (
 		<div className="grid grid-cols-8 gap-0.5">
@@ -296,6 +309,7 @@ const EmojiGrid = memo(function EmojiGrid({
 					type="button"
 					aria-label={emoji.label}
 					onClick={() => onPick(emoji)}
+					onMouseDown={keepFocus ? (event) => event.preventDefault() : undefined}
 					onMouseEnter={() => onHover(emoji)}
 					onFocus={() => onHover(emoji)}
 					className="flex h-9 items-center justify-center rounded-md text-[22px] hover:bg-accent focus-visible:bg-accent focus-visible:outline-none"
