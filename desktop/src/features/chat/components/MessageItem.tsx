@@ -7,7 +7,7 @@ import {
 	ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import { Avatar, PersonName } from "@/features/identity";
-import type { Message } from "@/lib/api";
+import type { FileView, Message } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import type { Mentionable } from "../model/mentions";
 import { authorName, stampLabel, timeLabel } from "../model/messages";
@@ -47,6 +47,7 @@ export function MessageItem({
 }) {
 	const actions = useMessageActionsContext();
 	const [menuOpen, setMenuOpen] = useState(false);
+	const [menuImage, setMenuImage] = useState<FileView | null>(null);
 	const [pickerOpen, setPickerOpen] = useState(false);
 	const { author } = message;
 	const name = authorName(author);
@@ -59,6 +60,15 @@ export function MessageItem({
 
 	const row = (
 		<li
+			// O botão direito numa imagem põe Copiar imagem e Baixar no começo do menu.
+			onContextMenuCapture={(event) => {
+				const id = (event.target as HTMLElement)
+					.closest("[data-image-id]")
+					?.getAttribute("data-image-id");
+				setMenuImage(
+					message.attachments?.find((file) => file.id === id) ?? null,
+				);
+			}}
 			data-message-id={message.id}
 			data-mentions-me={mentionsMe || undefined}
 			data-menu-open={menuOpen || pickerOpen || undefined}
@@ -162,6 +172,7 @@ export function MessageItem({
 				<MessageMenuItems
 					message={message}
 					actions={actions}
+					image={menuImage}
 					withReactions
 					onOpenPicker={() => setPickerOpen(true)}
 				/>
