@@ -9,6 +9,8 @@ use std::collections::{HashMap, HashSet};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
+use super::launchers;
+
 /// De onde veio o reconhecimento.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -85,9 +87,10 @@ pub fn normalize(path: &str) -> String {
         .to_lowercase()
 }
 
-/// O id de um `.exe`.
-pub fn game_id(exe: &str) -> String {
-    let digest = Sha256::digest(normalize(exe).as_bytes());
+/// O id de um jogo, pelo nome: os processos do mesmo jogo (o cliente e a partida do League of
+/// Legends) são um jogo só na lista, no "Não mostrar" e no ícone.
+pub fn game_id(name: &str) -> String {
+    let digest = Sha256::digest(name.trim().to_lowercase().as_bytes());
     hex(&digest[..8])
 }
 
@@ -155,21 +158,25 @@ impl Catalog {
     pub fn recognize(&self, exe_path: &str) -> Option<Recognized> {
         let path = normalize(exe_path);
         let file = file_name(&path);
-        let found = |name: &str, source, steam_app_id| Recognized {
-            id: game_id(exe_path),
-            name: self
+        let found = |name: &str, source, steam_app_id| {
+            let name = self
                 .names
                 .get(file)
                 .cloned()
-                .unwrap_or_else(|| name.to_owned()),
-            exe: exe_path.to_owned(),
-            source,
-            steam_app_id,
+                .unwrap_or_else(|| name.to_owned());
+            // Um launcher que alguma fonte conhece pelo nome ("Riot Client") nunca é jogo.
+            (!launchers::is_launcher_name(&name)).then(|| Recognized {
+                id: game_id(&name),
+                name,
+                exe: exe_path.to_owned(),
+                source,
+                steam_app_id,
+            })
         };
         // O que a pessoa adicionou ganha de tudo, até das correções.
         if let Some(name) = self.manual.get(&path) {
             return Some(Recognized {
-                id: game_id(exe_path),
+                id: game_id(name),
                 name: name.clone(),
                 exe: exe_path.to_owned(),
                 source: Source::Manual,
@@ -184,7 +191,7 @@ impl Catalog {
             .iter()
             .find(|game| path.starts_with(&format!("{}/", game.dir)))
         {
-            return Some(found(&game.name, game.source, game.steam_app_id.clone()));
+            return found(&game.name, game.source, game.steam_app_id.clone());
         }
         let by_path = self.detectable.get(file).and_then(|candidates| {
             candidates
@@ -192,7 +199,7 @@ impl Catalog {
                 .find(|game| path == game.exe || path.ends_with(&format!("/{}", game.exe)))
         });
         if let Some(game) = by_path {
-            return Some(found(&game.name, Source::Discord, None));
+            return found(&game.name, Source::Discord, None);
         }
         // Os jogos da Unreal abrem um `Jogo.exe` pequeno, que só abre o de verdade
         // (`Jogo-Win64-Shipping.exe`, ou `Jogo-WinGDK-Shipping.exe` no Game Pass), e é este que
@@ -202,7 +209,7 @@ impl Catalog {
             .get(&launcher)?
             .iter()
             .find(|game| !game.exe.contains('/'))
-            .map(|game| found(&game.name, Source::Discord, None))
+            .and_then(|game| found(&game.name, Source::Discord, None))
     }
 }
 
@@ -344,9 +351,9 @@ mod tests {
     }
 
     #[test]
-    fn o_id_nao_depende_de_maiusculas_nem_da_barra() {
-        assert_eq!(game_id(r"C:\Jogo\A.exe"), game_id("c:/jogo/a.EXE"));
-        assert_ne!(game_id(r"C:\Jogo\A.exe"), game_id(r"C:\Jogo\B.exe"));
+    fn o_id_e_o_do_nome_sem_maiusculas() {
+        assert_eq!(game_id("League of Legends"), game_id(" league of LEGENDS"));
+        assert_ne!(game_id("League of Legends"), game_id("Hades"));
         assert_eq!(game_id("x").len(), 16);
     }
 

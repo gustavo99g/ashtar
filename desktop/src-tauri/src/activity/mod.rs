@@ -176,12 +176,22 @@ impl Activity {
             .path()
             .app_data_dir()
             .unwrap_or_else(|_| std::env::temp_dir().join("ashtar"));
-        let settings = ActivitySettings::load(&dir.join("activity.json"));
+        let mut settings = ActivitySettings::load(&dir.join("activity.json"));
+        let extra = Extra::bundled();
+        // As versões de antes guardavam um jogo por `.exe`, e os launchers que já passaram.
+        settings.tidy_seen(catalog::game_id, |game| {
+            let file = catalog::normalize(&game.exe);
+            let file = file.rsplit('/').next().unwrap_or_default().to_owned();
+            !launchers::is_launcher_name(&game.name)
+                && !extra
+                    .not_games
+                    .iter()
+                    .any(|not_game| not_game.eq_ignore_ascii_case(&file))
+        });
         let copy: DetectableCopy = std::fs::read_to_string(dir.join("detectable-games.json"))
             .ok()
             .and_then(|text| serde_json::from_str(&text).ok())
             .unwrap_or_default();
-        let extra = Extra::bundled();
         let activity = Arc::new(Self {
             app: app.clone(),
             dir,

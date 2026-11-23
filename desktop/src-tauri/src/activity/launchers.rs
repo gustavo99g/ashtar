@@ -36,8 +36,7 @@ const GAME_PUBLISHERS: [&str; 7] = [
     "cd projekt red",
 ];
 
-/// Os nomes dos próprios launchers na lista de instalados (o começo do nome: "Riot Client" e
-/// "Riot Client (beta)" ficam de fora igual).
+/// Os nomes dos próprios launchers, na lista de instalados e na do Discord.
 const LAUNCHER_NAMES: [&str; 9] = [
     "ea app",
     "origin",
@@ -217,6 +216,15 @@ fn epic_games(dir: &Path) -> Vec<InstalledGame> {
         .collect()
 }
 
+/// Se `name` é o de um launcher: igual, ou com um complemento entre parênteses ("Riot Client
+/// (beta)"). "SteamWorld Dig" não é.
+pub fn is_launcher_name(name: &str) -> bool {
+    let name = name.trim().to_lowercase();
+    LAUNCHER_NAMES
+        .iter()
+        .any(|launcher| name == *launcher || name.starts_with(&format!("{launcher} (")))
+}
+
 /// Os programas instalados que são jogos: das editoras de jogos, com a pasta, sem os launchers.
 pub fn installed_games(programs: &[InstalledProgram]) -> Vec<InstalledGame> {
     programs
@@ -229,9 +237,7 @@ pub fn installed_games(programs: &[InstalledProgram]) -> Vec<InstalledGame> {
         })
         .filter(|program| {
             let name = program.name.to_lowercase();
-            !LAUNCHER_NAMES
-                .iter()
-                .any(|launcher| name.starts_with(launcher))
+            !is_launcher_name(&name)
         })
         .filter(|program| !program.location.trim().is_empty() && !program.name.trim().is_empty())
         .map(|program| InstalledGame {
@@ -305,6 +311,15 @@ mod tests {
         )
         .is_none());
         assert!(epic_manifest("{").is_none());
+    }
+
+    #[test]
+    fn o_nome_do_launcher() {
+        assert!(is_launcher_name("Riot Client"));
+        assert!(is_launcher_name(" riot client (beta)"));
+        assert!(is_launcher_name("Steam"));
+        assert!(!is_launcher_name("SteamWorld Dig"));
+        assert!(!is_launcher_name("League of Legends"));
     }
 
     #[test]

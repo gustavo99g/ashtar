@@ -75,6 +75,17 @@ impl ActivitySettings {
         }
     }
 
+    /// Arruma a lista dos que já abriram, gravada por versões de antes: um jogo por nome (o mais
+    /// recente fica), com o id de agora (`id_of`), e sem o que `keep` diz que não é jogo.
+    pub fn tidy_seen(&mut self, id_of: impl Fn(&str) -> String, keep: impl Fn(&SeenGame) -> bool) {
+        let mut names = std::collections::HashSet::new();
+        self.seen
+            .retain(|game| keep(game) && names.insert(game.name.trim().to_lowercase()));
+        for game in &mut self.seen {
+            game.id = id_of(&game.name);
+        }
+    }
+
     /// Marca que `game` abriu agora, no topo da lista. Devolve se ele é novo na lista.
     pub fn saw(&mut self, game: SeenGame) -> bool {
         let before = self.seen.len();
@@ -98,6 +109,28 @@ mod tests {
             source: Source::Steam,
             last_seen: at,
         }
+    }
+
+    #[test]
+    fn a_lista_antiga_fica_um_jogo_por_nome() {
+        let mut settings = ActivitySettings::default();
+        let lol = |exe: &str, at| SeenGame {
+            exe: exe.into(),
+            name: "League of Legends".into(),
+            ..seen("x", at)
+        };
+        settings.seen = vec![
+            lol(r"C:\LoL\Game\League of Legends.exe", 3),
+            seen("Riot Client", 2),
+            lol(r"C:\LoL\LeagueClient.exe", 1),
+        ];
+        settings.tidy_seen(
+            |name| format!("id-{name}"),
+            |game| game.name != "Riot Client",
+        );
+        assert_eq!(settings.seen.len(), 1);
+        assert_eq!(settings.seen[0].id, "id-League of Legends");
+        assert_eq!(settings.seen[0].last_seen, 3);
     }
 
     #[test]
