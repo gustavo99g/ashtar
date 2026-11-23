@@ -70,6 +70,19 @@ impl OpenGames {
         true
     }
 
+    /// Os processos abertos do jogo chamado `name`, do que abriu por último para o mais antigo: o
+    /// cliente e a partida de um jogo como o League of Legends. A transmissão fica no mais novo
+    /// que tem janela, e volta para o de antes quando ele fecha.
+    pub fn family(&self, name: &str) -> Vec<u32> {
+        let mut family: Vec<&OpenGame> = self
+            .0
+            .iter()
+            .filter(|open| open.game.name == name)
+            .collect();
+        family.sort_by_key(|open| std::cmp::Reverse(open.started_ms));
+        family.into_iter().map(|open| open.pid).collect()
+    }
+
     pub fn clear(&mut self) {
         self.0.clear();
     }
@@ -127,5 +140,19 @@ mod tests {
         assert_eq!((current.pid, current.game.id.as_str()), (5, "p3r"));
         assert!(!games.contains(1, 10));
         assert!(!games.adopt(9, 6, 66));
+    }
+
+    #[test]
+    fn a_familia_do_jogo_do_mais_novo_ao_mais_antigo() {
+        let mut games = OpenGames::default();
+        games.focused(open(1, "League of Legends"));
+        games.focused(open(3, "League of Legends"));
+        games.focused(open(2, "Hades"));
+        // Voltar ao cliente não muda a ordem: a partida abriu depois.
+        assert!(games.refocus(1, 10));
+        assert_eq!(games.family("League of Legends"), [3, 1]);
+        assert_eq!(games.family("Hades"), [2]);
+        games.retain_alive(|pid, _| pid != 3);
+        assert_eq!(games.family("League of Legends"), [1]);
     }
 }

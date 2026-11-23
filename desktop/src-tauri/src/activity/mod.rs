@@ -97,6 +97,9 @@ pub struct GameView {
     pub started_ms: i64,
     /// `data:image/png;base64,...`, ou `None` (o app desenha o controle).
     pub icon: Option<String>,
+    /// Os processos abertos do mesmo jogo, do mais novo ao mais antigo (este incluído): a
+    /// transmissão segue o mais novo que tem janela (o cliente e a partida do League of Legends).
+    pub family: Vec<u32>,
 }
 
 /// Um jogo da lista de reconhecidos das configurações.
@@ -341,12 +344,14 @@ impl Activity {
 
     /// O jogo do cartão agora, com o ícone.
     fn current(&self) -> Option<GameView> {
-        let open = {
+        let (open, family) = {
             let state = self.lock();
-            state
+            let open = state
                 .open
                 .current(|id| state.settings.is_hidden(id))
-                .cloned()?
+                .cloned()?;
+            let family = state.open.family(&open.game.name);
+            (open, family)
         };
         let icon = self.icon(&open.game.id, &open.game.exe);
         Some(GameView {
@@ -357,6 +362,7 @@ impl Activity {
             pid: open.pid,
             started_ms: open.started_ms,
             icon,
+            family,
         })
     }
 

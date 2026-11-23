@@ -26,6 +26,11 @@ export interface GameView {
 	startedMs: number;
 	/** `data:image/png;base64,...`, ou `null` (o cartão desenha o controle). */
 	icon: string | null;
+	/**
+	 * Os processos abertos do mesmo jogo, do mais novo ao mais antigo (este incluído): a
+	 * transmissão segue o mais novo que tem janela (o cliente e a partida do League of Legends).
+	 */
+	family: number[];
 }
 
 export interface SeenGame {

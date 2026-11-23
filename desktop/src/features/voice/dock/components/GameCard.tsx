@@ -46,8 +46,8 @@ import { useFollowGameWindow } from "../hooks/useFollowGameWindow";
  * - Fora da voz, abre as salas para cima; a escolhida entra e a transmissão começa quando a voz
  *   conecta (o `pendingGameShare`).
  * - Transmitindo o próprio jogo, o botão some e o nome ganha a bolinha dourada.
- * - Transmitindo uma janela do jogo, quando outro processo dele vira o jogo do cartão (o cliente e
- *   a partida do League of Legends), a transmissão vai junto (`useFollowGameWindow`).
+ * - Transmitindo uma janela do jogo, a transmissão fica no processo mais novo dele que tem janela
+ *   (a partida do League of Legends, não o cliente) e volta quando ele fecha (`useFollowGameWindow`).
  */
 
 /** O processo do jogo que vai ser transmitido quando a voz conectar. */

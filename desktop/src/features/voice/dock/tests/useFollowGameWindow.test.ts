@@ -11,7 +11,7 @@ vi.mock("@/components/ui/toast", async (importOriginal) => ({
 	toast: { add: vi.fn() },
 }));
 
-function game(pid: number, name = "League of Legends"): GameView {
+function game(pid: number, family: number[], name = "League of Legends"): GameView {
 	return {
 		id: `jogo-${pid}`,
 		name,
@@ -20,6 +20,7 @@ function game(pid: number, name = "League of Legends"): GameView {
 		pid,
 		startedMs: 0,
 		icon: null,
+		family,
 	};
 }
 
@@ -53,18 +54,20 @@ function sharing(processId: number): ScreenShareState {
 afterEach(() => vi.clearAllMocks());
 
 describe("a transmissão segue o jogo", () => {
-	it("do cliente para a partida do mesmo jogo, trocando a fonte", async () => {
+	it("vai para a partida e fica nela, mesmo com o cliente na frente", async () => {
 		const controller = fakeShareController(sharing(10), [
 			window(10, 1),
 			window(20, 2),
 		]);
 		const { rerender } = renderHook(
-			({ current }) => useFollowGameWindow(controller, sharing(10), current),
-			{ initialProps: { current: game(10) } },
+			({ current, state }) => useFollowGameWindow(controller, state, current),
+			{ initialProps: { current: game(10, [10]), state: sharing(10) } },
 		);
+		await new Promise((resolve) => setTimeout(resolve, 10));
 		expect(controller.update).not.toHaveBeenCalled();
 
-		rerender({ current: game(20) });
+		// A partida (20) abriu: a transmissão vai para ela.
+		rerender({ current: game(20, [20, 10]), state: sharing(10) });
 		await waitFor(() =>
 			expect(controller.update).toHaveBeenCalledWith({
 				kind: "source",
@@ -73,25 +76,52 @@ describe("a transmissão segue o jogo", () => {
 		);
 		expect(toast.add).toHaveBeenCalledWith(
 			expect.objectContaining({
-				title: "A transmissão foi para a nova janela de League of Legends",
+				title: "A transmissão foi para a outra janela de League of Legends",
 			}),
 		);
+
+		// O cliente voltou para a frente: a partida ainda está aberta, então fica nela.
+		vi.mocked(controller.update).mockClear();
+		rerender({ current: game(10, [20, 10]), state: sharing(20) });
+		await new Promise((resolve) => setTimeout(resolve, 10));
+		expect(controller.update).not.toHaveBeenCalled();
 	});
 
-	it("outro jogo, ou uma fonte que não é do jogo, fica onde está", async () => {
-		const controller = fakeShareController(sharing(10), [
+	it("a partida fechou e levou a transmissão: começa de novo no cliente", async () => {
+		const sources = [window(20, 2), window(10, 1)];
+		const controller = fakeShareController({ status: "idle" }, sources);
+		const { rerender } = renderHook(
+			({ current, state }) => useFollowGameWindow(controller, state, current),
+			{ initialProps: { current: game(20, [20, 10]), state: sharing(20) } },
+		);
+		await new Promise((resolve) => setTimeout(resolve, 10));
+		// A janela da partida sumiu junto com a transmissão.
+		sources.shift();
+		rerender({
+			current: game(20, [20, 10]),
+			state: { status: "idle", ended: "sourceClosed" },
+		});
+		await waitFor(() => expect(controller.start).toHaveBeenCalledTimes(1));
+		const [request] = vi.mocked(controller.start).mock.calls[0] as unknown as [
+			{ source: CaptureSource },
+		];
+		expect(request.source).toEqual(window(10, 1));
+	});
+
+	it("parar à mão, ou transmitir o que não é do jogo, fica como está", async () => {
+		const controller = fakeShareController({ status: "idle" }, [
 			window(10, 1),
-			window(30, 3),
+			window(20, 2),
 			window(77, 7),
 		]);
 		const { rerender } = renderHook(
 			({ current, state }) => useFollowGameWindow(controller, state, current),
-			{ initialProps: { current: game(10), state: sharing(10) } },
+			{ initialProps: { current: game(20, [20, 10]), state: sharing(77) } },
 		);
-		rerender({ current: game(30, "Hades"), state: sharing(10) });
-		// Transmitindo uma janela que nunca foi do cartão.
-		rerender({ current: game(20), state: sharing(77) });
+		rerender({ current: game(20, [20, 10]), state: sharing(20) });
+		rerender({ current: game(20, [20, 10]), state: { status: "idle" } });
 		await new Promise((resolve) => setTimeout(resolve, 20));
 		expect(controller.update).not.toHaveBeenCalled();
+		expect(controller.start).not.toHaveBeenCalled();
 	});
 });

@@ -46,6 +46,7 @@ const GAME: GameView = {
 	pid: 42,
 	startedMs: Date.now() - 12 * 60_000,
 	icon: null,
+	family: [42],
 };
 
 const GAME_WINDOW: CaptureSource = {
