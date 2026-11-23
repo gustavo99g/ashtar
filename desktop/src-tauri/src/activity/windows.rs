@@ -5,8 +5,12 @@
 use std::path::PathBuf;
 
 use windows_sys::Win32::{
-    Foundation::{CloseHandle, ERROR_NO_MORE_ITEMS, FILETIME, HANDLE, HWND},
+    Foundation::{CloseHandle, ERROR_NO_MORE_ITEMS, FILETIME, HANDLE, HWND, INVALID_HANDLE_VALUE},
     System::{
+        Diagnostics::ToolHelp::{
+            CreateToolhelp32Snapshot, Process32FirstW, Process32NextW, PROCESSENTRY32W,
+            TH32CS_SNAPPROCESS,
+        },
         Registry::{
             RegCloseKey, RegEnumKeyExW, RegGetValueW, RegOpenKeyExW, HKEY, HKEY_CURRENT_USER,
             HKEY_LOCAL_MACHINE, KEY_READ, RRF_RT_REG_SZ,
@@ -108,6 +112,32 @@ pub fn still_running(pid: u32, started_ms: i64) -> bool {
     Process::open(pid).is_some_and(|process| {
         process.running() && process.started_ms().is_none_or(|at| at == started_ms)
     })
+}
+
+/// O `.exe` do processo que abriu `pid` (o `Jogo.exe` da Unreal que abriu o
+/// `Jogo-Win64-Shipping.exe`), se ele ainda existe.
+pub fn parent_exe(pid: u32) -> Option<String> {
+    // SAFETY: o snapshot é só leitura e fechado no fim; `entry` leva o `dwSize` que a API pede.
+    let parent = unsafe {
+        let snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+        if snapshot == INVALID_HANDLE_VALUE {
+            return None;
+        }
+        let mut entry: PROCESSENTRY32W = std::mem::zeroed();
+        entry.dwSize = std::mem::size_of::<PROCESSENTRY32W>() as u32;
+        let mut found = None;
+        let mut more = Process32FirstW(snapshot, &mut entry) != 0;
+        while more {
+            if entry.th32ProcessID == pid {
+                found = Some(entry.th32ParentProcessID);
+                break;
+            }
+            more = Process32NextW(snapshot, &mut entry) != 0;
+        }
+        CloseHandle(snapshot);
+        found
+    }?;
+    Process::open(parent)?.path()
 }
 
 fn wide(text: &str) -> Vec<u16> {

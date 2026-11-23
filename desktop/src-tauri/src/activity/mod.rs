@@ -52,6 +52,10 @@ mod platform {
         None
     }
 
+    pub fn parent_exe(_pid: u32) -> Option<String> {
+        None
+    }
+
     pub fn still_running(_pid: u32, _started_ms: i64) -> bool {
         false
     }
@@ -136,6 +140,8 @@ struct State {
     catalog: Catalog,
     installed: Vec<catalog::InstalledGame>,
     open: OpenGames,
+    /// A última janela em primeiro plano que não era jogo: não é conferida de novo a cada volta.
+    missed: Option<(u32, i64)>,
     /// O que foi mandado ao app por último.
     shown: Option<GameView>,
     /// Os ícones já lidos, pelo id do jogo.
@@ -175,6 +181,7 @@ impl Activity {
                 detectable: copy.games,
                 installed: Vec::new(),
                 open: OpenGames::default(),
+                missed: None,
                 shown: None,
                 icons: HashMap::new(),
             }),
@@ -236,6 +243,8 @@ impl Activity {
     }
 
     fn rebuild(&self, state: &mut State) {
+        // Com fontes novas, a janela que não era jogo pode passar a ser.
+        state.missed = None;
         state.catalog = Catalog::new(
             &state.settings.manual,
             state.installed.clone(),
@@ -250,8 +259,13 @@ impl Activity {
         let mut state = self.lock();
         state.open.retain_alive(platform::still_running);
         if let Some((pid, exe, started_ms)) = foreground {
-            if !state.open.refocus(pid, started_ms) {
-                if let Some(game) = state.catalog.recognize(&exe) {
+            if !state.open.refocus(pid, started_ms) && state.missed != Some((pid, started_ms)) {
+                // Sem jogo no `.exe` da janela, o de quem o abriu (o `Jogo.exe` da Unreal).
+                let game = state.catalog.recognize(&exe).or_else(|| {
+                    platform::parent_exe(pid).and_then(|parent| state.catalog.recognize(&parent))
+                });
+                state.missed = game.is_none().then_some((pid, started_ms));
+                if let Some(game) = game {
                     self.remember(&mut state, &game);
                     state.open.focused(OpenGame {
                         pid,

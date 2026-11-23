@@ -186,12 +186,31 @@ impl Catalog {
         {
             return Some(found(&game.name, game.source, game.steam_app_id.clone()));
         }
-        let candidates = self.detectable.get(file)?;
-        candidates
+        let by_path = self.detectable.get(file).and_then(|candidates| {
+            candidates
+                .iter()
+                .find(|game| path == game.exe || path.ends_with(&format!("/{}", game.exe)))
+        });
+        if let Some(game) = by_path {
+            return Some(found(&game.name, Source::Discord, None));
+        }
+        // Os jogos da Unreal abrem um `Jogo.exe` pequeno, que só abre o de verdade
+        // (`Jogo-Win64-Shipping.exe`, ou `Jogo-WinGDK-Shipping.exe` no Game Pass), e é este que
+        // tem a janela. A lista do Discord às vezes só conhece o primeiro.
+        let launcher = unreal_launcher(file)?;
+        self.detectable
+            .get(&launcher)?
             .iter()
-            .find(|game| path == game.exe || path.ends_with(&format!("/{}", game.exe)))
+            .find(|game| !game.exe.contains('/'))
             .map(|game| found(&game.name, Source::Discord, None))
     }
+}
+
+/// `p3r-win64-shipping.exe` → `p3r.exe`; o resto, `None`.
+fn unreal_launcher(file: &str) -> Option<String> {
+    let stem = file.strip_suffix("-shipping.exe")?;
+    let (name, platform) = stem.rsplit_once('-')?;
+    (platform.starts_with("win") && !name.is_empty()).then(|| format!("{name}.exe"))
 }
 
 #[cfg(test)]
@@ -276,6 +295,33 @@ mod tests {
         // Uma pasta com o mesmo começo não conta.
         assert_eq!(name(r"C:\Steam\steamapps\common\Hades2\h.exe"), None);
         assert_eq!(name(r"C:\Windows\notepad.exe"), None);
+    }
+
+    #[test]
+    fn o_jogo_da_unreal_pelo_exe_que_abre_o_de_verdade() {
+        let catalog = Catalog::new(
+            &[],
+            Vec::new(),
+            &[detectable("p3r.exe", "Persona 3 Reload")],
+            &Extra::default(),
+        );
+        let name = |path: &str| catalog.recognize(path).map(|game| game.name);
+        // Maiúsculas não importam.
+        assert_eq!(
+            name(r"D:\Jogos\P3R\P3R.exe"),
+            Some("Persona 3 Reload".into())
+        );
+        assert_eq!(
+            name(r"D:\Jogos\P3R\P3R\Binaries\Win64\P3R-Win64-Shipping.exe"),
+            Some("Persona 3 Reload".into())
+        );
+        assert_eq!(
+            name(r"C:\XboxGames\P3R\Content\P3R\Binaries\WinGDK\P3R-WinGDK-Shipping.exe"),
+            Some("Persona 3 Reload".into())
+        );
+        assert_eq!(name(r"D:\Outro\Outro-Win64-Shipping.exe"), None);
+        assert_eq!(unreal_launcher("-win64-shipping.exe"), None);
+        assert_eq!(unreal_launcher("x-linux-shipping.exe"), None);
     }
 
     #[test]
