@@ -50,8 +50,8 @@ import { useFollowGameWindow } from "../hooks/useFollowGameWindow";
  *   troca a fonte, se já estiver transmitindo outra coisa).
  * - Fora da voz, abre as salas para cima; a escolhida entra e a transmissão começa quando a voz
  *   conecta (o `pendingGameShare`).
- * - Antes de o jogo ter janela (o processo abre bem antes, no League of Legends), o botão diz
- *   "Esperando a janela…" e não clica.
+ * - Só aparece com a janela do jogo pronta para transmitir: o processo abre bem antes (o cliente
+ *   do League of Legends), e até lá o cartão não aparece.
  * - Transmitindo o próprio jogo, o botão some e o nome ganha a bolinha dourada.
  * - Transmitindo uma janela do jogo, a transmissão fica no processo mais novo dele que tem janela
  *   (a partida do League of Legends, não o cliente) e volta quando ele fecha (`useFollowGameWindow`).
@@ -63,8 +63,8 @@ export const usePendingGameShare = create<{ pid: number | null }>()(() => ({
 }));
 
 /**
- * O Transmitir esperando a janela do jogo aparecer: o processo já abriu (o cartão aparece), mas a
- * janela ainda não (o cliente do League of Legends demora).
+ * O Transmitir esperando a janela do jogo aparecer na lista do seletor: o pedido de fora da voz,
+ * que começa quando a sala conecta, ou a lista um pouco atrás do Rust.
  */
 export const useWaitingGameWindow = create<{ waiting: boolean }>()(() => ({
 	waiting: false,
@@ -160,17 +160,15 @@ export function GameCard() {
 		if (!voiceChannelId || !game) usePendingGameShare.setState({ pid: null });
 	}, [voiceChannelId, game]);
 
-	if (!game) return null;
+	if (!game || !game.windowReady) return null;
 
 	const sharedPid =
 		share.status === "active" ? (share.source.processId ?? null) : null;
 	const sharingGame =
 		sharedPid !== null &&
 		(sharedPid === game.pid || game.family.includes(sharedPid));
-	// O processo abriu, mas a janela ainda não (o cliente do League of Legends demora).
-	const noWindow = !game.windowReady || waitingWindow;
 	const waiting =
-		pending === game.pid || share.status === "starting" || noWindow;
+		pending === game.pid || share.status === "starting" || waitingWindow;
 
 	return (
 		<div className="flex items-start gap-2.5 border-b border-border px-2.5 py-2.5">
@@ -204,14 +202,10 @@ export function GameCard() {
 							onClick={() => void shareGame(screenShare, game)}
 						>
 							<MonitorUpIcon aria-hidden="true" />
-							{noWindow ? "Esperando a janela…" : "Transmitir"}
+							Transmitir
 						</Button>
 					) : (
-						<RoomsButton
-							game={game}
-							waiting={waiting || !!voiceChannelId}
-							noWindow={noWindow}
-						/>
+						<RoomsButton game={game} waiting={waiting || !!voiceChannelId} />
 					))}
 			</div>
 			<GameMenu game={game} />
@@ -237,15 +231,7 @@ function GameIcon({ game }: { game: GameView }) {
 }
 
 /** Fora da voz: as salas para cima; a escolhida entra e transmite quando conectar. */
-function RoomsButton({
-	game,
-	waiting,
-	noWindow,
-}: {
-	game: GameView;
-	waiting: boolean;
-	noWindow: boolean;
-}) {
+function RoomsButton({ game, waiting }: { game: GameView; waiting: boolean }) {
 	const [open, setOpen] = useState(false);
 	const { join } = useVoice();
 	const layout = useOptionalChannelLayout();
@@ -270,7 +256,7 @@ function RoomsButton({
 				)}
 			>
 				<MonitorUpIcon aria-hidden="true" className="size-4" />
-				{noWindow ? "Esperando a janela…" : "Transmitir"}
+				Transmitir
 			</PopoverTrigger>
 			<PopoverContent side="top" align="start" className="w-60 gap-1 p-1.5">
 				<span className="px-2 pt-1 pb-1.5 text-[11px] font-bold tracking-[0.06em] text-muted-foreground uppercase">

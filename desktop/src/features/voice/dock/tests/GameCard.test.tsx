@@ -144,19 +144,11 @@ describe("GameCard", () => {
 		expect(request.source).toBe(GAME_WINDOW);
 	});
 
-	it("sem a janela do jogo pronta, o Transmitir espera, dentro e fora da voz", () => {
+	it("sem a janela do jogo pronta, o cartão não aparece", () => {
 		setCurrentGame({ ...GAME, windowReady: false });
 		voice({ inRoom: true });
-		const { unmount } = renderCard();
-		expect(
-			screen.getByRole("button", { name: "Esperando a janela…" }),
-		).toBeDisabled();
-		unmount();
-		voice({ inRoom: false });
-		renderCard();
-		expect(
-			screen.getByRole("button", { name: "Esperando a janela…" }),
-		).toBeDisabled();
+		const { container } = renderCard();
+		expect(container).toBeEmptyDOMElement();
 	});
 
 	it("a janela ainda não abriu: espera ela aparecer e transmite", async () => {
@@ -166,9 +158,9 @@ describe("GameCard", () => {
 		listed.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
 		renderCard();
 		await userEvent.click(screen.getByRole("button", { name: "Transmitir" }));
-		expect(
-			await screen.findByRole("button", { name: "Esperando a janela…" }),
-		).toBeDisabled();
+		await waitFor(() =>
+			expect(screen.getByRole("button", { name: "Transmitir" })).toBeDisabled(),
+		);
 		await act(() => vi.advanceTimersByTimeAsync(WINDOW_CHECK_MS * 2));
 		await waitFor(() => expect(controller.start).toHaveBeenCalledTimes(1));
 		vi.useRealTimers();
