@@ -344,6 +344,7 @@ impl Pipeline {
             bitrate,
             in_flight,
             last_output,
+            ..
         } = &mut self.output
         else {
             return Ok(SinkStatus::Continue);
