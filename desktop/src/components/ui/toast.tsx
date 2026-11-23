@@ -16,7 +16,8 @@ import { cn } from "@/lib/utils";
  * A barra é o relógio: o Base UI fica sem prazo (`timeout={0}`) e o aviso fecha quando a
  * animação da barra termina. Assim a barra e o fechamento nunca se desencontram. A animação
  * pausa com o mouse ou o foco do teclado em cima (`data-expanded` do Base UI) e com a janela
- * fora de foco: quem está no jogo vê o aviso quando voltar. Com "reduzir movimento" ligado no
+ * minimizada: quem minimizou o Ashtar vê o aviso quando voltar. Atrás de outra janela (o jogo na
+ * frente, o Ashtar no outro monitor), conta normal, para os avisos não se acumularem. Com "reduzir movimento" ligado no
  * Windows, a barra some, mas o tempo continua contando.
  */
 
@@ -73,21 +74,20 @@ interface ToastData {
  */
 const toast = ToastPrimitive.createToastManager<ToastData>();
 
-function useWindowFocused() {
-	const [focused, setFocused] = useState(() => document.hasFocus());
+/** Se a janela está à vista: `false` só minimizada (ou escondida na bandeja). */
+function useWindowVisible() {
+	const [visible, setVisible] = useState(
+		() => document.visibilityState !== "hidden",
+	);
 
 	useEffect(() => {
-		const onFocus = () => setFocused(true);
-		const onBlur = () => setFocused(false);
-		window.addEventListener("focus", onFocus);
-		window.addEventListener("blur", onBlur);
-		return () => {
-			window.removeEventListener("focus", onFocus);
-			window.removeEventListener("blur", onBlur);
-		};
+		const onChange = () =>
+			setVisible(document.visibilityState !== "hidden");
+		document.addEventListener("visibilitychange", onChange);
+		return () => document.removeEventListener("visibilitychange", onChange);
 	}, []);
 
-	return focused;
+	return visible;
 }
 
 function ToastTimer({
@@ -99,13 +99,13 @@ function ToastTimer({
 	duration: number;
 	bar: string;
 }) {
-	const windowFocused = useWindowFocused();
+	const windowVisible = useWindowVisible();
 
 	return (
 		<span
 			aria-hidden="true"
 			data-slot="toast-timer"
-			data-paused={windowFocused ? undefined : ""}
+			data-paused={windowVisible ? undefined : ""}
 			onAnimationEnd={onDone}
 			style={{ animationDuration: `${duration}ms` }}
 			className={cn(
