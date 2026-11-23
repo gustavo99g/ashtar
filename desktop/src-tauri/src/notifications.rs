@@ -25,9 +25,10 @@
 //! aparece mesmo com um jogo em tela cheia. Os botões dela voltam para a janela principal
 //! ([`NOTIFICATION_ANSWER`]), que é quem tem a sessão.
 //!
-//! **O ponto de não lido** ([`set_badge`]): o ícone da bandeja ganha uma bolinha vermelha e a janela
-//! principal ganha o selo na barra de tarefas. O selo é de janela: com o app na bandeja, só a
-//! bolinha aparece, e o selo volta junto com a janela.
+//! **O ponto no ícone** ([`set_badge`]): o ícone da bandeja ganha uma bolinha e a janela principal
+//! ganha o selo na barra de tarefas. Vermelha com não lidas; dourada transmitindo a tela (v0.8),
+//! que ganha da vermelha. O selo é de janela: com o app na bandeja, só a bolinha aparece, e o selo
+//! volta junto com a janela.
 
 use tauri::image::Image;
 use tauri::{
@@ -57,8 +58,31 @@ const WIDTH: f64 = 376.0;
 /// A distância da janela até as bordas da área útil, em pixels lógicos.
 const MARGIN: f64 = 12.0;
 
-/// A cor das bolinhas: o `--destructive` do tema escuro.
+/// A cor da bolinha de não lidas: o `--destructive` do tema escuro.
 const DOT: [u8; 4] = [0xED, 0x42, 0x45, 0xFF];
+/// A cor da bolinha de transmitindo: o `--gold` do tema escuro.
+const SHARING_DOT: [u8; 4] = [0xF6, 0xC2, 0x28, 0xFF];
+
+/// O que a bolinha do ícone diz.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Badge {
+    None,
+    /// Conversa privada com não lida, ou menção: vermelha.
+    Unread,
+    /// Transmitindo a tela: dourada, no lugar da vermelha.
+    Sharing,
+}
+
+impl Badge {
+    fn color(self) -> Option<[u8; 4]> {
+        match self {
+            Self::None => None,
+            Self::Unread => Some(DOT),
+            Self::Sharing => Some(SHARING_DOT),
+        }
+    }
+}
 
 /// Cria a janela dos avisos, escondida. Falhar só deixa o app sem avisos.
 pub fn create(app: &App) {
@@ -140,16 +164,16 @@ pub fn is_quiet() -> bool {
     false
 }
 
-/// Liga ou desliga o ponto de não lido: a bolinha no ícone da bandeja e o selo na barra de tarefas.
-pub fn set_badge(app: &AppHandle, unread: bool) {
+/// Troca o ponto do ícone: a bolinha no ícone da bandeja e o selo na barra de tarefas.
+pub fn set_badge(app: &AppHandle, badge: Badge) {
     let Some(icon) = app.default_window_icon().cloned() else {
         return;
     };
+    let color = badge.color();
     if let Some(tray) = app.tray_by_id("main") {
-        let icon = if unread {
-            with_dot(&icon)
-        } else {
-            icon.to_owned()
+        let icon = match color {
+            Some(color) => with_dot(&icon, color),
+            None => icon.to_owned(),
         };
         if let Err(error) = tray.set_icon(Some(icon)) {
             tracing::warn!(%error, "não foi possível trocar o ícone da bandeja");
@@ -157,7 +181,7 @@ pub fn set_badge(app: &AppHandle, unread: bool) {
     }
     #[cfg(windows)]
     if let Some(window) = app.get_webview_window("main") {
-        if let Err(error) = window.set_overlay_icon(unread.then(|| dot(32))) {
+        if let Err(error) = window.set_overlay_icon(color.map(|color| dot(32, color))) {
             tracing::warn!(%error, "não foi possível pôr o selo na barra de tarefas");
         }
     }
@@ -165,32 +189,38 @@ pub fn set_badge(app: &AppHandle, unread: bool) {
 
 /// Um ícone quadrado só com a bolinha: o selo da barra de tarefas.
 #[cfg_attr(not(windows), allow(dead_code))]
-fn dot(size: u32) -> Image<'static> {
+fn dot(size: u32, color: [u8; 4]) -> Image<'static> {
     let mut rgba = vec![0u8; (size * size * 4) as usize];
     let center = (size as f32 - 1.0) / 2.0;
-    paint_circle(&mut rgba, size, (center, center), size as f32 / 2.0 - 1.0);
+    paint_circle(
+        &mut rgba,
+        size,
+        (center, center),
+        size as f32 / 2.0 - 1.0,
+        color,
+    );
     Image::new_owned(rgba, size, size)
 }
 
 /// O ícone do app com a bolinha no canto de baixo à direita: o da bandeja com não lidas.
-fn with_dot(icon: &Image<'_>) -> Image<'static> {
+fn with_dot(icon: &Image<'_>, color: [u8; 4]) -> Image<'static> {
     let (width, height) = (icon.width(), icon.height());
     let mut rgba = icon.rgba().to_vec();
     let radius = width as f32 * 0.28;
     let center = (width as f32 - radius - 1.0, height as f32 - radius - 1.0);
-    paint_circle(&mut rgba, width, center, radius);
+    paint_circle(&mut rgba, width, center, radius, color);
     Image::new_owned(rgba, width, height)
 }
 
-/// Pinta um círculo cheio de [`DOT`] numa imagem RGBA de `width` de largura.
-fn paint_circle(rgba: &mut [u8], width: u32, center: (f32, f32), radius: f32) {
+/// Pinta um círculo cheio de `color` numa imagem RGBA de `width` de largura.
+fn paint_circle(rgba: &mut [u8], width: u32, center: (f32, f32), radius: f32, color: [u8; 4]) {
     let height = rgba.len() as u32 / 4 / width;
     for y in 0..height {
         for x in 0..width {
             let (dx, dy) = (x as f32 - center.0, y as f32 - center.1);
             if dx * dx + dy * dy <= radius * radius {
                 let i = ((y * width + x) * 4) as usize;
-                rgba[i..i + 4].copy_from_slice(&DOT);
+                rgba[i..i + 4].copy_from_slice(&color);
             }
         }
     }
@@ -229,7 +259,7 @@ mod tests {
     #[test]
     fn a_bolinha_fica_no_canto_e_o_resto_do_icone_nao_muda() {
         let icon = Image::new_owned(vec![0x10; 32 * 32 * 4], 32, 32);
-        let marked = with_dot(&icon);
+        let marked = with_dot(&icon, DOT);
         let pixel = |x: u32, y: u32| {
             let i = ((y * 32 + x) * 4) as usize;
             marked.rgba()[i..i + 4].to_vec()
@@ -240,12 +270,14 @@ mod tests {
 
     #[test]
     fn o_selo_e_um_circulo_com_o_fundo_transparente() {
-        let badge = dot(32);
+        let badge = dot(32, SHARING_DOT);
         let pixel = |x: u32, y: u32| {
             let i = ((y * 32 + x) * 4) as usize;
             badge.rgba()[i..i + 4].to_vec()
         };
-        assert_eq!(pixel(16, 16), DOT.to_vec());
+        assert_eq!(pixel(16, 16), SHARING_DOT.to_vec());
         assert_eq!(pixel(0, 0), vec![0; 4]);
+        assert_eq!(Badge::None.color(), None);
+        assert_eq!(Badge::Unread.color(), Some(DOT));
     }
 }

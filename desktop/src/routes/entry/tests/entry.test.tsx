@@ -33,7 +33,7 @@ vi.mock("@/components/ui/toast", async (importOriginal) => ({
 
 vi.mock("@/lib/tauri/commands", () => ({
 	// A ponta dos avisos, na moldura (`NotificationsBridge`).
-	setUnreadBadge: vi.fn(() => Promise.resolve()),
+	setAppBadge: vi.fn(() => Promise.resolve()),
 	onNotificationOpen: vi.fn(() => Promise.resolve(() => {})),
 	onNotificationAnswer: vi.fn(() => Promise.resolve(() => {})),
 	onSystemResumed: vi.fn(() => () => {}),

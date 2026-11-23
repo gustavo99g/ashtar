@@ -32,10 +32,13 @@ export function notificationOpen(target: unknown) {
 	return call<void>("notification_open", { target });
 }
 
-/** Liga ou desliga a bolinha da bandeja e o selo da barra de tarefas. */
-export function setUnreadBadge(unread: boolean) {
+/** O que a bolinha do ícone diz: nada, não lidas (vermelha) ou transmitindo (dourada). */
+export type AppBadge = "none" | "unread" | "sharing";
+
+/** Troca a bolinha da bandeja e o selo da barra de tarefas. */
+export function setAppBadge(badge: AppBadge) {
 	if (!isTauri()) return Promise.resolve();
-	return call<void>("set_unread_badge", { unread });
+	return call<void>("set_app_badge", { badge });
 }
 
 function listenIfTauri(

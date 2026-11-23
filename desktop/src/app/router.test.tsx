@@ -20,7 +20,7 @@ const HOME = paths.channel(DEFAULT_CHANNEL_ID);
 
 vi.mock("@/lib/tauri/commands", () => ({
 	// A ponta dos avisos, na moldura (`NotificationsBridge`).
-	setUnreadBadge: vi.fn(() => Promise.resolve()),
+	setAppBadge: vi.fn(() => Promise.resolve()),
 	onNotificationOpen: vi.fn(() => Promise.resolve(() => {})),
 	onNotificationAnswer: vi.fn(() => Promise.resolve(() => {})),
 	onSystemResumed: vi.fn(() => () => {}),
