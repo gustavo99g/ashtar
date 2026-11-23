@@ -23,6 +23,7 @@ use crate::{
 };
 
 use super::run_blocking;
+use crate::activity::Activity;
 
 /// Nome do evento de fim da sessão (contrato com o frontend).
 pub const SCREEN_SHARE_ENDED: &str = "screen-share-ended";
@@ -229,12 +230,17 @@ fn spawn_stats(app: AppHandle, manager: Arc<ShareManager>, session_id: u64) {
 ///
 /// A enumeração e a extração de ícones bloqueiam, por isso rodam em [`run_blocking`].
 #[tauri::command]
-pub async fn list_capture_sources() -> Result<Vec<CaptureSource>, AppError> {
-    run_blocking(sources::list_sources).await
+pub async fn list_capture_sources(
+    activity: State<'_, Arc<Activity>>,
+) -> Result<Vec<CaptureSource>, AppError> {
+    let mut sources = run_blocking(sources::list_sources).await?;
+    // A janela de um jogo aberto vai com o nome do jogo, não com o título que ele põe nela.
+    activity.name_game_windows(&mut sources);
+    Ok(sources)
 }
 
 /// Começa a transmissão: entra na sala como `:screen`, começa o vídeo e o áudio, traz a fonte para
-/// a frente e minimiza o app. Só responde depois que tudo começou (ou nada ficou rodando).
+/// a frente. Só responde depois que tudo começou (ou nada ficou rodando).
 #[tauri::command]
 pub async fn screen_share_start(
     app: AppHandle,

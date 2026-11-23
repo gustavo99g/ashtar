@@ -531,6 +531,17 @@ impl Activity {
             .collect()
     }
 
+    /// Os títulos das janelas de jogos abertos trocados pelo nome do jogo, na lista do seletor: o
+    /// título que o jogo põe na janela costuma ser feio ("League of Legends (TM) Client").
+    pub fn name_game_windows(&self, sources: &mut [crate::media::sources::CaptureSource]) {
+        let state = self.lock();
+        for source in sources {
+            if let Some(name) = source.process_id.and_then(|pid| state.open.name_of(pid)) {
+                name.clone_into(&mut source.title);
+            }
+        }
+    }
+
     /// O `ETag` da cópia da lista do Discord, para o app pedir com `If-None-Match`.
     pub fn detectable_etag(&self) -> Option<String> {
         self.lock().detectable_etag.clone()

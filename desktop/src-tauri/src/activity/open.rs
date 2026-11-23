@@ -83,6 +83,14 @@ impl OpenGames {
         family.into_iter().map(|open| open.pid).collect()
     }
 
+    /// O nome do jogo aberto no processo `pid`, se é um.
+    pub fn name_of(&self, pid: u32) -> Option<&str> {
+        self.0
+            .iter()
+            .find(|open| open.pid == pid)
+            .map(|open| open.game.name.as_str())
+    }
+
     pub fn clear(&mut self) {
         self.0.clear();
     }
@@ -154,5 +162,7 @@ mod tests {
         assert_eq!(games.family("Hades"), [2]);
         games.retain_alive(|pid, _| pid != 3);
         assert_eq!(games.family("League of Legends"), [1]);
+        assert_eq!(games.name_of(1), Some("League of Legends"));
+        assert_eq!(games.name_of(3), None);
     }
 }
