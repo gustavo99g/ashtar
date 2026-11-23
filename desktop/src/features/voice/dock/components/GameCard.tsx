@@ -35,6 +35,7 @@ import { type GameView, setGameHidden } from "@/lib/tauri/commands";
 import { cn } from "@/lib/utils";
 import { useRoomOccupancy } from "../../members/hooks/useRoomOccupancy";
 import { useVoice } from "../../room/hooks/useVoice";
+import { useFollowGameWindow } from "../hooks/useFollowGameWindow";
 
 /*
  * O cartão do jogo aberto (ADR 0033, decisões 5 a 8), em cima do "Voz conectada": o ícone,
@@ -45,6 +46,8 @@ import { useVoice } from "../../room/hooks/useVoice";
  * - Fora da voz, abre as salas para cima; a escolhida entra e a transmissão começa quando a voz
  *   conecta (o `pendingGameShare`).
  * - Transmitindo o próprio jogo, o botão some e o nome ganha a bolinha dourada.
+ * - Transmitindo uma janela do jogo, quando outro processo dele vira o jogo do cartão (o cliente e
+ *   a partida do League of Legends), a transmissão vai junto (`useFollowGameWindow`).
  */
 
 /** O processo do jogo que vai ser transmitido quando a voz conectar. */
@@ -83,6 +86,7 @@ export function GameCard() {
 	const share = useScreenShareState(screenShare);
 	const pending = usePendingGameShare((state) => state.pid);
 	const now = useNow(30_000);
+	useFollowGameWindow(screenShare, share, game);
 
 	// A voz conectou depois do Transmitir de fora dela: começa agora.
 	useEffect(() => {
