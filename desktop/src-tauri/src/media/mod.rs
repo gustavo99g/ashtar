@@ -16,6 +16,7 @@ pub mod black;
 mod diagnostics;
 pub mod encoded;
 pub mod focus;
+pub mod h264;
 pub mod leveler;
 pub mod platform;
 pub mod publisher;

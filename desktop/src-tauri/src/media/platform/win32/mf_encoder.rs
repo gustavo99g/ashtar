@@ -24,11 +24,15 @@ use windows::Win32::System::Variant::{VARIANT, VT_BOOL, VT_UI4};
 use super::gpu::GpuDevice;
 use super::hr::hr;
 use crate::error::AppError;
+use crate::media::h264::{nal_types, ParamSets};
 use crate::media::video::h264_level;
 
 /// O GOP: um keyframe a cada 30 s no máximo. Os keyframes de verdade vêm sob pedido (alguém
 /// entrou, a rede perdeu pacotes); este só garante que um decoder perdido se recupere sozinho.
 const GOP_SECONDS: u32 = 30;
+
+/// Quantas das primeiras saídas do encoder vão para o log, com os tipos de NAL.
+const FIRST_OUTPUTS_LOGGED: u32 = 3;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct EncoderSettings {
@@ -53,6 +57,10 @@ pub struct MfEncoder {
     name: String,
     need_input: u32,
     frame_duration: i64,
+    /// O SPS e o PPS que o encoder mandou, para o keyframe que vier sem eles (`h264.rs`).
+    params: ParamSets,
+    /// Quantas saídas já foram para o log (as primeiras vão, para diagnosticar uma placa).
+    logged: u32,
     _manager: IMFDXGIDeviceManager,
 }
 
@@ -166,6 +174,8 @@ impl MfEncoder {
 
             let events: IMFMediaEventGenerator =
                 transform.cast().map_err(hr("IMFMediaEventGenerator"))?;
+            let mut params = ParamSets::default();
+            learn_sequence_header(&transform, &mut params);
             Ok(Self {
                 transform,
                 events,
@@ -173,6 +183,8 @@ impl MfEncoder {
                 name,
                 need_input: 0,
                 frame_duration: 10_000_000 / i64::from(settings.fps.max(1)),
+                params,
+                logged: 0,
                 _manager: manager,
             })
         }
@@ -243,6 +255,7 @@ impl MfEncoder {
                         .SetOutputType(0, &proposed, 0)
                         .map_err(hr("SetOutputType"))?;
                 }
+                learn_sequence_header(&self.transform, &mut self.params);
                 tracing::info!(target: "media", "o encoder renegociou o formato da saída");
                 return Ok(None);
             }
@@ -267,6 +280,18 @@ impl MfEncoder {
                 .map_err(hr("IMFMediaBuffer::Lock"))?;
             let data = std::slice::from_raw_parts(ptr, len as usize).to_vec();
             let _ = media.Unlock();
+            if self.logged < FIRST_OUTPUTS_LOGGED {
+                self.logged += 1;
+                tracing::info!(
+                    target: "media",
+                    bytes = data.len(),
+                    marcado_keyframe = keyframe,
+                    nal = ?nal_types(&data),
+                    inicio = ?&data[..data.len().min(8)],
+                    "saída do encoder de hardware"
+                );
+            }
+            let (data, keyframe) = self.params.fix(data, keyframe);
             Ok(Some(EncodedOutput {
                 time,
                 keyframe,
@@ -419,6 +444,33 @@ fn friendly_name(activate: &IMFActivate) -> Option<String> {
 
 /// Baixa latência, CBR, o bitrate, sem B-frames e o GOP, pela codec API. Um valor recusado vai
 /// para o log: o encoder ainda funciona, só com o padrão dele naquele ponto.
+/// Guarda o SPS e o PPS que o encoder põe no tipo de mídia da saída, se puser: há driver que só
+/// os manda ali, e não no keyframe.
+fn learn_sequence_header(transform: &IMFTransform, params: &mut ParamSets) {
+    // SAFETY: chamadas COM em interface válida; o buffer tem o tamanho que o próprio tipo deu.
+    unsafe {
+        let Ok(current) = transform.GetOutputCurrentType(0) else {
+            return;
+        };
+        let Ok(size) = current.GetBlobSize(&MF_MT_MPEG_SEQUENCE_HEADER) else {
+            return;
+        };
+        let mut header = vec![0u8; size as usize];
+        if current
+            .GetBlob(&MF_MT_MPEG_SEQUENCE_HEADER, &mut header, None)
+            .is_ok()
+        {
+            tracing::info!(
+                target: "media",
+                bytes = header.len(),
+                nal = ?nal_types(&header),
+                "o encoder mandou o SPS e o PPS no tipo de mídia"
+            );
+            params.learn(&header);
+        }
+    }
+}
+
 fn configure(api: &ICodecAPI, settings: EncoderSettings) {
     let set = |name: &str, key: &GUID, value: VARIANT| {
         // SAFETY: `api` é a ICodecAPI de um encoder vivo; o VARIANT é local.
