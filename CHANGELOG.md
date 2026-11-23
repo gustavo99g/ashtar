@@ -1,5 +1,9 @@
 # O que há de novo no Ashtar
 
+## 0.8.4
+
+- Na RX 7600 e em outras placas em que o encoder não aceita a imagem direto da GPU, o Ashtar tenta entregar a imagem pela memória antes de ir para o processador, e assim a placa continua codificando.
+
 ## 0.8.3
 
 - Antes de transmitir, o Ashtar confere se o encoder da placa de vídeo devolve imagem. Se não devolver, como na RX 7600, a transmissão vai pelo processador na hora, em vez de sair preta.

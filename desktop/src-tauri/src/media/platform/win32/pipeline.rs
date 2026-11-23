@@ -32,7 +32,7 @@ const PROBE_TIMEOUT: Duration = Duration::from_millis(1500);
 /// avisar.
 const HARDWARE_STALL: Duration = Duration::from_secs(2);
 use super::gpu::GpuDevice;
-use super::mf_encoder::{EncoderSettings, MfEncoder};
+use super::mf_encoder::{EncoderInput, EncoderSettings, MfEncoder};
 use super::readback::Readback;
 use super::wgc::{self, WgcCapture};
 use crate::error::AppError;
@@ -146,6 +146,8 @@ enum Output {
         in_flight: usize,
         /// Quando saiu a última imagem codificada (ou quando o encoder foi criado).
         last_output: Instant,
+        /// Com [`EncoderInput::Memory`], a cópia da imagem para a memória antes do encoder.
+        readback: Option<Readback>,
     },
     /// Plano B: a imagem volta para a memória e o libwebrtc codifica.
     Software { readback: Readback },
@@ -413,6 +415,7 @@ impl Pipeline {
                 encoder,
                 in_flight,
                 last_output,
+                readback,
                 ..
             } => {
                 if *in_flight > 0 && now.duration_since(*last_output) >= HARDWARE_STALL {
@@ -436,7 +439,12 @@ impl Pipeline {
                     self.keyframe_pending = false;
                 }
                 let texture = self.converter.convert(self.slot)?;
-                encoder.submit(texture, time)?;
+                match readback {
+                    Some(readback) => {
+                        encoder.submit_memory(&readback.read(&self.gpu, texture)?, time)?
+                    }
+                    None => encoder.submit(texture, time)?,
+                }
                 *in_flight += 1;
             }
             Output::Software { readback } => {
@@ -494,43 +502,65 @@ fn build_output(
             fps: format.fps,
             bitrate_bps: target_bps,
         };
-        match MfEncoder::new(gpu, settings) {
-            Ok(mut encoder) => match probe(&mut encoder, &converter) {
-                Ok(in_flight) => Some((encoder, in_flight)),
+        // Primeiro com a textura na GPU; se o encoder não devolver imagem assim, com a imagem
+        // na memória (o caso da RX 7600); se nem assim, o plano B.
+        let mut found = None;
+        for input in [EncoderInput::Gpu, EncoderInput::Memory] {
+            let mut encoder = match MfEncoder::new(gpu, settings, input) {
+                Ok(encoder) => encoder,
                 Err(error) => {
-                    tracing::warn!(
-                        target: "media",
-                        %error,
-                        encoder = encoder.name(),
-                        placa = gpu.adapter_name(),
-                        "o encoder de hardware não passou no teste: plano B"
-                    );
-                    None
+                    tracing::warn!(target: "media", %error, ?input, "sem encoder de hardware");
+                    break;
                 }
-            },
-            Err(error) => {
-                tracing::warn!(target: "media", %error, "sem encoder de hardware: plano B");
-                None
+            };
+            let readback = match input {
+                EncoderInput::Gpu => None,
+                EncoderInput::Memory => Some(Readback::new(gpu, size, OutputFormat::Nv12)?),
+            };
+            match probe(&mut encoder, &converter, gpu, readback.as_ref()) {
+                Ok(in_flight) => {
+                    found = Some((encoder, in_flight, readback));
+                    break;
+                }
+                Err(error) => tracing::warn!(
+                    target: "media",
+                    %error,
+                    ?input,
+                    encoder = encoder.name(),
+                    placa = gpu.adapter_name(),
+                    "o encoder de hardware não passou no teste"
+                ),
             }
         }
+        if found.is_none() {
+            tracing::warn!(target: "media", "sem encoder de hardware que funcione: plano B");
+        }
+        found
     };
 
     let output = match hardware {
-        Some((encoder, in_flight)) => {
+        Some((encoder, in_flight, readback)) => {
             tracing::info!(
                 target: "media",
                 encoder = encoder.name(),
+                entrada = if readback.is_some() { "memória" } else { "textura" },
                 placa = gpu.adapter_name(),
                 tamanho = %format!("{}x{}", size.0, size.1),
                 fps = format.fps,
                 "encoder de hardware pronto"
             );
-            stats.set_encoder(EncoderKind::Hardware(encoder.name().to_string()));
+            let name = if readback.is_some() {
+                format!("{} (memória)", encoder.name())
+            } else {
+                encoder.name().to_string()
+            };
+            stats.set_encoder(EncoderKind::Hardware(name));
             Output::Hardware {
                 encoder,
                 bitrate: BitrateController::new(target_bps, format.fps, Instant::now()),
                 in_flight,
                 last_output: Instant::now(),
+                readback,
             }
         }
         None => {
@@ -550,7 +580,12 @@ fn build_output(
 ///
 /// Devolve quantos quadros do teste ainda estão no encoder (saem depois e são descartados por
 /// quem assiste, que espera o keyframe do primeiro quadro de verdade).
-fn probe(encoder: &mut MfEncoder, converter: &Converter) -> Result<usize, AppError> {
+fn probe(
+    encoder: &mut MfEncoder,
+    converter: &Converter,
+    gpu: &GpuDevice,
+    readback: Option<&Readback>,
+) -> Result<usize, AppError> {
     let started = Instant::now();
     let mut submitted = 0usize;
     loop {
@@ -573,7 +608,12 @@ fn probe(encoder: &mut MfEncoder, converter: &Converter) -> Result<usize, AppErr
         }
         if encoder.wants_input() && submitted < RING - 1 {
             let texture = converter.convert(submitted)?;
-            encoder.submit(texture, wgc::now_100ns())?;
+            match readback {
+                Some(readback) => {
+                    encoder.submit_memory(&readback.read(gpu, texture)?, wgc::now_100ns())?
+                }
+                None => encoder.submit(texture, wgc::now_100ns())?,
+            }
             submitted += 1;
         }
         std::thread::sleep(Duration::from_millis(2));
