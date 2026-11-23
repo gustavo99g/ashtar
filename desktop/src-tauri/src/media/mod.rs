@@ -11,6 +11,7 @@ mod sink;
 
 pub mod audio;
 pub mod bitrate;
+pub mod black;
 #[cfg(test)]
 mod diagnostics;
 pub mod encoded;

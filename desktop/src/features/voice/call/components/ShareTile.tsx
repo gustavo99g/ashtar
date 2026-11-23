@@ -15,9 +15,17 @@ interface ShareTileProps {
 	action: ReactNode;
 	/** A imagem ao vivo (`blob:`), só na própria transmissão. */
 	preview?: string;
+	/** Uma faixa em cima (o "Saindo preta" da própria transmissão). */
+	band?: ReactNode;
 }
 
-export function ShareTile({ title, source, action, preview }: ShareTileProps) {
+export function ShareTile({
+	title,
+	source,
+	action,
+	preview,
+	band,
+}: ShareTileProps) {
 	return (
 		<div className="relative flex aspect-video w-full flex-col items-center justify-center gap-1.5 overflow-hidden rounded-[10px] border border-border bg-rail px-6 text-center">
 			{preview && (
@@ -27,6 +35,7 @@ export function ShareTile({ title, source, action, preview }: ShareTileProps) {
 					className="absolute inset-0 size-full object-contain opacity-35"
 				/>
 			)}
+			{band}
 			<LiveBadge size="md" className="absolute top-2.5 left-2.5" />
 			<MonitorPlayIcon
 				aria-hidden="true"

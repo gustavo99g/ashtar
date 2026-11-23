@@ -77,6 +77,7 @@ pub fn run(log_file: logging::LateFile) {
             app.manage(commands::screen_share::create_manager(app.handle()));
             app.manage(commands::updater::create_auto_update(app.handle()));
             app.manage(commands::thumbnails::Thumbnails::default());
+            app.manage(commands::black_watch::BlackWatches::default());
             app.manage(shortcuts::start(app.handle()));
             app.manage(activity::Activity::start(app.handle()));
             power::watch_resume(app.handle());
@@ -151,7 +152,9 @@ pub fn run(log_file: logging::LateFile) {
             commands::activity::activity_set_detectable,
             commands::screenshot::screenshot_source,
             commands::screenshot::screenshot_image,
-            commands::screenshot::open_screenshot_dir
+            commands::screenshot::open_screenshot_dir,
+            commands::black_watch::black_watch_start,
+            commands::black_watch::black_watch_stop
         ])
         .build(context)
         .expect("error while running tauri application");

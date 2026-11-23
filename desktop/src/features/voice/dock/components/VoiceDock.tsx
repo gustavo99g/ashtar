@@ -1,4 +1,4 @@
-import { SourcePickerHost } from "@/features/screen-share";
+import { BlackShareWatch, SourcePickerHost } from "@/features/screen-share";
 import { ShareNotices } from "../../call/components/ShareNotices";
 import { ShareStartNotices } from "../../call/components/ShareStartNotices";
 import { WatchJanitor } from "../../call/components/WatchJanitor";
@@ -41,6 +41,7 @@ export function VoiceDock() {
 				))}
 			{screenShare && <ShareNotices controller={screenShare} />}
 			{screenShare && <TrayShare controller={screenShare} />}
+			{room && screenShare && <BlackShareWatch controller={screenShare} />}
 			{room && <WatchJanitor />}
 			{room && <ShareStartNotices />}
 			{room && <DeviceNotices />}

@@ -22,6 +22,7 @@ import {
 import type { Quality, ShareStats } from "@/lib/tauri/commands";
 import { cn } from "@/lib/utils";
 import { useNow } from "../hooks/useNow";
+import { BlackShareBand } from "./BlackShareWatch";
 import { useScreenShareState } from "../hooks/useScreenShareState";
 import { useShareControls } from "../hooks/useShareControls";
 import { useShareStatsHistory } from "../hooks/useShareStatsHistory";
@@ -162,6 +163,7 @@ function PanelBody({
 							Sem imagem por enquanto.
 						</span>
 					)}
+					{!state.paused && <BlackShareBand />}
 					{state.paused && (
 						<span className="absolute inset-0 flex items-center justify-center bg-background/70 text-sm font-semibold text-foreground">
 							Pausada: nada está indo para quem assiste

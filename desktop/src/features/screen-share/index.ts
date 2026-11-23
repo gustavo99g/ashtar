@@ -1,3 +1,7 @@
+export {
+	BlackShareBand,
+	BlackShareWatch,
+} from "./components/BlackShareWatch";
 export { ShareDefaultsSection } from "./components/ShareDefaultsSection";
 export { ShareQuickSettings } from "./components/ShareQuickSettings";
 export { SourcePickerHost } from "./components/SourcePickerHost";
@@ -24,6 +28,7 @@ export {
 	shareSpec,
 } from "./model/shareInfo";
 export { NativeScreenShare } from "./native/NativeScreenShare";
+export { setShareBlack, useShareIsBlack } from "./stores/blackStore";
 export {
 	closeSharePanel,
 	closeSourcePicker,

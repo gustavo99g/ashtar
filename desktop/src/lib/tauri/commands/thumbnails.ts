@@ -49,3 +49,20 @@ export function thumbnailsUpdate(id: number, sources: SourceRef[]) {
 export function thumbnailsStop(id: number) {
 	return call<void>("thumbnails_stop", { id });
 }
+
+/**
+ * Confere se a própria transmissão está saindo preta (`commands/black_watch.rs`): `onChange(true)`
+ * depois de 5 segundos pretos, `onChange(false)` quando volta a ter imagem. Devolve o id para parar.
+ */
+export function blackWatchStart(
+	source: SourceRef,
+	onChange: (black: boolean) => void,
+) {
+	const channel = new Channel<boolean>();
+	channel.onmessage = onChange;
+	return call<number>("black_watch_start", { source, channel });
+}
+
+export function blackWatchStop(id: number) {
+	return call<void>("black_watch_stop", { id });
+}

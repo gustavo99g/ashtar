@@ -11,6 +11,7 @@
 
 pub mod activity;
 pub mod app;
+pub mod black_watch;
 pub mod files;
 pub mod identity;
 pub mod notifications;
