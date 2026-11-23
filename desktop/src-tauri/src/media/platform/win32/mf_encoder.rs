@@ -218,6 +218,17 @@ impl MfEncoder {
                 if let Some(output) = self.take_output()? {
                     out.push(output);
                 }
+            } else {
+                // Um erro do encoder chega como evento (MEError), não como retorno: sem este log,
+                // ele some e a transmissão só fica preta.
+                // SAFETY: `event` é um IMFMediaEvent válido.
+                let status = unsafe { event.GetStatus() }.map(|status| status.0);
+                tracing::warn!(
+                    target: "media",
+                    evento = kind.0,
+                    status = ?status.map(|code| format!("{:#010x}", code as u32)),
+                    "evento inesperado do encoder de hardware"
+                );
             }
         }
     }

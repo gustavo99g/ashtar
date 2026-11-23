@@ -26,6 +26,8 @@ use windows::Win32::Media::{timeBeginPeriod, timeEndPeriod};
 
 use super::convert::{Converter, OutputFormat, RING};
 
+/// Quanto tempo o teste do encoder da placa espera a primeira imagem ([`probe`]).
+const PROBE_TIMEOUT: Duration = Duration::from_millis(1500);
 /// Quanto tempo o encoder da placa pode ficar com imagens sem devolver nenhuma antes de o log
 /// avisar.
 const HARDWARE_STALL: Duration = Duration::from_secs(2);
@@ -493,7 +495,19 @@ fn build_output(
             bitrate_bps: target_bps,
         };
         match MfEncoder::new(gpu, settings) {
-            Ok(encoder) => Some(encoder),
+            Ok(mut encoder) => match probe(&mut encoder, &converter) {
+                Ok(in_flight) => Some((encoder, in_flight)),
+                Err(error) => {
+                    tracing::warn!(
+                        target: "media",
+                        %error,
+                        encoder = encoder.name(),
+                        placa = gpu.adapter_name(),
+                        "o encoder de hardware não passou no teste: plano B"
+                    );
+                    None
+                }
+            },
             Err(error) => {
                 tracing::warn!(target: "media", %error, "sem encoder de hardware: plano B");
                 None
@@ -502,7 +516,7 @@ fn build_output(
     };
 
     let output = match hardware {
-        Some(encoder) => {
+        Some((encoder, in_flight)) => {
             tracing::info!(
                 target: "media",
                 encoder = encoder.name(),
@@ -515,7 +529,7 @@ fn build_output(
             Output::Hardware {
                 encoder,
                 bitrate: BitrateController::new(target_bps, format.fps, Instant::now()),
-                in_flight: 0,
+                in_flight,
                 last_output: Instant::now(),
             }
         }
@@ -527,6 +541,43 @@ fn build_output(
         }
     };
     Ok((converter, output))
+}
+
+/// Antes de usar o encoder da placa, confere que ele devolve imagem: manda quadros pretos (a
+/// entrada do conversor ainda está zerada) até sair o primeiro H.264, por no máximo
+/// [`PROBE_TIMEOUT`]. Na RX 7600, o da AMD abria sem erro, aceitava um quadro e nunca devolvia
+/// nada, e a transmissão ficava preta; agora esse caso cai no plano B antes de publicar.
+///
+/// Devolve quantos quadros do teste ainda estão no encoder (saem depois e são descartados por
+/// quem assiste, que espera o keyframe do primeiro quadro de verdade).
+fn probe(encoder: &mut MfEncoder, converter: &Converter) -> Result<usize, AppError> {
+    let started = Instant::now();
+    let mut submitted = 0usize;
+    loop {
+        let outputs = encoder.poll()?.len();
+        if outputs > 0 {
+            tracing::info!(
+                target: "media",
+                ms = started.elapsed().as_millis() as u64,
+                quadros = submitted,
+                "o encoder de hardware respondeu ao teste"
+            );
+            return Ok(submitted.saturating_sub(outputs));
+        }
+        if started.elapsed() >= PROBE_TIMEOUT {
+            return Err(AppError::VideoCapture(format!(
+                "nenhuma imagem em {} ms com {submitted} quadros entregues (pediu entrada: {})",
+                PROBE_TIMEOUT.as_millis(),
+                encoder.wants_input()
+            )));
+        }
+        if encoder.wants_input() && submitted < RING - 1 {
+            let texture = converter.convert(submitted)?;
+            encoder.submit(texture, wgc::now_100ns())?;
+            submitted += 1;
+        }
+        std::thread::sleep(Duration::from_millis(2));
+    }
 }
 
 /// Há quanto tempo o Windows compôs a imagem do horário `time` (100 ns, relógio do WGC).

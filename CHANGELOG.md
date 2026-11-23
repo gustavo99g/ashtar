@@ -1,5 +1,9 @@
 # O que há de novo no Ashtar
 
+## 0.8.3
+
+- Antes de transmitir, o Ashtar confere se o encoder da placa de vídeo devolve imagem. Se não devolver, como na RX 7600, a transmissão vai pelo processador na hora, em vez de sair preta.
+
 ## 0.8.2
 
 - Mais um ajuste no encoder da placa de vídeo para as AMD da série RX 7000, que ainda deixavam a transmissão preta para quem assistia.
