@@ -23,7 +23,7 @@ pub use clipboard::copy_image;
 pub use focus::{bring_to_front, exclude_from_capture};
 pub use pipeline::spawn_video;
 pub use sources::exe_icon_png;
-pub use sources::list::{list_monitors, list_windows};
+pub use sources::list::{list_monitors, list_windows, shareable_window_pids};
 pub use still::capture_still;
 pub use thumbnails::spawn_thumbnails;
 

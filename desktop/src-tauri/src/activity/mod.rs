@@ -100,6 +100,9 @@ pub struct GameView {
     /// Os processos abertos do mesmo jogo, do mais novo ao mais antigo (este incluído): a
     /// transmissão segue o mais novo que tem janela (o cliente e a partida do League of Legends).
     pub family: Vec<u32>,
+    /// Algum desses processos já tem uma janela no seletor: só aí o Transmitir libera (o cliente
+    /// do League of Legends abre o processo bem antes da janela).
+    pub window_ready: bool,
 }
 
 /// Um jogo da lista de reconhecidos das configurações.
@@ -354,6 +357,8 @@ impl Activity {
             (open, family)
         };
         let icon = self.icon(&open.game.id, &open.game.exe);
+        let windows = crate::media::sources::shareable_window_pids();
+        let window_ready = family.iter().any(|pid| windows.contains(pid));
         Some(GameView {
             id: open.game.id,
             name: open.game.name,
@@ -363,6 +368,7 @@ impl Activity {
             started_ms: open.started_ms,
             icon,
             family,
+            window_ready,
         })
     }
 

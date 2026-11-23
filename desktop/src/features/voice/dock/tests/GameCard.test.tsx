@@ -8,7 +8,11 @@ import type { CaptureSource, GameView } from "@/lib/tauri/commands";
 import { setGameHidden } from "@/lib/tauri/commands";
 import { fakeShareController } from "@/test/fakeShareController";
 import { useVoice } from "../../room/hooks/useVoice";
-import { GameCard, usePendingGameShare } from "../components/GameCard";
+import {
+	GameCard,
+	usePendingGameShare,
+	WINDOW_CHECK_MS,
+} from "../components/GameCard";
 
 vi.mock("../../room/hooks/useVoice", () => ({ useVoice: vi.fn() }));
 vi.mock("../../members/hooks/useRoomOccupancy", () => ({
@@ -47,6 +51,7 @@ const GAME: GameView = {
 	startedMs: Date.now() - 12 * 60_000,
 	icon: null,
 	family: [42],
+	windowReady: true,
 };
 
 const GAME_WINDOW: CaptureSource = {
@@ -137,6 +142,39 @@ describe("GameCard", () => {
 			{ source: CaptureSource },
 		];
 		expect(request.source).toBe(GAME_WINDOW);
+	});
+
+	it("sem a janela do jogo pronta, o Transmitir espera, dentro e fora da voz", () => {
+		setCurrentGame({ ...GAME, windowReady: false });
+		voice({ inRoom: true });
+		const { unmount } = renderCard();
+		expect(
+			screen.getByRole("button", { name: "Esperando a janela…" }),
+		).toBeDisabled();
+		unmount();
+		voice({ inRoom: false });
+		renderCard();
+		expect(
+			screen.getByRole("button", { name: "Esperando a janela…" }),
+		).toBeDisabled();
+	});
+
+	it("a janela ainda não abriu: espera ela aparecer e transmite", async () => {
+		vi.useFakeTimers({ shouldAdvanceTime: true });
+		const { controller } = voice({ inRoom: true });
+		const listed = vi.mocked(controller.listSources);
+		listed.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+		renderCard();
+		await userEvent.click(screen.getByRole("button", { name: "Transmitir" }));
+		expect(
+			await screen.findByRole("button", { name: "Esperando a janela…" }),
+		).toBeDisabled();
+		await act(() => vi.advanceTimersByTimeAsync(WINDOW_CHECK_MS * 2));
+		await waitFor(() => expect(controller.start).toHaveBeenCalledTimes(1));
+		vi.useRealTimers();
+		await waitFor(() =>
+			expect(screen.getByRole("button", { name: "Transmitir" })).toBeEnabled(),
+		);
 	});
 
 	it("já transmitindo outra coisa, troca a fonte sem parar", async () => {

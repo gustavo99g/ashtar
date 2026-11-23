@@ -31,6 +31,8 @@ export interface GameView {
 	 * transmissão segue o mais novo que tem janela (o cliente e a partida do League of Legends).
 	 */
 	family: number[];
+	/** Algum desses processos já tem janela no seletor: só aí o Transmitir libera. */
+	windowReady: boolean;
 }
 
 export interface SeenGame {

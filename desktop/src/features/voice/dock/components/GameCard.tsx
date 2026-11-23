@@ -22,7 +22,11 @@ import {
 	PopoverTrigger,
 } from "@/components/ui/popover";
 import { toast } from "@/components/ui/toast";
-import { playTime, useCurrentGame } from "@/features/activity";
+import {
+	playTime,
+	useActivityStore,
+	useCurrentGame,
+} from "@/features/activity";
 import { allChannels, useOptionalChannelLayout } from "@/features/channels";
 import {
 	type ScreenShareController,
@@ -46,6 +50,8 @@ import { useFollowGameWindow } from "../hooks/useFollowGameWindow";
  *   troca a fonte, se já estiver transmitindo outra coisa).
  * - Fora da voz, abre as salas para cima; a escolhida entra e a transmissão começa quando a voz
  *   conecta (o `pendingGameShare`).
+ * - Antes de o jogo ter janela (o processo abre bem antes, no League of Legends), o botão diz
+ *   "Esperando a janela…" e não clica.
  * - Transmitindo o próprio jogo, o botão some e o nome ganha a bolinha dourada.
  * - Transmitindo uma janela do jogo, a transmissão fica no processo mais novo dele que tem janela
  *   (a partida do League of Legends, não o cliente) e volta quando ele fecha (`useFollowGameWindow`).
@@ -55,6 +61,18 @@ import { useFollowGameWindow } from "../hooks/useFollowGameWindow";
 export const usePendingGameShare = create<{ pid: number | null }>()(() => ({
 	pid: null,
 }));
+
+/**
+ * O Transmitir esperando a janela do jogo aparecer: o processo já abriu (o cartão aparece), mas a
+ * janela ainda não (o cliente do League of Legends demora).
+ */
+export const useWaitingGameWindow = create<{ waiting: boolean }>()(() => ({
+	waiting: false,
+}));
+
+/** Quanto o Transmitir espera a janela aparecer, e de quanto em quanto tempo olha. */
+export const WINDOW_WAIT_MS = 60_000;
+export const WINDOW_CHECK_MS = 1_500;
 
 function failed(description: string): void {
 	toast.add({
@@ -67,32 +85,53 @@ function failed(description: string): void {
 /**
  * O processo do jogo que tem a janela para transmitir: o mais novo dos processos abertos dele que
  * tem uma. O do cartão pode ser um sem janela (o `LeagueClient.exe` do League of Legends, ou o que
- * o Ashtar achou primeiro ao abrir com o jogo já aberto).
+ * o Ashtar achou primeiro ao abrir com o jogo já aberto). `null`: nenhum tem janela ainda.
  */
 async function gameWindowPid(
 	controller: ScreenShareController,
 	game: GameView,
-): Promise<number> {
+): Promise<number | null> {
 	const sources = await controller.listSources();
 	const pids = game.family.length > 0 ? game.family : [game.pid];
-	return pids.find((pid) => windowOfProcess(sources, pid)) ?? game.pid;
+	return pids.find((pid) => windowOfProcess(sources, pid)) ?? null;
 }
 
-/** Transmite a janela do jogo; um erro vira o aviso do canto. */
+/**
+ * Transmite a janela do jogo; sem janela ainda, espera ela aparecer por até [`WINDOW_WAIT_MS`],
+ * com o botão dizendo que está esperando. Um erro vira o aviso do canto.
+ */
 async function shareGame(
 	controller: ScreenShareController,
 	game: GameView,
 ): Promise<void> {
+	if (useWaitingGameWindow.getState().waiting) return;
+	const started = Date.now();
 	try {
-		const pid = await gameWindowPid(controller, game);
-		const found = await shareProcessWindow(controller, pid);
-		if (!found) failed(`A janela de ${game.name} não está na lista de janelas.`);
+		for (;;) {
+			// O jogo do cartão agora, com os processos de agora; fechou, desiste.
+			const current = useActivityStore.getState().game ?? null;
+			if (!current || current.name !== game.name) return;
+			const pid = await gameWindowPid(controller, current);
+			if (pid !== null) {
+				const found = await shareProcessWindow(controller, pid);
+				if (!found) failed(`A janela de ${game.name} não está na lista de janelas.`);
+				return;
+			}
+			if (Date.now() - started >= WINDOW_WAIT_MS) {
+				failed(`A janela de ${game.name} não abriu a tempo. Tente de novo quando ela aparecer.`);
+				return;
+			}
+			useWaitingGameWindow.setState({ waiting: true });
+			await new Promise((resolve) => setTimeout(resolve, WINDOW_CHECK_MS));
+		}
 	} catch (error) {
 		failed(
 			typeof error === "object" && error !== null && "message" in error
 				? String(error.message)
 				: "Tente de novo pelo botão Tela.",
 		);
+	} finally {
+		useWaitingGameWindow.setState({ waiting: false });
 	}
 }
 
@@ -101,6 +140,7 @@ export function GameCard() {
 	const { room, voiceChannelId, screenShare } = useVoice();
 	const share = useScreenShareState(screenShare);
 	const pending = usePendingGameShare((state) => state.pid);
+	const waitingWindow = useWaitingGameWindow((state) => state.waiting);
 	const now = useNow(30_000);
 	useFollowGameWindow(screenShare, share, game);
 
@@ -127,7 +167,10 @@ export function GameCard() {
 	const sharingGame =
 		sharedPid !== null &&
 		(sharedPid === game.pid || game.family.includes(sharedPid));
-	const waiting = pending === game.pid || share.status === "starting";
+	// O processo abriu, mas a janela ainda não (o cliente do League of Legends demora).
+	const noWindow = !game.windowReady || waitingWindow;
+	const waiting =
+		pending === game.pid || share.status === "starting" || noWindow;
 
 	return (
 		<div className="flex items-start gap-2.5 border-b border-border px-2.5 py-2.5">
@@ -161,10 +204,14 @@ export function GameCard() {
 							onClick={() => void shareGame(screenShare, game)}
 						>
 							<MonitorUpIcon aria-hidden="true" />
-							Transmitir
+							{noWindow ? "Esperando a janela…" : "Transmitir"}
 						</Button>
 					) : (
-						<RoomsButton game={game} waiting={waiting || !!voiceChannelId} />
+						<RoomsButton
+							game={game}
+							waiting={waiting || !!voiceChannelId}
+							noWindow={noWindow}
+						/>
 					))}
 			</div>
 			<GameMenu game={game} />
@@ -190,7 +237,15 @@ function GameIcon({ game }: { game: GameView }) {
 }
 
 /** Fora da voz: as salas para cima; a escolhida entra e transmite quando conectar. */
-function RoomsButton({ game, waiting }: { game: GameView; waiting: boolean }) {
+function RoomsButton({
+	game,
+	waiting,
+	noWindow,
+}: {
+	game: GameView;
+	waiting: boolean;
+	noWindow: boolean;
+}) {
 	const [open, setOpen] = useState(false);
 	const { join } = useVoice();
 	const layout = useOptionalChannelLayout();
@@ -215,7 +270,7 @@ function RoomsButton({ game, waiting }: { game: GameView; waiting: boolean }) {
 				)}
 			>
 				<MonitorUpIcon aria-hidden="true" className="size-4" />
-				Transmitir
+				{noWindow ? "Esperando a janela…" : "Transmitir"}
 			</PopoverTrigger>
 			<PopoverContent side="top" align="start" className="w-60 gap-1 p-1.5">
 				<span className="px-2 pt-1 pb-1.5 text-[11px] font-bold tracking-[0.06em] text-muted-foreground uppercase">

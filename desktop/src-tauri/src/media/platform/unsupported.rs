@@ -35,6 +35,11 @@ pub fn list_windows() -> Vec<WindowEntry> {
     Vec::new()
 }
 
+/// Sempre vazio: sem implementação de plataforma, não há janelas.
+pub fn shareable_window_pids() -> std::collections::HashSet<u32> {
+    std::collections::HashSet::new()
+}
+
 /// Sempre vazia: sem implementação de plataforma, não há telas para listar.
 pub fn list_monitors() -> Vec<MonitorEntry> {
     Vec::new()

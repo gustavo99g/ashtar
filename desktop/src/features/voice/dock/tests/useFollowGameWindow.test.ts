@@ -24,6 +24,7 @@ function game(pid: number, family: number[], name = "League of Legends"): GameVi
 		startedMs: 0,
 		icon: null,
 		family,
+		windowReady: true,
 	};
 }
 
