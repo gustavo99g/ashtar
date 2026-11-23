@@ -24,7 +24,7 @@ uso.
 **Escolher uma fonte a traz para a frente** (restaurando, se minimizada). Desde a v0.8 o app não se
 minimiza mais: fica atrás da janela escolhida (pedido do Kid, 22/11).
 
-**O Ashtar nunca aparece numa captura:** as janelas do app têm `WDA_EXCLUDEFROMCAPTURE`.
+**O Ashtar nunca aparece numa captura:** as janelas do app têm `WDA_EXCLUDEFROMCAPTURE`. Desde a 0.8.1, só enquanto uma tela inteira está sendo transmitida: uma janela transmitida já não mostra o Ashtar, e fora disso o app precisa aparecer no print de quem relata um problema.
 
 ## Alternativas consideradas
 

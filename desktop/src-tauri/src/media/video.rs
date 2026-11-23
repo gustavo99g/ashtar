@@ -249,15 +249,15 @@ impl VideoStats {
     }
 }
 
-/// Tamanho final de uma imagem `width` × `height` para caber na caixa, mantendo a proporção.
-///
-/// Nunca amplia, e devolve sempre lados pares: no NV12 (e no I420) cada amostra de cor cobre um
-/// bloco de 2×2 pixels, e os encoders exigem lados pares.
 /// O nome da placa de vídeo, para o `info.txt` do "Enviar logs".
 pub fn gpu_name() -> Option<String> {
     super::platform::gpu_name()
 }
 
+/// Tamanho final de uma imagem `width` × `height` para caber na caixa, mantendo a proporção.
+///
+/// Nunca amplia, e devolve sempre lados pares: no NV12 (e no I420) cada amostra de cor cobre um
+/// bloco de 2×2 pixels, e os encoders exigem lados pares.
 pub fn fit_in_box(width: u32, height: u32, max_width: u32, max_height: u32) -> (u32, u32) {
     // Em u64, as multiplicações abaixo não têm como estourar.
     let (w, h) = (u64::from(width), u64::from(height));
@@ -271,6 +271,17 @@ pub fn fit_in_box(width: u32, height: u32, max_width: u32, max_height: u32) -> (
         (w * mh / h, mh) // mais alta que a caixa: a altura limita
     };
     (even(w), even(h))
+}
+
+/// O tamanho para o encoder da placa: os lados de [`fit_in_box`] arredondados para baixo até um
+/// múltiplo de 16 (o macrobloco do H.264), com mínimo de 16. O conversor centraliza a imagem com
+/// a proporção certa e completa a sobra (no máximo 15 pixels por lado) com preto.
+///
+/// Alguns encoders de hardware (o da AMD na RX 7000, por exemplo) leem a textura com um
+/// alinhamento próprio e mandam a imagem toda preta ou embaralhada quando o lado não é múltiplo
+/// de 16. Os outros aceitam qualquer lado par, então alinhar sempre não custa nada.
+pub fn align_for_hardware((width, height): (u32, u32)) -> (u32, u32) {
+    ((width & !15).max(16), (height & !15).max(16))
 }
 
 /// Arredonda para baixo até um número par, com mínimo de 2.
@@ -377,6 +388,16 @@ mod tests {
         assert_eq!(fit_in_box(1001, 601, 1920, 1080), (1000, 600));
         // Tão estreita que a largura reduzida daria 1: o mínimo é 2.
         assert_eq!(fit_in_box(16, 10_000, 1920, 1080), (2, 1080));
+    }
+
+    #[test]
+    fn tamanho_do_encoder_de_hardware_em_multiplos_de_16() {
+        assert_eq!(align_for_hardware((1920, 1080)), (1920, 1072));
+        assert_eq!(align_for_hardware((1280, 720)), (1280, 720));
+        // Uma janela qualquer (1918 × 1036 depois do `fit_in_box`).
+        assert_eq!(align_for_hardware((1918, 1036)), (1904, 1024));
+        // Nunca abaixo de um macrobloco.
+        assert_eq!(align_for_hardware((2, 1080)), (16, 1072));
     }
 
     #[test]

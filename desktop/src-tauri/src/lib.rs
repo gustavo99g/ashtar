@@ -97,10 +97,6 @@ pub fn run(log_file: logging::LateFile) {
             } else {
                 window::bring_to_front(app.handle());
             }
-            // O Ashtar nunca aparece numa captura, nem na da própria transmissão (ADR 0019).
-            if let Some(window) = app.get_webview_window("main") {
-                media::focus::exclude_from_capture(&window);
-            }
             Ok(())
         })
         .plugin(tauri_plugin_opener::init())
