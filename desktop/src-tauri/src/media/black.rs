@@ -3,8 +3,9 @@
 //! não percebe. A miniatura da própria fonte é conferida uma vez por segundo; 5 segundos seguidos
 //! de imagem toda preta viram o aviso, e a primeira imagem com conteúdo o desfaz.
 //!
-//! "Toda preta" é escuro **e** sem nada mais claro: uma cena escura de jogo tem a interface, uma
-//! luz, um texto, e não conta.
+//! "Saindo preta" é a maior parte da imagem preta de verdade (o zero da proteção, com o ruído do
+//! JPEG), mesmo com a legenda, os controles do player ou a barra do navegador por cima. Uma cena
+//! escura de jogo ou de filme quase nunca é zero: tem um cinza bem escuro, a interface, uma luz.
 
 use std::time::{Duration, Instant};
 
@@ -13,28 +14,27 @@ pub const BLACK_FOR: Duration = Duration::from_secs(5);
 /// De quanto em quanto tempo uma miniatura é conferida.
 pub const CHECK_EVERY: Duration = Duration::from_secs(1);
 
-/// A média de brilho (0 a 255) abaixo da qual a imagem é escura.
-const DARK_AVERAGE: f64 = 6.0;
-/// O pixel mais claro de uma imagem toda preta: acima disso, tem alguma coisa ali (e o JPEG deixa
-/// um pouco de ruído perto do zero).
-const DARK_MAX: u8 = 24;
+/// O brilho (0 a 255) até onde um pixel é preto de verdade: o zero mais o ruído do JPEG.
+const NEAR_BLACK: u8 = 10;
+/// A parte da imagem que precisa ser preta de verdade. O resto pode ser a legenda, os controles
+/// do player, a barra de título ou a do navegador.
+const BLACK_SHARE: f64 = 0.75;
 
-/// Se a imagem (RGB, 3 bytes por pixel) é toda preta.
+/// Se a imagem (RGB, 3 bytes por pixel) está saindo preta.
 pub fn looks_black(rgb: &[u8]) -> bool {
     let (pixels, _) = rgb.as_chunks::<3>();
     if pixels.is_empty() {
         return false;
     }
-    let mut total = 0u64;
-    for &[r, g, b] in pixels {
-        // O brilho como o olho vê (BT.601), em inteiros.
-        let luma = ((299 * u32::from(r) + 587 * u32::from(g) + 114 * u32::from(b)) / 1000) as u8;
-        if luma > DARK_MAX {
-            return false;
-        }
-        total += u64::from(luma);
-    }
-    (total as f64 / pixels.len() as f64) < DARK_AVERAGE
+    let black = pixels
+        .iter()
+        .filter(|&&[r, g, b]| {
+            // O brilho como o olho vê (BT.601), em inteiros.
+            let luma = (299 * u32::from(r) + 587 * u32::from(g) + 114 * u32::from(b)) / 1000;
+            luma <= u32::from(NEAR_BLACK)
+        })
+        .count();
+    black as f64 / pixels.len() as f64 >= BLACK_SHARE
 }
 
 /// Conta o tempo de preto e diz quando o aviso muda.
@@ -78,12 +78,19 @@ mod tests {
         assert!(looks_black(&image([0, 0, 0], 100)));
         // O ruído do JPEG perto do zero continua preto.
         assert!(looks_black(&image([3, 2, 4], 100)));
-        // Uma cena escura com um texto claro (a interface do jogo) não é preta.
-        let mut scene = image([4, 4, 6], 100);
-        scene.extend_from_slice(&[200, 200, 200]);
+        // O filme protegido com a legenda e os controles do player por cima: ainda preto.
+        let mut player = image([0, 0, 0], 80);
+        player.extend(image([230, 230, 230], 8));
+        player.extend(image([40, 40, 40], 12));
+        assert!(looks_black(&player));
+        // Uma cena escura de jogo: cinza bem escuro, não zero, e a interface.
+        let mut scene = image([14, 14, 18], 90);
+        scene.extend(image([200, 200, 200], 10));
         assert!(!looks_black(&scene));
-        // Escura por igual, mas não preta.
-        assert!(!looks_black(&image([15, 15, 15], 100)));
+        // Meio a meio: tem imagem.
+        let mut half = image([0, 0, 0], 50);
+        half.extend(image([120, 90, 60], 50));
+        assert!(!looks_black(&half));
         assert!(!looks_black(&[]));
     }
 
