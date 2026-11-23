@@ -36,12 +36,14 @@ const GAME_PUBLISHERS: [&str; 7] = [
     "cd projekt red",
 ];
 
-/// Os nomes dos próprios launchers na lista de instalados.
-const LAUNCHER_NAMES: [&str; 8] = [
+/// Os nomes dos próprios launchers na lista de instalados (o começo do nome: "Riot Client" e
+/// "Riot Client (beta)" ficam de fora igual).
+const LAUNCHER_NAMES: [&str; 9] = [
     "ea app",
     "origin",
     "ubisoft connect",
     "riot client",
+    "riot vanguard",
     "battle.net",
     "gog galaxy",
     "epic games launcher",
@@ -227,7 +229,9 @@ pub fn installed_games(programs: &[InstalledProgram]) -> Vec<InstalledGame> {
         })
         .filter(|program| {
             let name = program.name.to_lowercase();
-            !LAUNCHER_NAMES.iter().any(|launcher| name == *launcher)
+            !LAUNCHER_NAMES
+                .iter()
+                .any(|launcher| name.starts_with(launcher))
         })
         .filter(|program| !program.location.trim().is_empty() && !program.name.trim().is_empty())
         .map(|program| InstalledGame {
@@ -323,6 +327,16 @@ mod tests {
             ),
             program("Battlefield 2042", r"C:\EA\BF2042", "Electronic Arts"),
             program("The Witcher 3", r#""D:\GOG\Witcher 3""#, "GOG.com"),
+            program(
+                "Riot Client",
+                r"C:\Riot Games\Riot Client",
+                "Riot Games, Inc",
+            ),
+            program(
+                "Riot Vanguard",
+                r"C:\Program Files\Riot Vanguard",
+                "Riot Games, Inc.",
+            ),
             program("Google Chrome", r"C:\Chrome", "Google LLC"),
             program("Sem pasta", "", "Ubisoft"),
         ]);

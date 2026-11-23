@@ -259,6 +259,25 @@ mod tests {
     }
 
     #[test]
+    fn os_launchers_nunca_sao_jogo() {
+        // Com a lista do Discord e a pasta da Riot como fonte, o Riot Client ainda fica de fora.
+        let catalog = Catalog::new(
+            &[],
+            vec![installed(r"C:\Riot Games", "Riot Games", Source::Installed)],
+            &[detectable("riot client.exe", "Riot Client")],
+            &Extra::bundled(),
+        );
+        for exe in [
+            r"C:\Riot Games\Riot Client\Riot Client.exe",
+            r"C:\Riot Games\Riot Client\RiotClientServices.exe",
+            r"C:\Riot Games\Riot Client\UX\RiotClientCrashHandler.exe",
+            r"C:\Program Files\Riot Vanguard\vgtray.exe",
+        ] {
+            assert_eq!(catalog.recognize(exe), None, "{exe}");
+        }
+    }
+
+    #[test]
     fn a_ordem_das_fontes() {
         let catalog = catalog();
         let name = |path: &str| catalog.recognize(path).map(|game| (game.name, game.source));
