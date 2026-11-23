@@ -1,5 +1,9 @@
 # O que há de novo no Ashtar
 
+## 0.8.2
+
+- Mais um ajuste no encoder da placa de vídeo para as AMD da série RX 7000, que ainda deixavam a transmissão preta para quem assistia.
+
 ## 0.8.1
 
 - Transmitir com o encoder da placa de vídeo nas AMD da série RX 7000: a imagem saía preta ou embaralhada para quem assistia.

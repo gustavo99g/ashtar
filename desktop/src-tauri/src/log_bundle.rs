@@ -17,7 +17,8 @@ pub const RECENT: Duration = Duration::from_secs(2 * 24 * 60 * 60);
 pub const MAX_ZIP: usize = 10 * 1024 * 1024;
 
 /// Junta os `ashtar.*.log` de `dir` mudados desde `now - RECENT`, do mais novo para o mais antigo, e
-/// o `info`, num `.zip`. Um arquivo que deixaria o `.zip` grande demais fica de fora.
+/// o `info`, num `.zip`. De um arquivo que deixaria o `.zip` grande demais vai só o fim, que é
+/// onde está o que acabou de acontecer (um log cheio de um erro repetido ficava todo de fora).
 pub fn bundle(dir: &Path, now: SystemTime, info: &str) -> Result<Vec<u8>, AppError> {
     let since = now.checked_sub(RECENT).unwrap_or(SystemTime::UNIX_EPOCH);
     let mut files: Vec<(SystemTime, std::path::PathBuf)> = std::fs::read_dir(dir)
@@ -49,7 +50,8 @@ pub fn bundle(dir: &Path, now: SystemTime, info: &str) -> Result<Vec<u8>, AppErr
         let Ok(bytes) = std::fs::read(&path) else {
             continue;
         };
-        if bytes.len() > budget {
+        let bytes = tail(bytes, budget);
+        if bytes.is_empty() {
             continue;
         }
         budget -= bytes.len();
@@ -68,6 +70,18 @@ pub fn bundle(dir: &Path, now: SystemTime, info: &str) -> Result<Vec<u8>, AppErr
         ));
     }
     Ok(bytes)
+}
+
+/// No máximo os últimos `limit` bytes de `bytes`, começando numa linha inteira.
+fn tail(bytes: Vec<u8>, limit: usize) -> Vec<u8> {
+    if bytes.len() <= limit {
+        return bytes;
+    }
+    let cut = &bytes[bytes.len() - limit..];
+    match cut.iter().position(|&byte| byte == b'\n') {
+        Some(newline) => cut[newline + 1..].to_vec(),
+        None => Vec::new(),
+    }
 }
 
 /// O texto do `info.txt`.
@@ -136,6 +150,13 @@ fn registry_string(value: &str) -> Option<String> {
 mod tests {
     use super::*;
     use std::io::Read;
+
+    #[test]
+    fn de_um_log_grande_demais_vai_o_fim_em_linhas_inteiras() {
+        assert_eq!(tail(b"um\ndois\ntres\n".to_vec(), 100), b"um\ndois\ntres\n");
+        assert_eq!(tail(b"um\ndois\ntres\n".to_vec(), 7), b"tres\n");
+        assert_eq!(tail(b"uma linha so".to_vec(), 4), b"");
+    }
 
     #[test]
     fn junta_os_logs_recentes_e_o_info() {
