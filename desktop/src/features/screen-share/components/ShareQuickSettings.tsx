@@ -137,7 +137,7 @@ function StatsLine({
 	const text = paused
 		? "Pausada: nada está indo para quem assiste."
 		: stats
-			? `${stats.height}p · ${stats.fps} fps · ${mbps(stats.bitrateKbps)} Mbps · ${stats.latencyMs} ms`
+			? `${stats.height}p · ${stats.fps} fps · ${mbps(stats.bitrateKbps)} Mbps · ${Math.round(stats.latencyMs)} ms`
 			: "Os números chegam em um segundo.";
 	return (
 		<span className="font-mono text-xs text-muted-foreground">{text}</span>
