@@ -140,7 +140,8 @@ impl Drop for Runtime {
 /// Para onde vai a imagem convertida.
 enum Output {
     Hardware {
-        encoder: MfEncoder,
+        /// Numa caixa: o encoder é bem maior que o plano B (o `large_enum_variant` do clippy).
+        encoder: Box<MfEncoder>,
         bitrate: BitrateController,
         /// Frames entregues ao encoder que ainda não saíram.
         in_flight: usize,
@@ -557,7 +558,7 @@ fn build_output(
             };
             stats.set_encoder(EncoderKind::Hardware(name));
             Output::Hardware {
-                encoder,
+                encoder: Box::new(encoder),
                 bitrate: BitrateController::new(target_bps, format.fps, Instant::now()),
                 in_flight,
                 last_output: Instant::now(),
