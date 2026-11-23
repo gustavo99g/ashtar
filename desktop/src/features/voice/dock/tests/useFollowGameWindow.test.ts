@@ -88,7 +88,8 @@ describe("a transmissão segue o jogo", () => {
 		);
 		expect(toast.add).toHaveBeenCalledWith(
 			expect.objectContaining({
-				title: "A transmissão foi para a outra janela de League of Legends",
+				title: "A transmissão trocou de janela",
+				description: "Agora mostrando a janela aberta de League of Legends.",
 			}),
 		);
 

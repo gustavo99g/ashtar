@@ -1,3 +1,4 @@
+import { ScreenShareIcon } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { toast } from "@/components/ui/toast";
 import {
@@ -7,6 +8,7 @@ import {
 	windowOfProcess,
 } from "@/features/screen-share";
 import type { GameView } from "@/lib/tauri/commands";
+import { NoticeIcon } from "../../call/components/NoticeIcon";
 
 /** Quanto espera o processo novo do jogo desenhar a janela antes de trocar. */
 export const FOLLOW_DELAY_MS = 5_000;
@@ -84,8 +86,20 @@ export function useFollowGameWindow(
 	}, [controller, closedPid, name]);
 }
 
+/** O aviso da troca, no padrão dos avisos da transmissão (`ShareNotices`). */
 function moved(name: string): void {
-	toast.add({ title: `A transmissão foi para a outra janela de ${name}` });
+	toast.add({
+		title: "A transmissão trocou de janela",
+		description: `Agora mostrando a janela aberta de ${name}.`,
+		data: {
+			tone: "info",
+			media: (
+				<NoticeIcon tone="info">
+					<ScreenShareIcon />
+				</NoticeIcon>
+			),
+		},
+	});
 }
 
 /**
