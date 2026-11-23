@@ -11,7 +11,10 @@
  * - mutar, desmutar, ficar surdo e voltar. Ficar surdo também muta: toca só o do surdo. Fora da voz
  *   também toca (o botão e o atalho valem lá, v0.6); numa ligação, não;
  * - a própria transmissão começando e parando, e a própria câmera ligando e desligando (v0.8), na
- *   sala e na ligação. Sair da voz com elas ligadas toca só o de sair.
+ *   sala e na ligação. Sair da voz com elas ligadas toca só o de sair;
+ * - uma transmissão que acaba e volta em [`SHARE_RETURN_MS`] (a do jogo, que recomeça no cliente
+ *   quando a partida fecha) não toca nada. Por isso o parar dos outros chega com esse atraso; o
+ *   próprio parar à mão toca na hora.
  */
 import { RoomEvent, type RemoteParticipant } from "livekit-client";
 import { useEffect, useRef } from "react";
@@ -20,6 +23,12 @@ import { useCameraState, useMaybeVoice } from "@/features/voice";
 import { playRoomSound } from "../model/roomSounds";
 
 const SCREEN_SUFFIX = ":screen";
+
+/**
+ * Quanto o som de parar de transmitir espera para ver se a transmissão volta (v0.8): a partida do
+ * jogo fechou e a transmissão recomeçou no cliente. Voltou nesse tempo: nenhum dos dois toca.
+ */
+export const SHARE_RETURN_MS = 6_000;
 
 export function RoomSounds() {
 	const voice = useMaybeVoice();
@@ -53,12 +62,31 @@ export function RoomSounds() {
 	useEffect(() => {
 		if (!room) return;
 		const mine = room.localParticipant.identity + SCREEN_SUFFIX;
+		// As transmissões que acabaram há pouco, esperando para ver se voltam.
+		const stopping = new Map<string, ReturnType<typeof setTimeout>>();
 		const changed = (participant: RemoteParticipant, came: boolean) => {
-			if (deafened.current) return;
 			const identity = participant.identity;
 			if (identity.endsWith(SCREEN_SUFFIX)) {
-				if (identity !== mine) playRoomSound(came ? "shareStart" : "shareStop");
-			} else {
+				if (identity === mine) return;
+				const pending = stopping.get(identity);
+				if (came) {
+					if (pending !== undefined) {
+						clearTimeout(pending);
+						stopping.delete(identity);
+						return;
+					}
+					if (!deafened.current) playRoomSound("shareStart");
+					return;
+				}
+				clearTimeout(pending);
+				stopping.set(
+					identity,
+					setTimeout(() => {
+						stopping.delete(identity);
+						if (!deafened.current) playRoomSound("shareStop");
+					}, SHARE_RETURN_MS),
+				);
+			} else if (!deafened.current) {
 				playRoomSound(came ? "join" : "leave");
 			}
 		};
@@ -69,6 +97,7 @@ export function RoomSounds() {
 		return () => {
 			room.off(RoomEvent.ParticipantConnected, onConnected);
 			room.off(RoomEvent.ParticipantDisconnected, onDisconnected);
+			for (const timer of stopping.values()) clearTimeout(timer);
 		};
 	}, [room]);
 
@@ -90,16 +119,39 @@ export function RoomSounds() {
 	const connected = (voice?.voiceChannelId ?? null) !== null;
 	const stillConnected = useRef(connected);
 	stillConnected.current = connected;
-	const sharing =
-		useScreenShareState(voice?.screenShare ?? null).status === "active";
+	const shareState = useScreenShareState(voice?.screenShare ?? null);
+	const sharing = shareState.status === "active";
+	const sourceClosed =
+		shareState.status === "idle" && shareState.ended === "sourceClosed";
 	const wasSharing = useRef(sharing);
+	// A janela fechou sozinha: o parar espera para ver se a transmissão volta.
+	const ownStopping = useRef<ReturnType<typeof setTimeout> | null>(null);
 	useEffect(() => {
 		if (wasSharing.current === sharing) return;
 		wasSharing.current = sharing;
-		if (stillConnected.current) {
-			playRoomSound(sharing ? "shareStart" : "shareStop", { gap: false });
+		if (sharing && ownStopping.current !== null) {
+			clearTimeout(ownStopping.current);
+			ownStopping.current = null;
+			return;
 		}
-	}, [sharing]);
+		if (!stillConnected.current) return;
+		if (!sharing && sourceClosed) {
+			ownStopping.current = setTimeout(() => {
+				ownStopping.current = null;
+				if (stillConnected.current) {
+					playRoomSound("shareStop", { gap: false });
+				}
+			}, SHARE_RETURN_MS);
+			return;
+		}
+		playRoomSound(sharing ? "shareStart" : "shareStop", { gap: false });
+	}, [sharing, sourceClosed]);
+	useEffect(
+		() => () => {
+			if (ownStopping.current !== null) clearTimeout(ownStopping.current);
+		},
+		[],
+	);
 	const cameraOn = useCameraState((camera) => camera.on);
 	const wasCameraOn = useRef(cameraOn);
 	useEffect(() => {
