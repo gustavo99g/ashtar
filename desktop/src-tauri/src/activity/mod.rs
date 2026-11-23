@@ -93,7 +93,8 @@ pub struct GameView {
     pub source: Source,
     /// O processo do jogo: o app acha a janela dele na lista do seletor para transmitir.
     pub pid: u32,
-    /// Quando o processo abriu, em milissegundos desde 1970.
+    /// Quando o jogo abriu (o mais antigo dos processos dele ainda abertos), em milissegundos
+    /// desde 1970: o "há quanto tempo" do cartão.
     pub started_ms: i64,
     /// `data:image/png;base64,...`, ou `None` (o app desenha o controle).
     pub icon: Option<String>,
@@ -357,14 +358,18 @@ impl Activity {
 
     /// O jogo do cartão agora, com o ícone.
     fn current(&self) -> Option<GameView> {
-        let (open, family) = {
+        let (open, family, opened_ms) = {
             let state = self.lock();
             let open = state
                 .open
                 .current(|id| state.settings.is_hidden(id))
                 .cloned()?;
             let family = state.open.family(&open.game.name);
-            (open, family)
+            let opened_ms = state
+                .open
+                .opened_ms(&open.game.name)
+                .unwrap_or(open.started_ms);
+            (open, family, opened_ms)
         };
         let icon = self.icon(&open.game.id, &open.game.exe);
         let windows = crate::media::sources::shareable_window_pids();
@@ -375,7 +380,7 @@ impl Activity {
             exe: open.game.exe,
             source: open.game.source,
             pid: open.pid,
-            started_ms: open.started_ms,
+            started_ms: opened_ms,
             icon,
             family,
             window_ready,

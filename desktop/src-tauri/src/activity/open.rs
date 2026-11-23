@@ -83,6 +83,16 @@ impl OpenGames {
         family.into_iter().map(|open| open.pid).collect()
     }
 
+    /// Quando o jogo chamado `name` abriu: o processo mais antigo dele ainda aberto (o cliente do
+    /// League of Legends, não a partida). O tempo do cartão não recomeça a cada processo.
+    pub fn opened_ms(&self, name: &str) -> Option<i64> {
+        self.0
+            .iter()
+            .filter(|open| open.game.name == name)
+            .map(|open| open.started_ms)
+            .min()
+    }
+
     /// O nome do jogo aberto no processo `pid`, se é um.
     pub fn name_of(&self, pid: u32) -> Option<&str> {
         self.0
@@ -164,5 +174,8 @@ mod tests {
         assert_eq!(games.family("League of Legends"), [1]);
         assert_eq!(games.name_of(1), Some("League of Legends"));
         assert_eq!(games.name_of(3), None);
+        games.focused(open(4, "League of Legends"));
+        assert_eq!(games.opened_ms("League of Legends"), Some(10));
+        assert_eq!(games.opened_ms("Nenhum"), None);
     }
 }
