@@ -25,6 +25,10 @@ use windows::Win32::Media::MediaFoundation::{MFStartup, MFSTARTUP_FULL, MF_VERSI
 use windows::Win32::Media::{timeBeginPeriod, timeEndPeriod};
 
 use super::convert::{Converter, OutputFormat, RING};
+
+/// Quanto tempo o encoder da placa pode ficar com imagens sem devolver nenhuma antes de o log
+/// avisar.
+const HARDWARE_STALL: Duration = Duration::from_secs(2);
 use super::gpu::GpuDevice;
 use super::mf_encoder::{EncoderSettings, MfEncoder};
 use super::readback::Readback;
@@ -138,6 +142,8 @@ enum Output {
         bitrate: BitrateController,
         /// Frames entregues ao encoder que ainda não saíram.
         in_flight: usize,
+        /// Quando saiu a última imagem codificada (ou quando o encoder foi criado).
+        last_output: Instant,
     },
     /// Plano B: a imagem volta para a memória e o libwebrtc codifica.
     Software { readback: Readback },
@@ -333,6 +339,7 @@ impl Pipeline {
             encoder,
             bitrate,
             in_flight,
+            last_output,
         } = &mut self.output
         else {
             return Ok(SinkStatus::Continue);
@@ -341,6 +348,7 @@ impl Pipeline {
         for output in encoder.poll()? {
             *in_flight = in_flight.saturating_sub(1);
             let now = Instant::now();
+            *last_output = now;
             let age = age(output.time);
             self.stats.frame(output.data.len(), age, now);
             if let Some(value) = bitrate.on_frame(output.data.len(), now) {
@@ -400,8 +408,23 @@ impl Pipeline {
 
         match &mut self.output {
             Output::Hardware {
-                encoder, in_flight, ..
+                encoder,
+                in_flight,
+                last_output,
+                ..
             } => {
+                if *in_flight > 0 && now.duration_since(*last_output) >= HARDWARE_STALL {
+                    // Recebeu imagens e não devolveu nada (visto numa RX 7600, com o anel de 4
+                    // texturas): vai para o log uma vez a cada período, para diagnosticar.
+                    tracing::warn!(
+                        target: "media",
+                        encoder = encoder.name(),
+                        em_voo = *in_flight,
+                        pediu_entrada = encoder.wants_input(),
+                        "o encoder de hardware não devolve imagens"
+                    );
+                    *last_output = now;
+                }
                 if !encoder.wants_input() || *in_flight >= RING - 1 {
                     self.stats.dropped();
                     return Ok(SinkStatus::Continue);
@@ -493,6 +516,7 @@ fn build_output(
                 encoder,
                 bitrate: BitrateController::new(target_bps, format.fps, Instant::now()),
                 in_flight: 0,
+                last_output: Instant::now(),
             }
         }
         None => {

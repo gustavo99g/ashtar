@@ -28,8 +28,9 @@ use super::hr::hr;
 use crate::error::AppError;
 use crate::media::video::letterbox;
 
-/// Quantas texturas de saída o anel tem.
-pub const RING: usize = 4;
+/// Quantas texturas de saída o anel tem. O encoder da placa pode segurar até `RING - 1` antes de
+/// devolver a primeira imagem; alguns (o da AMD) seguram mais de 3.
+pub const RING: usize = 8;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OutputFormat {
