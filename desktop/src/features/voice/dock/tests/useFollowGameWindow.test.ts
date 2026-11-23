@@ -4,7 +4,10 @@ import { toast } from "@/components/ui/toast";
 import type { ScreenShareState } from "@/features/screen-share";
 import type { CaptureSource, GameView } from "@/lib/tauri/commands";
 import { fakeShareController } from "@/test/fakeShareController";
-import { useFollowGameWindow } from "../hooks/useFollowGameWindow";
+import {
+	FOLLOW_DELAY_MS,
+	useFollowGameWindow,
+} from "../hooks/useFollowGameWindow";
 
 vi.mock("@/components/ui/toast", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/components/ui/toast")>()),
@@ -51,7 +54,10 @@ function sharing(processId: number): ScreenShareState {
 	};
 }
 
-afterEach(() => vi.clearAllMocks());
+afterEach(() => {
+	vi.useRealTimers();
+	vi.clearAllMocks();
+});
 
 describe("a transmissão segue o jogo", () => {
 	it("vai para a partida e fica nela, mesmo com o cliente na frente", async () => {
@@ -66,8 +72,13 @@ describe("a transmissão segue o jogo", () => {
 		await new Promise((resolve) => setTimeout(resolve, 10));
 		expect(controller.update).not.toHaveBeenCalled();
 
-		// A partida (20) abriu: a transmissão vai para ela.
+		// A partida (20) abriu: a transmissão vai para ela uns segundos depois.
+		vi.useFakeTimers();
 		rerender({ current: game(20, [20, 10]), state: sharing(10) });
+		await vi.advanceTimersByTimeAsync(FOLLOW_DELAY_MS - 100);
+		expect(controller.update).not.toHaveBeenCalled();
+		await vi.advanceTimersByTimeAsync(200);
+		vi.useRealTimers();
 		await waitFor(() =>
 			expect(controller.update).toHaveBeenCalledWith({
 				kind: "source",
