@@ -5,7 +5,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Emitter, Manager, State};
+use tauri::{AppHandle, Emitter, State};
 use tracing::{info, warn};
 
 use crate::{
@@ -182,14 +182,10 @@ pub fn create_manager(app: &AppHandle) -> Arc<ShareManager> {
     }))
 }
 
-/// A fonte escolhida vai para a frente e o Ashtar sai da frente dela.
-fn focus_source(app: &AppHandle, source: SourceRef) {
+/// A janela escolhida vem para a frente (restaurada, se estava minimizada). O Ashtar não é
+/// minimizado: fica onde está, atrás dela, e nunca aparece na captura (ADR 0019).
+fn focus_source(source: SourceRef) {
     focus::bring_to_front(source);
-    if let Some(window) = app.get_webview_window("main") {
-        if let Err(error) = window.minimize() {
-            warn!(%error, "não deu para minimizar o app");
-        }
-    }
 }
 
 /// Manda os números de `session_id` a cada segundo, e um resumo ao log a cada minuto, até a
@@ -270,7 +266,7 @@ pub async fn screen_share_start(
     );
     let starting = Arc::clone(&manager);
     let session_id = run_blocking(move || starting.start(request)).await?;
-    focus_source(&app, options.source);
+    focus_source(options.source);
     spawn_stats(app, manager, session_id);
     Ok(session_id)
 }
@@ -290,7 +286,7 @@ pub async fn screen_share_update(
     let manager = Arc::clone(manager.inner());
     run_blocking(move || manager.update(session_id, update.into_change())).await?;
     if let ShareUpdate::Source { source } = update {
-        focus_source(&app, source);
+        focus_source(source);
     }
     Ok(())
 }
