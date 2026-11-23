@@ -6,10 +6,11 @@
 //! - `open.rs`: os jogos abertos e qual deles vai no cartão;
 //! - `windows.rs`: o que se pergunta ao Windows.
 //!
-//! A tarefa é uma thread que, a cada [`TICK`], olha a janela em primeiro plano e se os jogos
-//! abertos ainda rodam (o plano falava em `SetWinEventHook`; a volta curta faz o mesmo com menos
-//! código e custa uma chamada de sistema por volta). Com a chave geral desligada, ela termina e só
-//! volta quando a chave liga. Cada mudança do jogo do cartão vira o evento `activity:changed`.
+//! A tarefa é uma thread que, a cada [`TICK`], olha os processos abertos (como o Discord faz:
+//! um jogo aparece assim que o processo abre, sem esperar a janela ficar na frente), a janela em
+//! primeiro plano (para decidir qual vale com dois abertos) e se os jogos abertos ainda rodam.
+//! Com a chave geral desligada, ela termina e só volta quando a chave liga. Cada mudança do jogo
+//! do cartão vira o evento `activity:changed`.
 
 pub mod catalog;
 pub mod launchers;
@@ -18,7 +19,7 @@ pub mod settings;
 #[cfg(target_os = "windows")]
 mod windows;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
@@ -52,7 +53,11 @@ mod platform {
         None
     }
 
-    pub fn parent_exe(_pid: u32) -> Option<String> {
+    pub fn processes() -> Vec<(u32, u32)> {
+        Vec::new()
+    }
+
+    pub fn process_info(_pid: u32) -> Option<(String, i64)> {
         None
     }
 
@@ -140,8 +145,8 @@ struct State {
     catalog: Catalog,
     installed: Vec<catalog::InstalledGame>,
     open: OpenGames,
-    /// A última janela em primeiro plano que não era jogo: não é conferida de novo a cada volta.
-    missed: Option<(u32, i64)>,
+    /// Os processos já conferidos: só os novos são olhados a cada volta.
+    checked: HashSet<u32>,
     /// O que foi mandado ao app por último.
     shown: Option<GameView>,
     /// Os ícones já lidos, pelo id do jogo.
@@ -181,7 +186,7 @@ impl Activity {
                 detectable: copy.games,
                 installed: Vec::new(),
                 open: OpenGames::default(),
-                missed: None,
+                checked: HashSet::new(),
                 shown: None,
                 icons: HashMap::new(),
             }),
@@ -243,8 +248,8 @@ impl Activity {
     }
 
     fn rebuild(&self, state: &mut State) {
-        // Com fontes novas, a janela que não era jogo pode passar a ser.
-        state.missed = None;
+        // Com fontes novas, um processo que não era jogo pode passar a ser.
+        state.checked.clear();
         state.catalog = Catalog::new(
             &state.settings.manual,
             state.installed.clone(),
@@ -253,18 +258,52 @@ impl Activity {
         );
     }
 
-    /// Uma volta: a janela em primeiro plano e os jogos que fecharam.
+    /// Uma volta: os processos novos, a janela em primeiro plano e os jogos que fecharam.
+    ///
+    /// Os processos são olhados como o Discord faz: o jogo aparece assim que abre, sem esperar a
+    /// janela dele (um jogo da Unreal leva um bom tempo até desenhar). Cada processo é conferido
+    /// uma vez só, quando aparece.
     fn tick(&self) {
         let foreground = platform::foreground();
+        let processes = platform::processes();
         let mut state = self.lock();
         state.open.retain_alive(platform::still_running);
-        if let Some((pid, exe, started_ms)) = foreground {
-            if !state.open.refocus(pid, started_ms) && state.missed != Some((pid, started_ms)) {
-                // Sem jogo no `.exe` da janela, o de quem o abriu (o `Jogo.exe` da Unreal).
-                let game = state.catalog.recognize(&exe).or_else(|| {
-                    platform::parent_exe(pid).and_then(|parent| state.catalog.recognize(&parent))
+
+        let alive: HashSet<u32> = processes.iter().map(|&(pid, _)| pid).collect();
+        state.checked.retain(|pid| alive.contains(pid));
+        for &(pid, _) in &processes {
+            if !state.checked.insert(pid) {
+                continue;
+            }
+            let Some((exe, started_ms)) = platform::process_info(pid) else {
+                continue;
+            };
+            if state.open.contains(pid, started_ms) {
+                continue;
+            }
+            if let Some(game) = state.catalog.recognize(&exe) {
+                self.remember(&mut state, &game);
+                state.open.focused(OpenGame {
+                    pid,
+                    started_ms,
+                    game,
                 });
-                state.missed = game.is_none().then_some((pid, started_ms));
+            }
+        }
+
+        if let Some((pid, exe, started_ms)) = foreground {
+            let parent = processes
+                .iter()
+                .find(|&&(known, _)| known == pid)
+                .map(|&(_, parent)| parent);
+            let known = state.open.refocus(pid, started_ms)
+                || parent.is_some_and(|parent| state.open.adopt(parent, pid, started_ms));
+            if !known {
+                // Uma janela que não é jogo pelo `.exe` dela pode ser pelo de quem a abriu.
+                let game = state.catalog.recognize(&exe).or_else(|| {
+                    let (parent_exe, _) = platform::process_info(parent?)?;
+                    state.catalog.recognize(&parent_exe)
+                });
                 if let Some(game) = game {
                     self.remember(&mut state, &game);
                     state.open.focused(OpenGame {

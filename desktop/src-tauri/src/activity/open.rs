@@ -49,6 +49,27 @@ impl OpenGames {
         true
     }
 
+    /// Se o processo já está na lista.
+    pub fn contains(&self, pid: u32, started_ms: i64) -> bool {
+        self.0
+            .iter()
+            .any(|open| open.pid == pid && open.started_ms == started_ms)
+    }
+
+    /// A janela em primeiro plano é de um processo que o jogo aberto `parent` abriu (o
+    /// `Jogo-Win64-Shipping.exe` que o `Jogo.exe` da Unreal abre): o jogo passa a ser desse
+    /// processo, que é o que tem a janela para transmitir, e vai para o topo. Devolve se achou.
+    pub fn adopt(&mut self, parent: u32, pid: u32, started_ms: i64) -> bool {
+        let Some(index) = self.0.iter().position(|open| open.pid == parent) else {
+            return false;
+        };
+        let mut open = self.0.remove(index);
+        open.pid = pid;
+        open.started_ms = started_ms;
+        self.0.insert(0, open);
+        true
+    }
+
     pub fn clear(&mut self) {
         self.0.clear();
     }
@@ -92,5 +113,19 @@ mod tests {
         assert!(!games.refocus(1, 10));
         games.retain_alive(|_, _| false);
         assert!(games.current(|_| false).is_none());
+    }
+
+    #[test]
+    fn a_janela_do_filho_fica_com_o_jogo() {
+        let mut games = OpenGames::default();
+        games.focused(open(1, "p3r"));
+        games.focused(open(2, "outro"));
+        assert!(games.contains(1, 10));
+        // O P3R.exe (1) abriu o P3R-Win64-Shipping.exe (5), que tem a janela.
+        assert!(games.adopt(1, 5, 55));
+        let current = games.current(|_| false).unwrap();
+        assert_eq!((current.pid, current.game.id.as_str()), (5, "p3r"));
+        assert!(!games.contains(1, 10));
+        assert!(!games.adopt(9, 6, 66));
     }
 }

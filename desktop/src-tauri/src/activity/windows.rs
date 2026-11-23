@@ -114,30 +114,31 @@ pub fn still_running(pid: u32, started_ms: i64) -> bool {
     })
 }
 
-/// O `.exe` do processo que abriu `pid` (o `Jogo.exe` da Unreal que abriu o
-/// `Jogo-Win64-Shipping.exe`), se ele ainda existe.
-pub fn parent_exe(pid: u32) -> Option<String> {
+/// Todos os processos agora: o pid e o pid de quem o abriu.
+pub fn processes() -> Vec<(u32, u32)> {
+    let mut found = Vec::new();
     // SAFETY: o snapshot é só leitura e fechado no fim; `entry` leva o `dwSize` que a API pede.
-    let parent = unsafe {
+    unsafe {
         let snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
         if snapshot == INVALID_HANDLE_VALUE {
-            return None;
+            return found;
         }
         let mut entry: PROCESSENTRY32W = std::mem::zeroed();
         entry.dwSize = std::mem::size_of::<PROCESSENTRY32W>() as u32;
-        let mut found = None;
         let mut more = Process32FirstW(snapshot, &mut entry) != 0;
         while more {
-            if entry.th32ProcessID == pid {
-                found = Some(entry.th32ParentProcessID);
-                break;
-            }
+            found.push((entry.th32ProcessID, entry.th32ParentProcessID));
             more = Process32NextW(snapshot, &mut entry) != 0;
         }
         CloseHandle(snapshot);
-        found
-    }?;
-    Process::open(parent)?.path()
+    }
+    found
+}
+
+/// O `.exe` do processo `pid` e quando ele abriu, se dá para abrir.
+pub fn process_info(pid: u32) -> Option<(String, i64)> {
+    let process = Process::open(pid)?;
+    Some((process.path()?, process.started_ms().unwrap_or(0)))
 }
 
 fn wide(text: &str) -> Vec<u16> {
