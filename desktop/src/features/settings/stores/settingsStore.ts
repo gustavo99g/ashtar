@@ -33,6 +33,8 @@ export const ROOM_SOUND_IDS = [
 	"shareStop",
 	"ptt",
 	"screenshot",
+	"cameraOn",
+	"cameraOff",
 ] as const;
 
 export type RoomSoundId = (typeof ROOM_SOUND_IDS)[number];
@@ -52,6 +54,9 @@ export const DEFAULT_ROOM_SOUNDS: RoomSoundPrefs = {
 	ptt: false,
 	// O clique de câmera do print da transmissão (v0.8).
 	screenshot: true,
+	// A própria câmera ligando e desligando (v0.8).
+	cameraOn: true,
+	cameraOff: true,
 };
 
 /** O volume dos sons do Ashtar (v0.6): de 0 a 100%, para todos os sons do app. */

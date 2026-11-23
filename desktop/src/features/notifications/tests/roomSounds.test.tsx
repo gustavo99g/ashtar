@@ -3,7 +3,8 @@ import { EventEmitter } from "events";
 import { RoomEvent } from "livekit-client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useSettingsStore } from "@/features/settings";
-import { useMaybeVoice } from "@/features/voice";
+import { useCameraState, useMaybeVoice } from "@/features/voice";
+import { fakeShareController } from "@/test/fakeShareController";
 import { RoomSounds } from "../components/RoomSounds";
 import {
 	playPttSound,
@@ -12,7 +13,10 @@ import {
 	resetRoomSounds,
 } from "../model/roomSounds";
 
-vi.mock("@/features/voice", () => ({ useMaybeVoice: vi.fn() }));
+vi.mock("@/features/voice", async (importOriginal) => ({
+	...(await importOriginal<object>()),
+	useMaybeVoice: vi.fn(),
+}));
 
 const played: string[] = [];
 const audios: { volume: number }[] = [];
@@ -33,6 +37,8 @@ beforeEach(() => {
 			shareStop: true,
 			ptt: false,
 			screenshot: true,
+			cameraOn: true,
+			cameraOff: true,
 		},
 		soundVolume: 100,
 	});
@@ -236,6 +242,67 @@ describe("os sons da sala", () => {
 		rerender(<RoomSounds />);
 		voice = { ...voice, isDeafened: false };
 		rerender(<RoomSounds />);
+		await flush();
+		expect(names()).toEqual([]);
+	});
+
+	it("a própria transmissão e a própria câmera tocam, e sair da voz toca só o de sair", async () => {
+		useCameraState.setState({ on: false, busy: false });
+		const idle = fakeShareController();
+		const active = fakeShareController({
+			status: "active",
+			sessionId: 1,
+			startedAt: 0,
+			source: {
+				source: { kind: "window", id: 7 },
+				title: "Jogo",
+				processId: 1,
+				icon: null,
+				monitor: null,
+				minimized: false,
+			},
+			quality: "1080p60",
+			audioMode: { mode: "off" },
+			cursor: true,
+			leveler: true,
+			paused: false,
+			audio: "off",
+			link: "ok",
+		});
+		let voice = {
+			voiceKind: "call" as string | null,
+			voiceChannelId: "dm" as string | null,
+			connectionState: "connected",
+			room: null,
+			screenShare: idle as unknown,
+			isMuted: false,
+			isDeafened: false,
+		};
+		vi.mocked(useMaybeVoice).mockImplementation(() => voice as never);
+		const { rerender } = render(<RoomSounds />);
+		voice = { ...voice, screenShare: active };
+		rerender(<RoomSounds />);
+		act(() => useCameraState.setState({ on: true }));
+		act(() => useCameraState.setState({ on: false }));
+		voice = { ...voice, screenShare: idle };
+		rerender(<RoomSounds />);
+		await flush();
+		expect(names()).toEqual([
+			"share-start",
+			"camera-on",
+			"camera-off",
+			"share-stop",
+		]);
+
+		// Saindo da voz com as duas ligadas: nada além do sair.
+		voice = { ...voice, screenShare: active };
+		rerender(<RoomSounds />);
+		act(() => useCameraState.setState({ on: true }));
+		await flush();
+		played.length = 0;
+		voice = { ...voice, voiceChannelId: null, screenShare: null };
+		rerender(<RoomSounds />);
+		act(() => useCameraState.setState({ on: false }));
 		await flush();
 		expect(names()).toEqual([]);
 	});

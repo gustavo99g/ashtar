@@ -9,6 +9,8 @@
  * Desde a v0.6, o clique do pressionar para falar ([`playPttSound`], fora do intervalo: toca a cada
  * frase) e o volume dos sons de Notificações, que vale para todos.
  */
+import cameraOffSound from "@/assets/sounds/camera-off.wav";
+import cameraOnSound from "@/assets/sounds/camera-on.wav";
 import deafenSound from "@/assets/sounds/room-deafen.wav";
 import joinSound from "@/assets/sounds/room-join.wav";
 import leaveSound from "@/assets/sounds/room-leave.wav";
@@ -40,6 +42,8 @@ const FILES: Record<RoomSoundId, string> = {
 	shareStop: shareStopSound,
 	ptt: pttOnSound,
 	screenshot: screenshotSound,
+	cameraOn: cameraOnSound,
+	cameraOff: cameraOffSound,
 };
 
 const lastPlayed = new Map<RoomSoundId, number>();

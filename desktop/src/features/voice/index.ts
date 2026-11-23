@@ -46,6 +46,7 @@ export {
 	type VoiceKind,
 	VoiceProvider,
 } from "./room/components/VoiceProvider";
+export { useCameraState } from "./camera/stores/cameraStore";
 export { useInCall } from "./room/hooks/useInCall";
 export { useMaybeVoice } from "./room/hooks/useMaybeVoice";
 export { useShareViewers } from "./room/hooks/useShareViewers";

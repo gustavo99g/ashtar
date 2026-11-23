@@ -9,11 +9,14 @@
  * - com o áudio desligado (surdo), nada dos outros toca: só os sons dos próprios botões e o de
  *   entrar e sair da sala, como no Discord;
  * - mutar, desmutar, ficar surdo e voltar. Ficar surdo também muta: toca só o do surdo. Fora da voz
- *   também toca (o botão e o atalho valem lá, v0.6); numa ligação, não.
+ *   também toca (o botão e o atalho valem lá, v0.6); numa ligação, não;
+ * - a própria transmissão começando e parando, e a própria câmera ligando e desligando (v0.8), na
+ *   sala e na ligação. Sair da voz com elas ligadas toca só o de sair.
  */
 import { RoomEvent, type RemoteParticipant } from "livekit-client";
 import { useEffect, useRef } from "react";
-import { useMaybeVoice } from "@/features/voice";
+import { useScreenShareState } from "@/features/screen-share";
+import { useCameraState, useMaybeVoice } from "@/features/voice";
 import { playRoomSound } from "../model/roomSounds";
 
 const SCREEN_SUFFIX = ":screen";
@@ -82,6 +85,30 @@ export function RoomSounds() {
 			playRoomSound(isMuted ? "mute" : "unmute", { gap: false });
 		}
 	}, [isMuted, isDeafened, channelId, state, outOfVoice]);
+
+	// A própria transmissão e a própria câmera, com a voz ainda de pé.
+	const connected = (voice?.voiceChannelId ?? null) !== null;
+	const stillConnected = useRef(connected);
+	stillConnected.current = connected;
+	const sharing =
+		useScreenShareState(voice?.screenShare ?? null).status === "active";
+	const wasSharing = useRef(sharing);
+	useEffect(() => {
+		if (wasSharing.current === sharing) return;
+		wasSharing.current = sharing;
+		if (stillConnected.current) {
+			playRoomSound(sharing ? "shareStart" : "shareStop", { gap: false });
+		}
+	}, [sharing]);
+	const cameraOn = useCameraState((camera) => camera.on);
+	const wasCameraOn = useRef(cameraOn);
+	useEffect(() => {
+		if (wasCameraOn.current === cameraOn) return;
+		wasCameraOn.current = cameraOn;
+		if (stillConnected.current) {
+			playRoomSound(cameraOn ? "cameraOn" : "cameraOff", { gap: false });
+		}
+	}, [cameraOn]);
 
 	return null;
 }

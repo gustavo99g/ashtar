@@ -54,8 +54,10 @@ const ROOM_SOUND_ROWS: { id: RoomSoundId; title: string }[] = [
 	{ id: "unmute", title: "Você ligou o microfone" },
 	{ id: "deafen", title: "Você desligou o áudio" },
 	{ id: "undeafen", title: "Você ligou o áudio" },
-	{ id: "shareStart", title: "Alguém começou a transmitir" },
-	{ id: "shareStop", title: "Alguém parou de transmitir" },
+	{ id: "shareStart", title: "Uma transmissão começou (a sua também)" },
+	{ id: "shareStop", title: "Uma transmissão parou (a sua também)" },
+	{ id: "cameraOn", title: "Você ligou a câmera" },
+	{ id: "cameraOff", title: "Você desligou a câmera" },
 	{ id: "ptt", title: "Som do pressionar para falar" },
 	{ id: "screenshot", title: "Som do print da transmissão" },
 ];
