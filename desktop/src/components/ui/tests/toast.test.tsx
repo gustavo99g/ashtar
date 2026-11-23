@@ -33,29 +33,38 @@ describe("Toaster", () => {
 		});
 	});
 
-	it("pausa a barra quando a janela perde o foco", () => {
-		vi.spyOn(document, "hasFocus").mockReturnValue(true);
+	it("atrás de outra janela conta normal; minimizada, pausa", () => {
+		const visibility = vi
+			.spyOn(document, "visibilityState", "get")
+			.mockReturnValue("visible");
 		render(<Toaster />);
 		act(() => {
 			toast.add({ title: "thi entrou no grupo" });
 		});
-		expect(timerOf("thi entrou no grupo")).not.toHaveAttribute("data-paused");
-
 		act(() => {
 			window.dispatchEvent(new Event("blur"));
 		});
+		expect(timerOf("thi entrou no grupo")).not.toHaveAttribute("data-paused");
 
+		visibility.mockReturnValue("hidden");
+		act(() => {
+			document.dispatchEvent(new Event("visibilitychange"));
+		});
 		expect(timerOf("thi entrou no grupo")).toHaveAttribute("data-paused");
+		visibility.mockRestore();
 	});
 
-	it("já nasce pausado se a janela estiver fora de foco (a pessoa está no jogo)", () => {
-		vi.spyOn(document, "hasFocus").mockReturnValue(false);
+	it("já nasce pausado com a janela minimizada", () => {
+		const visibility = vi
+			.spyOn(document, "visibilityState", "get")
+			.mockReturnValue("hidden");
 		render(<Toaster />);
 		act(() => {
 			toast.add({ title: "pedrin entrou no grupo" });
 		});
 
 		expect(timerOf("pedrin entrou no grupo")).toHaveAttribute("data-paused");
+		visibility.mockRestore();
 	});
 
 	it("o tipo dá a cor da barra e o tempo: o erro fica 12 s, a confirmação curta 4 s e sem o X", () => {

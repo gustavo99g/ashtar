@@ -1,6 +1,11 @@
 export { useGuardedJoin } from "./call/components/LeaveCallDialog";
 export { LiveBadge } from "./call/components/LiveBadge";
 export { MiniShare } from "./call/components/MiniShare";
+export {
+	screenshotName,
+	screenshotTarget,
+	takeScreenshot,
+} from "./call/screenshot";
 export { VoiceRoom } from "./call/components/VoiceRoom";
 export {
 	focusShare,
@@ -17,6 +22,7 @@ export {
 	useMoveTargets,
 } from "./members/components/RoomModeration";
 export { ConnectionMark } from "./members/components/ConnectionMark";
+export { MuteMark } from "./members/components/MuteMark";
 export { ConnectionSection } from "./members/components/ConnectionSection";
 export { UserVolume } from "./members/components/UserVolume";
 export { useLiveMembers } from "./members/hooks/useLiveMembers";
@@ -40,6 +46,7 @@ export {
 	type VoiceKind,
 	VoiceProvider,
 } from "./room/components/VoiceProvider";
+export { useCameraState } from "./camera/stores/cameraStore";
 export { useInCall } from "./room/hooks/useInCall";
 export { useMaybeVoice } from "./room/hooks/useMaybeVoice";
 export { useShareViewers } from "./room/hooks/useShareViewers";

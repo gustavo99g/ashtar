@@ -3,6 +3,7 @@ import { ConnectionQuality, type Participant } from "livekit-client";
 import { participantPerson } from "@/features/identity";
 import { isScreenIdentity, shareOwner } from "@/features/screen-share";
 import { useVoice } from "../../room/hooks/useVoice";
+import { useModeration } from "../../room/stores/moderationStore";
 import type { ChannelMember, ConnectionTrouble } from "../model/members";
 
 export interface LiveMember extends ChannelMember {
@@ -19,6 +20,9 @@ export interface LiveMember extends ChannelMember {
 export function useLiveMembers(): LiveMember[] {
 	const participants = useParticipants();
 	const { isDeafened, deafenedIds } = useVoice();
+	// O que a moderação impôs aos outros vem da lista da API (o `voice.participants`); o próprio, do
+	// estado que o `VoiceProvider` cumpre.
+	const own = useModeration();
 	// A tela de alguém é a `:screen` dele (ADR 0017): não é um membro, só marca o dono.
 	const screens = new Set(
 		participants
@@ -40,6 +44,12 @@ export function useLiveMembers(): LiveMember[] {
 			deafened: participant.isLocal
 				? isDeafened
 				: deafenedIds.has(participant.identity),
+			serverMuted: participant.isLocal
+				? own.serverMuted
+				: own.others[participant.identity]?.muted === true,
+			serverDeafened: participant.isLocal
+				? own.serverDeafened
+				: own.others[participant.identity]?.deafened === true,
 			connection: trouble(participant.connectionQuality),
 		}));
 }

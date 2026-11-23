@@ -35,7 +35,7 @@ v0.7  → Perfil e chat avançado
         Nick e foto + anexos + editar, responder, reagir + busca
         ↓
 v0.8  → Atividade, moderação e refinamentos
-        "Jogando X" + administração + refinos do screen share
+        Jogo detectado + moderação na voz + registro + refinos do screen share
         ↓
 v0.9  → Release Candidate
         ↓
@@ -925,6 +925,9 @@ encontrar uma mensagem antiga pela busca
 
 # v0.8 — Atividade, moderação e refinamentos
 
+Sai numa versão só, a `0.8.0`. O plano está em
+[`docs/plans/v0.8-atividade-e-moderacao.md`](plans/v0.8-atividade-e-moderacao.md); as decisões, nas ADRs 0033 e 0034.
+
 ## Objetivo
 
 Fechar os recursos antes do Release Candidate. A lista é um ponto de partida reordenado pelo feedback
@@ -932,23 +935,28 @@ do grupo, e entra só o que mantiver a base simples.
 
 ## Atividade
 
-* **"Jogando X"**: o aplicativo detecta o jogo aberto e mostra ao lado do nick, reaproveitando a
-  listagem de processos e janelas do screen share;
-* lista de jogos reconhecidos mantida pelo próprio projeto, com opção de esconder a atividade.
+* o jogo aberto aparece **só para a própria pessoa**, num cartão em cima dos controles, com o botão Transmitir, que
+  manda a janela do jogo para a sala ou a ligação sem abrir o seletor (o "Jogando X" visível para todos saiu, 22/11);
+* o jogo é reconhecido pelos launchers instalados no PC, depois pela lista de jogos detectáveis do Discord (buscada
+  pela API) e pelo "Adicionar jogo"; o ícone em boa qualidade;
+* Configurações › Atividade, com a chave geral e uma chave por jogo.
 
 ## Screen Share
 
 * ~~miniaturas e preview no seletor de fontes~~ (adiantado para a v0.2.4, com o publicador nativo);
-* aviso de conteúdo protegido (frames pretos por vários segundos);
-* ~~presets de qualidade expostos na interface~~ (v0.2.4: Movimento e Nitidez, no seletor e no painel).
+* aviso de conteúdo protegido (frames pretos por vários segundos), só para quem transmite;
+* ~~presets de qualidade expostos na interface~~ (v0.2.4: Movimento e Nitidez, no seletor e no painel);
+* os botões Trocar, Detalhes e Pausar do popover com fundo;
+* um atalho para tirar print da transmissão, com som de câmera, para a área de transferência (salvar no PC é opção).
 
 ## Moderação
 
-* tela de administração no aplicativo;
-* listar e revogar convites;
-* expulsar usuário e desvincular seus dispositivos;
-* na voz: mutar alguém e encerrar uma transmissão (operações da API de servidor do LiveKit). Tirar da sala
-  saiu na v0.5, como "Desconectar da voz".
+* ~~tela de administração no aplicativo; listar e revogar convites; expulsar usuário e desvincular seus
+  dispositivos~~ (já estão no Painel de controle desde a v0.2.2);
+* na voz, com a permissão nova "Moderar voz", só nas salas de voz: silenciar, deixar surdo, desligar a câmera e
+  encerrar a transmissão de alguém (operações da API de servidor do LiveKit). Tirar da sala saiu na v0.5, como
+  "Desconectar da voz";
+* o registro de moderação e administração, só para o dono, no Painel de controle.
 
 ## Critério
 
@@ -1028,7 +1036,7 @@ outra.
 ✓ entrada por convite, sem senha
 ✓ convite de recuperação
 ✓ perfil com nick e foto
-✓ status e "Jogando X"
+✓ status e jogo detectado
 ```
 
 ## Chat
@@ -1150,7 +1158,7 @@ em segundo plano dos jogos jogados juntos. Nada disso entra antes da v1.0, mas a
 
 * v0.2.4: saída do encoder com mais de um destino (o `Fanout`);
 * v0.7: armazenamento de arquivos e anexos de vídeo no chat;
-* v0.8: reconhecimento de jogos ("Jogando X"), reaproveitado para ligar o replay.
+* v0.8: reconhecimento de jogos (o cartão do jogo, ADR 0033), reaproveitado para ligar o replay.
 
 ## Critérios de conclusão
 
@@ -1230,9 +1238,9 @@ v0.7
 24. Chat avançado + busca
 
 v0.8
-25. "Jogando X"
-26. Refinos do screen share
-27. Moderação
+25. Jogo detectado + Configurações › Atividade
+26. Refinos do screen share + print
+27. Moderação na voz + registro
 
 v0.9
 28. Release Candidate

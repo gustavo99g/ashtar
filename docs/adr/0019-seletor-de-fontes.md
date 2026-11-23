@@ -21,7 +21,8 @@ comprimida em JPEG a 8 fps, só quando a imagem muda, e enviada como bytes crus 
 diz quais cards estão à vista (`IntersectionObserver`). O preview de quem transmite é a miniatura da fonte em
 uso.
 
-**Escolher uma fonte a traz para a frente** (restaurando, se minimizada) **e minimiza o app.**
+**Escolher uma fonte a traz para a frente** (restaurando, se minimizada). Desde a v0.8 o app não se
+minimiza mais: fica atrás da janela escolhida (pedido do Kid, 22/11).
 
 **O Ashtar nunca aparece numa captura:** as janelas do app têm `WDA_EXCLUDEFROMCAPTURE`.
 

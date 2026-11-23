@@ -12,6 +12,8 @@ describe("memberFromApi", () => {
 				mic_off: true,
 				deafened: false,
 				camera: true,
+				server_muted: false,
+				server_deafened: false,
 			}),
 		).toEqual({
 			id: "u1",
@@ -20,6 +22,8 @@ describe("memberFromApi", () => {
 			sharing: true,
 			micOff: true,
 			deafened: false,
+			serverMuted: false,
+			serverDeafened: false,
 			camera: true,
 		});
 		expect(
@@ -31,6 +35,8 @@ describe("memberFromApi", () => {
 				mic_off: false,
 				deafened: false,
 				camera: false,
+				server_muted: false,
+				server_deafened: false,
 			}),
 		).toEqual({
 			id: "u2",
@@ -39,6 +45,8 @@ describe("memberFromApi", () => {
 			sharing: false,
 			micOff: false,
 			deafened: false,
+			serverMuted: false,
+			serverDeafened: false,
 			camera: false,
 		});
 	});

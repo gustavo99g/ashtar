@@ -7,7 +7,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { toast } from "@/components/ui/toast";
 import {
 	ApiError,
+	type AuditEntry,
 	getServerStatus,
+	listAudit,
 	type LogReportView,
 	listLogEntries,
 	listLogReports,
@@ -16,9 +18,11 @@ import {
 	sendLogs,
 } from "@/lib/api";
 import { downloadFile, logsBundle } from "@/lib/tauri/commands";
+import { AuditSettings } from "../components/AuditSettings";
 import { LogsSettings } from "../components/LogsSettings";
 import { SendLogs } from "../components/SendLogs";
 import { ServerStatusSettings } from "../components/ServerStatusSettings";
+import { auditPhrase, auditPlace, auditWhen } from "../model/audit";
 import { ago, duration, size } from "../model/format";
 import { handleAdminRealtime, onLogsReceived } from "../realtime";
 
@@ -27,6 +31,7 @@ vi.mock("@/lib/api", async (importOriginal) => ({
 	sendLogs: vi.fn(),
 	listLogReports: vi.fn(),
 	getServerStatus: vi.fn(),
+	listAudit: vi.fn(),
 	listLogEntries: vi.fn(),
 	readLogEntry: vi.fn(),
 }));
@@ -198,5 +203,99 @@ describe("os textos", () => {
 		expect(duration(8 * 60)).toBe("8 min");
 		expect(duration(5 * 3600 + 12 * 60)).toBe("5 h e 12 min");
 		expect(ago(100, 100 + 2 * 86_400)).toBe("há 2 dias");
+	});
+});
+
+function auditEntry(id: number, patch: Partial<AuditEntry> = {}): AuditEntry {
+	return {
+		id,
+		at: 1_763_850_000,
+		kind: "voice",
+		action: "voz.silenciar",
+		actor: { id: "u1", name: "kid" },
+		target: { id: "u2", name: "rafa" },
+		place: "Jogatina",
+		detail: null,
+		...patch,
+	};
+}
+
+describe("o registro", () => {
+	beforeEach(() => vi.mocked(listAudit).mockReset());
+
+	it("mostra a frase, quem fez e onde, e filtra por tipo", async () => {
+		vi.mocked(listAudit).mockResolvedValue([
+			auditEntry(2),
+			auditEntry(1, {
+				kind: "members",
+				action: "permissoes.dar",
+				detail: "Moderar voz",
+				target: { id: "u3", name: "Lua" },
+				place: null,
+			}),
+		]);
+		wrap(<AuditSettings />);
+		const rows = await screen.findAllByRole("listitem");
+		expect(rows[0]).toHaveTextContent("silenciou o microfone de rafa");
+		expect(rows[0]).toHaveTextContent("Jogatina");
+		expect(rows[1]).toHaveTextContent("deu Moderar voz para Lua");
+		expect(rows[1]).toHaveTextContent("Permissões");
+		expect(listAudit).toHaveBeenLastCalledWith(null, undefined);
+
+		await userEvent.click(screen.getByRole("radio", { name: "Voz" }));
+		await waitFor(() =>
+			expect(listAudit).toHaveBeenLastCalledWith("voice", undefined),
+		);
+	});
+
+	it("carrega mais a partir da última linha", async () => {
+		const page = Array.from({ length: 50 }, (_, i) => auditEntry(100 - i));
+		vi.mocked(listAudit)
+			.mockResolvedValueOnce(page)
+			.mockResolvedValueOnce([auditEntry(10)]);
+		wrap(<AuditSettings />);
+		await userEvent.click(
+			await screen.findByRole("button", { name: "Carregar mais" }),
+		);
+		await waitFor(() =>
+			expect(listAudit).toHaveBeenLastCalledWith(null, 51),
+		);
+		expect(await screen.findAllByRole("listitem")).toHaveLength(51);
+		expect(screen.queryByRole("button", { name: "Carregar mais" })).toBeNull();
+	});
+
+	it("os textos de cada ação e do quando", () => {
+		const text = (entry: AuditEntry) =>
+			auditPhrase(entry)
+				.map((part) => part.text)
+				.join("");
+		expect(
+			text(auditEntry(1, { action: "voz.mover", detail: "Squad" })),
+		).toBe("moveu rafa para Squad");
+		expect(
+			text(
+				auditEntry(1, {
+					kind: "channels",
+					action: "canais.criar",
+					target: null,
+					place: "Jogatina",
+				}),
+			),
+		).toBe("criou Jogatina");
+		expect(text(auditEntry(1, { action: "nova.acao" }))).toBe("nova.acao");
+		expect(auditPlace(auditEntry(1, { kind: "invites", place: null }))).toBe(
+			"Convites",
+		);
+		const now = new Date(2026, 10, 22, 23, 0).getTime();
+		const at = (d: Date) => Math.floor(d.getTime() / 1000);
+		expect(auditWhen(at(new Date(2026, 10, 22, 22, 20)), now)).toBe(
+			"hoje, 22:20",
+		);
+		expect(auditWhen(at(new Date(2026, 10, 21, 23, 2)), now)).toBe(
+			"ontem, 23:02",
+		);
+		expect(auditWhen(at(new Date(2026, 10, 18, 20, 11)), now)).toBe(
+			"18 nov, 20:11",
+		);
 	});
 });

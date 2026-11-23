@@ -29,12 +29,14 @@ import {
 	ArchivedSettingsRoute,
 	EmojisSettingsRoute,
 	LogsSettingsRoute,
+	AuditSettingsRoute,
 	ServerSettingsRoute,
 	InvitesSettingsRoute,
 	MembersSettingsRoute,
 	NotificationsSettingsRoute,
 	ProfileSettingsRoute,
 	ShortcutsSettingsRoute,
+	ActivitySettingsRoute,
 	VoiceSettingsRoute,
 } from "@/routes/settings";
 import { StartRoute } from "@/routes/start";
@@ -75,6 +77,7 @@ export const routes: RouteObject[] = [
 							{ path: "profile", element: <ProfileSettingsRoute /> },
 							{ path: "voice", element: <VoiceSettingsRoute /> },
 							{ path: "shortcuts", element: <ShortcutsSettingsRoute /> },
+							{ path: "activity", element: <ActivitySettingsRoute /> },
 							{
 								path: "notifications",
 								element: <NotificationsSettingsRoute />,
@@ -86,6 +89,7 @@ export const routes: RouteObject[] = [
 							{ path: "emojis", element: <EmojisSettingsRoute /> },
 							{ path: "logs", element: <LogsSettingsRoute /> },
 							{ path: "server", element: <ServerSettingsRoute /> },
+							{ path: "audit", element: <AuditSettingsRoute /> },
 						],
 					},
 				],

@@ -1409,6 +1409,7 @@ mod regras {
                 (beta, Origin::Owner),
                 (Permission::ManageChannels, Origin::Owner),
                 (Permission::MoveMembers, Origin::Owner),
+                (Permission::ModerateVoice, Origin::Owner),
                 (Permission::ManageEmojis, Origin::Owner),
                 (Permission::ViewLogs, Origin::Owner),
             ]
@@ -2424,6 +2425,7 @@ mod painel {
                 "atualizacoes.beta",
                 "canais.gerenciar",
                 "membros.mover",
+                "voz.moderar",
                 "emojis.gerenciar",
                 "logs.ver",
                 "convites.criar",
@@ -2450,12 +2452,14 @@ mod painel {
         assert_eq!(list[1]["kind"], "permission");
         assert_eq!(list[2]["key"], "membros.mover");
         assert_eq!(list[2]["kind"], "permission");
-        assert_eq!(list[3]["key"], "emojis.gerenciar");
+        assert_eq!(list[3]["key"], "voz.moderar");
         assert_eq!(list[3]["kind"], "permission");
-        assert_eq!(list[4]["key"], "logs.ver");
+        assert_eq!(list[4]["key"], "emojis.gerenciar");
         assert_eq!(list[4]["kind"], "permission");
+        assert_eq!(list[5]["key"], "logs.ver");
+        assert_eq!(list[5]["kind"], "permission");
         // As permissões vêm antes das ações.
-        for grant in list.as_array().unwrap()[5..].iter() {
+        for grant in list.as_array().unwrap()[6..].iter() {
             assert_eq!(grant["kind"], "action");
             assert_eq!(grant["granted"], true);
             assert_eq!(grant["origin"], "owner");
@@ -2712,8 +2716,8 @@ mod sala {
         assert_eq!(
             json,
             json!([
-                { "user_id": carla.id, "nick": "carla", "display_name": null, "screen_sharing": true, "avatar": null, "mic_off": false, "deafened": false, "camera": false },
-                { "user_id": ju.id, "nick": "juliana", "display_name": "juju", "screen_sharing": false, "avatar": null, "mic_off": false, "deafened": false, "camera": false },
+                { "user_id": carla.id, "nick": "carla", "display_name": null, "screen_sharing": true, "avatar": null, "mic_off": false, "deafened": false, "camera": false, "server_muted": false, "server_deafened": false },
+                { "user_id": ju.id, "nick": "juliana", "display_name": "juju", "screen_sharing": false, "avatar": null, "mic_off": false, "deafened": false, "camera": false, "server_muted": false, "server_deafened": false },
             ])
         );
     }

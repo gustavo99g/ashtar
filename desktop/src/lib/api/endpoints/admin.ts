@@ -4,6 +4,8 @@
  */
 import { apiFetch, apiJson } from "../client";
 import type {
+	AuditEntry,
+	AuditKind,
 	LogEntry,
 	LogReportView,
 	LogText,
@@ -50,4 +52,16 @@ export function readLogEntry(id: string, name: string): Promise<LogText> {
 
 export function getServerStatus(): Promise<ServerStatus> {
 	return apiJson<ServerStatus>("/api/admin/status");
+}
+
+/** Uma página do registro (`GET /api/admin/audit`), de 50 em 50, da mais nova para a mais velha. */
+export function listAudit(
+	kind: AuditKind | null,
+	before?: number,
+): Promise<AuditEntry[]> {
+	const query = new URLSearchParams();
+	if (kind) query.set("kind", kind);
+	if (before !== undefined) query.set("before", String(before));
+	const suffix = query.size > 0 ? `?${query}` : "";
+	return apiJson<AuditEntry[]>(`/api/admin/audit${suffix}`);
 }

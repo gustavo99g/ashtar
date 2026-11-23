@@ -67,7 +67,7 @@ function QuickBody({
 					</span>
 				</div>
 				<Button
-					variant="ghost"
+					variant="solid"
 					size="sm"
 					onClick={() => {
 						onClose();
@@ -90,7 +90,7 @@ function QuickBody({
 
 			<footer className="flex items-center gap-2 border-t border-border pt-3">
 				<Button
-					variant="secondary"
+					variant="solid"
 					size="sm"
 					className="mr-auto"
 					onClick={() => {
@@ -101,7 +101,7 @@ function QuickBody({
 					Detalhes
 				</Button>
 				<Button
-					variant="secondary"
+					variant="solid"
 					size="sm"
 					disabled={controls.busy}
 					onClick={() =>
@@ -137,7 +137,7 @@ function StatsLine({
 	const text = paused
 		? "Pausada: nada está indo para quem assiste."
 		: stats
-			? `${stats.height}p · ${stats.fps} fps · ${mbps(stats.bitrateKbps)} Mbps · ${stats.latencyMs} ms`
+			? `${stats.height}p · ${stats.fps} fps · ${mbps(stats.bitrateKbps)} Mbps · ${Math.round(stats.latencyMs)} ms`
 			: "Os números chegam em um segundo.";
 	return (
 		<span className="font-mono text-xs text-muted-foreground">{text}</span>

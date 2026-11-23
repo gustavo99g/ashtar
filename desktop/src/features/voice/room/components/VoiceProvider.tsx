@@ -68,7 +68,10 @@ import {
 	useRoomView,
 } from "../../call/stores/roomViewStore";
 import { useShareVolume } from "../../call/stores/shareVolumeStore";
-import { useLocalCamera } from "../../camera/hooks/useLocalCamera";
+import {
+	setCameraOn,
+	useLocalCamera,
+} from "../../camera/hooks/useLocalCamera";
 import { useAudioDevices } from "../../devices/hooks/useAudioDevices";
 import { effectiveDevice, knownDevices } from "../../devices/model/devices";
 import {
@@ -106,6 +109,11 @@ import {
 } from "../model/reconnect";
 import { checkSession, requestVoiceToken } from "../queries";
 import { onSystemResumed } from "@/lib/tauri/commands";
+import {
+	clearModerationNotice,
+	setImposed,
+	useModeration,
+} from "../stores/moderationStore";
 import { clearVoiceOrder, useVoiceOrder } from "../stores/voiceOrderStore";
 import { RoomAudio } from "./RoomAudio";
 import { VoiceStateReport } from "./VoiceStateReport";
@@ -154,6 +162,13 @@ export interface VoiceContextValue {
 	/** Mute e deafen valem também fora da chamada: a próxima entrada já começa assim. */
 	isMuted: boolean;
 	isDeafened: boolean;
+	/**
+	 * Silenciada pela moderação (ADR 0034): `isMuted` fica ligado e `unmute` não faz nada até
+	 * liberarem. Só nas salas de voz do grupo.
+	 */
+	serverMuted: boolean;
+	/** Com o áudio desligado pela moderação: `isDeafened` fica ligado e `undeafen` não faz nada. */
+	serverDeafened: boolean;
 	/** Quem mais na sala desligou o áudio, pelos avisos dos outros apps (`voiceState.ts`). */
 	deafenedIds: ReadonlySet<string>;
 	mute: () => Promise<void>;
@@ -217,6 +232,8 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 	const [error, setError] = useState<VoiceError | null>(null);
 	const [isMuted, setIsMuted] = useState(false);
 	const [isDeafened, setIsDeafened] = useState(false);
+	const serverMuted = useModeration((state) => state.serverMuted);
+	const serverDeafened = useModeration((state) => state.serverDeafened);
 	const [deafenedIds, setDeafenedIds] = useState(NOBODY);
 
 	/**
@@ -459,8 +476,11 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 				setConnectionState(recovery.current ? "reconnecting" : "connecting");
 				setError(null);
 
-				const { url, token } = await requestVoiceToken(channelId);
+				const { url, token, server_muted, server_deafened } =
+					await requestVoiceToken(channelId);
 				if (cancelled) return;
+				// A moderação vale desde a entrada: o token já não deixa abrir o microfone.
+				setImposed(server_muted, server_deafened);
 
 				// Nada é assinado sozinho: quem decide é o efeito do `shown`, mais abaixo.
 				await nextRoom.connect(url, token, { autoSubscribe: false });
@@ -471,8 +491,8 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 				// Se isto lançasse para fora, a sala ficaria conectada sem nenhuma UI para sair dela.
 				// Quem mutou (ou fez deafen) antes de entrar entra assim, sem abrir o microfone.
 				let microphoneProblem: string | null = null;
-				const { isMuted: wasMuted, isDeafened: wasDeafened } =
-					audioFlags.current;
+				const wasMuted = audioFlags.current.isMuted || server_muted;
+				const wasDeafened = audioFlags.current.isDeafened || server_deafened;
 				if (!wasMuted && !wasDeafened && noMicrophone.current) {
 					microphoneProblem = "Nenhum microfone encontrado.";
 				} else if (!wasMuted && !wasDeafened) {
@@ -663,9 +683,13 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 			screenShare,
 			isMuted,
 			isDeafened,
+			serverMuted,
+			serverDeafened,
 			deafenedIds,
 			mute: () => setMicrophone(false),
 			unmute: async () => {
+				// Silenciada pela moderação: o clique, o atalho e o Pressionar para falar não abrem.
+				if (useModeration.getState().serverMuted) return;
 				// O deafen muta o microfone sozinho, então a pessoa vê "mutado" e clica para desmutar:
 				// como no Discord, isso também tira o deafen. Sem tirá-lo, o microfone ficaria aberto
 				// com o áudio da sala ainda desligado.
@@ -680,6 +704,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 				await setMicrophone(false);
 			},
 			undeafen: async () => {
+				if (useModeration.getState().serverDeafened) return;
 				// Sem o deafen ativo, reativar o microfone desfaria um mute que a pessoa pediu.
 				if (!isDeafened) return;
 				setIsDeafened(false);
@@ -723,8 +748,61 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 		screenShare,
 		isMuted,
 		isDeafened,
+		serverMuted,
+		serverDeafened,
 		deafenedIds,
 	]);
+
+	// A moderação (ADR 0034): silenciada, muta e marca que foi ela; liberada, volta como a pessoa
+	// estava. O mesmo para o áudio. O LiveKit já garante; isto acerta o estado e os botões.
+	const valueRef = useRef(value);
+	valueRef.current = value;
+	const mutedByModeration = useRef(false);
+	const deafenedByModeration = useRef(false);
+	useEffect(() => {
+		const voice = valueRef.current;
+		if (serverMuted && !voice.isMuted) {
+			mutedByModeration.current = true;
+			void voice.mute();
+		} else if (!serverMuted && mutedByModeration.current) {
+			mutedByModeration.current = false;
+			if (!voice.isDeafened) void voice.unmute();
+		}
+	}, [serverMuted]);
+	useEffect(() => {
+		const voice = valueRef.current;
+		if (serverDeafened && !voice.isDeafened) {
+			deafenedByModeration.current = true;
+			void voice.deafen();
+		} else if (!serverDeafened && deafenedByModeration.current) {
+			deafenedByModeration.current = false;
+			void voice.undeafen();
+		}
+	}, [serverDeafened]);
+
+	// Desligar a câmera e encerrar a transmissão (ADR 0034): de uma vez só, com o aviso. Parar
+	// por aqui, antes de a API derrubar a tela, evita a volta automática de uma queda.
+	const moderationNotice = useModeration((state) => state.notice);
+	useEffect(() => {
+		if (!moderationNotice) return;
+		clearModerationNotice();
+		if (target?.kind !== "room") return;
+		if (moderationNotice.action === "camera_off") {
+			if (room) void setCameraOn(room, false);
+			toast.add({
+				title: `${moderationNotice.byName} desligou sua câmera`,
+				description: "Você pode ligar de novo pelo botão Câmera.",
+				data: { tone: "warning" },
+			});
+		} else {
+			void screenShare?.stop();
+			toast.add({
+				title: `${moderationNotice.byName} encerrou sua transmissão`,
+				description: "Você pode transmitir de novo pelo botão Tela.",
+				data: { tone: "warning" },
+			});
+		}
+	}, [moderationNotice, target, room, screenShare]);
 
 	return (
 		<VoiceContext.Provider value={value}>

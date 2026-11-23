@@ -15,12 +15,14 @@ use ts_rs::TS;
 use super::auth::CurrentUser;
 use super::extract::ApiJson;
 use crate::AppState;
+use crate::audit::{self, AuditKind};
 use crate::calls;
 use crate::chat::channels::Channel;
 use crate::chat::{access, channels, dms};
 use crate::error::ApiError;
 use crate::identity::permissions::{Permission, require_permission};
 use crate::identity::{User, users};
+use crate::moderation::{self, Imposed};
 use crate::realtime::{DisconnectReason, ServerEvent};
 use crate::voice::{
     self, ParticipantView, RoomParticipant, join_participants, list_room, livekit_env,
@@ -33,6 +35,10 @@ use crate::voice::{
 pub struct JoinVoiceResponse {
     pub token: String,
     pub url: String,
+    /// Silenciado pela moderação (ADR 0034): o app entra mutado e não desmuta. Só no token de voz.
+    pub server_muted: bool,
+    /// Com o áudio desligado pela moderação.
+    pub server_deafened: bool,
 }
 
 #[derive(Debug, Deserialize, TS)]
@@ -57,7 +63,12 @@ pub async fn voice_token(
     CurrentUser(user): CurrentUser,
     ApiJson(request): ApiJson<VoiceTokenRequest>,
 ) -> Result<Json<JoinVoiceResponse>, ApiError> {
-    check_room(&state, &user, &request.channel_id).await?;
+    let room = check_room(&state, &user, &request.channel_id).await?;
+    // A moderação vale só nas salas de voz do grupo (ADR 0034): a ligação privada sai sem travas.
+    let imposed = match room {
+        RoomKind::Voice => moderation::get(&state.db, &user.id).await?,
+        RoomKind::Call => Imposed::default(),
+    };
     let (api_key, api_secret, url) = livekit_env().map_err(ApiError::Config)?;
     let token = create_voice_token(
         &api_key,
@@ -66,9 +77,15 @@ pub async fn voice_token(
         &user.id,
         user.shown_name(),
         &json!({ "nick": user.nick }).to_string(),
+        imposed,
     )
     .map_err(ApiError::Config)?;
-    Ok(Json(JoinVoiceResponse { token, url }))
+    Ok(Json(JoinVoiceResponse {
+        token,
+        url,
+        server_muted: imposed.mic_muted,
+        server_deafened: imposed.deafened,
+    }))
 }
 
 /// Quanto tempo o token da tela vale para entrar. Depois de entrar, a conexão segue: a LiveKit só
@@ -125,7 +142,12 @@ pub async fn screen_token(
         &user.nick,
     )
     .map_err(ApiError::Config)?;
-    Ok(Json(JoinVoiceResponse { token, url }))
+    Ok(Json(JoinVoiceResponse {
+        token,
+        url,
+        server_muted: false,
+        server_deafened: false,
+    }))
 }
 
 /// Quanto tempo o token do Testar conexão vale: o teste leva uns 10 segundos.
@@ -138,7 +160,12 @@ pub async fn test_token(
 ) -> Result<Json<JoinVoiceResponse>, ApiError> {
     let (api_key, api_secret, url) = livekit_env().map_err(ApiError::Config)?;
     let token = create_test_token(&api_key, &api_secret, &user.id).map_err(ApiError::Config)?;
-    Ok(Json(JoinVoiceResponse { token, url }))
+    Ok(Json(JoinVoiceResponse {
+        token,
+        url,
+        server_muted: false,
+        server_deafened: false,
+    }))
 }
 
 fn create_test_token(api_key: &str, api_secret: &str, user_id: &str) -> Result<String, String> {
@@ -159,14 +186,21 @@ fn create_test_token(api_key: &str, api_secret: &str, user_id: &str) -> Result<S
         .map_err(|error| error.to_string())
 }
 
+/// Que sala é a de um token: uma sala de voz do grupo ou a de uma ligação privada.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RoomKind {
+    Voice,
+    Call,
+}
+
 /// Se `user` pode entrar na sala `channel_id`: uma sala de voz aberta, ou a
 /// conversa privada dele com a ligação atendida. A conversa dos outros cai no
 /// mesmo 404 de uma sala que não existe; a própria, sem ligação atendida, 409.
-async fn check_room(state: &AppState, user: &User, channel_id: &str) -> Result<(), ApiError> {
+async fn check_room(state: &AppState, user: &User, channel_id: &str) -> Result<RoomKind, ApiError> {
     validate_channel_id(channel_id)?;
     if let Some(dm) = dms::find_for(&state.db, &user.id, channel_id).await? {
         return if calls::is_answered(&state.db, &dm.id).await? {
-            Ok(())
+            Ok(RoomKind::Call)
         } else {
             Err(ApiError::Conflict(
                 "A ligação ainda não foi atendida.".into(),
@@ -174,7 +208,7 @@ async fn check_room(state: &AppState, user: &User, channel_id: &str) -> Result<(
         };
     }
     access::joinable(&state.db, user, channel_id).await?;
-    Ok(())
+    Ok(RoomKind::Voice)
 }
 
 /// Se `user_id` está na sala pela voz (a `:screen` não conta: ela some da lista).
@@ -328,7 +362,10 @@ pub struct DisconnectMemberRequest {
 /// A sala de voz do grupo em que `user_id` está: pela lista que o hub guarda e,
 /// sem ela, perguntando ao LiveKit. Uma ligação privada não conta: ninguém é
 /// movido de dentro de uma.
-async fn voice_room_of(state: &AppState, user_id: &str) -> Result<Option<String>, ApiError> {
+pub(crate) async fn voice_room_of(
+    state: &AppState,
+    user_id: &str,
+) -> Result<Option<String>, ApiError> {
     let room = match state.hub.room_of(user_id) {
         Some(room) => Some(room),
         None => voice::find_room_of(user_id).await?,
@@ -341,7 +378,7 @@ async fn voice_room_of(state: &AppState, user_id: &str) -> Result<Option<String>
 }
 
 /// O membro ativo `user_id`, ou 404.
-async fn active_member(state: &AppState, user_id: &str) -> Result<User, ApiError> {
+pub(crate) async fn active_member(state: &AppState, user_id: &str) -> Result<User, ApiError> {
     users::find_by_id(&state.db, user_id)
         .await?
         .filter(User::is_active)
@@ -379,6 +416,19 @@ pub async fn move_member(
     if from == destination.id {
         return Err(ApiError::Conflict("Essa pessoa já está nessa sala.".into()));
     }
+    audit::record(
+        &state.db,
+        audit::Entry {
+            kind: AuditKind::Voice,
+            action: "voz.mover",
+            actor: &user,
+            target: Some(&target),
+            place: audit::channel_name(&state.db, &from).await?,
+            detail: Some(destination.name.clone()),
+        },
+        crate::db::now(),
+    )
+    .await?;
     state.hub.publish_to(
         &[&target.id],
         &ServerEvent::VoiceMoved {
@@ -413,6 +463,19 @@ pub async fn disconnect_member(
             "Essa pessoa não está numa sala de voz.".into(),
         ));
     };
+    audit::record(
+        &state.db,
+        audit::Entry {
+            kind: AuditKind::Voice,
+            action: "voz.desconectar",
+            actor: &user,
+            target: Some(&target),
+            place: audit::channel_name(&state.db, &from).await?,
+            detail: None,
+        },
+        crate::db::now(),
+    )
+    .await?;
     state.hub.publish_to(
         &[&target.id],
         &ServerEvent::VoiceDisconnected {
@@ -475,7 +538,8 @@ fn validate_channel_id(channel_id: &str) -> Result<(), ApiError> {
 }
 
 /// Monta o token da sala. `can_update_own_metadata` fica desligado: o
-/// participante não consegue trocar o próprio nome ou metadados lá dentro.
+/// participante não consegue trocar o próprio nome ou metadados lá dentro. Com a moderação
+/// (`imposed`), a entrada já nasce travada: sem o microfone nas fontes, ou sem receber o áudio.
 fn create_voice_token(
     api_key: &str,
     api_secret: &str,
@@ -483,6 +547,7 @@ fn create_voice_token(
     user_id: &str,
     display_name: &str,
     metadata: &str,
+    imposed: Imposed,
 ) -> Result<String, String> {
     AccessToken::with_api_key(api_key, api_secret)
         .with_identity(user_id)
@@ -492,7 +557,8 @@ fn create_voice_token(
             room_join: true,
             room: channel_id.to_owned(),
             can_publish: Some(true),
-            can_subscribe: Some(true),
+            can_subscribe: Some(!imposed.deafened),
+            can_publish_sources: imposed.token_sources(),
             can_update_own_metadata: Some(false),
             ..Default::default()
         })
@@ -602,6 +668,7 @@ mod tests {
             "id-1",
             "Kid",
             r#"{"nick":"kid"}"#,
+            Imposed::default(),
         )
         .unwrap();
         let claims = TokenVerifier::with_api_key("chave", "segredo-de-teste-comprido")
@@ -612,6 +679,33 @@ mod tests {
         assert_eq!(claims.metadata, r#"{"nick":"kid"}"#);
         assert_eq!(claims.video.room, "geral");
         assert_eq!(claims.video.can_update_own_metadata, Some(false));
+        assert_eq!(claims.video.can_subscribe, Some(true));
+        assert!(claims.video.can_publish_sources.is_empty());
+    }
+
+    #[test]
+    fn o_token_de_quem_foi_moderado_ja_sai_travado() {
+        let token = create_voice_token(
+            "chave",
+            "segredo-de-teste-comprido",
+            "geral",
+            "id-1",
+            "Kid",
+            "{}",
+            Imposed {
+                mic_muted: true,
+                deafened: true,
+            },
+        )
+        .unwrap();
+        let claims = TokenVerifier::with_api_key("chave", "segredo-de-teste-comprido")
+            .verify(&token)
+            .unwrap();
+        assert_eq!(claims.video.can_subscribe, Some(false));
+        assert_eq!(
+            claims.video.can_publish_sources,
+            ["camera", "screen_share", "screen_share_audio"]
+        );
     }
 
     #[test]

@@ -3,8 +3,9 @@
  * (`AppShell`), porque precisa do router e da voz.
  *
  * - Mantém o `contextStore` em dia (status, foco, o que está aberto, a sala), para a regra.
- * - Acende e apaga o ponto de não lido na bandeja e na barra de tarefas: conversa privada com não
- *   lida, ou menção em qualquer lugar. Canal comum com não lidas não acende.
+ * - Acende e apaga o ponto na bandeja e na barra de tarefas: vermelho com conversa privada com não
+ *   lida, ou menção em qualquer lugar (canal comum com não lidas não acende); dourado transmitindo
+ *   a tela, no lugar do vermelho (v0.8).
  * - Recebe o clique num cartão e abre o que ele aponta.
  */
 import { useEffect } from "react";
@@ -14,14 +15,15 @@ import { useMyStatus } from "@/features/identity";
 import { useUnreadStore } from "@/features/unread";
 import { useVoice, useVoiceChannelId, watchShare } from "@/features/voice";
 import { paths } from "@/lib/paths";
-import { onNotificationOpen, setUnreadBadge } from "@/lib/tauri/commands";
+import { useScreenShareState } from "@/features/screen-share";
+import { onNotificationOpen, setAppBadge } from "@/lib/tauri/commands";
 import { useAppFocused } from "@/lib/visibility";
 import { type CardTarget, parseTarget } from "../model/cards";
 import { setNotificationContext } from "../stores/contextStore";
 
 export function NotificationsBridge() {
 	useContextSync();
-	useUnreadBadge();
+	useAppBadge();
 	useOpenTarget();
 	return null;
 }
@@ -38,16 +40,18 @@ function useContextSync() {
 	}, [status, focused, channelId, dmId, voiceChannelId]);
 }
 
-function useUnreadBadge() {
+function useAppBadge() {
 	const dms = useDmsUnread();
 	const mentions = useUnreadStore((store) =>
 		Object.values(store.byChannel).some((state) => state.mentions > 0),
 	);
-	const unread = dms > 0 || mentions;
+	const { screenShare } = useVoice();
+	const sharing = useScreenShareState(screenShare).status === "active";
+	const badge = sharing ? "sharing" : dms > 0 || mentions ? "unread" : "none";
 
 	useEffect(() => {
-		void setUnreadBadge(unread).catch(() => {});
-	}, [unread]);
+		void setAppBadge(badge).catch(() => {});
+	}, [badge]);
 }
 
 function useOpenTarget() {

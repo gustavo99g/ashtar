@@ -3,7 +3,8 @@ import { EventEmitter } from "events";
 import { RoomEvent } from "livekit-client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useSettingsStore } from "@/features/settings";
-import { useMaybeVoice } from "@/features/voice";
+import { useCameraState, useMaybeVoice } from "@/features/voice";
+import { fakeShareController } from "@/test/fakeShareController";
 import { RoomSounds } from "../components/RoomSounds";
 import {
 	playPttSound,
@@ -11,8 +12,12 @@ import {
 	RETRY_MS,
 	resetRoomSounds,
 } from "../model/roomSounds";
+import { SHARE_RETURN_MS } from "../components/RoomSounds";
 
-vi.mock("@/features/voice", () => ({ useMaybeVoice: vi.fn() }));
+vi.mock("@/features/voice", async (importOriginal) => ({
+	...(await importOriginal<object>()),
+	useMaybeVoice: vi.fn(),
+}));
 
 const played: string[] = [];
 const audios: { volume: number }[] = [];
@@ -32,6 +37,9 @@ beforeEach(() => {
 			shareStart: true,
 			shareStop: true,
 			ptt: false,
+			screenshot: true,
+			cameraOn: true,
+			cameraOff: true,
 		},
 		soundVolume: 100,
 	});
@@ -52,6 +60,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+	vi.useRealTimers();
 	vi.unstubAllGlobals();
 });
 
@@ -237,6 +246,156 @@ describe("os sons da sala", () => {
 		rerender(<RoomSounds />);
 		await flush();
 		expect(names()).toEqual([]);
+	});
+
+	it("a própria transmissão e a própria câmera tocam, e sair da voz toca só o de sair", async () => {
+		useCameraState.setState({ on: false, busy: false });
+		const idle = fakeShareController();
+		const active = fakeShareController({
+			status: "active",
+			sessionId: 1,
+			startedAt: 0,
+			source: {
+				source: { kind: "window", id: 7 },
+				title: "Jogo",
+				processId: 1,
+				icon: null,
+				monitor: null,
+				minimized: false,
+			},
+			quality: "1080p60",
+			audioMode: { mode: "off" },
+			cursor: true,
+			leveler: true,
+			paused: false,
+			audio: "off",
+			link: "ok",
+		});
+		let voice = {
+			voiceKind: "call" as string | null,
+			voiceChannelId: "dm" as string | null,
+			connectionState: "connected",
+			room: null,
+			screenShare: idle as unknown,
+			isMuted: false,
+			isDeafened: false,
+		};
+		vi.mocked(useMaybeVoice).mockImplementation(() => voice as never);
+		const { rerender } = render(<RoomSounds />);
+		voice = { ...voice, screenShare: active };
+		rerender(<RoomSounds />);
+		act(() => useCameraState.setState({ on: true }));
+		act(() => useCameraState.setState({ on: false }));
+		voice = { ...voice, screenShare: idle };
+		rerender(<RoomSounds />);
+		await flush();
+		expect(names()).toEqual([
+			"share-start",
+			"camera-on",
+			"camera-off",
+			"share-stop",
+		]);
+
+		// Saindo da voz com as duas ligadas: nada além do sair.
+		voice = { ...voice, screenShare: active };
+		rerender(<RoomSounds />);
+		act(() => useCameraState.setState({ on: true }));
+		await flush();
+		played.length = 0;
+		voice = { ...voice, voiceChannelId: null, screenShare: null };
+		rerender(<RoomSounds />);
+		act(() => useCameraState.setState({ on: false }));
+		await flush();
+		expect(names()).toEqual([]);
+	});
+});
+
+describe("a transmissão que volta logo", () => {
+	it("a dos outros: o parar espera, e voltando nesse tempo nada toca", async () => {
+		vi.useFakeTimers();
+		const room = Object.assign(new EventEmitter(), {
+			localParticipant: { identity: "kid" },
+		});
+		vi.mocked(useMaybeVoice).mockReturnValue({
+			voiceKind: "room",
+			voiceChannelId: "sala",
+			connectionState: "connected",
+			room,
+			isMuted: false,
+			isDeafened: false,
+		} as never);
+		render(<RoomSounds />);
+		await vi.advanceTimersByTimeAsync(0);
+		played.length = 0;
+
+		act(() => {
+			room.emit(RoomEvent.ParticipantDisconnected, { identity: "ana:screen" });
+		});
+		await vi.advanceTimersByTimeAsync(SHARE_RETURN_MS - 1000);
+		act(() => {
+			room.emit(RoomEvent.ParticipantConnected, { identity: "ana:screen" });
+		});
+		await vi.advanceTimersByTimeAsync(SHARE_RETURN_MS);
+		expect(names()).toEqual([]);
+
+		// Não voltou: o parar toca depois do prazo.
+		act(() => {
+			room.emit(RoomEvent.ParticipantDisconnected, { identity: "ana:screen" });
+		});
+		await vi.advanceTimersByTimeAsync(SHARE_RETURN_MS);
+		vi.useRealTimers();
+		await flush();
+		expect(names()).toEqual(["share-stop"]);
+	});
+
+	it("a própria: a janela fechou e ela voltou, nada toca; parar à mão toca na hora", async () => {
+		vi.useFakeTimers();
+		const active = fakeShareController({
+			status: "active",
+			sessionId: 1,
+			startedAt: 0,
+			source: {
+				source: { kind: "window", id: 7 },
+				title: "Jogo",
+				processId: 1,
+				icon: null,
+				monitor: null,
+				minimized: false,
+			},
+			quality: "1080p60",
+			audioMode: { mode: "off" },
+			cursor: true,
+			leveler: true,
+			paused: false,
+			audio: "off",
+			link: "ok",
+		});
+		const closed = fakeShareController({ status: "idle", ended: "sourceClosed" });
+		const stopped = fakeShareController({ status: "idle" });
+		let voice = {
+			voiceKind: "call",
+			voiceChannelId: "dm",
+			connectionState: "connected",
+			room: null,
+			screenShare: active as unknown,
+			isMuted: false,
+			isDeafened: false,
+		};
+		vi.mocked(useMaybeVoice).mockImplementation(() => voice as never);
+		const { rerender } = render(<RoomSounds />);
+		voice = { ...voice, screenShare: closed };
+		rerender(<RoomSounds />);
+		await vi.advanceTimersByTimeAsync(2000);
+		voice = { ...voice, screenShare: active };
+		rerender(<RoomSounds />);
+		await vi.advanceTimersByTimeAsync(SHARE_RETURN_MS);
+		expect(names()).toEqual([]);
+
+		voice = { ...voice, screenShare: stopped };
+		rerender(<RoomSounds />);
+		vi.useRealTimers();
+		await flush();
+		expect(names()).toEqual(["share-stop"]);
 	});
 });
 

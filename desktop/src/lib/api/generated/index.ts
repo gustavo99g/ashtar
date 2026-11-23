@@ -17,6 +17,21 @@ export type Archived = { channels: Array<ChannelView>, categories: Array<Archive
 export type ArchivedCategory = { id: string, name: string, archived_at: number, };
 
 /**
+ * Uma linha do registro, como o Painel mostra.
+ */
+export type AuditEntry = { id: number, at: number, kind: AuditKind, action: string, actor: AuditPerson, target: AuditPerson | null, place: string | null, detail: string | null, };
+
+/**
+ * De que parte do grupo é a linha: o filtro do Painel › Registro.
+ */
+export type AuditKind = "voice" | "members" | "invites" | "channels";
+
+/**
+ * Alguém numa linha do registro, com o nome de quando a ação aconteceu.
+ */
+export type AuditPerson = { id: string, name: string, };
+
+/**
  * Quem escreveu, como a mensagem leva junto: quem não é dono não lê a lista
  * do Painel, então o app não teria de onde tirar o nome.
  */
@@ -206,6 +221,15 @@ export type CreatedInviteView = { id: string, code: string, link: string, expire
  */
 preset: Preset | null, };
 
+/**
+ * Um jogo da lista, como o app recebe.
+ */
+export type DetectableGame = { 
+/**
+ * O fim do caminho do `.exe`, em minúsculas e com `/` (`javaw.exe`, `bin/game.exe`).
+ */
+exe: string, name: string, };
+
 export type DeviceView = { linked_at: number, };
 
 export type DisconnectMemberRequest = { user_id: string, };
@@ -327,7 +351,15 @@ uses: Array<InviteUseView>, };
 /**
  * A resposta do `voice/token`.
  */
-export type JoinVoiceResponse = { token: string, url: string, };
+export type JoinVoiceResponse = { token: string, url: string, 
+/**
+ * Silenciado pela moderação (ADR 0034): o app entra mutado e não desmuta. Só no token de voz.
+ */
+server_muted: boolean, 
+/**
+ * Com o áudio desligado pela moderação.
+ */
+server_deafened: boolean, };
 
 /**
  * O convite novo com que o membro entrou, e quantos já entraram com ele.
@@ -437,7 +469,11 @@ can_manage_emojis: boolean,
 /**
  * Se lê os logs que os membros mandam (Painel › Logs).
  */
-can_view_logs: boolean, };
+can_view_logs: boolean, 
+/**
+ * Se o cartão de quem está numa sala de voz mostra a seção Moderação (v0.8).
+ */
+can_moderate_voice: boolean, };
 
 export type MediaFilter = "media" | "files";
 
@@ -531,6 +567,11 @@ has_more: boolean,
  */
 has_newer?: boolean, };
 
+/**
+ * O que a moderação fez, no `voice.moderated` que vai para a pessoa moderada.
+ */
+export type ModerationAction = "mute" | "unmute" | "deafen" | "undeafen" | "camera_off" | "stop_share";
+
 export type MoveMemberRequest = { user_id: string, channel_id: string, };
 
 export type MuteRequest = { muted: boolean, };
@@ -579,7 +620,15 @@ camera: boolean,
  * O que a pessoa está transmitindo, pelo que o app dela contou ([`ShareInfo`]). Só enquanto
  * transmite.
  */
-share?: ShareInfo | null, };
+share?: ShareInfo | null, 
+/**
+ * Silenciada pela moderação (ADR 0034): o microfone vermelho com o escudo.
+ */
+server_muted: boolean, 
+/**
+ * Com o áudio desligado pela moderação.
+ */
+server_deafened: boolean, };
 
 export type PendingRecovery = { invite_id: string, expires_at: number, };
 
@@ -706,7 +755,7 @@ export type ServerEvent = { "type": "ready", user_id: string, status: Status, on
 /**
  * O nome de quem moveu, para o aviso.
  */
-by_name: string, } | { "type": "voice.disconnected", by: string, by_name: string, reason: DisconnectReason, } | { "type": "typing", channel_id: string, user_id: string, } | { "type": "member.joined", person: Person, } | { "type": "user.updated", id: string, display_name: string | null, avatar: string | null, } | { "type": "member.left", user_id: string, } | { "type": "logs.received", report: LogReportView, } | { "type": "channels.changed", version: number, } | { "type": "emojis.changed", emojis: Array<Emoji>, } | { "type": "channel.state", channel_id: string, state: ReadState, } | { "type": "call.ringing", call: CallView, } | { "type": "call.accepted", call: CallView, } | { "type": "call.ended", call_id: string, channel_id: string, outcome: CallOutcome, duration: number | null, };
+by_name: string, } | { "type": "voice.disconnected", by: string, by_name: string, reason: DisconnectReason, } | { "type": "voice.moderated", action: ModerationAction, server_muted: boolean, server_deafened: boolean, by: string, by_name: string, } | { "type": "typing", channel_id: string, user_id: string, } | { "type": "member.joined", person: Person, } | { "type": "user.updated", id: string, display_name: string | null, avatar: string | null, } | { "type": "member.left", user_id: string, } | { "type": "logs.received", report: LogReportView, } | { "type": "channels.changed", version: number, } | { "type": "emojis.changed", emojis: Array<Emoji>, } | { "type": "channel.state", channel_id: string, state: ReadState, } | { "type": "call.ringing", call: CallView, } | { "type": "call.accepted", call: CallView, } | { "type": "call.ended", call_id: string, channel_id: string, outcome: CallOutcome, duration: number | null, };
 
 export type ServerStatus = { api: ApiStatus, livekit: LiveKitStatus, 
 /**

@@ -17,6 +17,7 @@ import {
 } from "@/features/identity";
 import { paths } from "@/lib/paths";
 import { cn } from "@/lib/utils";
+import { ShieldBadge } from "../../members/components/MuteMark";
 import { useVoice } from "../../room/hooks/useVoice";
 import { StatusMenu } from "./StatusMenu";
 
@@ -31,7 +32,16 @@ import { StatusMenu } from "./StatusMenu";
 export function UserPanel() {
 	const session = useSession();
 	const { data: me } = useMe();
-	const { isMuted, isDeafened, mute, unmute, deafen, undeafen } = useVoice();
+	const {
+		isMuted,
+		isDeafened,
+		serverMuted,
+		serverDeafened,
+		mute,
+		unmute,
+		deafen,
+		undeafen,
+	} = useVoice();
 	const user =
 		me?.user ?? (session.status === "connected" ? session.user : null);
 	const name = user ? user.display_name?.trim() || user.nick : "";
@@ -71,27 +81,52 @@ export function UserPanel() {
 				<div className="min-w-0 flex-1" />
 			)}
 			<div className="flex shrink-0">
+				{/* Travado pela moderação (ADR 0034): vermelho com o escudo, e o clique não solta. */}
 				<PanelButton
-					aria-label={isMuted ? "Ativar microfone" : "Desativar microfone"}
+					aria-label={
+						serverMuted
+							? "Silenciado pela moderação"
+							: isMuted
+								? "Ativar microfone"
+								: "Desativar microfone"
+					}
+					title={serverMuted ? "Silenciado pela moderação" : undefined}
 					aria-pressed={isMuted}
-					onClick={() => void (isMuted ? unmute() : mute())}
+					aria-disabled={serverMuted || undefined}
+					onClick={() => {
+						if (serverMuted) return;
+						void (isMuted ? unmute() : mute());
+					}}
 				>
 					{isMuted ? (
 						<MicOffIcon className="text-destructive-border" />
 					) : (
 						<MicIcon />
 					)}
+					{serverMuted && <ShieldBadge />}
 				</PanelButton>
 				<PanelButton
-					aria-label={isDeafened ? "Ativar áudio" : "Desativar áudio"}
+					aria-label={
+						serverDeafened
+							? "Áudio desligado pela moderação"
+							: isDeafened
+								? "Ativar áudio"
+								: "Desativar áudio"
+					}
+					title={serverDeafened ? "Áudio desligado pela moderação" : undefined}
 					aria-pressed={isDeafened}
-					onClick={() => void (isDeafened ? undeafen() : deafen())}
+					aria-disabled={serverDeafened || undefined}
+					onClick={() => {
+						if (serverDeafened) return;
+						void (isDeafened ? undeafen() : deafen());
+					}}
 				>
 					{isDeafened ? (
 						<HeadphoneOffIcon className="text-destructive-border" />
 					) : (
 						<HeadphonesIcon />
 					)}
+					{serverDeafened && <ShieldBadge />}
 				</PanelButton>
 				<Link
 					to={paths.settings.profile}
@@ -106,7 +141,7 @@ export function UserPanel() {
 }
 
 const panelButtonClass =
-	"flex h-8 w-[30px] items-center justify-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground [&_svg]:size-5";
+	"relative flex h-8 w-[30px] items-center justify-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground [&_svg]:size-5";
 
 function PanelButton({ className, ...props }: ComponentProps<"button">) {
 	return (

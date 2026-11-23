@@ -112,6 +112,7 @@ mod tests {
         assert_eq!(
             tables,
             [
+                "audit_log",
                 "calls",
                 "categories",
                 "channel_layout",
@@ -138,7 +139,8 @@ mod tests {
                 "reactions",
                 "sessions",
                 "user_permissions",
-                "users"
+                "users",
+                "voice_moderation"
             ]
         );
     }

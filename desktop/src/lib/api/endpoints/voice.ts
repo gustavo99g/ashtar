@@ -88,3 +88,36 @@ export async function disconnectMember(userId: string): Promise<void> {
 	const request: DisconnectMemberRequest = { user_id: userId };
 	await apiFetch("/api/voice/disconnect", jsonRequest("POST", request));
 }
+
+/**
+ * Silencia (`on`) ou libera o microfone de alguém numa sala de voz (ADR 0034). Só com "Moderar
+ * voz". Vale em todas as salas até alguém liberar.
+ */
+export async function setServerMute(userId: string, on: boolean): Promise<void> {
+	await apiFetch(`/api/voice/moderation/${encodeURIComponent(userId)}/mute`, {
+		method: on ? "PUT" : "DELETE",
+	});
+}
+
+/** Desliga (`on`) ou devolve o áudio de alguém numa sala de voz. */
+export async function setServerDeafen(userId: string, on: boolean): Promise<void> {
+	await apiFetch(`/api/voice/moderation/${encodeURIComponent(userId)}/deafen`, {
+		method: on ? "PUT" : "DELETE",
+	});
+}
+
+/** Desliga a câmera de alguém, de uma vez só: a pessoa pode ligar de novo. */
+export async function moderateCameraOff(userId: string): Promise<void> {
+	await apiFetch(
+		`/api/voice/moderation/${encodeURIComponent(userId)}/camera-off`,
+		{ method: "POST" },
+	);
+}
+
+/** Encerra a transmissão de tela de alguém (só a tela). */
+export async function moderateStopShare(userId: string): Promise<void> {
+	await apiFetch(
+		`/api/voice/moderation/${encodeURIComponent(userId)}/stop-share`,
+		{ method: "POST" },
+	);
+}

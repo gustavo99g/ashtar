@@ -15,13 +15,14 @@ use super::auth::CurrentUser;
 use super::extract::ApiJson;
 use super::invites::CreatedInviteView;
 use crate::AppState;
+use crate::audit::{self, AuditKind};
 use crate::chat::layout;
 use crate::db::now;
 use crate::error::ApiError;
-use crate::identity::devices;
 use crate::identity::invites::{self, DEFAULT_TTL_SECS, InviteKind};
 use crate::identity::permissions::{self, Action, GrantKind, Origin, Permission, require};
 use crate::identity::users::{self, BetaGrant, JoinedWith, MemberDetails, PendingRecovery};
+use crate::identity::{User, devices};
 use crate::realtime::ServerEvent;
 use crate::voice;
 
@@ -147,6 +148,14 @@ pub async fn set_beta(
         now(),
     )
     .await?;
+    log_permission(
+        &state,
+        &user,
+        &target,
+        Permission::BetaUpdates,
+        request.enabled,
+    )
+    .await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -180,6 +189,7 @@ pub async fn set_permission(
         now(),
     )
     .await?;
+    log_permission(&state, &user, &target, permission, request.enabled).await?;
     // Quem gerencia os canais vê os restritos: a lista dele muda.
     if permission == Permission::ManageChannels {
         let version = layout::touch(&state.db).await?;
@@ -200,6 +210,7 @@ pub async fn unlink(
     require(&user, Action::UnlinkDevice)?;
     let target = users::get_by_id(&state.db, &id).await?;
     devices::unlink(&state.db, &user, &target).await?;
+    log_member(&state, &user, &target, "membros.desvincular", None).await?;
     state.hub.close_user(&target.id);
     voice::kick_in_background(target.id);
     Ok(StatusCode::NO_CONTENT)
@@ -224,6 +235,19 @@ pub async fn recovery_invite(
         now(),
     )
     .await?;
+    audit::record(
+        &state.db,
+        audit::Entry {
+            kind: AuditKind::Invites,
+            action: "convites.recuperacao",
+            actor: &user,
+            target: Some(&target),
+            place: None,
+            detail: None,
+        },
+        now(),
+    )
+    .await?;
     Ok((
         StatusCode::CREATED,
         Json(CreatedInviteView::new(
@@ -245,10 +269,57 @@ pub async fn remove(
     require(&user, Action::RemoveMember)?;
     let target = users::get_by_id(&state.db, &id).await?;
     users::remove(&state.db, &user, &target, now()).await?;
+    log_member(&state, &user, &target, "membros.remover", None).await?;
     state.hub.close_user(&target.id);
     state.hub.publish(&ServerEvent::MemberLeft {
         user_id: target.id.clone(),
     });
     voice::kick_in_background(target.id);
     Ok(StatusCode::NO_CONTENT)
+}
+
+/// Grava no registro uma ação de membros em `target`.
+async fn log_member(
+    state: &AppState,
+    actor: &User,
+    target: &User,
+    action: &str,
+    detail: Option<String>,
+) -> Result<(), ApiError> {
+    audit::record(
+        &state.db,
+        audit::Entry {
+            kind: AuditKind::Members,
+            action,
+            actor,
+            target: Some(target),
+            place: None,
+            detail,
+        },
+        now(),
+    )
+    .await
+}
+
+/// Grava no registro que `actor` deu ou tirou `permission` de `target`.
+async fn log_permission(
+    state: &AppState,
+    actor: &User,
+    target: &User,
+    permission: Permission,
+    granted: bool,
+) -> Result<(), ApiError> {
+    let action = if granted {
+        "permissoes.dar"
+    } else {
+        "permissoes.tirar"
+    };
+    log_member(
+        state,
+        actor,
+        target,
+        action,
+        Some(permission.label().into()),
+    )
+    .await
 }

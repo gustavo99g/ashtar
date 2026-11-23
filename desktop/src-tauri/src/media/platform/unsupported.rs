@@ -35,6 +35,11 @@ pub fn list_windows() -> Vec<WindowEntry> {
     Vec::new()
 }
 
+/// Sempre vazio: sem implementação de plataforma, não há janelas.
+pub fn shareable_window_pids() -> std::collections::HashSet<u32> {
+    std::collections::HashSet::new()
+}
+
 /// Sempre vazia: sem implementação de plataforma, não há telas para listar.
 pub fn list_monitors() -> Vec<MonitorEntry> {
     Vec::new()
@@ -65,4 +70,16 @@ pub fn spawn_thumbnails(
     _on_thumbnail: OnThumbnail,
 ) -> Result<CaptureHandle, AppError> {
     Err(AppError::Unsupported("miniaturas"))
+}
+
+pub fn exe_icon_png(_path: &str, _size: u32) -> Option<Vec<u8>> {
+    None
+}
+
+pub fn capture_still(_source: SourceRef) -> Result<(Vec<u8>, u32, u32), AppError> {
+    Err(AppError::Unsupported("print"))
+}
+
+pub fn copy_image(_owner: usize, _dib: &[u8], _png: &[u8]) -> Result<(), AppError> {
+    Err(AppError::Unsupported("área de transferência"))
 }
