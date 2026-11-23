@@ -187,7 +187,16 @@ impl Converter {
             };
             let mut outputs = Vec::with_capacity(RING);
             for _ in 0..RING {
-                let out = texture(device, output, format.dxgi(), D3D11_BIND_RENDER_TARGET)?;
+                // Também como shader resource: é como o encoder da placa costuma ler a textura
+                // (o da AMD sai preto ou embaralhado com uma textura só de render target). Se o
+                // driver não deixar, fica só render target, que serve para a leitura do plano B.
+                let out = texture(
+                    device,
+                    output,
+                    format.dxgi(),
+                    D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE,
+                )
+                .or_else(|_| texture(device, output, format.dxgi(), D3D11_BIND_RENDER_TARGET))?;
                 let mut view = None;
                 video_device
                     .CreateVideoProcessorOutputView(
@@ -252,6 +261,10 @@ impl Converter {
         // SAFETY: o ManuallyDrop é solto uma única vez, aqui, e não é usado depois.
         unsafe { ManuallyDrop::drop(&mut streams[0].pInputSurface) };
         result.map_err(hr("VideoProcessorBlt"))?;
+        // Manda a conversão para a placa já: o encoder pode ler a textura por outra fila, e sem
+        // isso alguns drivers (o da AMD) leem antes de a conversão terminar.
+        // SAFETY: chamada COM em interface válida.
+        unsafe { self.context.Flush() };
         Ok(texture)
     }
 }

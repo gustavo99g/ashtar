@@ -35,8 +35,8 @@ use crate::media::capture::{spawn_capture, EndReason};
 use crate::media::encoded::{EncodedFrame, PacketSink, RawFrame, VideoPacket};
 use crate::media::sources::SourceRef;
 use crate::media::video::{
-    fit_in_box, EncoderKind, VideoCommand, VideoConfig, VideoControl, VideoFormat, VideoStats,
-    RESEND_AFTER,
+    align_for_hardware, fit_in_box, EncoderKind, VideoCommand, VideoConfig, VideoControl,
+    VideoFormat, VideoStats, RESEND_AFTER,
 };
 use crate::media::{CaptureHandle, OnEnd, SinkStatus};
 
@@ -449,6 +449,13 @@ fn build_output(
 ) -> Result<(Converter, Output), AppError> {
     let (width, height) = capture.size();
     let size = fit_in_box(width, height, format.max_width, format.max_height);
+    // Com o encoder da placa, o tamanho vai em múltiplos de 16 (ver `align_for_hardware`). Se a
+    // placa não tiver encoder, o plano B recebe o mesmo tamanho, que também serve para ele.
+    let size = if force_software {
+        size
+    } else {
+        align_for_hardware(size)
+    };
     let converter = Converter::new(gpu, capture.size(), size, OutputFormat::Nv12, format.fps)?;
     stats.set_size(size.0, size.1);
 
