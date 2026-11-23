@@ -51,7 +51,7 @@ pub fn bring_to_front(_id: u64) -> bool {
 }
 
 /// Não faz nada: sem implementação de plataforma, não há captura de que sair.
-pub fn exclude_from_capture(_hwnd: usize) {}
+pub fn exclude_from_capture(_hwnd: usize, _excluded: bool) {}
 
 /// Sempre `Err(Unsupported)`: sem implementação de plataforma, não há captura de vídeo.
 pub fn spawn_video(

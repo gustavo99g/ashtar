@@ -13,14 +13,14 @@ pub fn bring_to_front(source: SourceRef) -> bool {
     }
 }
 
-/// Tira a janela do app de toda captura de tela, inclusive a da própria transmissão: quem assiste
-/// uma tela inteira vê o que está atrás do Ashtar. Chamado uma vez, no `setup`.
-pub fn exclude_from_capture(window: &tauri::WebviewWindow) {
+/// Tira uma janela do app de toda captura de tela, inclusive a da própria transmissão (quem
+/// assiste uma tela inteira vê o que está atrás do Ashtar), ou a devolve (`excluded` falso).
+pub fn exclude_from_capture(window: &tauri::WebviewWindow, excluded: bool) {
     #[cfg(windows)]
     match window.hwnd() {
-        Ok(hwnd) => platform::exclude_from_capture(hwnd.0 as usize),
-        Err(error) => tracing::warn!(%error, "sem o HWND da janela principal"),
+        Ok(hwnd) => platform::exclude_from_capture(hwnd.0 as usize, excluded),
+        Err(error) => tracing::warn!(%error, "sem o HWND da janela"),
     }
     #[cfg(not(windows))]
-    let _ = window;
+    let _ = (window, excluded);
 }
