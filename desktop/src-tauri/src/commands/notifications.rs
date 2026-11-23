@@ -71,10 +71,11 @@ fn brings_to_front(answer: &serde_json::Value) -> bool {
     )
 }
 
-/// Liga ou desliga o ponto de não lido (a bolinha na bandeja e o selo na barra de tarefas).
+/// Troca o ponto do ícone (a bolinha na bandeja e o selo na barra de tarefas): nenhum, não lidas
+/// (vermelho) ou transmitindo (dourado).
 #[tauri::command]
-pub async fn set_unread_badge(app: AppHandle, unread: bool) -> Result<(), AppError> {
-    notifications::set_badge(&app, unread);
+pub async fn set_app_badge(app: AppHandle, badge: notifications::Badge) -> Result<(), AppError> {
+    notifications::set_badge(&app, badge);
     Ok(())
 }
 

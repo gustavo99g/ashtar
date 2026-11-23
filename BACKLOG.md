@@ -51,21 +51,15 @@ Bugs que saem assim que ficarem prontos, pelo auto-update, sem esperar a entrega
 - [x] No cartão do usuário (ADR 0020), "Mover para outra sala": entrou com as várias salas de voz (ADR 0026), junto do
       "Desconectar da voz" e do arrastar entre salas.
 
-## v0.8 — Moderação
-
-- [ ] A seção Moderação do cartão do usuário (silenciar o microfone de alguém e deixar surdo, para todos),
-      que está no canvas ("Menu do usuário — com ações") e ficou fora da v0.3: pede uma permissão nova e um
-      comando no servidor de voz.
-
 ## Mais adiante
 
-O aviso de conteúdo protegido está na v0.8 do roadmap (`## Screen Share`); as miniaturas foram adiantadas para a v0.2.4; Linux, depois da v1.0; sem versão para funcionalidades novas de voz.
+As miniaturas foram adiantadas para a v0.2.4 e o aviso de conteúdo protegido entrou na v0.8; Linux, depois da v1.0; sem versão para funcionalidades novas de voz.
 
-- [ ] Aviso de possível conteúdo protegido (frames totalmente pretos por vários segundos).
 - [ ] Suporte a Linux (risco principal: WebRTC no WebKitGTK) e versão web.
 - [ ] Qualquer funcionalidade nova de voz além do que já existe.
 - [ ] O overlay em jogos, desenhado no canvas e sem versão (a câmera entrou na v0.4).
 - [ ] `@todos`, silenciar com prazo e grupos privados com mais de duas pessoas (fora da v0.3).
+- [ ] Moderação nas ligações privadas e o "Jogando X" visível para os outros (fora da v0.8, 22/11).
 - [ ] Cópia dos arquivos (fotos, anexos, prévias e emojis) fora da VPS: o R2 como segunda implementação do
       `FileStore` (ADR 0031) ou uma cópia periódica de `data/files`, ou o snapshot do provedor. Adiado pelo Kid em
       20/11; até lá os arquivos ficam fora do backup.

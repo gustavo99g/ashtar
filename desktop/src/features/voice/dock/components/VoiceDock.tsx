@@ -1,10 +1,11 @@
-import { SourcePickerHost } from "@/features/screen-share";
+import { BlackShareWatch, SourcePickerHost } from "@/features/screen-share";
 import { ShareNotices } from "../../call/components/ShareNotices";
 import { ShareStartNotices } from "../../call/components/ShareStartNotices";
 import { WatchJanitor } from "../../call/components/WatchJanitor";
 import { useVoice } from "../../room/hooks/useVoice";
 import { useConnectedRoomName } from "../../room/hooks/useRoomName";
 import { DeviceNotices } from "./DeviceNotices";
+import { GameCard } from "./GameCard";
 import { MutedWarning } from "./MutedWarning";
 import { ShareHost } from "./ShareHost";
 import { TrayShare } from "./TrayShare";
@@ -23,6 +24,7 @@ export function VoiceDock() {
 	return (
 		<div className="shrink-0 px-2 pb-2">
 			<div className="flex flex-col rounded-xl border border-border bg-secondary">
+				<GameCard />
 				{room && <MutedWarning />}
 				{voiceChannelId && <VoiceConnection />}
 				<UserPanel />
@@ -39,6 +41,7 @@ export function VoiceDock() {
 				))}
 			{screenShare && <ShareNotices controller={screenShare} />}
 			{screenShare && <TrayShare controller={screenShare} />}
+			{room && screenShare && <BlackShareWatch controller={screenShare} />}
 			{room && <WatchJanitor />}
 			{room && <ShareStartNotices />}
 			{room && <DeviceNotices />}

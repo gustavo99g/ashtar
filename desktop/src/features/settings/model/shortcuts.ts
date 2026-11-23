@@ -4,7 +4,13 @@
  * Windows (`VK_*`) ou um botão do mouse, e os modificadores.
  */
 
-export type ShortcutId = "mute" | "deafen" | "ptt" | "answer" | "decline";
+export type ShortcutId =
+	| "mute"
+	| "deafen"
+	| "ptt"
+	| "answer"
+	| "decline"
+	| "screenshot";
 
 export type MouseButton = "middle" | "x1" | "x2";
 
@@ -31,6 +37,7 @@ export const SHORTCUT_IDS: readonly ShortcutId[] = [
 	"ptt",
 	"answer",
 	"decline",
+	"screenshot",
 ];
 
 export const SHORTCUT_NAMES: Record<ShortcutId, string> = {
@@ -39,6 +46,7 @@ export const SHORTCUT_NAMES: Record<ShortcutId, string> = {
 	ptt: "Pressionar para falar",
 	answer: "Atender ligação",
 	decline: "Recusar ou desligar",
+	screenshot: "Tirar print da transmissão",
 };
 
 /** `Ctrl+Shift+` e a letra. */
@@ -62,6 +70,7 @@ export const DEFAULT_SHORTCUTS: Shortcuts = {
 	ptt: null,
 	answer: ctrlShift("A"),
 	decline: ctrlShift("E"),
+	screenshot: ctrlShift("P"),
 };
 
 export function sameCombo(a: Combo, b: Combo): boolean {

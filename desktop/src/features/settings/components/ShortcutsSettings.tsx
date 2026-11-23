@@ -18,6 +18,8 @@ import { ShortcutKeys } from "./ShortcutKeys";
 
 const DESCRIPTIONS: Partial<Record<ShortcutId, string>> = {
 	ptt: "Segurando, seu microfone abre. Vale com o modo Pressionar para falar, em Voz e vídeo.",
+	screenshot:
+		"Copia a transmissão em foco (ou a que você assiste, ou a sua) para a área de transferência.",
 };
 
 export function ShortcutsSettings() {
@@ -55,6 +57,9 @@ export function ShortcutsSettings() {
 				{(["answer", "decline"] as const).map((id) => (
 					<ShortcutRow key={id} id={id} recorder={recorder} />
 				))}
+			</Group>
+			<Group title="Transmissão">
+				<ShortcutRow id="screenshot" recorder={recorder} />
 			</Group>
 		</div>
 	);

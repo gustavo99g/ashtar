@@ -1,8 +1,13 @@
-import { LogsSettings, ServerStatusSettings } from "@/features/admin";
+import {
+	AuditSettings,
+	LogsSettings,
+	ServerStatusSettings,
+} from "@/features/admin";
 import { ArchivedSettings } from "@/features/channels";
 import { EmojiSettings } from "@/features/emojis";
 import { ProfileSettings } from "@/features/identity";
 import { ShortcutsSettings } from "@/features/settings";
+import { ActivitySettings } from "@/features/activity";
 import { InvitesSettings } from "@/features/invites";
 import { MembersSettings } from "@/features/members";
 import { NotificationsSettings } from "@/features/notifications";
@@ -27,6 +32,10 @@ export function VoiceSettingsRoute() {
 
 export function ShortcutsSettingsRoute() {
 	return <ShortcutsSettings />;
+}
+
+export function ActivitySettingsRoute() {
+	return <ActivitySettings />;
 }
 
 export function NotificationsSettingsRoute() {
@@ -54,6 +63,10 @@ export function EmojisSettingsRoute() {
 
 export function LogsSettingsRoute() {
 	return <LogsSettings />;
+}
+
+export function AuditSettingsRoute() {
+	return <AuditSettings />;
 }
 
 export function ServerSettingsRoute() {

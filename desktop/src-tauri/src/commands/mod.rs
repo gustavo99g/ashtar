@@ -9,12 +9,15 @@
 //! - comandos só traduzem: validam a entrada, chamam `media::` e convertem o
 //!   resultado. Lógica de captura e de sessão não mora aqui.
 
+pub mod activity;
 pub mod app;
+pub mod black_watch;
 pub mod files;
 pub mod identity;
 pub mod notifications;
 pub mod presence;
 pub mod screen_share;
+pub mod screenshot;
 pub mod shortcuts;
 pub mod thumbnails;
 pub mod updater;

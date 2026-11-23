@@ -11,6 +11,7 @@ mod sink;
 
 pub mod audio;
 pub mod bitrate;
+pub mod black;
 #[cfg(test)]
 mod diagnostics;
 pub mod encoded;
@@ -19,6 +20,7 @@ pub mod leveler;
 pub mod platform;
 pub mod publisher;
 pub mod quality;
+pub mod screenshot;
 pub mod share;
 #[cfg(test)]
 mod share_e2e;

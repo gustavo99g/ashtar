@@ -1,4 +1,4 @@
-import { EyeIcon, HeadphoneOffIcon, MicOffIcon, VideoIcon } from "lucide-react";
+import { EyeIcon, VideoIcon } from "lucide-react";
 import { type ReactElement, useState } from "react";
 import { useMatch, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,7 @@ import {
 	ConnectionSection,
 	focusShare,
 	LiveBadge,
+	MuteMark,
 	RoomModeration,
 	useGuardedJoin,
 	UserVolume,
@@ -150,17 +151,7 @@ function MemberRow({
 						className="size-3.5 text-muted-foreground"
 					/>
 				)}
-				{member.deafened ? (
-					<HeadphoneOffIcon
-						aria-label="áudio desativado"
-						className="size-3.5 text-destructive-border"
-					/>
-				) : member.micOff ? (
-					<MicOffIcon
-						aria-label="microfone desativado"
-						className="size-3.5 text-destructive-border"
-					/>
-				) : null}
+				<MuteMark member={member} className="size-3.5" />
 				{member.sharing && <LiveBadge />}
 			</span>
 		</PopoverTrigger>
@@ -204,6 +195,8 @@ function MemberRow({
 						userId={member.id}
 						name={member.name}
 						roomId={roomId}
+						roomName={roomName}
+						member={member}
 						onDone={() => setOpen(false)}
 					/>
 				)}

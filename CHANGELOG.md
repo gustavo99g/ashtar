@@ -1,5 +1,23 @@
 # O que há de novo no Ashtar
 
+## 0.8.0
+
+- Jogando agora: o Ashtar reconhece o jogo aberto e mostra um cartão em cima dos controles do usuário, com o ícone, o nome, há quanto tempo e o Transmitir. Só você vê; ninguém mais fica sabendo o que você joga. O jogo é reconhecido pelos launchers do PC (Steam, Epic, Riot, EA, Ubisoft, Battle.net e GOG) e pela lista de jogos do Discord, e o cartão aparece assim que a janela do jogo está pronta para transmitir, mesmo se o jogo já estava aberto antes do Ashtar.
+- Transmitir pelo cartão: numa sala ou numa ligação, transmite a janela do jogo na hora, com as configurações da última transmissão. Fora da voz, escolha a sala na lista e ela já entra transmitindo.
+- Jogos com cliente e partida separados, como o League of Legends: a transmissão vai sozinha para a partida quando ela abre e volta para o cliente quando ela fecha, sem você mexer e sem tocar o som de parar. Quem estava assistindo continua assistindo.
+- Configurações › Atividade: liga e desliga o reconhecimento, mostra os jogos que já abriram neste PC, esconde um jogo do cartão e o "Adicionar jogo" para o que o Ashtar não reconhece sozinho.
+- Na lista de janelas da transmissão, a janela de um jogo aparece com o nome do jogo, no lugar do título que ele põe ("League of Legends" em vez de "League of Legends (TM) Client").
+- Moderar voz: uma permissão nova, que o dono dá em Membros. Quem tem pode silenciar, deixar surdo, desligar a câmera e encerrar a transmissão de alguém numa sala de voz, pela seção Moderação do cartão da pessoa. Quem foi silenciado não consegue se desmutar, nem pelo atalho, até ser liberado, e o mute dele fica vermelho com um escudo para todos. Nas ligações privadas nada muda.
+- Registro: Painel de controle › Registro mostra ao dono quem fez o quê, como moderação, cargos, permissões e canais, com filtros. As linhas com mais de um ano são apagadas.
+- Print da transmissão: Ctrl+Shift+P tira um print da transmissão que você está assistindo, ou da sua, e copia para colar em qualquer lugar. Em Voz e vídeo, "Salvar prints no computador" também guarda em Imagens\Ashtar. O atalho dá para trocar em Configurações › Atalhos.
+- "Sua transmissão está saindo preta": um filme com proteção ou um jogo em tela cheia exclusiva sai preto na captura, e agora o Ashtar avisa quem transmite, com o Trocar fonte. A legenda e os controles do player por cima não enganam o aviso.
+- Sons novos: começar e parar a sua transmissão, e ligar e desligar a câmera, cada um com a sua chave em Notificações.
+- A Câmera do painel "Voz conectada" agora liga e desliga a câmera.
+- Transmitindo, o ícone do Ashtar na bandeja e na barra de tarefas ganha uma bolinha dourada, no lugar da vermelha das não lidas.
+- Começar a transmitir não minimiza mais o Ashtar: só traz a janela escolhida para a frente.
+- Os botões Trocar, Detalhes e Pausar do popover da transmissão ganharam fundo, e a latência aparece em milissegundos inteiros.
+- Os avisos no canto contam o tempo com o Ashtar atrás de outra janela, como num segundo monitor, e só param com ele minimizado.
+
 ## 0.7.1
 
 - Assistir pela lista: passe o mouse em quem está AO VIVO na lista de salas, à esquerda, para ver o que a pessoa transmite (o que está sendo transmitido, a qualidade, há quanto tempo e quantos assistem) e clicar em Assistir. Fora da sala, você entra nela e a transmissão já abre em foco.

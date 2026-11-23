@@ -7,7 +7,7 @@
 //! As duas funções bloqueiam (o ícone de uma janela que não responde espera até 50 ms): chamar
 //! dentro de `spawn_blocking`.
 
-use std::{mem, ptr};
+use std::{collections::HashSet, mem, ptr};
 
 use windows_sys::Win32::{
     Foundation::{HWND, LPARAM, RECT},
@@ -50,6 +50,20 @@ pub fn list_windows() -> Vec<WindowEntry> {
                 icon: icon_data_url(hwnd),
             })
         })
+        .collect()
+}
+
+/// Os processos com alguma janela que entra no seletor, sem os ícones (o cartão do jogo pergunta a
+/// cada volta se o jogo já tem janela para transmitir, ADR 0033).
+pub fn shareable_window_pids() -> HashSet<u32> {
+    let own_pid = std::process::id();
+    // SAFETY: sem pré-condições; devolve nulo se não houver shell.
+    let shell = unsafe { GetShellWindow() };
+    collect_windows()
+        .into_iter()
+        .filter_map(|hwnd| facts(hwnd, own_pid, shell))
+        .filter(is_shareable)
+        .map(|facts| facts.process_id)
         .collect()
 }
 

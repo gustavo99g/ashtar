@@ -20,11 +20,16 @@ const HOME = paths.channel(DEFAULT_CHANNEL_ID);
 
 vi.mock("@/lib/tauri/commands", () => ({
 	// A ponta dos avisos, na moldura (`NotificationsBridge`).
-	setUnreadBadge: vi.fn(() => Promise.resolve()),
+	setAppBadge: vi.fn(() => Promise.resolve()),
 	onNotificationOpen: vi.fn(() => Promise.resolve(() => {})),
 	onNotificationAnswer: vi.fn(() => Promise.resolve(() => {})),
 	onSystemResumed: vi.fn(() => () => {}),
 	notificationRing: vi.fn(() => Promise.resolve()),
+	// O jogo aberto (`ActivitySync`): nenhum.
+	activityState: vi.fn(() => Promise.resolve(null)),
+	onActivityChanged: vi.fn(() => Promise.resolve(() => {})),
+	activityDetectableEtag: vi.fn(() => Promise.resolve(null)),
+	activitySetDetectable: vi.fn(() => Promise.resolve()),
 	login: vi.fn(),
 	accountMarker: vi.fn(),
 	checkForUpdate: vi.fn(() => Promise.resolve()),
@@ -46,7 +51,7 @@ function me(canViewPanel: boolean): MeResponse {
 		can_create_invite: canViewPanel,
 		can_view_panel: canViewPanel,
 		can_manage_channels: false,
-		can_move_members: false, can_manage_emojis: false, can_view_logs: false,
+		can_move_members: false, can_manage_emojis: false, can_view_logs: false, can_moderate_voice: false,
 	};
 }
 

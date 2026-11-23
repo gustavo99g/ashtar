@@ -49,6 +49,16 @@ async fn main() {
         }
     });
 
+    // A lista de jogos detectáveis do Discord, ao subir e uma vez por dia (ADR 0033).
+    let games = state.games.clone();
+    tokio::spawn(async move {
+        let mut every = tokio::time::interval(api::games::REFRESH_EVERY);
+        loop {
+            every.tick().await;
+            games.refresh().await;
+        }
+    });
+
     let app = api::app(state, policy);
 
     let listener = tokio::net::TcpListener::bind("127.0.0.1:3000")

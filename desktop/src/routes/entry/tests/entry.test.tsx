@@ -33,11 +33,16 @@ vi.mock("@/components/ui/toast", async (importOriginal) => ({
 
 vi.mock("@/lib/tauri/commands", () => ({
 	// A ponta dos avisos, na moldura (`NotificationsBridge`).
-	setUnreadBadge: vi.fn(() => Promise.resolve()),
+	setAppBadge: vi.fn(() => Promise.resolve()),
 	onNotificationOpen: vi.fn(() => Promise.resolve(() => {})),
 	onNotificationAnswer: vi.fn(() => Promise.resolve(() => {})),
 	onSystemResumed: vi.fn(() => () => {}),
 	notificationRing: vi.fn(() => Promise.resolve()),
+	// O jogo aberto (`ActivitySync`): nenhum.
+	activityState: vi.fn(() => Promise.resolve(null)),
+	onActivityChanged: vi.fn(() => Promise.resolve(() => {})),
+	activityDetectableEtag: vi.fn(() => Promise.resolve(null)),
+	activitySetDetectable: vi.fn(() => Promise.resolve()),
 	login: vi.fn(),
 	redeem: vi.fn(),
 	accountMarker: vi.fn(),

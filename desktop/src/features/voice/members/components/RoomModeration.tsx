@@ -1,11 +1,32 @@
 /*
- * "Mover para" e "Desconectar da voz" no cartão de quem está numa sala de voz (ADR 0026). Só para
- * quem tem "Mover membros" (`can_move_members`, o dono sempre tem), e nunca no próprio cartão: a
- * própria pessoa troca de sala clicando nela. A API manda a ordem para o app da pessoa, que troca
- * ou sai sozinho; aqui só se pede.
+ * A seção Moderação no cartão de quem está numa sala de voz (quadro "Moderação — na voz"). Com
+ * "Moderar voz" (v0.8, ADR 0034): Silenciar microfone e Deixar surdo (chaves), Desligar câmera (com
+ * ela ligada) e Encerrar transmissão (transmitindo, com a confirmação e o Shift para pular). Com
+ * "Mover membros" (ADR 0026): Mover para e Desconectar da voz. O dono sempre tem as duas. Nunca no
+ * próprio cartão, e ninguém modera o dono. A API manda as ordens para o app da pessoa; aqui só se
+ * pede.
  */
-import { ArrowRightLeftIcon, LogOutIcon, Volume2Icon } from "lucide-react";
-import { useState } from "react";
+import { QueryClientContext } from "@tanstack/react-query";
+import {
+	ArrowRightLeftIcon,
+	HeadphoneOffIcon,
+	LogOutIcon,
+	MicOffIcon,
+	ScreenShareOffIcon,
+	VideoOffIcon,
+	Volume2Icon,
+} from "lucide-react";
+import { type MouseEvent, useContext, useState } from "react";
+import { Button } from "@/components/ui/button";
+import {
+	Dialog,
+	DialogClose,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogTitle,
+} from "@/components/ui/dialog";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "@/components/ui/toast";
 import {
 	DropdownMenu,
@@ -15,12 +36,52 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { allChannels, useOptionalChannelLayout } from "@/features/channels";
 import { useOptionalMe } from "@/features/identity";
-import { disconnectMember, moveMember } from "@/lib/api";
+import {
+	disconnectMember,
+	moderateCameraOff,
+	moderateStopShare,
+	moveMember,
+	type Person,
+	setServerDeafen,
+	setServerMute,
+} from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 /** Se quem usa o app pode mover e desconectar os outros. */
 export function useCanMoveMembers(): boolean {
 	return useOptionalMe()?.can_move_members === true;
+}
+
+/** Se quem usa o app pode silenciar, deixar surdo, desligar a câmera e encerrar a transmissão. */
+export function useCanModerateVoice(): boolean {
+	return useOptionalMe()?.can_moderate_voice === true;
+}
+
+/**
+ * Se `userId` é o dono, pela lista de pessoas que a coluna já buscou (`GET /api/people`). Só lê o
+ * cache; sem ele, a API recusa do mesmo jeito.
+ */
+function useIsOwner(userId: string): boolean {
+	const client = useContext(QueryClientContext);
+	const people = client?.getQueryData<Person[]>(["chat", "people"]);
+	return people?.some((person) => person.id === userId && person.is_owner) === true;
+}
+
+/** O que a seção precisa saber de quem está no cartão. */
+export interface ModeratedMember {
+	camera?: boolean;
+	sharing?: boolean;
+	serverMuted?: boolean;
+	serverDeafened?: boolean;
+}
+
+function failed(what: string, error: unknown): void {
+	toast.add({
+		title: `Não deu para ${what}`,
+		description:
+			error instanceof Error ? error.message : "Tente de novo em instantes.",
+		data: { tone: "error" },
+	});
 }
 
 /**
@@ -72,19 +133,70 @@ export function RoomModeration({
 	userId,
 	name,
 	roomId,
+	roomName,
+	member = {},
 	onDone,
 }: {
 	userId: string;
 	name: string;
 	/** A sala em que a pessoa está agora. */
 	roomId: string;
+	/** O nome dela, para a confirmação de encerrar. */
+	roomName?: string;
+	/** A câmera, a tela e o que a moderação já impôs. */
+	member?: ModeratedMember;
 	/** Pediu: quem pôs a seção fecha o cartão. */
 	onDone?: () => void;
 }) {
 	const canMove = useCanMoveMembers();
+	const canModerate = useCanModerateVoice();
+	const isOwner = useIsOwner(userId);
 	const targets = useMoveTargets(roomId, userId);
 	const [busy, setBusy] = useState(false);
-	if (!canMove) return null;
+	// O estado novo aparece na hora; o `voice.participants` confirma.
+	const [muted, setMuted] = useState<boolean | null>(null);
+	const [deafened, setDeafened] = useState<boolean | null>(null);
+	const [confirmStop, setConfirmStop] = useState(false);
+	if ((!canMove && !canModerate) || isOwner) return null;
+	const isMuted = muted ?? member.serverMuted === true;
+	const isDeafened = deafened ?? member.serverDeafened === true;
+
+	function toggleMute(on: boolean) {
+		setMuted(on);
+		setServerMute(userId, on).catch((error: unknown) => {
+			setMuted(null);
+			failed(on ? `silenciar ${name}` : `liberar o microfone de ${name}`, error);
+		});
+	}
+
+	function toggleDeafen(on: boolean) {
+		setDeafened(on);
+		setServerDeafen(userId, on).catch((error: unknown) => {
+			setDeafened(null);
+			failed(on ? `desligar o áudio de ${name}` : `devolver o áudio de ${name}`, error);
+		});
+	}
+
+	function cameraOff() {
+		moderateCameraOff(userId)
+			.then(() => onDone?.())
+			.catch((error: unknown) => failed(`desligar a câmera de ${name}`, error));
+	}
+
+	function stopShare() {
+		setConfirmStop(false);
+		moderateStopShare(userId)
+			.then(() => onDone?.())
+			.catch((error: unknown) =>
+				failed(`encerrar a transmissão de ${name}`, error),
+			);
+	}
+
+	function askStop(event: MouseEvent) {
+		// Segurar Shift pula a pergunta, como no excluir.
+		if (event.shiftKey) stopShare();
+		else setConfirmStop(true);
+	}
 
 	function disconnect() {
 		setBusy(true);
@@ -105,9 +217,56 @@ export function RoomModeration({
 
 	return (
 		<section
-			aria-label="Sala de voz"
+			aria-label="Moderação"
 			className="flex flex-col gap-1 border-t border-border pt-3"
 		>
+			<span className="px-2 pb-1 text-[11px] font-bold tracking-[0.06em] text-muted-foreground uppercase">
+				Moderação
+			</span>
+			{canModerate && (
+				<>
+					<label className="flex h-8 cursor-pointer items-center gap-2 rounded-md px-2 text-[13px] text-foreground hover:bg-secondary">
+						<MicOffIcon aria-hidden="true" className="size-4" />
+						<span className="flex-1">Silenciar microfone</span>
+						<Switch
+							variant="blue"
+							checked={isMuted}
+							onCheckedChange={toggleMute}
+						/>
+					</label>
+					<label className="flex h-8 cursor-pointer items-center gap-2 rounded-md px-2 text-[13px] text-foreground hover:bg-secondary">
+						<HeadphoneOffIcon aria-hidden="true" className="size-4" />
+						<span className="flex-1">Deixar surdo</span>
+						<Switch
+							variant="blue"
+							checked={isDeafened}
+							onCheckedChange={toggleDeafen}
+						/>
+					</label>
+					{member.camera && (
+						<button
+							type="button"
+							onClick={cameraOff}
+							className="flex h-8 items-center gap-2 rounded-md px-2 text-left text-[13px] text-foreground hover:bg-secondary"
+						>
+							<VideoOffIcon aria-hidden="true" className="size-4" />
+							Desligar câmera
+						</button>
+					)}
+					{member.sharing && (
+						<button
+							type="button"
+							onClick={askStop}
+							className="flex h-8 items-center gap-2 rounded-md px-2 text-left text-[13px] text-destructive-text hover:bg-destructive-subtle"
+						>
+							<ScreenShareOffIcon aria-hidden="true" className="size-4" />
+							Encerrar transmissão
+						</button>
+					)}
+				</>
+			)}
+			{canMove && (
+				<>
 			<DropdownMenu>
 				<DropdownMenuTrigger
 					disabled={targets.length === 0}
@@ -143,6 +302,30 @@ export function RoomModeration({
 				<LogOutIcon aria-hidden="true" className="size-4" />
 				Desconectar da voz
 			</button>
+				</>
+			)}
+			<Dialog open={confirmStop} onOpenChange={setConfirmStop}>
+				<DialogContent>
+					<DialogTitle>Encerrar a transmissão de {name}?</DialogTitle>
+					<DialogDescription>
+						A tela de {name} sai do ar para todos
+						{roomName ? ` na ${roomName}` : " na sala"}. O microfone continua, e a
+						câmera também, se não for desligada à parte. {name} pode transmitir de
+						novo depois.
+					</DialogDescription>
+					<p className="text-xs text-muted-foreground">
+						Segure Shift para pular esta confirmação.
+					</p>
+					<DialogFooter>
+						<DialogClose render={<Button variant="ghost" />}>
+							Cancelar
+						</DialogClose>
+						<Button variant="danger" onClick={stopShare}>
+							Encerrar
+						</Button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
 		</section>
 	);
 }

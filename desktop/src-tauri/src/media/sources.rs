@@ -130,6 +130,17 @@ pub fn list_sources() -> Result<Vec<CaptureSource>, AppError> {
     Ok(sources)
 }
 
+/// Os processos com alguma janela que entra no seletor. Bloqueia: enumera as janelas.
+pub fn shareable_window_pids() -> std::collections::HashSet<u32> {
+    platform::shareable_window_pids()
+}
+
+/// O ícone de um `.exe` em PNG, até `size` pixels (o do jogo detectado, ADR 0033). Bloqueia: lê o
+/// disco.
+pub fn exe_icon_png(path: &str, size: u32) -> Option<Vec<u8>> {
+    platform::exe_icon_png(path, size)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

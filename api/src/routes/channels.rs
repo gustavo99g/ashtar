@@ -15,11 +15,13 @@ use ts_rs::TS;
 use super::auth::CurrentUser;
 use super::extract::ApiJson;
 use crate::AppState;
+use crate::audit::{self, AuditKind};
 use crate::chat::categories;
 use crate::chat::channels::{self, ChannelAccess, ChannelEdit, ChannelKind, ChannelView};
 use crate::chat::layout::{self, Archived, Layout, LayoutRequest};
 use crate::db::now;
 use crate::error::ApiError;
+use crate::identity::User;
 use crate::realtime::ServerEvent;
 use crate::voice;
 
@@ -100,6 +102,7 @@ pub async fn create(
     )
     .await?;
     changed(&state, Some(version));
+    log(&state, &user, "canais.criar", channel.name.clone(), None).await?;
     Ok((StatusCode::CREATED, Json(channel.into())))
 }
 
@@ -130,13 +133,40 @@ pub async fn update(
     Path(id): Path<String>,
     ApiJson(request): ApiJson<UpdateChannelRequest>,
 ) -> Result<Json<ChannelView>, ApiError> {
+    let old_name = audit::channel_name(&state.db, &id).await?;
     let edit = ChannelEdit {
         name: request.name.as_deref(),
         topic: request.topic.as_deref(),
         access: access_of(request.restricted, &request.member_ids),
     };
+    let access_changed = edit.access.is_some();
     let (channel, version) = channels::update(&state.db, &user, &id, edit).await?;
     changed(&state, version);
+    if let Some(old) = old_name.filter(|old| *old != channel.name) {
+        log(
+            &state,
+            &user,
+            "canais.renomear",
+            old,
+            Some(channel.name.clone()),
+        )
+        .await?;
+    }
+    if access_changed && version.is_some() {
+        let detail = if channel.restricted {
+            "Restrito"
+        } else {
+            "Aberto a todos"
+        };
+        log(
+            &state,
+            &user,
+            "canais.acesso",
+            channel.name.clone(),
+            Some(detail.into()),
+        )
+        .await?;
+    }
     if version.is_some() && channel.kind == ChannelKind::Voice {
         super::voice::remove_without_access(&state, &channel, &user).await?;
     }
@@ -153,6 +183,11 @@ pub async fn archive(
 ) -> Result<StatusCode, ApiError> {
     let voice_room = channels::get_open_voice(&state.db, &id).await.is_ok();
     let version = channels::archive(&state.db, &user, &id, now()).await?;
+    if version.is_some()
+        && let Some(name) = audit::channel_name(&state.db, &id).await?
+    {
+        log(&state, &user, "canais.arquivar", name, None).await?;
+    }
     if voice_room && version.is_some() {
         voice::delete_room_in_background(id);
     }
@@ -167,6 +202,11 @@ pub async fn unarchive(
     Path(id): Path<String>,
 ) -> Result<StatusCode, ApiError> {
     let version = channels::unarchive(&state.db, &user, &id).await?;
+    if version.is_some()
+        && let Some(name) = audit::channel_name(&state.db, &id).await?
+    {
+        log(&state, &user, "canais.desarquivar", name, None).await?;
+    }
     changed(&state, version);
     Ok(StatusCode::NO_CONTENT)
 }
@@ -234,4 +274,27 @@ pub async fn unarchive_category(
     let version = categories::unarchive(&state.db, &user, &id).await?;
     changed(&state, version);
     Ok(StatusCode::NO_CONTENT)
+}
+
+/// Grava no registro uma ação de canais, com o canal pelo nome.
+async fn log(
+    state: &AppState,
+    actor: &User,
+    action: &str,
+    place: String,
+    detail: Option<String>,
+) -> Result<(), ApiError> {
+    audit::record(
+        &state.db,
+        audit::Entry {
+            kind: AuditKind::Channels,
+            action,
+            actor,
+            target: None,
+            place: Some(place),
+            detail,
+        },
+        now(),
+    )
+    .await
 }

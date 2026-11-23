@@ -9,8 +9,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
 /// Restaura a janela `id` (se estiver minimizada) e a traz para a frente, com o foco.
 ///
 /// O Windows só deixa um app trocar o foco quando ele mesmo está em primeiro plano. No clique de
-/// "Transmitir" o Ashtar está; por isso a troca acontece no início da transmissão, antes de o app
-/// se minimizar. Devolve se o Windows aceitou dar o foco (restaurar funciona mesmo sem ele).
+/// "Transmitir" o Ashtar está; por isso a troca acontece no início da transmissão. Devolve se o Windows aceitou dar o foco (restaurar funciona mesmo sem ele).
 pub fn bring_to_front(id: u64) -> bool {
     let hwnd = HWND(id as usize as *mut _);
     // SAFETY: as três chamadas aceitam qualquer `HWND`, inclusive o de uma janela que fechou no

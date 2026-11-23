@@ -22,6 +22,10 @@ const buttonVariants = cva(
 					"bg-secondary text-secondary-foreground hover:bg-secondary-hover hover:text-foreground disabled:text-foreground-subtle",
 				outline:
 					"border-border-strong text-secondary-foreground hover:border-ring hover:bg-secondary hover:text-foreground disabled:border-border disabled:text-foreground-subtle",
+				// Com fundo e borda, para não sumir sobre um popover ou um painel (que já usam o
+				// fundo do secondary): o Trocar, o Detalhes e o Pausar da transmissão.
+				solid:
+					"border-border-strong bg-secondary-hover text-foreground hover:border-ring hover:bg-secondary-hover disabled:border-border disabled:text-foreground-subtle",
 				ghost:
 					"text-secondary-foreground hover:bg-secondary hover:text-foreground disabled:text-foreground-subtle",
 				danger:

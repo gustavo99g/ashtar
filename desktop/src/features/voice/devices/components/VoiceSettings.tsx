@@ -1,4 +1,4 @@
-import { UnplugIcon } from "lucide-react";
+import { FolderOpenIcon, UnplugIcon } from "lucide-react";
 import { type ReactNode, useId } from "react";
 import {
 	Select,
@@ -8,8 +8,10 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
 import { ShareDefaultsSection } from "@/features/screen-share";
 import { useSettingsStore } from "@/features/settings";
+import { openScreenshotDir } from "@/lib/tauri/commands";
 import { cn } from "@/lib/utils";
 import { CameraOptions } from "../../camera/components/CameraOptions";
 import {
@@ -68,6 +70,14 @@ export function VoiceSettings() {
 	const askBeforeSwitchRoom = useSettingsStore(
 		(state) => state.askBeforeSwitchRoom,
 	);
+	const saveScreenshots = useSettingsStore((state) => state.saveScreenshots);
+	const setSaveScreenshots = useSettingsStore(
+		(state) => state.setSaveScreenshots,
+	);
+	const screenshotSound = useSettingsStore(
+		(state) => state.roomSounds.screenshot,
+	);
+	const setRoomSound = useSettingsStore((state) => state.setRoomSound);
 	const setAskBeforeSwitchRoom = useSettingsStore(
 		(state) => state.setAskBeforeSwitchRoom,
 	);
@@ -139,6 +149,30 @@ export function VoiceSettings() {
 			</Section>
 			<Section title="Compartilhamento de tela">
 				<ShareDefaultsSection />
+			</Section>
+			<Section title="Prints" gap="gap-1">
+				<SettingSwitch
+					title="Salvar prints no computador"
+					description="Além de copiar, guarda cada print da transmissão em Imagens\Ashtar."
+					checked={saveScreenshots}
+					onCheckedChange={setSaveScreenshots}
+				/>
+				<SettingSwitch
+					title="Som do print"
+					description="Um clique de câmera curto ao tirar o print, no volume dos sons do app."
+					checked={screenshotSound}
+					onCheckedChange={(enabled) => setRoomSound("screenshot", enabled)}
+				/>
+				<div className="pt-2">
+					<Button
+						variant="outline"
+						size="sm"
+						onClick={() => void openScreenshotDir().catch(() => {})}
+					>
+						<FolderOpenIcon aria-hidden="true" />
+						Abrir pasta dos prints
+					</Button>
+				</div>
 			</Section>
 			<Section title="Ligações" gap="gap-1">
 				<SettingSwitch

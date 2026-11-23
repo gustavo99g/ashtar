@@ -4,13 +4,18 @@ import {
 	declineOrHangUp,
 	runCallAction,
 } from "@/features/calls";
-import { playPttSound } from "@/features/notifications";
+import { playPttSound, playRoomSound } from "@/features/notifications";
 import {
 	SHORTCUT_IDS,
 	type ShortcutId,
 	useShortcuts,
 } from "@/features/settings";
-import { setPushToTalkHeld, useInputChoice, useVoice } from "@/features/voice";
+import {
+	setPushToTalkHeld,
+	takeScreenshot,
+	useInputChoice,
+	useVoice,
+} from "@/features/voice";
 import { onShortcut, setShortcuts, shortcutInput } from "@/lib/tauri/commands";
 import { keyInput, mouseInput } from "./windowInput";
 
@@ -23,6 +28,7 @@ import { keyInput, mouseInput } from "./windowInput";
  * - Pressionar para falar: abre o portão enquanto está apertado (só vale no modo Pressionar para
  *   falar), com o clique, se ligado em Notificações.
  * - Atender e Recusar ou desligar: só fazem algo com uma ligação tocando, chamando ou no ar.
+ * - Tirar print da transmissão: a em foco, a assistida ou a própria (`takeScreenshot`).
  *
  * Com o Ashtar em foco, o gancho do Windows não recebe as teclas: a janela manda para o Rust cada
  * tecla e botão que vê, e o Rust trata como as do gancho (também na gravação de um atalho).
@@ -112,6 +118,11 @@ export function handleShortcut(
 			return;
 		case "decline":
 			runCallAction(declineOrHangUp);
+			return;
+		case "screenshot":
+			void takeScreenshot(voice.room, voice.screenShare).then((taken) => {
+				if (taken) playRoomSound("screenshot", { gap: false });
+			});
 			return;
 	}
 }

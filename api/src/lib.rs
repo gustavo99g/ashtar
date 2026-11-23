@@ -1,6 +1,7 @@
 //! A API do Ashtar como biblioteca: o servidor (`main.rs`) e o `admin`
 //! (`src/bin/admin.rs`) usam as mesmas regras e o mesmo banco.
 
+pub mod audit;
 pub mod avatar;
 pub mod calls;
 pub mod chat;
@@ -9,9 +10,11 @@ pub mod db;
 pub mod download;
 pub mod error;
 pub mod files;
+pub mod games;
 pub mod identity;
 pub mod limiter;
 pub mod logs;
+pub mod moderation;
 pub mod previews;
 pub mod realtime;
 pub mod routes;
@@ -72,6 +75,8 @@ pub struct AppState {
     pub disk_alerted_at: Arc<std::sync::atomic::AtomicI64>,
     /// As regras da busca das prévias de link (a VPS só vai a endereços públicos).
     pub previews: Arc<previews::Guard>,
+    /// A lista de jogos detectáveis do Discord, buscada uma vez por dia (ADR 0033).
+    pub games: Arc<games::DetectableGames>,
     /// A chave dos links curtos do vídeo, sorteada a cada vez que a API sobe (um link vale 10
     /// minutos: reiniciar só faz o app pedir outro).
     pub link_key: Arc<[u8; 32]>,
@@ -96,6 +101,7 @@ impl AppState {
             files: Arc::new(files::FileStore::from_env(&logs::data_dir_from_env())),
             disk_alerted_at: Arc::new(std::sync::atomic::AtomicI64::new(0)),
             previews: Arc::new(previews::Guard::default()),
+            games: Arc::new(games::DetectableGames::open(&logs::data_dir_from_env())),
             link_key: Arc::new({
                 let mut key = [0u8; 32];
                 getrandom::fill(&mut key).expect("o sistema deveria fornecer bytes aleatórios");
@@ -121,6 +127,9 @@ pub const FILE_MAINTENANCE_EVERY: std::time::Duration = std::time::Duration::fro
 /// 80%, avisa o dono (no máximo uma vez por dia).
 pub async fn maintain_files(state: &AppState) {
     let now = db::now();
+    if let Err(error) = audit::sweep(&state.db, now).await {
+        eprintln!("limpeza do registro: {error}");
+    }
     if let Err(error) = previews::sweep(&state.db, &state.files, now).await {
         eprintln!("limpeza das prévias: {error}");
     }
@@ -184,6 +193,22 @@ pub fn app(state: AppState, policy: Arc<ClientPolicy>) -> Router {
         )
         .route("/voice/move", post(routes::voice::move_member))
         .route("/voice/disconnect", post(routes::voice::disconnect_member))
+        .route(
+            "/voice/moderation/{id}/mute",
+            put(routes::moderation::mute).delete(routes::moderation::unmute),
+        )
+        .route(
+            "/voice/moderation/{id}/deafen",
+            put(routes::moderation::deafen).delete(routes::moderation::undeafen),
+        )
+        .route(
+            "/voice/moderation/{id}/camera-off",
+            post(routes::moderation::camera_off),
+        )
+        .route(
+            "/voice/moderation/{id}/stop-share",
+            post(routes::moderation::stop_share),
+        )
         .route("/auth/redeem", post(routes::auth::redeem))
         .route("/auth/login", post(routes::auth::login))
         .route("/me", get(routes::auth::me).patch(routes::auth::update_me))
@@ -285,6 +310,8 @@ pub fn app(state: AppState, policy: Arc<ClientPolicy>) -> Router {
         .route("/logs/{id}/entries", get(routes::logs::entries))
         .route("/logs/{id}/entry", get(routes::logs::entry))
         .route("/admin/status", get(routes::admin::status))
+        .route("/admin/audit", get(routes::admin::audit))
+        .route("/games/detectable", get(routes::games::detectable))
         .route("/files/{id}", get(routes::files::download))
         .route("/files/{id}/link", post(routes::files::link))
         .route("/files/{id}/stream", get(routes::files::stream))

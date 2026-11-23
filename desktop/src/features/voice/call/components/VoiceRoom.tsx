@@ -7,6 +7,7 @@ import { ErrorState } from "@/components/ui/states";
 import { useMe, useSession } from "@/features/identity";
 import { QuickInvite } from "@/features/invites";
 import {
+	BlackShareBand,
 	openSharePanel,
 	parseShareTrackName,
 	type ScreenShareController,
@@ -574,6 +575,7 @@ function OwnShareTile({
 			title={paused ? "Sua transmissão está pausada" : "Você está transmitindo"}
 			source={source.title}
 			preview={preview}
+			band={paused ? null : <BlackShareBand />}
 			action={
 				<div className="flex gap-2">
 					<Button

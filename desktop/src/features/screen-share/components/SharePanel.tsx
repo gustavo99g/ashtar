@@ -22,6 +22,7 @@ import {
 import type { Quality, ShareStats } from "@/lib/tauri/commands";
 import { cn } from "@/lib/utils";
 import { useNow } from "../hooks/useNow";
+import { BlackShareBand } from "./BlackShareWatch";
 import { useScreenShareState } from "../hooks/useScreenShareState";
 import { useShareControls } from "../hooks/useShareControls";
 import { useShareStatsHistory } from "../hooks/useShareStatsHistory";
@@ -123,7 +124,7 @@ function PanelBody({
 				</div>
 				<div className="flex items-center gap-1">
 					<Button
-						variant="secondary"
+						variant="solid"
 						className="h-9 text-sm font-medium"
 						onClick={() => {
 							onClose();
@@ -162,6 +163,7 @@ function PanelBody({
 							Sem imagem por enquanto.
 						</span>
 					)}
+					{!state.paused && <BlackShareBand />}
 					{state.paused && (
 						<span className="absolute inset-0 flex items-center justify-center bg-background/70 text-sm font-semibold text-foreground">
 							Pausada: nada está indo para quem assiste
@@ -216,7 +218,7 @@ function PanelBody({
 					{controls.failure && `Não deu para ajustar: ${controls.failure}`}
 				</span>
 				<Button
-					variant="secondary"
+					variant="solid"
 					className="h-10 text-sm"
 					disabled={controls.busy}
 					onClick={() =>

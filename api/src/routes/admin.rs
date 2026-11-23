@@ -4,12 +4,14 @@
 use std::path::Path;
 
 use axum::Json;
-use axum::extract::State;
-use serde::Serialize;
+use axum::extract::rejection::QueryRejection;
+use axum::extract::{Query, State};
+use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
 use super::auth::CurrentUser;
 use crate::AppState;
+use crate::audit::{self, AuditEntry, AuditKind};
 use crate::db::now;
 use crate::error::ApiError;
 use crate::voice;
@@ -66,6 +68,32 @@ pub struct BackupStatus {
     pub at: i64,
     #[ts(type = "number")]
     pub size: u64,
+}
+
+/// O filtro e a página do `GET /api/admin/audit`.
+#[derive(Debug, Deserialize)]
+pub struct AuditQuery {
+    /// Sem ele, tudo.
+    pub kind: Option<AuditKind>,
+    /// O id da última linha da página anterior.
+    pub before: Option<i64>,
+}
+
+/// `GET /api/admin/audit?kind=voice&before=123`: o registro do grupo, de 50 em 50, da linha mais
+/// nova para a mais velha (ADR 0034). Só o dono: não é uma permissão que se dá.
+pub async fn audit(
+    State(state): State<AppState>,
+    CurrentUser(user): CurrentUser,
+    query: Result<Query<AuditQuery>, QueryRejection>,
+) -> Result<Json<Vec<AuditEntry>>, ApiError> {
+    if !user.is_owner || !user.is_active() {
+        return Err(ApiError::Forbidden);
+    }
+    let Query(query) = query
+        .map_err(|_| ApiError::InvalidRequest("O pedido não está no formato esperado.".into()))?;
+    Ok(Json(
+        audit::list(&state.db, query.kind, query.before).await?,
+    ))
 }
 
 /// `GET /api/admin/status`.

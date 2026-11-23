@@ -6,6 +6,11 @@
 import type { QueryClient } from "@tanstack/react-query";
 import type { ServerEvent } from "@/lib/api";
 import type { RealtimeEventInfo } from "@/lib/realtime";
+import {
+	rememberModerated,
+	setImposed,
+	setModerationNotice,
+} from "../room/stores/moderationStore";
 import { setVoiceOrder } from "../room/stores/voiceOrderStore";
 import { voiceKeys } from "./queries";
 
@@ -20,6 +25,7 @@ export function handleVoiceRealtime(
 				voiceKeys.participants(event.channel_id),
 				event.participants,
 			);
+			rememberModerated(event.participants);
 			break;
 		case "voice.moved":
 			setVoiceOrder({
@@ -34,6 +40,13 @@ export function handleVoiceRealtime(
 				byName: event.by_name,
 				noAccess: event.reason === "no_access",
 			});
+			break;
+		case "voice.moderated":
+			// Silenciar e deixar surdo não têm aviso: só o estado muda (e o ícone, com o escudo).
+			setImposed(event.server_muted, event.server_deafened);
+			if (event.action === "camera_off" || event.action === "stop_share") {
+				setModerationNotice({ action: event.action, byName: event.by_name });
+			}
 			break;
 		case "ready":
 			// O que mudou enquanto o socket estava fora não veio por evento. No primeiro `ready`,
