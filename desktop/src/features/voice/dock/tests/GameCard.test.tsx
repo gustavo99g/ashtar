@@ -25,16 +25,13 @@ vi.mock("@/features/channels", () => ({
 		{ id: "sala-2", name: "Jogos", kind: "voice", restricted: false },
 		{ id: "texto", name: "geral", kind: "text", restricted: false },
 		{
-			id: "fechada",
-			name: "Fechada",
+			id: "privada",
+			name: "Privada",
 			kind: "voice",
 			restricted: true,
 			member_ids: [],
 		},
 	],
-}));
-vi.mock("@/features/identity", () => ({
-	useOptionalMe: () => ({ user: { id: "eu" } }),
 }));
 vi.mock("@/lib/tauri/commands", async (importOriginal) => ({
 	...(await importOriginal<object>()),
@@ -185,10 +182,12 @@ describe("GameCard", () => {
 		const { rerender } = renderCard();
 		await userEvent.click(screen.getByRole("button", { name: "Transmitir" }));
 
-		// Só as salas de voz em que a pessoa pode entrar, com quantos estão nelas.
+		// As salas de voz da lista, com quantos estão nelas. A restrita também: a lista só traz as
+		// que a pessoa acessa.
 		expect(await screen.findByText("2 pessoas")).toBeInTheDocument();
-		expect(screen.getByText("vazia")).toBeInTheDocument();
-		expect(screen.queryByText("Fechada")).not.toBeInTheDocument();
+		expect(screen.getAllByText("vazia")).toHaveLength(2);
+		expect(screen.getByText("Privada")).toBeInTheDocument();
+		expect(screen.queryByText("geral")).not.toBeInTheDocument();
 
 		await userEvent.click(screen.getByRole("button", { name: /Jogos/ }));
 		expect(join).toHaveBeenCalledWith("sala-2");

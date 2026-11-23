@@ -24,7 +24,6 @@ import {
 import { toast } from "@/components/ui/toast";
 import { playTime, useCurrentGame } from "@/features/activity";
 import { allChannels, useOptionalChannelLayout } from "@/features/channels";
-import { useOptionalMe } from "@/features/identity";
 import {
 	type ScreenShareController,
 	shareProcessWindow,
@@ -34,7 +33,6 @@ import {
 import { paths } from "@/lib/paths";
 import { type GameView, setGameHidden } from "@/lib/tauri/commands";
 import { cn } from "@/lib/utils";
-import { roomAllows } from "../../members/components/RoomModeration";
 import { useRoomOccupancy } from "../../members/hooks/useRoomOccupancy";
 import { useVoice } from "../../room/hooks/useVoice";
 
@@ -173,14 +171,11 @@ function RoomsButton({ game, waiting }: { game: GameView; waiting: boolean }) {
 	const [open, setOpen] = useState(false);
 	const { join } = useVoice();
 	const layout = useOptionalChannelLayout();
-	const me = useOptionalMe();
 	const occupancy = useRoomOccupancy();
+	// A lista já vem só com as salas que a pessoa acessa: as restritas em que ela está e, para
+	// quem gerencia os canais, todas (ADR 0028).
 	const rooms = layout
-		? allChannels(layout).filter(
-				(channel) =>
-					channel.kind === "voice" &&
-					(!me || roomAllows(channel, me.user.id)),
-			)
+		? allChannels(layout).filter((channel) => channel.kind === "voice")
 		: [];
 	const counts = new Map<string, number>();
 	for (const place of occupancy.values()) {
