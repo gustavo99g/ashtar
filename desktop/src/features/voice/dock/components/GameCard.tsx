@@ -28,6 +28,7 @@ import {
 	type ScreenShareController,
 	shareProcessWindow,
 	useNow,
+	windowOfProcess,
 	useScreenShareState,
 } from "@/features/screen-share";
 import { paths } from "@/lib/paths";
@@ -63,13 +64,28 @@ function failed(description: string): void {
 	});
 }
 
+/**
+ * O processo do jogo que tem a janela para transmitir: o mais novo dos processos abertos dele que
+ * tem uma. O do cartão pode ser um sem janela (o `LeagueClient.exe` do League of Legends, ou o que
+ * o Ashtar achou primeiro ao abrir com o jogo já aberto).
+ */
+async function gameWindowPid(
+	controller: ScreenShareController,
+	game: GameView,
+): Promise<number> {
+	const sources = await controller.listSources();
+	const pids = game.family.length > 0 ? game.family : [game.pid];
+	return pids.find((pid) => windowOfProcess(sources, pid)) ?? game.pid;
+}
+
 /** Transmite a janela do jogo; um erro vira o aviso do canto. */
 async function shareGame(
 	controller: ScreenShareController,
 	game: GameView,
 ): Promise<void> {
 	try {
-		const found = await shareProcessWindow(controller, game.pid);
+		const pid = await gameWindowPid(controller, game);
+		const found = await shareProcessWindow(controller, pid);
 		if (!found) failed(`A janela de ${game.name} não está na lista de janelas.`);
 	} catch (error) {
 		failed(
@@ -91,7 +107,7 @@ export function GameCard() {
 	// A voz conectou depois do Transmitir de fora dela: começa agora.
 	useEffect(() => {
 		if (pending === null || !room || !screenShare || !game) return;
-		if (game.pid !== pending) {
+		if (game.pid !== pending && !game.family.includes(pending)) {
 			usePendingGameShare.setState({ pid: null });
 			return;
 		}
@@ -106,8 +122,11 @@ export function GameCard() {
 
 	if (!game) return null;
 
+	const sharedPid =
+		share.status === "active" ? (share.source.processId ?? null) : null;
 	const sharingGame =
-		share.status === "active" && share.source.processId === game.pid;
+		sharedPid !== null &&
+		(sharedPid === game.pid || game.family.includes(sharedPid));
 	const waiting = pending === game.pid || share.status === "starting";
 
 	return (

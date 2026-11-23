@@ -126,6 +126,19 @@ describe("GameCard", () => {
 		expect(request.audio).toEqual({ mode: "application", processId: 42 });
 	});
 
+	it("o processo do cartão sem janela: transmite a do outro processo do jogo", async () => {
+		// O LeagueClient.exe (40) não tem janela; o LeagueClientUx.exe (42) tem.
+		setCurrentGame({ ...GAME, pid: 40, family: [40, 42] });
+		const { controller } = voice({ inRoom: true });
+		renderCard();
+		await userEvent.click(screen.getByRole("button", { name: "Transmitir" }));
+		await waitFor(() => expect(controller.start).toHaveBeenCalledTimes(1));
+		const [request] = controller.start.mock.calls[0] as unknown as [
+			{ source: CaptureSource },
+		];
+		expect(request.source).toBe(GAME_WINDOW);
+	});
+
 	it("já transmitindo outra coisa, troca a fonte sem parar", async () => {
 		const { controller } = voice({
 			inRoom: true,
