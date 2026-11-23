@@ -109,7 +109,7 @@ export function GameCard() {
 	const waiting = pending === game.pid || share.status === "starting";
 
 	return (
-		<div className="flex items-center gap-2.5 border-b border-border px-2.5 py-2.5">
+		<div className="flex items-start gap-2.5 border-b border-border px-2.5 py-2.5">
 			<GameIcon game={game} />
 			<div className="flex min-w-0 flex-1 flex-col gap-px">
 				<span className="text-[10px] leading-tight font-bold tracking-[0.06em] text-muted-foreground uppercase">
@@ -131,21 +131,21 @@ export function GameCard() {
 				<span className="text-[11px] text-muted-foreground">
 					{playTime(game.startedMs, now)}
 				</span>
+				{!sharingGame &&
+					(room && screenShare ? (
+						<Button
+							size="sm"
+							disabled={waiting}
+							className="mt-1.5 h-7 w-full bg-gold px-2.5 text-gold-foreground hover:bg-gold/90"
+							onClick={() => void shareGame(screenShare, game)}
+						>
+							<MonitorUpIcon aria-hidden="true" />
+							Transmitir
+						</Button>
+					) : (
+						<RoomsButton game={game} waiting={waiting || !!voiceChannelId} />
+					))}
 			</div>
-			{!sharingGame &&
-				(room && screenShare ? (
-					<Button
-						size="sm"
-						disabled={waiting}
-						className="shrink-0 bg-gold px-2.5 text-gold-foreground hover:bg-gold/90"
-						onClick={() => void shareGame(screenShare, game)}
-					>
-						<MonitorUpIcon aria-hidden="true" />
-						Transmitir
-					</Button>
-				) : (
-					<RoomsButton game={game} waiting={waiting || !!voiceChannelId} />
-				))}
 			<GameMenu game={game} />
 		</div>
 	);
@@ -192,14 +192,14 @@ function RoomsButton({ game, waiting }: { game: GameView; waiting: boolean }) {
 			<PopoverTrigger
 				disabled={waiting}
 				className={cn(
-					"inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md bg-gold px-2.5 text-xs font-semibold text-gold-foreground hover:bg-gold/90",
+					"mt-1.5 inline-flex h-7 w-full items-center justify-center gap-1.5 rounded-md bg-gold px-2.5 text-xs font-semibold text-gold-foreground hover:bg-gold/90",
 					"disabled:pointer-events-none disabled:opacity-60",
 				)}
 			>
 				<MonitorUpIcon aria-hidden="true" className="size-4" />
 				Transmitir
 			</PopoverTrigger>
-			<PopoverContent side="top" align="end" className="w-60 gap-1 p-1.5">
+			<PopoverContent side="top" align="start" className="w-60 gap-1 p-1.5">
 				<span className="px-2 pt-1 pb-1.5 text-[11px] font-bold tracking-[0.06em] text-muted-foreground uppercase">
 					Transmitir em
 				</span>
@@ -214,7 +214,7 @@ function RoomsButton({ game, waiting }: { game: GameView; waiting: boolean }) {
 						<button
 							key={room.id}
 							type="button"
-							className="flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px] text-foreground hover:bg-secondary"
+							className="group/room flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px] text-foreground transition-colors hover:bg-accent focus-visible:bg-accent focus-visible:outline-hidden"
 							onClick={() => {
 								usePendingGameShare.setState({ pid: game.pid });
 								join(room.id);
@@ -223,7 +223,7 @@ function RoomsButton({ game, waiting }: { game: GameView; waiting: boolean }) {
 						>
 							<Volume2Icon
 								aria-hidden="true"
-								className="size-4 shrink-0 text-muted-foreground"
+								className="size-4 shrink-0 text-muted-foreground group-hover/room:text-gold"
 							/>
 							<span className="min-w-0 flex-1 truncate">{room.name}</span>
 							<span className="text-[11px] text-muted-foreground">
