@@ -1,5 +1,10 @@
 # O que há de novo no Ashtar
 
+## 0.8.1
+
+- Transmitir com o encoder da placa de vídeo nas AMD da série RX 7000: a imagem saía preta ou embaralhada para quem assistia.
+- O print do Windows (Win + Shift + S) e o OBS voltam a mostrar o Ashtar. Ele só fica fora das capturas enquanto você transmite uma tela inteira.
+
 ## 0.8.0
 
 - Jogando agora: o Ashtar reconhece o jogo aberto e mostra um cartão em cima dos controles do usuário, com o ícone, o nome, há quanto tempo e o Transmitir. Só você vê; ninguém mais fica sabendo o que você joga. O jogo é reconhecido pelos launchers do PC (Steam, Epic, Riot, EA, Ubisoft, Battle.net e GOG) e pela lista de jogos do Discord, e o cartão aparece assim que a janela do jogo está pronta para transmitir, mesmo se o jogo já estava aberto antes do Ashtar.
