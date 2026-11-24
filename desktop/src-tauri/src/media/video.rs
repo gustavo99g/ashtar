@@ -284,10 +284,20 @@ pub fn align_for_hardware((width, height): (u32, u32)) -> (u32, u32) {
     ((width & !15).max(16), (height & !15).max(16))
 }
 
+/// O menor tamanho de saída. Uma janela minúscula (o cliente do League of Legends ainda abrindo
+/// volta com 160x16) vai com bordas neste tamanho: os encoders da placa recusam tamanhos assim, e
+/// a transmissão caía no plano B à toa.
+pub const MIN_OUTPUT: (u32, u32) = (320, 180);
+
 /// O tamanho de saída da transmissão para uma fonte de `source` pixels no `format`: o
-/// [`fit_in_box`] e, com o encoder da placa, o [`align_for_hardware`].
+/// [`fit_in_box`], no mínimo [`MIN_OUTPUT`] (sem passar do `format`), e, com o encoder da placa,
+/// o [`align_for_hardware`].
 pub fn output_size(source: (u32, u32), format: VideoFormat, hardware: bool) -> (u32, u32) {
-    let size = fit_in_box(source.0, source.1, format.max_width, format.max_height);
+    let (width, height) = fit_in_box(source.0, source.1, format.max_width, format.max_height);
+    let size = (
+        width.max(MIN_OUTPUT.0.min(format.max_width)),
+        height.max(MIN_OUTPUT.1.min(format.max_height)),
+    );
     if hardware {
         align_for_hardware(size)
     } else {
@@ -478,6 +488,25 @@ mod tests {
         assert_eq!(output_size((1920, 1080), format, true), (1920, 1072));
         assert_eq!(output_size((1920, 1080), format, false), (1920, 1080));
         assert_eq!(output_size((3840, 2160), format, false), (1920, 1080));
+    }
+
+    #[test]
+    fn uma_janela_minuscula_sai_no_tamanho_minimo() {
+        let format = VideoFormat {
+            max_width: 1920,
+            max_height: 1080,
+            fps: 60,
+            bitrate_bps: 8_000_000,
+        };
+        assert_eq!(output_size((160, 16), format, true), (320, 176));
+        assert_eq!(output_size((160, 16), format, false), (320, 180));
+        assert_eq!(output_size((1600, 16), format, false), (1600, 180));
+        let tiny = VideoFormat {
+            max_width: 256,
+            max_height: 144,
+            ..format
+        };
+        assert_eq!(output_size((100, 100), tiny, false), (256, 144));
     }
 
     #[test]
