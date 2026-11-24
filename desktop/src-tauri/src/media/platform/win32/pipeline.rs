@@ -44,7 +44,7 @@ use crate::media::encoded::{EncodedFrame, PacketSink, RawFrame, VideoPacket};
 use crate::media::encoder_memory::{order, EncoderMemory, HardwarePath};
 use crate::media::sources::SourceRef;
 use crate::media::video::{
-    align_for_hardware, fit_in_box, EncoderKind, EncoderPreference, VideoCommand, VideoConfig,
+    output_size, EncoderKind, EncoderPreference, ResizeSettle, VideoCommand, VideoConfig,
     VideoControl, VideoFormat, VideoStats, RESEND_AFTER,
 };
 use crate::media::{CaptureHandle, OnEnd, SinkStatus};
@@ -174,6 +174,8 @@ struct Pipeline {
     /// A próxima textura do anel.
     slot: usize,
     last_sent: Option<Instant>,
+    /// A janela mudou de tamanho: o encoder é refeito no tamanho novo quando ela parar.
+    resize: ResizeSettle,
 }
 
 impl Pipeline {
@@ -205,6 +207,7 @@ impl Pipeline {
             keyframe_pending: true,
             slot: 0,
             last_sent: None,
+            resize: ResizeSettle::default(),
         })
     }
 
@@ -336,6 +339,7 @@ impl Pipeline {
         self.has_image = false;
         self.keyframe_pending = true;
         self.last_sent = None;
+        self.resize.clear();
         Ok(())
     }
 
@@ -394,6 +398,17 @@ impl Pipeline {
                 self.format.fps,
             )?;
             self.has_image = false;
+            let wanted = output_size(self.capture.size(), self.format, !self.force_software);
+            self.resize
+                .changed(wanted, self.converter.output_size(), now);
+        }
+        if self.resize.due(now) {
+            tracing::info!(
+                target: "media",
+                tamanho = %format!("{}x{}", self.capture.size().0, self.capture.size().1),
+                "a janela mudou de tamanho: o encoder acompanha"
+            );
+            self.rebuild()?;
         }
 
         let converter = &self.converter;
@@ -480,15 +495,9 @@ fn build_output(
     force_software: bool,
     stats: &VideoStats,
 ) -> Result<(Converter, Output), AppError> {
-    let (width, height) = capture.size();
-    let size = fit_in_box(width, height, format.max_width, format.max_height);
     // Com o encoder da placa, o tamanho vai em múltiplos de 16 (ver `align_for_hardware`). Se a
     // placa não tiver encoder, o plano B recebe o mesmo tamanho, que também serve para ele.
-    let size = if force_software {
-        size
-    } else {
-        align_for_hardware(size)
-    };
+    let size = output_size(capture.size(), format, !force_software);
     let converter = Converter::new(gpu, capture.size(), size, OutputFormat::Nv12, format.fps)?;
     stats.set_size(size.0, size.1);
 

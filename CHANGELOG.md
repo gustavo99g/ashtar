@@ -1,5 +1,9 @@
 # O que há de novo no Ashtar
 
+## 0.8.6
+
+- Quando a janela transmitida muda de tamanho, a transmissão acompanha assim que ela para de mudar. Antes, o cliente do League of Legends voltando depois da partida podia deixar a transmissão em baixa resolução até o fim, mesmo com a prévia normal.
+
 ## 0.8.5
 
 - Nas placas AMD em que o encoder do Windows trava, como a RX 7600, o Ashtar agora fala direto com o encoder da AMD antes de ir para o processador. A transmissão continua na placa de vídeo e pesa menos no jogo. Quando isso acontece, o Ashtar lembra da placa e, nas próximas transmissões, já começa pelo caminho que funciona.
