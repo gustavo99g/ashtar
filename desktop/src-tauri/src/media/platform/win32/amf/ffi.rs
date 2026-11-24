@@ -313,7 +313,19 @@ impl<T> Ref<T> {
     /// `ptr` é um objeto do AMF vivo, com uma referência que passa a ser desta `Ref`, e o vtable
     /// dele começa pelo [`StorageVtbl`].
     pub unsafe fn new(ptr: *mut T) -> Option<Self> {
-        (!ptr.is_null()).then_some(Self { ptr })
+        if ptr.is_null() {
+            return None;
+        }
+        // Um objeto sem vtable não é um objeto do AMF: chamar qualquer função dele derruba o app
+        // (visto na transmissão pelo AMF, logo depois de abrir o encoder). Fica de fora, e o
+        // log diz qual chamada devolveu isso.
+        // SAFETY: `ptr` não é nulo e, pelo contrato, aponta para um objeto que começa por um
+        // ponteiro.
+        if unsafe { *(ptr as *const *const c_void) }.is_null() {
+            tracing::warn!(target: "media", tipo = std::any::type_name::<T>(), "o AMF devolveu um objeto sem vtable; ignorado");
+            return None;
+        }
+        Some(Self { ptr })
     }
 
     pub fn as_ptr(&self) -> *mut T {
