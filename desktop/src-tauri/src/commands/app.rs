@@ -90,6 +90,52 @@ pub async fn set_hardware_acceleration(app: AppHandle, enabled: bool) -> Result<
     Ok(())
 }
 
+/// Põe a janela em tela cheia (ou tira), para a tela cheia da transmissão.
+///
+/// Além da tela cheia do Tauri, avisa a barra de tarefas do Windows (`MarkFullscreenWindow`). Sem
+/// o aviso, ela ficava por cima da parte de baixo da tela cheia a partir da segunda vez no mesmo
+/// monitor: o Windows só reconhecia a janela como tela cheia na primeira.
+///
+/// Síncrono de propósito: assim roda na thread principal, onde o COM da janela já está pronto.
+#[tauri::command]
+pub fn set_stage_fullscreen(app: AppHandle, on: bool) -> Result<(), AppError> {
+    let window = app
+        .get_webview_window("main")
+        .ok_or_else(|| AppError::Internal("sem a janela principal".into()))?;
+    window
+        .set_fullscreen(on)
+        .map_err(|error| AppError::Internal(format!("tela cheia: {error}")))?;
+    #[cfg(windows)]
+    match window.hwnd() {
+        Ok(hwnd) => {
+            if let Err(error) = mark_fullscreen(hwnd.0, on) {
+                tracing::warn!(%error, on, "a barra de tarefas não aceitou o aviso de tela cheia");
+            }
+        }
+        Err(error) => tracing::warn!(%error, "sem o HWND da janela"),
+    }
+    Ok(())
+}
+
+/// Diz à barra de tarefas que a janela `hwnd` está (ou não) em tela cheia, para ela ficar atrás.
+#[cfg(windows)]
+fn mark_fullscreen(hwnd: *mut std::ffi::c_void, on: bool) -> windows::core::Result<()> {
+    use windows::Win32::Foundation::HWND;
+    use windows::Win32::System::Com::{
+        CoCreateInstance, CoInitializeEx, CLSCTX_INPROC_SERVER, COINIT_APARTMENTTHREADED,
+    };
+    use windows::Win32::UI::Shell::{ITaskbarList2, TaskbarList};
+
+    // SAFETY: chamadas COM na thread principal; o `CoInitializeEx` só garante o COM (se já estiver
+    // pronto, ele devolve S_FALSE ou RPC_E_CHANGED_MODE, que servem). `hwnd` é a janela viva do app.
+    unsafe {
+        let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
+        let list: ITaskbarList2 = CoCreateInstance(&TaskbarList, None, CLSCTX_INPROC_SERVER)?;
+        list.HrInit()?;
+        list.MarkFullscreenWindow(HWND(hwnd), on)
+    }
+}
+
 /// Fecha e abre o app de novo (para a aceleração de hardware valer).
 #[tauri::command]
 pub fn restart_app(app: AppHandle) {
