@@ -2,8 +2,8 @@
 
 ## 0.8.6
 
-- Quando a janela transmitida muda de tamanho, a transmissão acompanha assim que ela para de mudar. Antes, o cliente do League of Legends voltando depois da partida podia deixar a transmissão em baixa resolução até o fim, mesmo com a prévia normal.
-- Transmitindo o League of Legends, a transmissão podia ficar parada na última imagem da partida em vez de voltar para o cliente. Agora ela acaba assim que a janela da partida fecha e volta no cliente.
+- A transmissão acompanha a janela quando ela muda de tamanho, sem ficar em baixa resolução.
+- Quando o jogo troca de janela, a transmissão não fica mais parada na última imagem.
 
 ## 0.8.5
 
