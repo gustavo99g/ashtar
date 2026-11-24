@@ -11,7 +11,7 @@ use windows::core::{w, Interface, PCWSTR};
 use windows::Win32::Graphics::Direct3D11::ID3D11Texture2D;
 
 use super::ffi::{
-    check, factory, AmfResult, AmfVariant, Buffer, Component, Context, Data, Ref, Surface,
+    check, factory, step, AmfResult, AmfVariant, Buffer, Component, Context, Data, Ref, Surface,
     AMF_DX11_0, AMF_EOF, AMF_INPUT_FULL, AMF_NEED_MORE_INPUT, AMF_OK, AMF_REPEAT, AMF_SURFACE_NV12,
     IID_AMF_BUFFER,
 };
@@ -33,6 +33,9 @@ const RATE_CONTROL_CBR: i64 = 1;
 const PICTURE_TYPE_IDR: i64 = 2;
 const OUTPUT_DATA_TYPE_IDR: i64 = 0;
 
+/// Quantas das primeiras entregas vão passo a passo para o log (ver [`step`]).
+const TRACED_SUBMITS: u32 = 3;
+
 pub struct AmfEncoder {
     // A ordem importa: o componente é solto antes do contexto em que foi criado.
     component: Ref<Component>,
@@ -44,6 +47,8 @@ pub struct AmfEncoder {
     /// O SPS e o PPS que o encoder mandou, para o IDR que vier sem eles (`h264.rs`).
     params: ParamSets,
     logged: u32,
+    /// Quantas imagens já foram entregues: as primeiras vão passo a passo para o `debug`.
+    submits: u32,
 }
 
 impl AmfEncoder {
@@ -55,6 +60,7 @@ impl AmfEncoder {
         let (context, component) = unsafe {
             let vtbl = &*(*factory).vtbl;
             let mut context = std::ptr::null_mut();
+            step("CreateContext");
             check(
                 "CreateContext",
                 (vtbl.create_context)(factory, &mut context),
@@ -62,11 +68,13 @@ impl AmfEncoder {
             let context = Ref::new(context)
                 .ok_or_else(|| AppError::VideoCapture("CreateContext sem o contexto".into()))?;
             let ctx_vtbl = &*(*context.as_ptr()).vtbl;
+            step("InitDX11");
             check(
                 "InitDX11",
                 (ctx_vtbl.init_dx11)(context.as_ptr(), gpu.device().as_raw(), AMF_DX11_0),
             )?;
             let mut component = std::ptr::null_mut();
+            step("CreateComponent");
             check(
                 "CreateComponent",
                 (vtbl.create_component)(factory, context.as_ptr(), ENCODER_ID, &mut component),
@@ -81,6 +89,7 @@ impl AmfEncoder {
         // SAFETY: o componente é vivo e as dimensões vêm das configurações (alinhadas em 16).
         unsafe {
             let vtbl = &*(*component.as_ptr()).vtbl;
+            step("AMFComponent::Init");
             check(
                 "AMFComponent::Init",
                 (vtbl.init)(
@@ -110,6 +119,7 @@ impl AmfEncoder {
             keyframe_pending: Cell::new(true),
             params: ParamSets::default(),
             logged: 0,
+            submits: 0,
         })
     }
 
@@ -121,6 +131,13 @@ impl AmfEncoder {
     /// Entrega uma textura NV12 ao encoder, com o horário da imagem (100 ns). Devolve `false` se
     /// o encoder estava cheio e não aceitou: a imagem se perde, e o `poll` abre espaço.
     pub fn submit(&mut self, texture: &ID3D11Texture2D, time: i64) -> Result<bool, AppError> {
+        let traced = self.submits < TRACED_SUBMITS;
+        self.submits = self.submits.saturating_add(1);
+        let trace = |what: &str| {
+            if traced {
+                step(what);
+            }
+        };
         // SAFETY: a textura é do mesmo dispositivo dado ao contexto (`InitDX11`), e o anel do
         // conversor garante que ela não é reescrita enquanto o encoder a lê. A superfície criada
         // é de uma `Ref`, que a solta depois do `SubmitInput` (o encoder guarda a própria
@@ -128,6 +145,7 @@ impl AmfEncoder {
         unsafe {
             let ctx_vtbl = &*(*self.context.as_ptr()).vtbl;
             let mut surface = std::ptr::null_mut();
+            trace("CreateSurfaceFromDX11Native");
             check(
                 "CreateSurfaceFromDX11Native",
                 (ctx_vtbl.create_surface_from_dx11_native)(
@@ -141,18 +159,22 @@ impl AmfEncoder {
                 AppError::VideoCapture("CreateSurfaceFromDX11Native sem a superfície".into())
             })?;
             let data_vtbl = &*(*surface.as_ptr()).vtbl;
+            trace("SetPts/SetDuration");
             (data_vtbl.set_pts)(surface.as_ptr().cast(), time);
             (data_vtbl.set_duration)(surface.as_ptr().cast(), self.frame_duration);
 
             let keyframe = self.keyframe_pending.get();
             if keyframe {
+                trace("ForcePictureType/InsertSPS/InsertPPS");
                 surface.set(w!("ForcePictureType"), AmfVariant::int(PICTURE_TYPE_IDR));
                 surface.set(w!("InsertSPS"), AmfVariant::bool(true));
                 surface.set(w!("InsertPPS"), AmfVariant::bool(true));
             }
 
             let vtbl = &*(*self.component.as_ptr()).vtbl;
+            trace("SubmitInput");
             let result = (vtbl.submit_input)(self.component.as_ptr(), surface.as_ptr().cast());
+            trace(&format!("SubmitInput: {result}"));
             match result {
                 AMF_INPUT_FULL => Ok(false),
                 result => {
@@ -169,7 +191,11 @@ impl AmfEncoder {
     /// As saídas prontas, sem esperar.
     pub fn poll(&mut self) -> Result<Vec<EncodedOutput>, AppError> {
         let mut out = Vec::new();
+        let traced = self.logged == 0 && self.submits <= TRACED_SUBMITS;
         loop {
+            if traced {
+                step("QueryOutput");
+            }
             let mut data: *mut c_void = std::ptr::null_mut();
             // SAFETY: o componente é vivo; o `QueryOutput` devolve uma referência nova (ou nada),
             // que passa a ser de uma `Ref`.
@@ -178,6 +204,9 @@ impl AmfEncoder {
                 let result: AmfResult = (vtbl.query_output)(self.component.as_ptr(), &mut data);
                 (result, Ref::<Data>::new(data.cast()))
             };
+            if traced {
+                step(&format!("QueryOutput: {result}"));
+            }
             let Some(data) = data else {
                 return match result {
                     AMF_OK | AMF_REPEAT | AMF_NEED_MORE_INPUT | AMF_EOF => Ok(out),
@@ -191,7 +220,14 @@ impl AmfEncoder {
     }
 
     fn take_output(&mut self, data: &Ref<Data>) -> Option<EncodedOutput> {
+        let traced = self.logged == 0;
+        if traced {
+            step("QueryInterface AMFBuffer");
+        }
         let buffer: Ref<Buffer> = data.query(&IID_AMF_BUFFER)?;
+        if traced {
+            step("GetProperty OutputDataType, GetPts, GetSize, GetNative");
+        }
         let marked =
             buffer.get(w!("OutputDataType")).and_then(|v| v.as_int()) == Some(OUTPUT_DATA_TYPE_IDR);
         // SAFETY: o buffer é vivo durante o bloco; os bytes são copiados antes de ele ser solto.
@@ -310,6 +346,7 @@ fn configure(component: &Ref<Component>, settings: EncoderSettings) {
         ),
     ];
     for (name, key, value) in properties {
+        step(&format!("SetProperty {name}"));
         let result = component.set(key, value);
         if result != AMF_OK {
             tracing::info!(target: "media", resultado = result, "o AMF recusou: {name}");

@@ -129,8 +129,9 @@ pub struct Factory {
 /// `core/PropertyStorage.h`): 13 funções.
 #[repr(C)]
 pub struct StorageVtbl {
-    pub acquire: unsafe extern "system" fn(*mut c_void) -> i64,
-    pub release: unsafe extern "system" fn(*mut c_void) -> i64,
+    // `amf_long` é o `long` do Windows: 32 bits.
+    pub acquire: unsafe extern "system" fn(*mut c_void) -> i32,
+    pub release: unsafe extern "system" fn(*mut c_void) -> i32,
     pub query_interface:
         unsafe extern "system" fn(*mut c_void, *const GUID, *mut *mut c_void) -> AmfResult,
     pub set_property: unsafe extern "system" fn(*mut c_void, PCWSTR, AmfVariant) -> AmfResult,
@@ -254,6 +255,7 @@ type AmfInitFn = unsafe extern "C" fn(u64, *mut *mut Factory) -> AmfResult;
 /// A fábrica do AMF. Falha sem o driver da AMD (a DLL não existe) ou com um driver velho demais.
 pub fn factory() -> Result<*mut Factory, AppError> {
     let loaded = FACTORY.get_or_init(|| {
+        step("LoadLibrary amfrt64.dll");
         let name: Vec<u16> = "amfrt64.dll\0".encode_utf16().collect();
         // SAFETY: o nome termina em zero; carregar uma DLL do sistema pelo nome é seguro.
         let module = unsafe { LoadLibraryW(name.as_ptr()) };
@@ -267,17 +269,25 @@ pub fn factory() -> Result<*mut Factory, AppError> {
         // SAFETY: `AMFInit` tem a assinatura de `AMFInit_Fn` (`core/Factory.h`).
         let init: AmfInitFn = unsafe { std::mem::transmute(init) };
         let mut factory = std::ptr::null_mut();
+        step("AMFInit");
         // SAFETY: o ponteiro de saída é uma variável local viva.
         let result = unsafe { init(AMF_VERSION_1_4, &mut factory) };
         if result != AMF_OK || factory.is_null() {
             return Err(format!("AMFInit falhou ({result})"));
         }
+        step("AMFInit ok");
         Ok(Loaded(factory))
     });
     match loaded {
         Ok(loaded) => Ok(loaded.0),
         Err(error) => Err(AppError::VideoCapture(error.clone())),
     }
+}
+
+/// Um passo da conversa com o AMF, no nível `debug` do alvo `amf`. O `amf-probe` mostra todos: se
+/// o processo cair, o último passo no terminal diz qual chamada derrubou.
+pub fn step(what: &str) {
+    tracing::debug!(target: "amf", "{what}");
 }
 
 /// Erro de uma chamada do AMF, com o nome dela.

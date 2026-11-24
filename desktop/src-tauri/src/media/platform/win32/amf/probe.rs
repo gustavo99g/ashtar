@@ -7,8 +7,8 @@ use std::path::Path;
 use std::time::{Duration, Instant};
 
 use windows::Win32::Graphics::Direct3D11::{
-    ID3D11Texture2D, D3D11_BIND_RENDER_TARGET, D3D11_SUBRESOURCE_DATA, D3D11_TEXTURE2D_DESC,
-    D3D11_USAGE_DEFAULT,
+    ID3D11Texture2D, D3D11_BIND_RENDER_TARGET, D3D11_BIND_SHADER_RESOURCE, D3D11_SUBRESOURCE_DATA,
+    D3D11_TEXTURE2D_DESC, D3D11_USAGE_DEFAULT,
 };
 use windows::Win32::Graphics::Dxgi::Common::{DXGI_FORMAT_NV12, DXGI_SAMPLE_DESC};
 
@@ -28,6 +28,7 @@ const TAIL: Duration = Duration::from_secs(2);
 
 /// Codifica `frames` quadros e grava o H.264 (Annex B) em `out`. Devolve um resumo para a tela.
 pub fn run(out: &Path, frames: u32) -> Result<String, AppError> {
+    super::ffi::step("GpuDevice");
     let gpu = GpuDevice::new()?;
     let name = gpu.adapter_name().to_owned();
     if !gpu.is_amd() {
@@ -45,6 +46,7 @@ pub fn run(out: &Path, frames: u32) -> Result<String, AppError> {
     let opened = Instant::now();
     let mut encoder = AmfEncoder::new(&gpu, settings)?;
     let open_time = opened.elapsed();
+    super::ffi::step("texturas de teste");
     let textures = (0..PATTERNS)
         .map(|n| pattern(&gpu, n))
         .collect::<Result<Vec<_>, _>>()?;
@@ -161,7 +163,8 @@ fn pattern(gpu: &GpuDevice, n: u32) -> Result<ID3D11Texture2D, AppError> {
             Quality: 0,
         },
         Usage: D3D11_USAGE_DEFAULT,
-        BindFlags: D3D11_BIND_RENDER_TARGET.0 as u32,
+        // Como as do conversor: o encoder lê a textura como shader.
+        BindFlags: (D3D11_BIND_RENDER_TARGET.0 | D3D11_BIND_SHADER_RESOURCE.0) as u32,
         CPUAccessFlags: 0,
         MiscFlags: 0,
     };
