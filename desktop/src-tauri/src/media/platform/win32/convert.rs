@@ -153,6 +153,14 @@ impl Converter {
                 bottom: (y + h) as i32,
             };
             video_context.VideoProcessorSetStreamDestRect(&processor, 0, true, Some(&dest));
+            // A saída inteira como alvo, explícito: o fundo preto vale para toda a sobra.
+            let target = RECT {
+                left: 0,
+                top: 0,
+                right: output.0 as i32,
+                bottom: output.1 as i32,
+            };
+            video_context.VideoProcessorSetOutputTargetRect(&processor, true, Some(&target));
 
             let input_texture = texture(
                 device,
