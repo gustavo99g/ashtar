@@ -10,6 +10,7 @@ pub mod clipboard;
 pub mod convert;
 pub mod focus;
 pub mod gpu;
+pub mod hardware;
 pub mod hr;
 pub mod mf_encoder;
 pub mod pipeline;

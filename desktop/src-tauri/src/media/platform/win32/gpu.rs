@@ -29,6 +29,7 @@ pub struct GpuDevice {
     context: ID3D11DeviceContext,
     adapter_name: String,
     luid: u64,
+    vendor: u32,
 }
 
 impl GpuDevice {
@@ -77,6 +78,7 @@ impl GpuDevice {
             context,
             adapter_name: wide(&adapter.Description),
             luid: (u64::from(luid.HighPart as u32) << 32) | u64::from(luid.LowPart),
+            vendor: adapter.VendorId,
         })
     }
 
@@ -91,6 +93,11 @@ impl GpuDevice {
     /// O nome da placa, como o Gerenciador de Dispositivos mostra ("AMD Radeon RX 9060 XT").
     pub fn adapter_name(&self) -> &str {
         &self.adapter_name
+    }
+
+    /// Se a placa é da AMD (o PCI vendor id 0x1002): só nela o app chama o AMF.
+    pub fn is_amd(&self) -> bool {
+        self.vendor == 0x1002
     }
 
     /// O LUID da placa: o encoder tem de ser da mesma (`mf_encoder.rs`).

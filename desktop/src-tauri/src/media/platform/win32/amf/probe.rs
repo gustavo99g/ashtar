@@ -30,7 +30,7 @@ const TAIL: Duration = Duration::from_secs(2);
 pub fn run(out: &Path, frames: u32) -> Result<String, AppError> {
     let gpu = GpuDevice::new()?;
     let name = gpu.adapter_name().to_owned();
-    if !(name.contains("AMD") || name.contains("Radeon")) {
+    if !gpu.is_amd() {
         return Err(AppError::VideoCapture(format!(
             "a placa padrão não é AMD ({name}): o AMF só roda na AMD"
         )));

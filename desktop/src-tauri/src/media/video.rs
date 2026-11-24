@@ -344,11 +344,40 @@ pub fn h264_level(width: u32, height: u32, fps: u32) -> u32 {
         .map_or(52, |(level, _, _)| *level)
 }
 
+/// Qual encoder tentar, pelo `ASHTAR_ENCODER` no ambiente: serve para testar um caminho numa
+/// placa em que ele não seria o escolhido (o AMF numa AMD em que o Media Foundation funciona).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EncoderPreference {
+    /// A ordem normal (ver `build_output` no Windows).
+    Auto,
+    /// Só o Media Foundation (`mf`); sem ele, o plano B.
+    MediaFoundation,
+    /// Só o AMF da AMD (`amf`); sem ele, o plano B.
+    Amf,
+    /// O plano B direto (`software`).
+    Software,
+}
+
+impl EncoderPreference {
+    pub fn parse(value: Option<&str>) -> Self {
+        match value.map(|v| v.trim().to_ascii_lowercase()).as_deref() {
+            Some("mf") => Self::MediaFoundation,
+            Some("amf") => Self::Amf,
+            Some("software") => Self::Software,
+            _ => Self::Auto,
+        }
+    }
+
+    pub fn from_env() -> Self {
+        Self::parse(std::env::var("ASHTAR_ENCODER").ok().as_deref())
+    }
+}
+
 /// Inicia o vídeo da transmissão, entregando cada pacote ao `sink`. Devolve o controle (para os
 /// comandos do meio) e os números.
 ///
 /// Sem encoder de hardware, com `software_encoder` no `config`, ou com
-/// `ASHTAR_FORCE_SOFTWARE_ENCODER=1` no ambiente, entra o plano B
+/// `ASHTAR_FORCE_SOFTWARE_ENCODER=1` ou `ASHTAR_ENCODER=software` no ambiente, entra o plano B
 /// (os pacotes saem como `RawFrame`). Uma fonte que não existe falha com `SourceNotFound`.
 ///
 /// # Bloqueia
@@ -361,13 +390,35 @@ pub fn spawn_video(
 ) -> Result<(CaptureHandle, VideoControl, VideoStats), AppError> {
     config.format.validate()?;
     let force_software = config.software_encoder
-        || std::env::var("ASHTAR_FORCE_SOFTWARE_ENCODER").is_ok_and(|v| v == "1");
+        || std::env::var("ASHTAR_FORCE_SOFTWARE_ENCODER").is_ok_and(|v| v == "1")
+        || EncoderPreference::from_env() == EncoderPreference::Software;
     platform::spawn_video(config, force_software, sink, on_end)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn ashtar_encoder_escolhe_o_caminho() {
+        assert_eq!(EncoderPreference::parse(None), EncoderPreference::Auto);
+        assert_eq!(
+            EncoderPreference::parse(Some("AMF")),
+            EncoderPreference::Amf
+        );
+        assert_eq!(
+            EncoderPreference::parse(Some(" mf ")),
+            EncoderPreference::MediaFoundation
+        );
+        assert_eq!(
+            EncoderPreference::parse(Some("software")),
+            EncoderPreference::Software
+        );
+        assert_eq!(
+            EncoderPreference::parse(Some("nvenc")),
+            EncoderPreference::Auto
+        );
+    }
 
     fn format(fps: u32, max_width: u32, max_height: u32) -> VideoFormat {
         VideoFormat {
