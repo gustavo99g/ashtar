@@ -98,11 +98,8 @@ pub fn create(app: &App) {
         .focused(false)
         .visible(false)
         .build();
-    match built {
-        Ok(window) => crate::media::focus::exclude_from_capture(&window),
-        Err(error) => {
-            tracing::warn!(%error, "não foi possível criar a janela dos avisos");
-        }
+    if let Err(error) = built {
+        tracing::warn!(%error, "não foi possível criar a janela dos avisos");
     }
 }
 

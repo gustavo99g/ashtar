@@ -7,6 +7,7 @@ import { useSession } from "@/features/identity";
 import {
 	type ChannelMember,
 	memberFromApi,
+	sharingFirst,
 	useLiveMembers,
 	useGuardedJoin,
 	useVoice,
@@ -214,9 +215,11 @@ function VoiceChannelRow({
 	channel,
 	collapsed,
 	manage,
-	members,
+	members: unordered,
 	inCall,
 }: RowProps & { members: ChannelMember[]; inCall: boolean }) {
+	// Quem transmite sobe para o topo da lista, o mais recente primeiro.
+	const members = sharingFirst(unordered);
 	const session = useSession();
 	const myId = session.status === "connected" ? session.user.id : null;
 	const { join } = useVoice();

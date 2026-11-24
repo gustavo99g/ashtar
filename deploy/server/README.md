@@ -1,7 +1,8 @@
 # Servidor na VPS
 
-A v0.2.5 tira o servidor do LiveKit Cloud e do computador de casa. Tudo roda numa VPS própria (Hostinger
-KVM 2, Ubuntu, IP `87.254.22.4`) com Docker Compose:
+A v0.2.5 tira o servidor do LiveKit Cloud e do computador de casa. Tudo roda numa VPS própria (BorkCloud
+VPS 2GB em São Paulo: 2 vCPU, 2 GB de RAM, 28 GB de disco, tráfego sem franquia, Ubuntu, IP `87.254.22.4`)
+com Docker Compose:
 
 * **LiveKit**, a mídia (voz e transmissão de tela);
 * **Caddy**, o HTTPS dos dois domínios, com certificado automático;
@@ -196,7 +197,8 @@ do celular. Teste uma vez com `docker compose stop api`.
   `docker compose up -d`. Fixe sempre uma versão exata.
 * **Trocar a chave do LiveKit:** apague `LIVEKIT_API_KEY` e `LIVEKIT_API_SECRET` do `.env`, rode o `./setup.sh`
   (ele atualiza o `api.env` junto) e `docker compose up -d`.
-* **Consumo:** o tráfego de saída aparece no painel da Hostinger; o KVM 2 inclui 8 TB por mês.
+* **Consumo:** o plano não tem franquia de tráfego; o que aperta primeiro é o disco (28 GB), por causa dos
+  anexos em `data/files/`. CPU, memória e disco aparecem no painel da BorkCloud.
 
 ## O que falta
 

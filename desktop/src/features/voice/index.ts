@@ -31,6 +31,7 @@ export {
 	memberFromApi,
 	peopleNowLabel,
 	type ShareSummary,
+	sharingFirst,
 } from "./members/model/members";
 export { useVoiceParticipants } from "./members/queries";
 export {

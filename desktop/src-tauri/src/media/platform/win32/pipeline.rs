@@ -25,7 +25,15 @@ use windows::Win32::Media::MediaFoundation::{MFStartup, MFSTARTUP_FULL, MF_VERSI
 use windows::Win32::Media::{timeBeginPeriod, timeEndPeriod};
 
 use super::convert::{Converter, OutputFormat, RING};
+
+/// Quanto tempo o teste do encoder da placa espera a primeira imagem ([`probe`]).
+const PROBE_TIMEOUT: Duration = Duration::from_millis(1500);
+/// Quanto tempo o encoder da placa pode ficar com imagens sem devolver nenhuma antes de o log
+/// avisar.
+const HARDWARE_STALL: Duration = Duration::from_secs(2);
+use super::amf::AmfEncoder;
 use super::gpu::GpuDevice;
+use super::hardware::HardwareEncoder;
 use super::mf_encoder::{EncoderSettings, MfEncoder};
 use super::readback::Readback;
 use super::wgc::{self, WgcCapture};
@@ -33,10 +41,11 @@ use crate::error::AppError;
 use crate::media::bitrate::BitrateController;
 use crate::media::capture::{spawn_capture, EndReason};
 use crate::media::encoded::{EncodedFrame, PacketSink, RawFrame, VideoPacket};
+use crate::media::encoder_memory::{order, EncoderMemory, HardwarePath};
 use crate::media::sources::SourceRef;
 use crate::media::video::{
-    fit_in_box, EncoderKind, VideoCommand, VideoConfig, VideoControl, VideoFormat, VideoStats,
-    RESEND_AFTER,
+    output_size, EncoderKind, EncoderPreference, ResizeSettle, VideoCommand, VideoConfig,
+    VideoControl, VideoFormat, VideoStats, RESEND_AFTER,
 };
 use crate::media::{CaptureHandle, OnEnd, SinkStatus};
 
@@ -81,13 +90,21 @@ pub fn spawn_video(
         };
         ctx.ready.ok();
 
-        match pipeline.run(&commands, &mut sink, &|| ctx.stop.load(Ordering::Acquire)) {
+        let reason = match pipeline.run(&commands, &mut sink, &|| ctx.stop.load(Ordering::Acquire))
+        {
             Ok(reason) => reason,
             Err(error) => {
                 tracing::error!(target: "media", %error, "o vídeo da transmissão parou com erro");
                 EndReason::Error(error.to_string())
             }
-        }
+        };
+        // A sessão fica sabendo antes de a captura e o encoder serem soltos: no fim de uma
+        // partida do LoL, soltar a captura da janela que fechou travou a thread, e a transmissão
+        // ficou parada na última imagem em vez de voltar para o cliente.
+        ctx.report(reason.clone());
+        drop(pipeline);
+        tracing::info!(target: "media", "vídeo da transmissão liberado");
+        reason
     })?;
 
     Ok((handle, control, stats))
@@ -134,10 +151,13 @@ impl Drop for Runtime {
 /// Para onde vai a imagem convertida.
 enum Output {
     Hardware {
-        encoder: MfEncoder,
+        /// Numa caixa: o encoder é bem maior que o plano B (o `large_enum_variant` do clippy).
+        encoder: Box<HardwareEncoder>,
         bitrate: BitrateController,
         /// Frames entregues ao encoder que ainda não saíram.
         in_flight: usize,
+        /// Quando saiu a última imagem codificada (ou quando o encoder foi criado).
+        last_output: Instant,
     },
     /// Plano B: a imagem volta para a memória e o libwebrtc codifica.
     Software { readback: Readback },
@@ -153,7 +173,10 @@ struct Pipeline {
     /// O último alvo da estimativa de banda da LiveKit. O encoder segue o menor entre ele e o
     /// bitrate do preset ([`Pipeline::target_bps`]): a trilha anuncia o teto do preset mais caro.
     network_bps: u32,
-    force_software: bool,
+    /// A trilha foi publicada para o plano B (vídeo cru), não para o encoder da placa. O tipo da
+    /// trilha não muda no meio da transmissão, então um encoder refeito fica no mesmo caminho:
+    /// pacotes do encoder da placa numa trilha crua deixavam a tela preta para quem assistia.
+    software_track: bool,
     cursor: bool,
     paused: bool,
     /// A entrada do conversor tem uma imagem de verdade (para reenviar).
@@ -162,6 +185,8 @@ struct Pipeline {
     /// A próxima textura do anel.
     slot: usize,
     last_sent: Option<Instant>,
+    /// A janela mudou de tamanho: o encoder é refeito no tamanho novo quando ela parar.
+    resize: ResizeSettle,
 }
 
 impl Pipeline {
@@ -178,6 +203,7 @@ impl Pipeline {
             force_software,
             &stats,
         )?;
+        let software_track = matches!(output, Output::Software { .. });
         Ok(Self {
             gpu,
             capture,
@@ -186,13 +212,14 @@ impl Pipeline {
             stats,
             format: config.format,
             network_bps: u32::MAX,
-            force_software,
+            software_track,
             cursor: config.cursor,
             paused: false,
             has_image: false,
             keyframe_pending: true,
             slot: 0,
             last_sent: None,
+            resize: ResizeSettle::default(),
         })
     }
 
@@ -315,15 +342,22 @@ impl Pipeline {
             &self.capture,
             self.format,
             self.target_bps(),
-            self.force_software,
+            self.software_track,
             &self.stats,
         )?;
+        if matches!(output, Output::Software { .. }) && !self.software_track {
+            // A trilha espera o vídeo do encoder da placa: o plano B não tem como entrar nela.
+            return Err(AppError::VideoCapture(
+                "o encoder da placa não reabriu no tamanho novo".into(),
+            ));
+        }
         self.converter = converter;
         self.output = output;
         self.stats.set_target(self.target_bps());
         self.has_image = false;
         self.keyframe_pending = true;
         self.last_sent = None;
+        self.resize.clear();
         Ok(())
     }
 
@@ -333,6 +367,8 @@ impl Pipeline {
             encoder,
             bitrate,
             in_flight,
+            last_output,
+            ..
         } = &mut self.output
         else {
             return Ok(SinkStatus::Continue);
@@ -341,6 +377,7 @@ impl Pipeline {
         for output in encoder.poll()? {
             *in_flight = in_flight.saturating_sub(1);
             let now = Instant::now();
+            *last_output = now;
             let age = age(output.time);
             self.stats.frame(output.data.len(), age, now);
             if let Some(value) = bitrate.on_frame(output.data.len(), now) {
@@ -379,6 +416,17 @@ impl Pipeline {
                 self.format.fps,
             )?;
             self.has_image = false;
+            let wanted = output_size(self.capture.size(), self.format, !self.software_track);
+            self.resize
+                .changed(wanted, self.converter.output_size(), now);
+        }
+        if self.resize.due(now) {
+            tracing::info!(
+                target: "media",
+                tamanho = %format!("{}x{}", self.capture.size().0, self.capture.size().1),
+                "a janela mudou de tamanho: o encoder acompanha"
+            );
+            self.rebuild()?;
         }
 
         let converter = &self.converter;
@@ -400,8 +448,23 @@ impl Pipeline {
 
         match &mut self.output {
             Output::Hardware {
-                encoder, in_flight, ..
+                encoder,
+                in_flight,
+                last_output,
+                ..
             } => {
+                if *in_flight > 0 && now.duration_since(*last_output) >= HARDWARE_STALL {
+                    // Recebeu imagens e não devolveu nada (visto numa RX 7600, com o anel de 4
+                    // texturas): vai para o log uma vez a cada período, para diagnosticar.
+                    tracing::warn!(
+                        target: "media",
+                        encoder = encoder.name(),
+                        em_voo = *in_flight,
+                        pediu_entrada = encoder.wants_input(),
+                        "o encoder de hardware não devolve imagens"
+                    );
+                    *last_output = now;
+                }
                 if !encoder.wants_input() || *in_flight >= RING - 1 {
                     self.stats.dropped();
                     return Ok(SinkStatus::Continue);
@@ -411,8 +474,11 @@ impl Pipeline {
                     self.keyframe_pending = false;
                 }
                 let texture = self.converter.convert(self.slot)?;
-                encoder.submit(texture, time)?;
-                *in_flight += 1;
+                if encoder.submit(texture, time)? {
+                    *in_flight += 1;
+                } else {
+                    self.stats.dropped();
+                }
             }
             Output::Software { readback } => {
                 let texture = self.converter.convert(self.slot)?;
@@ -447,13 +513,14 @@ fn build_output(
     force_software: bool,
     stats: &VideoStats,
 ) -> Result<(Converter, Output), AppError> {
-    let (width, height) = capture.size();
-    let size = fit_in_box(width, height, format.max_width, format.max_height);
+    // Com o encoder da placa, o tamanho vai em múltiplos de 16 (ver `align_for_hardware`). Se a
+    // placa não tiver encoder, o plano B recebe o mesmo tamanho, que também serve para ele.
+    let size = output_size(capture.size(), format, !force_software);
     let converter = Converter::new(gpu, capture.size(), size, OutputFormat::Nv12, format.fps)?;
     stats.set_size(size.0, size.1);
 
     let hardware = if force_software {
-        tracing::info!(target: "media", "plano B forçado pelo ambiente");
+        tracing::info!(target: "media", "plano B: pedido pelo ambiente ou pela trilha já publicada");
         None
     } else {
         let settings = EncoderSettings {
@@ -462,30 +529,61 @@ fn build_output(
             fps: format.fps,
             bitrate_bps: target_bps,
         };
-        match MfEncoder::new(gpu, settings) {
-            Ok(encoder) => Some(encoder),
-            Err(error) => {
-                tracing::warn!(target: "media", %error, "sem encoder de hardware: plano B");
-                None
+        let preference = EncoderPreference::from_env();
+        if preference != EncoderPreference::Auto {
+            tracing::info!(target: "media", ?preference, "encoder escolhido pelo ambiente (ASHTAR_ENCODER)");
+        }
+        let amd = gpu.is_amd();
+        if preference == EncoderPreference::Amf && !amd {
+            tracing::warn!(target: "media", placa = gpu.adapter_name(), "ASHTAR_ENCODER=amf numa placa que não é AMD");
+        }
+        let mut memory = EncoderMemory::open();
+        let (adapter, driver) = (gpu.adapter_name(), gpu.driver());
+        let mf_stalls_here = memory.mf_stalls(adapter, driver);
+        if mf_stalls_here && preference == EncoderPreference::Auto {
+            tracing::info!(target: "media", placa = adapter, driver, "o Media Foundation trava nesta placa com este driver: começa pelo AMF");
+        }
+        let mut mf_failed = false;
+        let mut found = None;
+        for candidate in order(preference, amd, mf_stalls_here) {
+            match open_hardware(candidate, gpu, settings, &converter) {
+                Some((encoder, in_flight)) => {
+                    found = Some((candidate, encoder, in_flight));
+                    break;
+                }
+                None => mf_failed |= candidate == HardwarePath::MediaFoundation,
             }
         }
+        if preference == EncoderPreference::Auto && amd {
+            match found.as_ref().map(|(candidate, ..)| *candidate) {
+                Some(HardwarePath::Amf) if mf_failed => memory.remember(adapter, driver, true),
+                Some(HardwarePath::MediaFoundation) => memory.remember(adapter, driver, false),
+                _ => {}
+            }
+        }
+        if found.is_none() {
+            tracing::warn!(target: "media", "sem encoder de hardware que funcione: plano B");
+        }
+        found.map(|(_, encoder, in_flight)| (encoder, in_flight))
     };
 
     let output = match hardware {
-        Some(encoder) => {
+        Some((encoder, in_flight)) => {
             tracing::info!(
                 target: "media",
                 encoder = encoder.name(),
                 placa = gpu.adapter_name(),
+                driver = gpu.driver(),
                 tamanho = %format!("{}x{}", size.0, size.1),
                 fps = format.fps,
                 "encoder de hardware pronto"
             );
             stats.set_encoder(EncoderKind::Hardware(encoder.name().to_string()));
             Output::Hardware {
-                encoder,
+                encoder: Box::new(encoder),
                 bitrate: BitrateController::new(target_bps, format.fps, Instant::now()),
-                in_flight: 0,
+                in_flight,
+                last_output: Instant::now(),
             }
         }
         None => {
@@ -496,6 +594,79 @@ fn build_output(
         }
     };
     Ok((converter, output))
+}
+
+/// Abre o encoder do `candidate` e passa pelo [`probe`]. `None` (com o motivo no log) se ele não
+/// abrir ou não devolver imagem.
+fn open_hardware(
+    candidate: HardwarePath,
+    gpu: &GpuDevice,
+    settings: EncoderSettings,
+    converter: &Converter,
+) -> Option<(HardwareEncoder, usize)> {
+    let opened = match candidate {
+        HardwarePath::MediaFoundation => MfEncoder::new(gpu, settings).map(HardwareEncoder::Mf),
+        HardwarePath::Amf => AmfEncoder::new(gpu, settings).map(HardwareEncoder::Amf),
+    };
+    let mut encoder = match opened {
+        Ok(encoder) => encoder,
+        Err(error) => {
+            tracing::warn!(target: "media", %error, ?candidate, "sem encoder de hardware");
+            return None;
+        }
+    };
+    match probe(&mut encoder, converter) {
+        Ok(in_flight) => Some((encoder, in_flight)),
+        Err(error) => {
+            tracing::warn!(
+                target: "media",
+                %error,
+                ?candidate,
+                encoder = encoder.name(),
+                placa = gpu.adapter_name(),
+                "o encoder de hardware não passou no teste"
+            );
+            None
+        }
+    }
+}
+
+/// Antes de usar o encoder da placa, confere que ele devolve imagem: manda quadros pretos (a
+/// entrada do conversor ainda está zerada) até sair o primeiro H.264, por no máximo
+/// [`PROBE_TIMEOUT`]. Na RX 7600, o da AMD abria sem erro, aceitava um quadro e nunca devolvia
+/// nada, e a transmissão ficava preta; agora esse caso cai no plano B antes de publicar.
+///
+/// Devolve quantos quadros do teste ainda estão no encoder (saem depois e são descartados por
+/// quem assiste, que espera o keyframe do primeiro quadro de verdade).
+fn probe(encoder: &mut HardwareEncoder, converter: &Converter) -> Result<usize, AppError> {
+    let started = Instant::now();
+    let mut submitted = 0usize;
+    loop {
+        let outputs = encoder.poll()?.len();
+        if outputs > 0 {
+            tracing::info!(
+                target: "media",
+                ms = started.elapsed().as_millis() as u64,
+                quadros = submitted,
+                "o encoder de hardware respondeu ao teste"
+            );
+            return Ok(submitted.saturating_sub(outputs));
+        }
+        if started.elapsed() >= PROBE_TIMEOUT {
+            return Err(AppError::VideoCapture(format!(
+                "nenhuma imagem em {} ms com {submitted} quadros entregues (pediu entrada: {})",
+                PROBE_TIMEOUT.as_millis(),
+                encoder.wants_input()
+            )));
+        }
+        if encoder.wants_input() && submitted < RING - 1 {
+            let texture = converter.convert(submitted)?;
+            if encoder.submit(texture, wgc::now_100ns())? {
+                submitted += 1;
+            }
+        }
+        std::thread::sleep(Duration::from_millis(2));
+    }
 }
 
 /// Há quanto tempo o Windows compôs a imagem do horário `time` (100 ns, relógio do WGC).

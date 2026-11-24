@@ -3,7 +3,7 @@
 use windows::Win32::Foundation::HWND;
 use windows::Win32::UI::WindowsAndMessaging::{
     IsIconic, IsWindow, SetForegroundWindow, SetWindowDisplayAffinity, ShowWindow, SW_RESTORE,
-    WDA_EXCLUDEFROMCAPTURE,
+    WDA_EXCLUDEFROMCAPTURE, WDA_NONE,
 };
 
 /// Restaura a janela `id` (se estiver minimizada) e a traz para a frente, com o foco.
@@ -25,17 +25,23 @@ pub fn bring_to_front(id: u64) -> bool {
     }
 }
 
-/// Tira a janela `hwnd` (o valor do `HWND`) de toda captura de tela: a do Ashtar, a do print do Windows
-/// (Win + Shift + S), a do OBS. Quem assiste vê o que está atrás dela.
+/// Tira a janela `hwnd` (o valor do `HWND`) de toda captura de tela, ou a devolve (`excluded`
+/// falso). Fora, ela some da transmissão do Ashtar, do print do Windows (Win + Shift + S) e do
+/// OBS: quem assiste vê o que está atrás dela.
 ///
 /// Precisa do Windows 10 2004 ou mais novo; num mais antigo, a janela continua aparecendo, e o
 /// erro só vai para o log.
-pub fn exclude_from_capture(hwnd: usize) {
+pub fn exclude_from_capture(hwnd: usize, excluded: bool) {
     let hwnd = HWND(hwnd as *mut _);
-    // SAFETY: `hwnd` é a janela principal do app, criada pelo Tauri e viva; um valor inválido só
-    // faz a chamada devolver erro.
-    if let Err(error) = unsafe { SetWindowDisplayAffinity(hwnd, WDA_EXCLUDEFROMCAPTURE) } {
-        tracing::warn!(%error, "não deu para tirar a janela do Ashtar das capturas");
+    let affinity = if excluded {
+        WDA_EXCLUDEFROMCAPTURE
+    } else {
+        WDA_NONE
+    };
+    // SAFETY: `hwnd` é uma janela do app, criada pelo Tauri e viva; um valor inválido só faz a
+    // chamada devolver erro.
+    if let Err(error) = unsafe { SetWindowDisplayAffinity(hwnd, affinity) } {
+        tracing::warn!(%error, excluded, "não deu para mudar a janela do Ashtar nas capturas");
     }
 }
 

@@ -45,7 +45,8 @@ import { ShareViewers } from "./ShareViewers";
  * A transmissão em foco (sozinha no palco: a focada ou a única aberta) ganha também a tela cheia e
  * as ferramentas de quem assiste (`FocusTools.tsx`): ampliar, copiar um quadro e ver como está
  * chegando.
- * Lado a lado e no 2×2, nenhuma delas aparece (combinado em 19/11).
+ * Lado a lado e no 2×2, nenhuma delas aparece (combinado em 19/11), e clicar na imagem põe a
+ * transmissão em foco.
  *
  * A tela de quem transmite só é baixada enquanto este bloco existe, no tamanho dele (`setShown`).
  *
@@ -119,6 +120,16 @@ export function ScreenStage({
 				<Spinner className="size-6 text-primary" />
 			)}
 			{ready && <PausedCover share={share} />}
+			{canFocus && !inFocus && (
+				// Lado a lado e no 2×2, clicar na imagem põe ela em foco (o botão de Focar só aparece
+				// com o mouse em cima e passava despercebido).
+				<button
+					type="button"
+					aria-label={`Focar em ${sharer.name}`}
+					onClick={onFocus}
+					className="absolute inset-0 cursor-pointer"
+				/>
+			)}
 			<div
 				className={cn(
 					"absolute top-3.5 left-3.5 flex items-center gap-2",
@@ -208,15 +219,27 @@ export function ScreenStage({
 						</span>
 					</div>
 				)}
-				{canFocus && (
-					<StageButton
-						aria-label={focused ? "Dividir o palco" : `Focar em ${sharer.name}`}
-						aria-pressed={focused}
-						onClick={onFocus}
-					>
-						{focused ? <Minimize2Icon /> : <Maximize2Icon />}
-					</StageButton>
-				)}
+				{canFocus &&
+					(focused ? (
+						// Com texto: é o único jeito de sair do foco, e só o ícone passava despercebido.
+						<StageButton
+							aria-label="Dividir o palco"
+							aria-pressed
+							onClick={onFocus}
+							className="w-auto gap-1.5 px-3 text-[13px] font-semibold"
+						>
+							<Minimize2Icon />
+							Lado a lado
+						</StageButton>
+					) : (
+						<StageButton
+							aria-label={`Focar em ${sharer.name}`}
+							aria-pressed={false}
+							onClick={onFocus}
+						>
+							<Maximize2Icon />
+						</StageButton>
+					))}
 				{inFocus && (
 					<StageButton
 						aria-label="Tela cheia"

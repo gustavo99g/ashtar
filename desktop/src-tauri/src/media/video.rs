@@ -249,15 +249,15 @@ impl VideoStats {
     }
 }
 
-/// Tamanho final de uma imagem `width` × `height` para caber na caixa, mantendo a proporção.
-///
-/// Nunca amplia, e devolve sempre lados pares: no NV12 (e no I420) cada amostra de cor cobre um
-/// bloco de 2×2 pixels, e os encoders exigem lados pares.
 /// O nome da placa de vídeo, para o `info.txt` do "Enviar logs".
 pub fn gpu_name() -> Option<String> {
     super::platform::gpu_name()
 }
 
+/// Tamanho final de uma imagem `width` × `height` para caber na caixa, mantendo a proporção.
+///
+/// Nunca amplia, e devolve sempre lados pares: no NV12 (e no I420) cada amostra de cor cobre um
+/// bloco de 2×2 pixels, e os encoders exigem lados pares.
 pub fn fit_in_box(width: u32, height: u32, max_width: u32, max_height: u32) -> (u32, u32) {
     // Em u64, as multiplicações abaixo não têm como estourar.
     let (w, h) = (u64::from(width), u64::from(height));
@@ -273,6 +273,73 @@ pub fn fit_in_box(width: u32, height: u32, max_width: u32, max_height: u32) -> (
     (even(w), even(h))
 }
 
+/// O tamanho para o encoder da placa: os lados de [`fit_in_box`] arredondados para baixo até um
+/// múltiplo de 16 (o macrobloco do H.264), com mínimo de 16. O conversor centraliza a imagem com
+/// a proporção certa e completa a sobra (no máximo 15 pixels por lado) com preto.
+///
+/// Alguns encoders de hardware (o da AMD na RX 7000, por exemplo) leem a textura com um
+/// alinhamento próprio e mandam a imagem toda preta ou embaralhada quando o lado não é múltiplo
+/// de 16. Os outros aceitam qualquer lado par, então alinhar sempre não custa nada.
+pub fn align_for_hardware((width, height): (u32, u32)) -> (u32, u32) {
+    ((width & !15).max(16), (height & !15).max(16))
+}
+
+/// O menor tamanho de saída. Uma janela minúscula (o cliente do League of Legends ainda abrindo
+/// volta com 160x16) vai com bordas neste tamanho: os encoders da placa recusam tamanhos assim, e
+/// a transmissão caía no plano B à toa.
+pub const MIN_OUTPUT: (u32, u32) = (320, 180);
+
+/// O tamanho de saída da transmissão para uma fonte de `source` pixels no `format`: o
+/// [`fit_in_box`], no mínimo [`MIN_OUTPUT`] (sem passar do `format`), e, com o encoder da placa,
+/// o [`align_for_hardware`].
+pub fn output_size(source: (u32, u32), format: VideoFormat, hardware: bool) -> (u32, u32) {
+    let (width, height) = fit_in_box(source.0, source.1, format.max_width, format.max_height);
+    let size = (
+        width.max(MIN_OUTPUT.0.min(format.max_width)),
+        height.max(MIN_OUTPUT.1.min(format.max_height)),
+    );
+    if hardware {
+        align_for_hardware(size)
+    } else {
+        size
+    }
+}
+
+/// Quanto a fonte precisa ficar no mesmo tamanho para a transmissão refazer o encoder nele.
+pub const RESIZE_SETTLE: Duration = Duration::from_millis(700);
+
+/// Quando a janela muda de tamanho no meio da transmissão, a saída fica no tamanho antigo (com
+/// bordas) até a janela parar de mudar por [`RESIZE_SETTLE`]; aí o encoder é refeito no tamanho
+/// novo. Sem isso, uma janela que estava pequena na troca de fonte (o cliente do League of Legends
+/// voltando depois da partida) deixava a transmissão em baixa resolução até o fim.
+#[derive(Debug, Default)]
+pub struct ResizeSettle {
+    since: Option<Instant>,
+}
+
+impl ResizeSettle {
+    /// A fonte mudou de tamanho: `wanted` é a saída para o tamanho novo, `current` a de agora.
+    pub fn changed(&mut self, wanted: (u32, u32), current: (u32, u32), now: Instant) {
+        self.since = (wanted != current).then_some(now);
+    }
+
+    /// Se chegou a hora de refazer o encoder. Responde `true` uma vez só.
+    pub fn due(&mut self, now: Instant) -> bool {
+        match self.since {
+            Some(at) if now.duration_since(at) >= RESIZE_SETTLE => {
+                self.since = None;
+                true
+            }
+            _ => false,
+        }
+    }
+
+    /// A saída foi refeita por outro motivo (preset, fonte): nada pendente.
+    pub fn clear(&mut self) {
+        self.since = None;
+    }
+}
+
 /// Arredonda para baixo até um número par, com mínimo de 2.
 fn even(side: u64) -> u32 {
     (side as u32 & !1).max(2)
@@ -284,6 +351,10 @@ fn even(side: u64) -> u32 {
 ///
 /// Posição e tamanho saem sempre pares: no NV12 a cor cobre blocos de 2×2, e um retângulo ímpar
 /// borraria a borda do conteúdo.
+///
+/// Uma sobra de até [`STRETCH_UP_TO`] pixels (a do alinhamento em 16 do encoder da placa, como
+/// 1920 × 1080 em 1920 × 1072) não vira faixa: a imagem estica para ocupar a saída inteira. Uma
+/// faixa assim fina só mostrava lixo, porque nem todo driver pinta o fundo da conversão de preto.
 pub fn letterbox(input: (u32, u32), output: (u32, u32)) -> (u32, u32, u32, u32) {
     let (iw, ih) = (u64::from(input.0.max(1)), u64::from(input.1.max(1)));
     let (ow, oh) = (u64::from(output.0), u64::from(output.1));
@@ -293,8 +364,15 @@ pub fn letterbox(input: (u32, u32), output: (u32, u32)) -> (u32, u32, u32, u32) 
         ((iw * oh / ih).min(ow), oh) // mais alta: faixas dos lados
     };
     let (w, h) = (w as u32 & !1, h as u32 & !1);
+    if output.0 - w <= STRETCH_UP_TO && output.1 - h <= STRETCH_UP_TO {
+        return (0, 0, output.0, output.1);
+    }
     (((output.0 - w) / 2) & !1, ((output.1 - h) / 2) & !1, w, h)
 }
+
+/// A maior sobra, em pixels, que o [`letterbox`] estica em vez de virar faixa. A imagem deforma
+/// no máximo 2% (32 em 1920), o que não se nota.
+const STRETCH_UP_TO: u32 = 32;
 
 /// Menor nível H.264 que comporta `width` × `height` a `fps` (tabela A-1 da norma).
 ///
@@ -322,11 +400,40 @@ pub fn h264_level(width: u32, height: u32, fps: u32) -> u32 {
         .map_or(52, |(level, _, _)| *level)
 }
 
+/// Qual encoder tentar, pelo `ASHTAR_ENCODER` no ambiente: serve para testar um caminho numa
+/// placa em que ele não seria o escolhido (o AMF numa AMD em que o Media Foundation funciona).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EncoderPreference {
+    /// A ordem normal (ver `build_output` no Windows).
+    Auto,
+    /// Só o Media Foundation (`mf`); sem ele, o plano B.
+    MediaFoundation,
+    /// Só o AMF da AMD (`amf`); sem ele, o plano B.
+    Amf,
+    /// O plano B direto (`software`).
+    Software,
+}
+
+impl EncoderPreference {
+    pub fn parse(value: Option<&str>) -> Self {
+        match value.map(|v| v.trim().to_ascii_lowercase()).as_deref() {
+            Some("mf") => Self::MediaFoundation,
+            Some("amf") => Self::Amf,
+            Some("software") => Self::Software,
+            _ => Self::Auto,
+        }
+    }
+
+    pub fn from_env() -> Self {
+        Self::parse(std::env::var("ASHTAR_ENCODER").ok().as_deref())
+    }
+}
+
 /// Inicia o vídeo da transmissão, entregando cada pacote ao `sink`. Devolve o controle (para os
 /// comandos do meio) e os números.
 ///
 /// Sem encoder de hardware, com `software_encoder` no `config`, ou com
-/// `ASHTAR_FORCE_SOFTWARE_ENCODER=1` no ambiente, entra o plano B
+/// `ASHTAR_FORCE_SOFTWARE_ENCODER=1` ou `ASHTAR_ENCODER=software` no ambiente, entra o plano B
 /// (os pacotes saem como `RawFrame`). Uma fonte que não existe falha com `SourceNotFound`.
 ///
 /// # Bloqueia
@@ -339,13 +446,89 @@ pub fn spawn_video(
 ) -> Result<(CaptureHandle, VideoControl, VideoStats), AppError> {
     config.format.validate()?;
     let force_software = config.software_encoder
-        || std::env::var("ASHTAR_FORCE_SOFTWARE_ENCODER").is_ok_and(|v| v == "1");
+        || std::env::var("ASHTAR_FORCE_SOFTWARE_ENCODER").is_ok_and(|v| v == "1")
+        || EncoderPreference::from_env() == EncoderPreference::Software;
     platform::spawn_video(config, force_software, sink, on_end)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_saida_so_muda_depois_que_a_janela_para_de_mudar() {
+        let t0 = Instant::now();
+        let mut settle = ResizeSettle::default();
+        settle.changed((1280, 720), (640, 352), t0);
+        assert!(!settle.due(t0 + RESIZE_SETTLE / 2));
+        // Mudou de novo no meio: o tempo recomeça.
+        settle.changed((1920, 1072), (640, 352), t0 + RESIZE_SETTLE / 2);
+        assert!(!settle.due(t0 + RESIZE_SETTLE));
+        assert!(settle.due(t0 + RESIZE_SETTLE * 2));
+        assert!(!settle.due(t0 + RESIZE_SETTLE * 3), "uma vez só");
+    }
+
+    #[test]
+    fn mesmo_tamanho_de_saida_nao_refaz() {
+        let t0 = Instant::now();
+        let mut settle = ResizeSettle::default();
+        settle.changed((640, 352), (1280, 720), t0);
+        settle.changed((1280, 720), (1280, 720), t0);
+        assert!(!settle.due(t0 + RESIZE_SETTLE * 2));
+    }
+
+    #[test]
+    fn o_tamanho_de_saida_alinha_so_no_encoder_da_placa() {
+        let format = VideoFormat {
+            max_width: 1920,
+            max_height: 1080,
+            fps: 60,
+            bitrate_bps: 8_000_000,
+        };
+        assert_eq!(output_size((1920, 1080), format, true), (1920, 1072));
+        assert_eq!(output_size((1920, 1080), format, false), (1920, 1080));
+        assert_eq!(output_size((3840, 2160), format, false), (1920, 1080));
+    }
+
+    #[test]
+    fn uma_janela_minuscula_sai_no_tamanho_minimo() {
+        let format = VideoFormat {
+            max_width: 1920,
+            max_height: 1080,
+            fps: 60,
+            bitrate_bps: 8_000_000,
+        };
+        assert_eq!(output_size((160, 16), format, true), (320, 176));
+        assert_eq!(output_size((160, 16), format, false), (320, 180));
+        assert_eq!(output_size((1600, 16), format, false), (1600, 180));
+        let tiny = VideoFormat {
+            max_width: 256,
+            max_height: 144,
+            ..format
+        };
+        assert_eq!(output_size((100, 100), tiny, false), (256, 144));
+    }
+
+    #[test]
+    fn ashtar_encoder_escolhe_o_caminho() {
+        assert_eq!(EncoderPreference::parse(None), EncoderPreference::Auto);
+        assert_eq!(
+            EncoderPreference::parse(Some("AMF")),
+            EncoderPreference::Amf
+        );
+        assert_eq!(
+            EncoderPreference::parse(Some(" mf ")),
+            EncoderPreference::MediaFoundation
+        );
+        assert_eq!(
+            EncoderPreference::parse(Some("software")),
+            EncoderPreference::Software
+        );
+        assert_eq!(
+            EncoderPreference::parse(Some("nvenc")),
+            EncoderPreference::Auto
+        );
+    }
 
     fn format(fps: u32, max_width: u32, max_height: u32) -> VideoFormat {
         VideoFormat {
@@ -380,6 +563,16 @@ mod tests {
     }
 
     #[test]
+    fn tamanho_do_encoder_de_hardware_em_multiplos_de_16() {
+        assert_eq!(align_for_hardware((1920, 1080)), (1920, 1072));
+        assert_eq!(align_for_hardware((1280, 720)), (1280, 720));
+        // Uma janela qualquer (1918 × 1036 depois do `fit_in_box`).
+        assert_eq!(align_for_hardware((1918, 1036)), (1904, 1024));
+        // Nunca abaixo de um macrobloco.
+        assert_eq!(align_for_hardware((2, 1080)), (16, 1072));
+    }
+
+    #[test]
     fn nivel_h264_pelo_tamanho_e_fps() {
         assert_eq!(h264_level(1920, 1080, 30), 40);
         assert_eq!(h264_level(1920, 1080, 60), 42);
@@ -399,6 +592,9 @@ mod tests {
     fn outra_proporcao_fica_no_meio_com_bordas() {
         // A janela ficou quadrada numa saída 16:9: faixas dos lados.
         assert_eq!(letterbox((1000, 1000), (1920, 1080)), (420, 0, 1080, 1080));
+        // A sobra do alinhamento em 16 (1920 × 1080 em 1920 × 1072) estica, sem faixa.
+        assert_eq!(letterbox((1920, 1080), (1920, 1072)), (0, 0, 1920, 1072));
+        assert_eq!(letterbox((1918, 1036), (1904, 1024)), (0, 0, 1904, 1024));
         // Ficou ultrawide: faixas em cima e embaixo.
         assert_eq!(letterbox((3440, 1440), (1920, 1080)), (0, 138, 1920, 802));
     }

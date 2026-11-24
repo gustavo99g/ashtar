@@ -1,11 +1,12 @@
 //! Comandos da transmissão de tela (ADR 0017): a lista de fontes, começar, ajustar e parar; e os
 //! eventos de fim e dos números a cada segundo.
 
-use std::sync::Arc;
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 use tracing::{info, warn};
 
 use crate::{
@@ -184,9 +185,38 @@ pub fn create_manager(app: &AppHandle) -> Arc<ShareManager> {
 }
 
 /// A janela escolhida vem para a frente (restaurada, se estava minimizada). O Ashtar não é
-/// minimizado: fica onde está, atrás dela, e nunca aparece na captura (ADR 0019).
+/// minimizado: fica onde está, atrás dela, e não aparece na captura (ADR 0019).
 fn focus_source(source: SourceRef) {
     focus::bring_to_front(source);
+}
+
+/// As transmissões que estão rodando e se cada uma mostra uma tela inteira.
+static SHARES: Mutex<Option<HashMap<u64, bool>>> = Mutex::new(None);
+
+/// Anota a fonte de `session_id` (`None`: a transmissão acabou) e deixa as janelas do Ashtar fora
+/// das capturas só enquanto alguma tela inteira é transmitida (ADR 0019). Uma janela transmitida
+/// já não mostra o Ashtar, e fora disso ele aparece no print, o que ajuda a mostrar um problema.
+fn track_share(app: &AppHandle, session_id: u64, source: Option<SourceRef>) {
+    let excluded = {
+        let mut shares = SHARES
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let shares = shares.get_or_insert_with(HashMap::new);
+        match source {
+            Some(source) => {
+                shares.insert(session_id, matches!(source, SourceRef::Monitor(_)));
+            }
+            None => {
+                shares.remove(&session_id);
+            }
+        }
+        shares.values().any(|&monitor| monitor)
+    };
+    for label in ["main", crate::notifications::LABEL] {
+        if let Some(window) = app.get_webview_window(label) {
+            focus::exclude_from_capture(&window, excluded);
+        }
+    }
 }
 
 /// Manda os números de `session_id` a cada segundo, e um resumo ao log a cada minuto, até a
@@ -197,6 +227,7 @@ fn spawn_stats(app: AppHandle, manager: Arc<ShareManager>, session_id: u64) {
         loop {
             tokio::time::sleep(STATS_EVERY).await;
             let Some(stats) = manager.stats(session_id) else {
+                track_share(&app, session_id, None);
                 return;
             };
             let snapshot = stats.snapshot(Instant::now());
@@ -272,6 +303,7 @@ pub async fn screen_share_start(
     );
     let starting = Arc::clone(&manager);
     let session_id = run_blocking(move || starting.start(request)).await?;
+    track_share(&app, session_id, Some(options.source));
     focus_source(options.source);
     spawn_stats(app, manager, session_id);
     Ok(session_id)
@@ -292,6 +324,7 @@ pub async fn screen_share_update(
     let manager = Arc::clone(manager.inner());
     run_blocking(move || manager.update(session_id, update.into_change())).await?;
     if let ShareUpdate::Source { source } = update {
+        track_share(&app, session_id, Some(source));
         focus_source(source);
     }
     Ok(())
