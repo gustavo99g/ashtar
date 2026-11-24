@@ -68,6 +68,21 @@ export function memberFromApi(participant: ParticipantView): ChannelMember {
 	};
 }
 
+/**
+ * A ordem da lista da sala: quem transmite vem primeiro, do que começou por último para o mais
+ * antigo; o resto fica na ordem de sempre. Quem acabou de começar e ainda não tem o horário na API
+ * conta como o mais novo.
+ */
+export function sharingFirst<T extends ChannelMember>(members: T[]): T[] {
+	const started = (member: T) => member.share?.startedAt ?? Number.POSITIVE_INFINITY;
+	return [...members].sort((a, b) => {
+		if (a.sharing !== b.sharing) return a.sharing ? -1 : 1;
+		if (!a.sharing) return 0;
+		const diff = started(b) - started(a);
+		return Number.isNaN(diff) ? 0 : diff;
+	});
+}
+
 /** "1 pessoa na Sala agora", "4 pessoas na Sala agora". */
 export function peopleNowLabel(count: number, channelName: string): string {
 	return `${count} ${count === 1 ? "pessoa" : "pessoas"} na ${channelName} agora`;

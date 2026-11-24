@@ -173,7 +173,10 @@ struct Pipeline {
     /// O último alvo da estimativa de banda da LiveKit. O encoder segue o menor entre ele e o
     /// bitrate do preset ([`Pipeline::target_bps`]): a trilha anuncia o teto do preset mais caro.
     network_bps: u32,
-    force_software: bool,
+    /// A trilha foi publicada para o plano B (vídeo cru), não para o encoder da placa. O tipo da
+    /// trilha não muda no meio da transmissão, então um encoder refeito fica no mesmo caminho:
+    /// pacotes do encoder da placa numa trilha crua deixavam a tela preta para quem assistia.
+    software_track: bool,
     cursor: bool,
     paused: bool,
     /// A entrada do conversor tem uma imagem de verdade (para reenviar).
@@ -200,6 +203,7 @@ impl Pipeline {
             force_software,
             &stats,
         )?;
+        let software_track = matches!(output, Output::Software { .. });
         Ok(Self {
             gpu,
             capture,
@@ -208,7 +212,7 @@ impl Pipeline {
             stats,
             format: config.format,
             network_bps: u32::MAX,
-            force_software,
+            software_track,
             cursor: config.cursor,
             paused: false,
             has_image: false,
@@ -338,9 +342,15 @@ impl Pipeline {
             &self.capture,
             self.format,
             self.target_bps(),
-            self.force_software,
+            self.software_track,
             &self.stats,
         )?;
+        if matches!(output, Output::Software { .. }) && !self.software_track {
+            // A trilha espera o vídeo do encoder da placa: o plano B não tem como entrar nela.
+            return Err(AppError::VideoCapture(
+                "o encoder da placa não reabriu no tamanho novo".into(),
+            ));
+        }
         self.converter = converter;
         self.output = output;
         self.stats.set_target(self.target_bps());
@@ -406,7 +416,7 @@ impl Pipeline {
                 self.format.fps,
             )?;
             self.has_image = false;
-            let wanted = output_size(self.capture.size(), self.format, !self.force_software);
+            let wanted = output_size(self.capture.size(), self.format, !self.software_track);
             self.resize
                 .changed(wanted, self.converter.output_size(), now);
         }
@@ -510,7 +520,7 @@ fn build_output(
     stats.set_size(size.0, size.1);
 
     let hardware = if force_software {
-        tracing::info!(target: "media", "plano B forçado pelo ambiente");
+        tracing::info!(target: "media", "plano B: pedido pelo ambiente ou pela trilha já publicada");
         None
     } else {
         let settings = EncoderSettings {

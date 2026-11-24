@@ -1,31 +1,12 @@
 # O que há de novo no Ashtar
 
-## 0.8.6
+## 0.8.10
 
-- A transmissão acompanha a janela quando ela muda de tamanho, sem ficar em baixa resolução.
-- Quando o jogo troca de janela, a transmissão não fica mais parada na última imagem.
-
-## 0.8.5
-
-- Nas placas AMD em que o encoder do Windows trava, como a RX 7600, o Ashtar agora fala direto com o encoder da AMD antes de ir para o processador. A transmissão continua na placa de vídeo e pesa menos no jogo. Quando isso acontece, o Ashtar lembra da placa e, nas próximas transmissões, já começa pelo caminho que funciona.
-- A transmissão em tela cheia não mostra mais uma faixa colorida na borda de baixo.
-
-## 0.8.4
-
-- Na RX 7600 e em outras placas em que o encoder não aceita a imagem direto da GPU, o Ashtar tenta entregar a imagem pela memória antes de ir para o processador, e assim a placa continua codificando.
-
-## 0.8.3
-
-- Antes de transmitir, o Ashtar confere se o encoder da placa de vídeo devolve imagem. Se não devolver, como na RX 7600, a transmissão vai pelo processador na hora, em vez de sair preta.
-
-## 0.8.2
-
-- Mais um ajuste no encoder da placa de vídeo para as AMD da série RX 7000, que ainda deixavam a transmissão preta para quem assistia.
-
-## 0.8.1
-
-- Transmitir com o encoder da placa de vídeo nas AMD da série RX 7000: a imagem saía preta ou embaralhada para quem assistia.
-- O print do Windows (Win + Shift + S) e o OBS voltam a mostrar o Ashtar. Ele só fica fora das capturas enquanto você transmite uma tela inteira.
+- Transmitir pela placa de vídeo ficou mais confiável nas AMD: o Ashtar testa o encoder antes de começar e, se ele falhar, usa o encoder da AMD direto ou o processador, em vez de a tela sair preta.
+- A transmissão acompanha a janela quando ela muda de tamanho e não fica mais parada na última imagem quando o jogo troca de janela.
+- A tela cheia da transmissão não mostra mais uma faixa colorida embaixo.
+- Na lista da sala, à esquerda, quem está transmitindo aparece primeiro.
+- O print do Windows e o OBS voltam a mostrar o Ashtar. Ele só fica fora das capturas enquanto você transmite uma tela inteira.
 
 ## 0.8.0
 
