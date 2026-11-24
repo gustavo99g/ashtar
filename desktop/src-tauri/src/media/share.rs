@@ -50,6 +50,9 @@ use crate::{
 /// Quanto a transmissão espera a conexão voltar antes de acabar.
 pub const GIVE_UP: Duration = Duration::from_secs(120);
 
+/// Quanto o fim de uma transmissão espera as capturas terminarem antes de seguir sem elas.
+const JOIN_LIMIT: Duration = Duration::from_secs(3);
+
 /// Tudo que o início precisa.
 #[derive(Debug, Clone)]
 pub struct ShareRequest {
@@ -190,9 +193,15 @@ impl Session {
         }
         self.video.request_stop();
         self.link.close();
-        self.video.stop_and_join();
+        // Com limite: uma captura que travou ao soltar a janela fechada não pode prender quem
+        // encerra (a fila de avisos, que precisa seguir para o fim da próxima transmissão).
+        if !self.video.stop_and_join_within(JOIN_LIMIT) {
+            warn!(session_id = self.id, "o vídeo não terminou a tempo; segue sem ele");
+        }
         if let Some(audio) = self.audio {
-            audio.handle.stop_and_join();
+            if !audio.handle.stop_and_join_within(JOIN_LIMIT) {
+                warn!(session_id = self.id, "o áudio não terminou a tempo; segue sem ele");
+            }
         }
     }
 }

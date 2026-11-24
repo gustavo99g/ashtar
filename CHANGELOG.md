@@ -1,6 +1,6 @@
 # O que há de novo no Ashtar
 
-## 0.8.10
+## 0.8.11
 
 - Transmitir pela placa de vídeo ficou mais confiável nas AMD: o Ashtar testa o encoder antes de começar e, se ele falhar, usa o encoder da AMD direto ou o processador, em vez de a tela sair preta.
 - A transmissão acompanha a janela quando ela muda de tamanho e não fica mais parada na última imagem quando o jogo troca de janela.
