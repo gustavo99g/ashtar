@@ -52,7 +52,6 @@ import {
 import { CallControls } from "./CallControls";
 import { CALL_TILE_MAX, RoomGrid } from "./RoomGrid";
 import { LayoutToggle, RoomHeader } from "./RoomHeader";
-import { LiveBadge } from "./LiveBadge";
 import { ScreenStage, SmallShare } from "./ScreenStage";
 import { ShareTile } from "./ShareTile";
 
@@ -210,7 +209,7 @@ function ConnectedRoom({
 	useEffect(() => {
 		if (focusedCamera && !camMember) focusCamera(null);
 	}, [focusedCamera, camMember]);
-	// As que estão no ar e a pessoa não abriu: aparecem com Assistir embaixo do palco.
+	// As que estão no ar e a pessoa não abriu: aparecem pequenas embaixo do palco; clicar abre em foco.
 	const notOpen = remotes.filter(
 		(share) => !open.includes(share.ownerId) && memberOf(share.ownerId),
 	);
@@ -340,19 +339,17 @@ function ConnectedRoom({
 						{notOpen.map((share) => {
 							const sharer = memberOf(share.ownerId);
 							if (!sharer) return null;
+							// Pequena com a imagem, como as abertas: clicar abre e já põe em foco.
 							return (
-								<button
+								<SmallShare
 									key={share.ownerId}
-									type="button"
-									onClick={() => watchShare(share.ownerId)}
-									className="flex h-[90px] w-40 shrink-0 flex-col items-center justify-center gap-1 rounded-[10px] border border-dashed border-live/70 bg-rail px-2 text-center hover:bg-secondary"
-								>
-									<LiveBadge />
-									<span className="max-w-full truncate text-xs font-semibold text-foreground">
-										{sharer.name}
-									</span>
-									<span className="text-[11px] text-primary">Assistir</span>
-								</button>
+									share={share.track}
+									sharer={sharer}
+									onFocus={() => {
+										watchShare(share.ownerId);
+										focusShare(share.ownerId);
+									}}
+								/>
 							);
 						})}
 						{members

@@ -20,6 +20,7 @@ use std::{
         mpsc, Arc, Mutex, PoisonError,
     },
     thread::{self, JoinHandle},
+    time::Duration,
 };
 
 use crate::error::AppError;
@@ -105,6 +106,34 @@ impl CaptureHandle {
         if let Some(t) = self.thread.take() {
             let _ = t.join();
         }
+    }
+
+    /// Como o [`stop_and_join`](Self::stop_and_join), mas espera no máximo `limit`. Se a thread
+    /// não terminar a tempo, ela fica para trás (solta, sem ninguém esperando) e a resposta é
+    /// `false`. Soltar a captura de uma janela que fechou já travou a thread de vídeo para sempre
+    /// no fim de uma partida do League of Legends; esperar por ela travava junto a fila de avisos
+    /// das transmissões, e a próxima não acabava quando o jogo fechava.
+    ///
+    /// # Bloqueia
+    ///
+    /// Até `limit`. Mesmas regras do `stop_and_join`.
+    pub fn stop_and_join_within(mut self, limit: Duration) -> bool {
+        self.request_stop();
+        let Some(t) = self.thread.take() else {
+            return true;
+        };
+        if t.is_finished() {
+            let _ = t.join();
+            return true;
+        }
+        let (done, finished) = mpsc::channel();
+        let spawned = thread::Builder::new()
+            .name("ashtar-join".to_string())
+            .spawn(move || {
+                let _ = t.join();
+                let _ = done.send(());
+            });
+        spawned.is_ok() && finished.recv_timeout(limit).is_ok()
     }
 }
 
@@ -311,5 +340,36 @@ mod tests {
         release_tx.send(()).unwrap();
         handle.stop_and_join();
         assert!(rx.recv_timeout(Duration::from_millis(100)).is_err());
+    }
+
+    #[test]
+    fn stop_and_join_within_nao_espera_uma_thread_travada() {
+        let (on_end, _rx) = on_end_probe();
+        let (release, hold) = mpsc::channel::<()>();
+        let handle = spawn_capture("test-travada", on_end, move |mut ctx| {
+            ctx.ready.ok();
+            // Ignora o pedido de parada, como a captura que travou ao ser solta.
+            let _ = hold.recv();
+            EndReason::Stopped
+        })
+        .unwrap();
+        let started = std::time::Instant::now();
+        assert!(!handle.stop_and_join_within(Duration::from_millis(100)));
+        assert!(started.elapsed() < Duration::from_secs(2));
+        drop(release);
+    }
+
+    #[test]
+    fn stop_and_join_within_espera_a_thread_que_para() {
+        let (on_end, _rx) = on_end_probe();
+        let handle = spawn_capture("test-para", on_end, |mut ctx| {
+            ctx.ready.ok();
+            while !ctx.stop.load(Ordering::Acquire) {
+                thread::sleep(Duration::from_millis(1));
+            }
+            EndReason::Stopped
+        })
+        .unwrap();
+        assert!(handle.stop_and_join_within(Duration::from_secs(5)));
     }
 }
