@@ -82,6 +82,10 @@ pub fn run(log_file: logging::LateFile) {
                 tracing::error!(%error, "não foi possível abrir o arquivo de log");
             }
 
+            // A memória do encoder da placa (`media/encoder_memory.rs`) fica na pasta de dados.
+            if let Ok(dir) = app.path().app_data_dir() {
+                media::encoder_memory::set_data_dir(dir);
+            }
             app.manage(commands::screen_share::create_manager(app.handle()));
             app.manage(commands::updater::create_auto_update(app.handle()));
             app.manage(commands::thumbnails::Thumbnails::default());

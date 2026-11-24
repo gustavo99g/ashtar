@@ -15,6 +15,7 @@ pub mod black;
 #[cfg(test)]
 mod diagnostics;
 pub mod encoded;
+pub mod encoder_memory;
 pub mod focus;
 pub mod h264;
 pub mod leveler;

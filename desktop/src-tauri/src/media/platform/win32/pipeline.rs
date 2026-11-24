@@ -41,6 +41,7 @@ use crate::error::AppError;
 use crate::media::bitrate::BitrateController;
 use crate::media::capture::{spawn_capture, EndReason};
 use crate::media::encoded::{EncodedFrame, PacketSink, RawFrame, VideoPacket};
+use crate::media::encoder_memory::{order, EncoderMemory, HardwarePath};
 use crate::media::sources::SourceRef;
 use crate::media::video::{
     align_for_hardware, fit_in_box, EncoderKind, EncoderPreference, VideoCommand, VideoConfig,
@@ -505,13 +506,38 @@ fn build_output(
         if preference != EncoderPreference::Auto {
             tracing::info!(target: "media", ?preference, "encoder escolhido pelo ambiente (ASHTAR_ENCODER)");
         }
-        let found = candidates(preference, gpu)
-            .into_iter()
-            .find_map(|candidate| open_hardware(candidate, gpu, settings, &converter));
+        let amd = gpu.is_amd();
+        if preference == EncoderPreference::Amf && !amd {
+            tracing::warn!(target: "media", placa = gpu.adapter_name(), "ASHTAR_ENCODER=amf numa placa que não é AMD");
+        }
+        let mut memory = EncoderMemory::open();
+        let (adapter, driver) = (gpu.adapter_name(), gpu.driver());
+        let mf_stalls_here = memory.mf_stalls(adapter, driver);
+        if mf_stalls_here && preference == EncoderPreference::Auto {
+            tracing::info!(target: "media", placa = adapter, driver, "o Media Foundation trava nesta placa com este driver: começa pelo AMF");
+        }
+        let mut mf_failed = false;
+        let mut found = None;
+        for candidate in order(preference, amd, mf_stalls_here) {
+            match open_hardware(candidate, gpu, settings, &converter) {
+                Some((encoder, in_flight)) => {
+                    found = Some((candidate, encoder, in_flight));
+                    break;
+                }
+                None => mf_failed |= candidate == HardwarePath::MediaFoundation,
+            }
+        }
+        if preference == EncoderPreference::Auto && amd {
+            match found.as_ref().map(|(candidate, ..)| *candidate) {
+                Some(HardwarePath::Amf) if mf_failed => memory.remember(adapter, driver, true),
+                Some(HardwarePath::MediaFoundation) => memory.remember(adapter, driver, false),
+                _ => {}
+            }
+        }
         if found.is_none() {
             tracing::warn!(target: "media", "sem encoder de hardware que funcione: plano B");
         }
-        found
+        found.map(|(_, encoder, in_flight)| (encoder, in_flight))
     };
 
     let output = match hardware {
@@ -520,6 +546,7 @@ fn build_output(
                 target: "media",
                 encoder = encoder.name(),
                 placa = gpu.adapter_name(),
+                driver = gpu.driver(),
                 tamanho = %format!("{}x{}", size.0, size.1),
                 fps = format.fps,
                 "encoder de hardware pronto"
@@ -542,41 +569,17 @@ fn build_output(
     Ok((converter, output))
 }
 
-/// Um caminho até o encoder da placa.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Candidate {
-    /// O Media Foundation, com a textura na GPU.
-    MediaFoundation,
-    /// O AMF, direto com a biblioteca da AMD (só numa placa AMD).
-    Amf,
-}
-
-/// Os caminhos a tentar, em ordem; se nenhum passar no [`probe`], o plano B.
-fn candidates(preference: EncoderPreference, gpu: &GpuDevice) -> Vec<Candidate> {
-    match preference {
-        EncoderPreference::Auto | EncoderPreference::MediaFoundation => {
-            vec![Candidate::MediaFoundation]
-        }
-        EncoderPreference::Amf if gpu.is_amd() => vec![Candidate::Amf],
-        EncoderPreference::Amf => {
-            tracing::warn!(target: "media", placa = gpu.adapter_name(), "ASHTAR_ENCODER=amf numa placa que não é AMD");
-            Vec::new()
-        }
-        EncoderPreference::Software => Vec::new(),
-    }
-}
-
 /// Abre o encoder do `candidate` e passa pelo [`probe`]. `None` (com o motivo no log) se ele não
 /// abrir ou não devolver imagem.
 fn open_hardware(
-    candidate: Candidate,
+    candidate: HardwarePath,
     gpu: &GpuDevice,
     settings: EncoderSettings,
     converter: &Converter,
 ) -> Option<(HardwareEncoder, usize)> {
     let opened = match candidate {
-        Candidate::MediaFoundation => MfEncoder::new(gpu, settings).map(HardwareEncoder::Mf),
-        Candidate::Amf => AmfEncoder::new(gpu, settings).map(HardwareEncoder::Amf),
+        HardwarePath::MediaFoundation => MfEncoder::new(gpu, settings).map(HardwareEncoder::Mf),
+        HardwarePath::Amf => AmfEncoder::new(gpu, settings).map(HardwareEncoder::Amf),
     };
     let mut encoder = match opened {
         Ok(encoder) => encoder,
