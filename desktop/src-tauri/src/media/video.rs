@@ -284,6 +284,52 @@ pub fn align_for_hardware((width, height): (u32, u32)) -> (u32, u32) {
     ((width & !15).max(16), (height & !15).max(16))
 }
 
+/// O tamanho de saída da transmissão para uma fonte de `source` pixels no `format`: o
+/// [`fit_in_box`] e, com o encoder da placa, o [`align_for_hardware`].
+pub fn output_size(source: (u32, u32), format: VideoFormat, hardware: bool) -> (u32, u32) {
+    let size = fit_in_box(source.0, source.1, format.max_width, format.max_height);
+    if hardware {
+        align_for_hardware(size)
+    } else {
+        size
+    }
+}
+
+/// Quanto a fonte precisa ficar no mesmo tamanho para a transmissão refazer o encoder nele.
+pub const RESIZE_SETTLE: Duration = Duration::from_millis(700);
+
+/// Quando a janela muda de tamanho no meio da transmissão, a saída fica no tamanho antigo (com
+/// bordas) até a janela parar de mudar por [`RESIZE_SETTLE`]; aí o encoder é refeito no tamanho
+/// novo. Sem isso, uma janela que estava pequena na troca de fonte (o cliente do League of Legends
+/// voltando depois da partida) deixava a transmissão em baixa resolução até o fim.
+#[derive(Debug, Default)]
+pub struct ResizeSettle {
+    since: Option<Instant>,
+}
+
+impl ResizeSettle {
+    /// A fonte mudou de tamanho: `wanted` é a saída para o tamanho novo, `current` a de agora.
+    pub fn changed(&mut self, wanted: (u32, u32), current: (u32, u32), now: Instant) {
+        self.since = (wanted != current).then_some(now);
+    }
+
+    /// Se chegou a hora de refazer o encoder. Responde `true` uma vez só.
+    pub fn due(&mut self, now: Instant) -> bool {
+        match self.since {
+            Some(at) if now.duration_since(at) >= RESIZE_SETTLE => {
+                self.since = None;
+                true
+            }
+            _ => false,
+        }
+    }
+
+    /// A saída foi refeita por outro motivo (preset, fonte): nada pendente.
+    pub fn clear(&mut self) {
+        self.since = None;
+    }
+}
+
 /// Arredonda para baixo até um número par, com mínimo de 2.
 fn even(side: u64) -> u32 {
     (side as u32 & !1).max(2)
@@ -398,6 +444,41 @@ pub fn spawn_video(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_saida_so_muda_depois_que_a_janela_para_de_mudar() {
+        let t0 = Instant::now();
+        let mut settle = ResizeSettle::default();
+        settle.changed((1280, 720), (640, 352), t0);
+        assert!(!settle.due(t0 + RESIZE_SETTLE / 2));
+        // Mudou de novo no meio: o tempo recomeça.
+        settle.changed((1920, 1072), (640, 352), t0 + RESIZE_SETTLE / 2);
+        assert!(!settle.due(t0 + RESIZE_SETTLE));
+        assert!(settle.due(t0 + RESIZE_SETTLE * 2));
+        assert!(!settle.due(t0 + RESIZE_SETTLE * 3), "uma vez só");
+    }
+
+    #[test]
+    fn mesmo_tamanho_de_saida_nao_refaz() {
+        let t0 = Instant::now();
+        let mut settle = ResizeSettle::default();
+        settle.changed((640, 352), (1280, 720), t0);
+        settle.changed((1280, 720), (1280, 720), t0);
+        assert!(!settle.due(t0 + RESIZE_SETTLE * 2));
+    }
+
+    #[test]
+    fn o_tamanho_de_saida_alinha_so_no_encoder_da_placa() {
+        let format = VideoFormat {
+            max_width: 1920,
+            max_height: 1080,
+            fps: 60,
+            bitrate_bps: 8_000_000,
+        };
+        assert_eq!(output_size((1920, 1080), format, true), (1920, 1072));
+        assert_eq!(output_size((1920, 1080), format, false), (1920, 1080));
+        assert_eq!(output_size((3840, 2160), format, false), (1920, 1080));
+    }
 
     #[test]
     fn ashtar_encoder_escolhe_o_caminho() {
