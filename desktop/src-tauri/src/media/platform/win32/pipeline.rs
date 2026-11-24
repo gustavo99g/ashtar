@@ -90,13 +90,21 @@ pub fn spawn_video(
         };
         ctx.ready.ok();
 
-        match pipeline.run(&commands, &mut sink, &|| ctx.stop.load(Ordering::Acquire)) {
+        let reason = match pipeline.run(&commands, &mut sink, &|| ctx.stop.load(Ordering::Acquire))
+        {
             Ok(reason) => reason,
             Err(error) => {
                 tracing::error!(target: "media", %error, "o vídeo da transmissão parou com erro");
                 EndReason::Error(error.to_string())
             }
-        }
+        };
+        // A sessão fica sabendo antes de a captura e o encoder serem soltos: no fim de uma
+        // partida do LoL, soltar a captura da janela que fechou travou a thread, e a transmissão
+        // ficou parada na última imagem em vez de voltar para o cliente.
+        ctx.report(reason.clone());
+        drop(pipeline);
+        tracing::info!(target: "media", "vídeo da transmissão liberado");
+        reason
     })?;
 
     Ok((handle, control, stats))

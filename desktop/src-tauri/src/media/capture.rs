@@ -4,7 +4,8 @@
 //! por [`spawn_capture`]. Garantias que este módulo dá:
 //!
 //! - o `on_end` é chamado exatamente uma vez, e só se a captura chegou a iniciar,
-//!   inclusive em caso de panic;
+//!   inclusive em caso de panic. A captura pode avisar antes de terminar
+//!   ([`CaptureContext::report`]), para o fim não esperar ela soltar os recursos;
 //! - um [`CaptureHandle`] esquecido pede a parada da thread no `Drop`.
 //!
 //! Regras para quem usa:
@@ -16,7 +17,7 @@
 use std::{
     sync::{
         atomic::{AtomicBool, Ordering},
-        mpsc, Arc,
+        mpsc, Arc, Mutex, PoisonError,
     },
     thread::{self, JoinHandle},
 };
@@ -39,29 +40,44 @@ pub type OnEnd = Box<dyn FnOnce(EndReason) + Send + 'static>;
 /// aparecer no log e encerrar a sessão, em vez de deixar o app achando que
 /// ainda está compartilhando.
 struct EndGuard {
-    on_end: Option<OnEnd>,
+    on_end: EndSlot,
+}
+
+/// O `on_end`, dividido entre o [`EndGuard`] e o [`CaptureContext::report`]: quem chamar primeiro
+/// leva, e o outro não faz nada.
+#[derive(Clone)]
+struct EndSlot {
+    on_end: Arc<Mutex<Option<OnEnd>>>,
     started: Arc<AtomicBool>,
 }
 
-impl EndGuard {
-    fn finish(mut self, reason: EndReason) {
-        if let Some(f) = self.on_end.take() {
-            if self.started.load(Ordering::Acquire) {
-                f(reason);
-            }
+impl EndSlot {
+    fn call(&self, reason: EndReason) {
+        if !self.started.load(Ordering::Acquire) {
+            return;
         }
+        let taken = self
+            .on_end
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .take();
+        if let Some(f) = taken {
+            f(reason);
+        }
+    }
+}
+
+impl EndGuard {
+    fn finish(self, reason: EndReason) {
+        self.on_end.call(reason);
     }
 }
 
 impl Drop for EndGuard {
     fn drop(&mut self) {
-        if let Some(f) = self.on_end.take() {
-            if self.started.load(Ordering::Acquire) {
-                f(EndReason::Error(
-                    "a thread de captura terminou inesperadamente".into(),
-                ));
-            }
-        }
+        self.on_end.call(EndReason::Error(
+            "a thread de captura terminou inesperadamente".into(),
+        ));
     }
 }
 
@@ -101,6 +117,17 @@ impl Drop for CaptureHandle {
 pub struct CaptureContext {
     pub stop: Arc<AtomicBool>,
     pub ready: ReadySignal,
+    end: EndSlot,
+}
+
+impl CaptureContext {
+    /// Avisa o fim agora, antes de a thread soltar o que segura. Soltar a captura de uma janela
+    /// que fechou pode demorar (ou travar, como visto no fim de uma partida do League of
+    /// Legends); com o aviso antes, a sessão acaba na hora e o app pode seguir para a próxima
+    /// fonte. O motivo que a thread devolver depois é ignorado.
+    pub fn report(&self, reason: EndReason) {
+        self.end.call(reason);
+    }
 }
 
 pub struct ReadySignal {
@@ -143,18 +170,20 @@ pub fn spawn_capture(
     let started = Arc::new(AtomicBool::new(false));
     let (tx, rx) = mpsc::sync_channel(1);
 
+    let end = EndSlot {
+        on_end: Arc::new(Mutex::new(Some(on_end))),
+        started: started.clone(),
+    };
     let ctx = CaptureContext {
         stop: stop.clone(),
         ready: ReadySignal {
             tx: Some(tx),
-            started: started.clone(),
+            started,
         },
+        end: end.clone(),
     };
 
-    let guard = EndGuard {
-        on_end: Some(on_end),
-        started,
-    };
+    let guard = EndGuard { on_end: end };
 
     let thread = thread::Builder::new()
         .name(name.into())
@@ -261,5 +290,26 @@ mod tests {
 
         assert!(matches!(result, Err(AppError::Internal(_))));
         assert!(rx.recv_timeout(Duration::from_millis(200)).is_err());
+    }
+
+    #[test]
+    fn report_avisa_antes_de_a_thread_acabar_e_uma_vez_so() {
+        let (on_end, rx) = on_end_probe();
+        let (release_tx, release_rx) = mpsc::channel::<()>();
+        let handle = spawn_capture("test-report", on_end, move |mut ctx| {
+            ctx.ready.ok();
+            ctx.report(EndReason::SourceClosed);
+            // Segura a thread, como um `Drop` demorado.
+            let _ = release_rx.recv();
+            EndReason::Stopped
+        })
+        .expect("inicia");
+        assert!(matches!(
+            rx.recv_timeout(Duration::from_secs(1)),
+            Ok(EndReason::SourceClosed)
+        ));
+        release_tx.send(()).unwrap();
+        handle.stop_and_join();
+        assert!(rx.recv_timeout(Duration::from_millis(100)).is_err());
     }
 }
