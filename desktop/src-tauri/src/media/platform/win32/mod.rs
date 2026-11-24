@@ -4,6 +4,7 @@
 //! `windows`, que é dependência direta do projeto: o erro do compilador nesse
 //! tipo de conflito é confuso.
 
+pub mod amf;
 pub mod audio_capture;
 pub mod clipboard;
 pub mod convert;

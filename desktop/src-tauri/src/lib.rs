@@ -40,6 +40,14 @@ const WINDOW_STATE: StateFlags = StateFlags::SIZE
     .union(StateFlags::POSITION)
     .union(StateFlags::MAXIMIZED);
 
+/// O `amf-probe` (`examples/amf_probe.rs`): codifica `frames` quadros de teste pelo AMF da AMD e
+/// grava o H.264 em `out`. Fica fora do app; existe só para validar o AMF numa placa.
+#[cfg(target_os = "windows")]
+#[doc(hidden)]
+pub fn amf_probe(out: &std::path::Path, frames: u32) -> Result<String, String> {
+    media::platform::amf::probe(out, frames).map_err(|error| error.to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run(log_file: logging::LateFile) {
     let context = tauri::generate_context!();

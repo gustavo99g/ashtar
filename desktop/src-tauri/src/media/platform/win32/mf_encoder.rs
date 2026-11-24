@@ -29,10 +29,10 @@ use crate::media::video::h264_level;
 
 /// O GOP: um keyframe a cada 30 s no máximo. Os keyframes de verdade vêm sob pedido (alguém
 /// entrou, a rede perdeu pacotes); este só garante que um decoder perdido se recupere sozinho.
-const GOP_SECONDS: u32 = 30;
+pub const GOP_SECONDS: u32 = 30;
 
 /// Quantas das primeiras saídas do encoder vão para o log, com os tipos de NAL.
-const FIRST_OUTPUTS_LOGGED: u32 = 3;
+pub const FIRST_OUTPUTS_LOGGED: u32 = 3;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct EncoderSettings {
