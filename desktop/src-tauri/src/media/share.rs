@@ -196,11 +196,17 @@ impl Session {
         // Com limite: uma captura que travou ao soltar a janela fechada não pode prender quem
         // encerra (a fila de avisos, que precisa seguir para o fim da próxima transmissão).
         if !self.video.stop_and_join_within(JOIN_LIMIT) {
-            warn!(session_id = self.id, "o vídeo não terminou a tempo; segue sem ele");
+            warn!(
+                session_id = self.id,
+                "o vídeo não terminou a tempo; segue sem ele"
+            );
         }
         if let Some(audio) = self.audio {
             if !audio.handle.stop_and_join_within(JOIN_LIMIT) {
-                warn!(session_id = self.id, "o áudio não terminou a tempo; segue sem ele");
+                warn!(
+                    session_id = self.id,
+                    "o áudio não terminou a tempo; segue sem ele"
+                );
             }
         }
     }
