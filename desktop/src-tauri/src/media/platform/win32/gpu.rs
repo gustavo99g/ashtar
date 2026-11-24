@@ -29,6 +29,8 @@ pub struct GpuDevice {
     context: ID3D11DeviceContext,
     adapter_name: String,
     luid: u64,
+    vendor: u32,
+    driver: String,
 }
 
 impl GpuDevice {
@@ -61,14 +63,16 @@ impl GpuDevice {
 
         // SAFETY: chamadas COM em interfaces válidas, recém-criadas; o `cast` só pede uma
         // interface que todo dispositivo D3D11 tem.
-        let adapter = unsafe {
+        let (adapter, umd) = unsafe {
             let multithread: ID3D11Multithread = context.cast().map_err(hr("ID3D11Multithread"))?;
             let _ = multithread.SetMultithreadProtected(true);
-            device
+            let dxgi = device
                 .cast::<IDXGIDevice>()
                 .and_then(|dxgi| dxgi.GetAdapter())
-                .and_then(|adapter| adapter.GetDesc())
-                .map_err(hr("IDXGIAdapter::GetDesc"))?
+                .map_err(hr("IDXGIDevice::GetAdapter"))?;
+            // A versão do driver: o `CheckInterfaceSupport` do `IDXGIDevice` a devolve.
+            let umd = dxgi.CheckInterfaceSupport(&IDXGIDevice::IID).ok();
+            (dxgi.GetDesc().map_err(hr("IDXGIAdapter::GetDesc"))?, umd)
         };
 
         let luid = adapter.AdapterLuid;
@@ -77,6 +81,8 @@ impl GpuDevice {
             context,
             adapter_name: wide(&adapter.Description),
             luid: (u64::from(luid.HighPart as u32) << 32) | u64::from(luid.LowPart),
+            vendor: adapter.VendorId,
+            driver: umd.map_or_else(|| "?".into(), driver_version),
         })
     }
 
@@ -93,10 +99,32 @@ impl GpuDevice {
         &self.adapter_name
     }
 
+    /// Se a placa é da AMD (o PCI vendor id 0x1002): só nela o app chama o AMF.
+    pub fn is_amd(&self) -> bool {
+        self.vendor == 0x1002
+    }
+
+    /// A versão do driver da placa ("32.0.21025.1024"), ou "?".
+    pub fn driver(&self) -> &str {
+        &self.driver
+    }
+
     /// O LUID da placa: o encoder tem de ser da mesma (`mf_encoder.rs`).
     pub fn luid(&self) -> u64 {
         self.luid
     }
+}
+
+/// A versão do driver como o Windows mostra: quatro números de 16 bits.
+fn driver_version(umd: i64) -> String {
+    let v = umd as u64;
+    format!(
+        "{}.{}.{}.{}",
+        v >> 48,
+        (v >> 32) & 0xFFFF,
+        (v >> 16) & 0xFFFF,
+        v & 0xFFFF
+    )
 }
 
 #[cfg(test)]
@@ -110,5 +138,11 @@ mod tests {
         println!("placa: {} (LUID {:#x})", gpu.adapter_name(), gpu.luid());
         assert!(!gpu.adapter_name().is_empty());
         assert_ne!(gpu.luid(), 0);
+    }
+
+    #[test]
+    fn a_versao_do_driver_sai_em_quatro_partes() {
+        let umd = (32i64 << 48) | (21025 << 16) | 1024;
+        assert_eq!(driver_version(umd), "32.0.21025.1024");
     }
 }

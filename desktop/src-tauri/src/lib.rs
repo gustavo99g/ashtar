@@ -40,6 +40,14 @@ const WINDOW_STATE: StateFlags = StateFlags::SIZE
     .union(StateFlags::POSITION)
     .union(StateFlags::MAXIMIZED);
 
+/// O `amf-probe` (`examples/amf_probe.rs`): codifica `frames` quadros de teste pelo AMF da AMD e
+/// grava o H.264 em `out`. Fica fora do app; existe só para validar o AMF numa placa.
+#[cfg(target_os = "windows")]
+#[doc(hidden)]
+pub fn amf_probe(out: &std::path::Path, frames: u32) -> Result<String, String> {
+    media::platform::amf::probe(out, frames).map_err(|error| error.to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run(log_file: logging::LateFile) {
     let context = tauri::generate_context!();
@@ -74,6 +82,10 @@ pub fn run(log_file: logging::LateFile) {
                 tracing::error!(%error, "não foi possível abrir o arquivo de log");
             }
 
+            // A memória do encoder da placa (`media/encoder_memory.rs`) fica na pasta de dados.
+            if let Ok(dir) = app.path().app_data_dir() {
+                media::encoder_memory::set_data_dir(dir);
+            }
             app.manage(commands::screen_share::create_manager(app.handle()));
             app.manage(commands::updater::create_auto_update(app.handle()));
             app.manage(commands::thumbnails::Thumbnails::default());

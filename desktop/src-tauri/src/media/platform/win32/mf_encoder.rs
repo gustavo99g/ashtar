@@ -29,10 +29,10 @@ use crate::media::video::h264_level;
 
 /// O GOP: um keyframe a cada 30 s no máximo. Os keyframes de verdade vêm sob pedido (alguém
 /// entrou, a rede perdeu pacotes); este só garante que um decoder perdido se recupere sozinho.
-const GOP_SECONDS: u32 = 30;
+pub const GOP_SECONDS: u32 = 30;
 
 /// Quantas das primeiras saídas do encoder vão para o log, com os tipos de NAL.
-const FIRST_OUTPUTS_LOGGED: u32 = 3;
+pub const FIRST_OUTPUTS_LOGGED: u32 = 3;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct EncoderSettings {
@@ -40,16 +40,6 @@ pub struct EncoderSettings {
     pub height: u32,
     pub fps: u32,
     pub bitrate_bps: u32,
-}
-
-/// Como as imagens chegam ao encoder.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum EncoderInput {
-    /// A textura NV12 do conversor, direto na GPU (pelo gerenciador DXGI). O normal.
-    Gpu,
-    /// A imagem NV12 copiada para a memória. Para o encoder da AMD na RX 7600, que com a
-    /// textura aceita um quadro e para; a placa ainda codifica, só a cópia passa pela CPU.
-    Memory,
 }
 
 /// Um H.264 que saiu do encoder.
@@ -71,7 +61,7 @@ pub struct MfEncoder {
     params: ParamSets,
     /// Quantas saídas já foram para o log (as primeiras vão, para diagnosticar uma placa).
     logged: u32,
-    _manager: Option<IMFDXGIDeviceManager>,
+    _manager: IMFDXGIDeviceManager,
 }
 
 impl MfEncoder {
@@ -79,11 +69,7 @@ impl MfEncoder {
     /// placa, falha: é o caso do plano B.
     ///
     /// Precisa do Media Foundation iniciado na thread (`MFStartup`, no `pipeline.rs`).
-    pub fn new(
-        gpu: &GpuDevice,
-        settings: EncoderSettings,
-        input: EncoderInput,
-    ) -> Result<Self, AppError> {
+    pub fn new(gpu: &GpuDevice, settings: EncoderSettings) -> Result<Self, AppError> {
         let (activate, name) = hardware_encoder(gpu.luid())?;
 
         // SAFETY: chamadas COM em interfaces válidas; os tipos de mídia e atributos são criados
@@ -97,25 +83,19 @@ impl MfEncoder {
                 .map_err(hr("MF_TRANSFORM_ASYNC_UNLOCK"))?;
             let _ = attributes.SetUINT32(&MF_LOW_LATENCY, 1);
 
-            let manager = match input {
-                EncoderInput::Gpu => {
-                    let mut token = 0u32;
-                    let mut manager = None;
-                    MFCreateDXGIDeviceManager(&mut token, &mut manager)
-                        .map_err(hr("MFCreateDXGIDeviceManager"))?;
-                    let manager = manager.ok_or_else(|| {
-                        AppError::VideoCapture("MFCreateDXGIDeviceManager sem o gerenciador".into())
-                    })?;
-                    manager
-                        .ResetDevice(gpu.device(), token)
-                        .map_err(hr("ResetDevice"))?;
-                    transform
-                        .ProcessMessage(MFT_MESSAGE_SET_D3D_MANAGER, manager.as_raw() as usize)
-                        .map_err(hr("MFT_MESSAGE_SET_D3D_MANAGER"))?;
-                    Some(manager)
-                }
-                EncoderInput::Memory => None,
-            };
+            let mut token = 0u32;
+            let mut manager = None;
+            MFCreateDXGIDeviceManager(&mut token, &mut manager)
+                .map_err(hr("MFCreateDXGIDeviceManager"))?;
+            let manager = manager.ok_or_else(|| {
+                AppError::VideoCapture("MFCreateDXGIDeviceManager sem o gerenciador".into())
+            })?;
+            manager
+                .ResetDevice(gpu.device(), token)
+                .map_err(hr("ResetDevice"))?;
+            transform
+                .ProcessMessage(MFT_MESSAGE_SET_D3D_MANAGER, manager.as_raw() as usize)
+                .map_err(hr("MFT_MESSAGE_SET_D3D_MANAGER"))?;
 
             let codec_api: ICodecAPI = transform.cast().map_err(hr("ICodecAPI"))?;
 
@@ -344,38 +324,6 @@ impl MfEncoder {
                     let _ = buffer.SetCurrentLength(length);
                 }
             }
-            let sample = MFCreateSample().map_err(hr("MFCreateSample"))?;
-            sample.AddBuffer(&buffer).map_err(hr("AddBuffer"))?;
-            sample.SetSampleTime(time).map_err(hr("SetSampleTime"))?;
-            sample
-                .SetSampleDuration(self.frame_duration)
-                .map_err(hr("SetSampleDuration"))?;
-            self.transform
-                .ProcessInput(0, &sample, 0)
-                .map_err(hr("ProcessInput"))?;
-        }
-        self.need_input = self.need_input.saturating_sub(1);
-        Ok(())
-    }
-
-    /// Entrega uma imagem NV12 na memória (sem sobra no fim das linhas), com o horário da imagem
-    /// (100 ns). Para o encoder aberto com [`EncoderInput::Memory`]; só chamar com
-    /// [`MfEncoder::wants_input`].
-    pub fn submit_memory(&mut self, nv12: &[u8], time: i64) -> Result<(), AppError> {
-        // SAFETY: o buffer é travado, recebe a cópia dentro do tamanho que foi criado e é
-        // destravado antes de ir para a amostra.
-        unsafe {
-            let len = nv12.len() as u32;
-            let buffer = MFCreateMemoryBuffer(len).map_err(hr("MFCreateMemoryBuffer"))?;
-            let mut ptr = std::ptr::null_mut();
-            buffer
-                .Lock(&mut ptr, None, None)
-                .map_err(hr("IMFMediaBuffer::Lock"))?;
-            std::ptr::copy_nonoverlapping(nv12.as_ptr(), ptr, nv12.len());
-            let _ = buffer.Unlock();
-            buffer
-                .SetCurrentLength(len)
-                .map_err(hr("SetCurrentLength"))?;
             let sample = MFCreateSample().map_err(hr("MFCreateSample"))?;
             sample.AddBuffer(&buffer).map_err(hr("AddBuffer"))?;
             sample.SetSampleTime(time).map_err(hr("SetSampleTime"))?;

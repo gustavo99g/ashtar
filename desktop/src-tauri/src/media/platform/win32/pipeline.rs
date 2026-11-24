@@ -31,18 +31,21 @@ const PROBE_TIMEOUT: Duration = Duration::from_millis(1500);
 /// Quanto tempo o encoder da placa pode ficar com imagens sem devolver nenhuma antes de o log
 /// avisar.
 const HARDWARE_STALL: Duration = Duration::from_secs(2);
+use super::amf::AmfEncoder;
 use super::gpu::GpuDevice;
-use super::mf_encoder::{EncoderInput, EncoderSettings, MfEncoder};
+use super::hardware::HardwareEncoder;
+use super::mf_encoder::{EncoderSettings, MfEncoder};
 use super::readback::Readback;
 use super::wgc::{self, WgcCapture};
 use crate::error::AppError;
 use crate::media::bitrate::BitrateController;
 use crate::media::capture::{spawn_capture, EndReason};
 use crate::media::encoded::{EncodedFrame, PacketSink, RawFrame, VideoPacket};
+use crate::media::encoder_memory::{order, EncoderMemory, HardwarePath};
 use crate::media::sources::SourceRef;
 use crate::media::video::{
-    align_for_hardware, fit_in_box, EncoderKind, VideoCommand, VideoConfig, VideoControl,
-    VideoFormat, VideoStats, RESEND_AFTER,
+    align_for_hardware, fit_in_box, EncoderKind, EncoderPreference, VideoCommand, VideoConfig,
+    VideoControl, VideoFormat, VideoStats, RESEND_AFTER,
 };
 use crate::media::{CaptureHandle, OnEnd, SinkStatus};
 
@@ -141,14 +144,12 @@ impl Drop for Runtime {
 enum Output {
     Hardware {
         /// Numa caixa: o encoder é bem maior que o plano B (o `large_enum_variant` do clippy).
-        encoder: Box<MfEncoder>,
+        encoder: Box<HardwareEncoder>,
         bitrate: BitrateController,
         /// Frames entregues ao encoder que ainda não saíram.
         in_flight: usize,
         /// Quando saiu a última imagem codificada (ou quando o encoder foi criado).
         last_output: Instant,
-        /// Com [`EncoderInput::Memory`], a cópia da imagem para a memória antes do encoder.
-        readback: Option<Readback>,
     },
     /// Plano B: a imagem volta para a memória e o libwebrtc codifica.
     Software { readback: Readback },
@@ -417,7 +418,6 @@ impl Pipeline {
                 encoder,
                 in_flight,
                 last_output,
-                readback,
                 ..
             } => {
                 if *in_flight > 0 && now.duration_since(*last_output) >= HARDWARE_STALL {
@@ -441,13 +441,11 @@ impl Pipeline {
                     self.keyframe_pending = false;
                 }
                 let texture = self.converter.convert(self.slot)?;
-                match readback {
-                    Some(readback) => {
-                        encoder.submit_memory(&readback.read(&self.gpu, texture)?, time)?
-                    }
-                    None => encoder.submit(texture, time)?,
+                if encoder.submit(texture, time)? {
+                    *in_flight += 1;
+                } else {
+                    self.stats.dropped();
                 }
-                *in_flight += 1;
             }
             Output::Software { readback } => {
                 let texture = self.converter.convert(self.slot)?;
@@ -504,65 +502,61 @@ fn build_output(
             fps: format.fps,
             bitrate_bps: target_bps,
         };
-        // Primeiro com a textura na GPU; se o encoder não devolver imagem assim, com a imagem
-        // na memória (o caso da RX 7600); se nem assim, o plano B.
+        let preference = EncoderPreference::from_env();
+        if preference != EncoderPreference::Auto {
+            tracing::info!(target: "media", ?preference, "encoder escolhido pelo ambiente (ASHTAR_ENCODER)");
+        }
+        let amd = gpu.is_amd();
+        if preference == EncoderPreference::Amf && !amd {
+            tracing::warn!(target: "media", placa = gpu.adapter_name(), "ASHTAR_ENCODER=amf numa placa que não é AMD");
+        }
+        let mut memory = EncoderMemory::open();
+        let (adapter, driver) = (gpu.adapter_name(), gpu.driver());
+        let mf_stalls_here = memory.mf_stalls(adapter, driver);
+        if mf_stalls_here && preference == EncoderPreference::Auto {
+            tracing::info!(target: "media", placa = adapter, driver, "o Media Foundation trava nesta placa com este driver: começa pelo AMF");
+        }
+        let mut mf_failed = false;
         let mut found = None;
-        for input in [EncoderInput::Gpu, EncoderInput::Memory] {
-            let mut encoder = match MfEncoder::new(gpu, settings, input) {
-                Ok(encoder) => encoder,
-                Err(error) => {
-                    tracing::warn!(target: "media", %error, ?input, "sem encoder de hardware");
+        for candidate in order(preference, amd, mf_stalls_here) {
+            match open_hardware(candidate, gpu, settings, &converter) {
+                Some((encoder, in_flight)) => {
+                    found = Some((candidate, encoder, in_flight));
                     break;
                 }
-            };
-            let readback = match input {
-                EncoderInput::Gpu => None,
-                EncoderInput::Memory => Some(Readback::new(gpu, size, OutputFormat::Nv12)?),
-            };
-            match probe(&mut encoder, &converter, gpu, readback.as_ref()) {
-                Ok(in_flight) => {
-                    found = Some((encoder, in_flight, readback));
-                    break;
-                }
-                Err(error) => tracing::warn!(
-                    target: "media",
-                    %error,
-                    ?input,
-                    encoder = encoder.name(),
-                    placa = gpu.adapter_name(),
-                    "o encoder de hardware não passou no teste"
-                ),
+                None => mf_failed |= candidate == HardwarePath::MediaFoundation,
+            }
+        }
+        if preference == EncoderPreference::Auto && amd {
+            match found.as_ref().map(|(candidate, ..)| *candidate) {
+                Some(HardwarePath::Amf) if mf_failed => memory.remember(adapter, driver, true),
+                Some(HardwarePath::MediaFoundation) => memory.remember(adapter, driver, false),
+                _ => {}
             }
         }
         if found.is_none() {
             tracing::warn!(target: "media", "sem encoder de hardware que funcione: plano B");
         }
-        found
+        found.map(|(_, encoder, in_flight)| (encoder, in_flight))
     };
 
     let output = match hardware {
-        Some((encoder, in_flight, readback)) => {
+        Some((encoder, in_flight)) => {
             tracing::info!(
                 target: "media",
                 encoder = encoder.name(),
-                entrada = if readback.is_some() { "memória" } else { "textura" },
                 placa = gpu.adapter_name(),
+                driver = gpu.driver(),
                 tamanho = %format!("{}x{}", size.0, size.1),
                 fps = format.fps,
                 "encoder de hardware pronto"
             );
-            let name = if readback.is_some() {
-                format!("{} (memória)", encoder.name())
-            } else {
-                encoder.name().to_string()
-            };
-            stats.set_encoder(EncoderKind::Hardware(name));
+            stats.set_encoder(EncoderKind::Hardware(encoder.name().to_string()));
             Output::Hardware {
                 encoder: Box::new(encoder),
                 bitrate: BitrateController::new(target_bps, format.fps, Instant::now()),
                 in_flight,
                 last_output: Instant::now(),
-                readback,
             }
         }
         None => {
@@ -575,6 +569,41 @@ fn build_output(
     Ok((converter, output))
 }
 
+/// Abre o encoder do `candidate` e passa pelo [`probe`]. `None` (com o motivo no log) se ele não
+/// abrir ou não devolver imagem.
+fn open_hardware(
+    candidate: HardwarePath,
+    gpu: &GpuDevice,
+    settings: EncoderSettings,
+    converter: &Converter,
+) -> Option<(HardwareEncoder, usize)> {
+    let opened = match candidate {
+        HardwarePath::MediaFoundation => MfEncoder::new(gpu, settings).map(HardwareEncoder::Mf),
+        HardwarePath::Amf => AmfEncoder::new(gpu, settings).map(HardwareEncoder::Amf),
+    };
+    let mut encoder = match opened {
+        Ok(encoder) => encoder,
+        Err(error) => {
+            tracing::warn!(target: "media", %error, ?candidate, "sem encoder de hardware");
+            return None;
+        }
+    };
+    match probe(&mut encoder, converter) {
+        Ok(in_flight) => Some((encoder, in_flight)),
+        Err(error) => {
+            tracing::warn!(
+                target: "media",
+                %error,
+                ?candidate,
+                encoder = encoder.name(),
+                placa = gpu.adapter_name(),
+                "o encoder de hardware não passou no teste"
+            );
+            None
+        }
+    }
+}
+
 /// Antes de usar o encoder da placa, confere que ele devolve imagem: manda quadros pretos (a
 /// entrada do conversor ainda está zerada) até sair o primeiro H.264, por no máximo
 /// [`PROBE_TIMEOUT`]. Na RX 7600, o da AMD abria sem erro, aceitava um quadro e nunca devolvia
@@ -582,12 +611,7 @@ fn build_output(
 ///
 /// Devolve quantos quadros do teste ainda estão no encoder (saem depois e são descartados por
 /// quem assiste, que espera o keyframe do primeiro quadro de verdade).
-fn probe(
-    encoder: &mut MfEncoder,
-    converter: &Converter,
-    gpu: &GpuDevice,
-    readback: Option<&Readback>,
-) -> Result<usize, AppError> {
+fn probe(encoder: &mut HardwareEncoder, converter: &Converter) -> Result<usize, AppError> {
     let started = Instant::now();
     let mut submitted = 0usize;
     loop {
@@ -610,13 +634,9 @@ fn probe(
         }
         if encoder.wants_input() && submitted < RING - 1 {
             let texture = converter.convert(submitted)?;
-            match readback {
-                Some(readback) => {
-                    encoder.submit_memory(&readback.read(gpu, texture)?, wgc::now_100ns())?
-                }
-                None => encoder.submit(texture, wgc::now_100ns())?,
+            if encoder.submit(texture, wgc::now_100ns())? {
+                submitted += 1;
             }
-            submitted += 1;
         }
         std::thread::sleep(Duration::from_millis(2));
     }

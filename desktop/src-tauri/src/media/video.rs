@@ -295,6 +295,10 @@ fn even(side: u64) -> u32 {
 ///
 /// Posição e tamanho saem sempre pares: no NV12 a cor cobre blocos de 2×2, e um retângulo ímpar
 /// borraria a borda do conteúdo.
+///
+/// Uma sobra de até [`STRETCH_UP_TO`] pixels (a do alinhamento em 16 do encoder da placa, como
+/// 1920 × 1080 em 1920 × 1072) não vira faixa: a imagem estica para ocupar a saída inteira. Uma
+/// faixa assim fina só mostrava lixo, porque nem todo driver pinta o fundo da conversão de preto.
 pub fn letterbox(input: (u32, u32), output: (u32, u32)) -> (u32, u32, u32, u32) {
     let (iw, ih) = (u64::from(input.0.max(1)), u64::from(input.1.max(1)));
     let (ow, oh) = (u64::from(output.0), u64::from(output.1));
@@ -304,8 +308,15 @@ pub fn letterbox(input: (u32, u32), output: (u32, u32)) -> (u32, u32, u32, u32) 
         ((iw * oh / ih).min(ow), oh) // mais alta: faixas dos lados
     };
     let (w, h) = (w as u32 & !1, h as u32 & !1);
+    if output.0 - w <= STRETCH_UP_TO && output.1 - h <= STRETCH_UP_TO {
+        return (0, 0, output.0, output.1);
+    }
     (((output.0 - w) / 2) & !1, ((output.1 - h) / 2) & !1, w, h)
 }
+
+/// A maior sobra, em pixels, que o [`letterbox`] estica em vez de virar faixa. A imagem deforma
+/// no máximo 2% (32 em 1920), o que não se nota.
+const STRETCH_UP_TO: u32 = 32;
 
 /// Menor nível H.264 que comporta `width` × `height` a `fps` (tabela A-1 da norma).
 ///
@@ -333,11 +344,40 @@ pub fn h264_level(width: u32, height: u32, fps: u32) -> u32 {
         .map_or(52, |(level, _, _)| *level)
 }
 
+/// Qual encoder tentar, pelo `ASHTAR_ENCODER` no ambiente: serve para testar um caminho numa
+/// placa em que ele não seria o escolhido (o AMF numa AMD em que o Media Foundation funciona).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EncoderPreference {
+    /// A ordem normal (ver `build_output` no Windows).
+    Auto,
+    /// Só o Media Foundation (`mf`); sem ele, o plano B.
+    MediaFoundation,
+    /// Só o AMF da AMD (`amf`); sem ele, o plano B.
+    Amf,
+    /// O plano B direto (`software`).
+    Software,
+}
+
+impl EncoderPreference {
+    pub fn parse(value: Option<&str>) -> Self {
+        match value.map(|v| v.trim().to_ascii_lowercase()).as_deref() {
+            Some("mf") => Self::MediaFoundation,
+            Some("amf") => Self::Amf,
+            Some("software") => Self::Software,
+            _ => Self::Auto,
+        }
+    }
+
+    pub fn from_env() -> Self {
+        Self::parse(std::env::var("ASHTAR_ENCODER").ok().as_deref())
+    }
+}
+
 /// Inicia o vídeo da transmissão, entregando cada pacote ao `sink`. Devolve o controle (para os
 /// comandos do meio) e os números.
 ///
 /// Sem encoder de hardware, com `software_encoder` no `config`, ou com
-/// `ASHTAR_FORCE_SOFTWARE_ENCODER=1` no ambiente, entra o plano B
+/// `ASHTAR_FORCE_SOFTWARE_ENCODER=1` ou `ASHTAR_ENCODER=software` no ambiente, entra o plano B
 /// (os pacotes saem como `RawFrame`). Uma fonte que não existe falha com `SourceNotFound`.
 ///
 /// # Bloqueia
@@ -350,13 +390,35 @@ pub fn spawn_video(
 ) -> Result<(CaptureHandle, VideoControl, VideoStats), AppError> {
     config.format.validate()?;
     let force_software = config.software_encoder
-        || std::env::var("ASHTAR_FORCE_SOFTWARE_ENCODER").is_ok_and(|v| v == "1");
+        || std::env::var("ASHTAR_FORCE_SOFTWARE_ENCODER").is_ok_and(|v| v == "1")
+        || EncoderPreference::from_env() == EncoderPreference::Software;
     platform::spawn_video(config, force_software, sink, on_end)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn ashtar_encoder_escolhe_o_caminho() {
+        assert_eq!(EncoderPreference::parse(None), EncoderPreference::Auto);
+        assert_eq!(
+            EncoderPreference::parse(Some("AMF")),
+            EncoderPreference::Amf
+        );
+        assert_eq!(
+            EncoderPreference::parse(Some(" mf ")),
+            EncoderPreference::MediaFoundation
+        );
+        assert_eq!(
+            EncoderPreference::parse(Some("software")),
+            EncoderPreference::Software
+        );
+        assert_eq!(
+            EncoderPreference::parse(Some("nvenc")),
+            EncoderPreference::Auto
+        );
+    }
 
     fn format(fps: u32, max_width: u32, max_height: u32) -> VideoFormat {
         VideoFormat {
@@ -420,6 +482,9 @@ mod tests {
     fn outra_proporcao_fica_no_meio_com_bordas() {
         // A janela ficou quadrada numa saída 16:9: faixas dos lados.
         assert_eq!(letterbox((1000, 1000), (1920, 1080)), (420, 0, 1080, 1080));
+        // A sobra do alinhamento em 16 (1920 × 1080 em 1920 × 1072) estica, sem faixa.
+        assert_eq!(letterbox((1920, 1080), (1920, 1072)), (0, 0, 1920, 1072));
+        assert_eq!(letterbox((1918, 1036), (1904, 1024)), (0, 0, 1904, 1024));
         // Ficou ultrawide: faixas em cima e embaixo.
         assert_eq!(letterbox((3440, 1440), (1920, 1080)), (0, 138, 1920, 802));
     }

@@ -1,5 +1,10 @@
 # O que há de novo no Ashtar
 
+## 0.8.5
+
+- Nas placas AMD em que o encoder do Windows trava, como a RX 7600, o Ashtar agora fala direto com o encoder da AMD antes de ir para o processador. A transmissão continua na placa de vídeo e pesa menos no jogo. Quando isso acontece, o Ashtar lembra da placa e, nas próximas transmissões, já começa pelo caminho que funciona.
+- A transmissão em tela cheia não mostra mais uma faixa colorida na borda de baixo.
+
 ## 0.8.4
 
 - Na RX 7600 e em outras placas em que o encoder não aceita a imagem direto da GPU, o Ashtar tenta entregar a imagem pela memória antes de ir para o processador, e assim a placa continua codificando.
