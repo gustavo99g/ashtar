@@ -167,7 +167,7 @@ function SoundTile({
 				event.dataTransfer.effectAllowed = "copy";
 			}}
 			onClick={() => onPlay(sound)}
-			className="relative flex h-14 w-full flex-col items-center justify-center gap-1 rounded-lg bg-secondary px-1.5 text-foreground hover:bg-secondary-hover"
+			className="relative flex h-14 w-full flex-col items-center justify-center gap-1 rounded-lg bg-secondary-hover px-1.5 text-foreground hover:bg-accent"
 		>
 			{slot >= 0 && <SlotNumber index={slot} />}
 			<SoundFace sound={sound} />
@@ -268,7 +268,9 @@ function Slot({
 			<SlotNumber index={index} />
 			{soundId ? (
 				<>
-					<span className="text-[11px] italic">Som removido</span>
+					<span className="px-3 pt-2 text-center text-[10px] leading-tight italic">
+						Som removido
+					</span>
 					<button
 						type="button"
 						aria-label={`Esvaziar o lugar ${index + 1}`}
@@ -279,7 +281,9 @@ function Slot({
 					</button>
 				</>
 			) : (
-				<span className="text-[11px]">Arraste um som</span>
+				<span className="px-3 pt-2 text-center text-[10px] leading-tight">
+					Arraste um som
+				</span>
 			)}
 		</div>
 	);

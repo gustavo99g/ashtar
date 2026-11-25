@@ -5,6 +5,7 @@ import {
 } from "@/features/admin";
 import { ArchivedSettings } from "@/features/channels";
 import { EmojiSettings } from "@/features/emojis";
+import { SoundSettings } from "@/features/sounds";
 import { ProfileSettings } from "@/features/identity";
 import { ShortcutsSettings } from "@/features/settings";
 import { ActivitySettings } from "@/features/activity";
@@ -55,6 +56,10 @@ export function MembersSettingsRoute() {
 }
 export function ArchivedSettingsRoute() {
 	return <ArchivedSettings />;
+}
+
+export function SoundsSettingsRoute() {
+	return <SoundSettings />;
 }
 
 export function EmojisSettingsRoute() {

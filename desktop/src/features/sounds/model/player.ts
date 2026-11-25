@@ -42,3 +42,32 @@ export async function playSoundFile(
 export function preloadSoundFiles(fileIds: string[]): void {
 	for (const id of fileIds) void fileUrl(id).catch(() => {});
 }
+
+/** Toca amostras de 48 kHz (o trecho no editor). Devolve como parar. */
+export function playSamples(
+	samples: Float32Array,
+	rate: number,
+	onEnd?: () => void,
+): () => void {
+	const context = new AudioContext();
+	const buffer = context.createBuffer(1, samples.length, rate);
+	buffer.getChannelData(0).set(samples);
+	const source = context.createBufferSource();
+	source.buffer = buffer;
+	source.connect(context.destination);
+	let stopped = false;
+	const stop = () => {
+		if (stopped) return;
+		stopped = true;
+		try {
+			source.stop();
+		} catch {
+			// Já tinha parado.
+		}
+		void context.close();
+		onEnd?.();
+	};
+	source.onended = stop;
+	source.start();
+	return stop;
+}
