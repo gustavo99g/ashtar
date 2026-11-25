@@ -60,9 +60,9 @@ As miniaturas foram adiantadas para a v0.2.4 e o aviso de conteúdo protegido en
 - [ ] O overlay em jogos, desenhado no canvas e sem versão (a câmera entrou na v0.4).
 - [ ] `@todos`, silenciar com prazo e grupos privados com mais de duas pessoas (fora da v0.3).
 - [ ] Moderação nas ligações privadas e o "Jogando X" visível para os outros (fora da v0.8, 22/11).
-- [ ] Cópia dos arquivos (fotos, anexos, prévias e emojis) fora da VPS: o R2 como segunda implementação do
-      `FileStore` (ADR 0031) ou uma cópia periódica de `data/files`, ou o snapshot do provedor. Adiado pelo Kid em
-      20/11; até lá os arquivos ficam fora do backup.
+- [ ] Cópia dos anexos e das prévias fora da VPS: o R2 como segunda implementação do `FileStore` (ADR 0031), uma
+      cópia periódica de `data/files` ou o snapshot do provedor. As fotos de perfil, os emojis e os sons já vão no
+      backup desde a v0.9 (ADR 0036); os anexos e as prévias ficaram fora por decisão do Kid (24/11).
 - [ ] O cartão "Evento do grupo" do quadro "Canal de texto — paleta Ashtar" (criar evento, confirmar presença,
       lembrete), "Ouvindo música" e o player de áudio no chat: sem versão.
 - [ ] Um segundo tema (claro, por exemplo). A troca por `data-theme` já existe desde a v0.2.2 (ADR 0012);

@@ -1,93 +1,57 @@
-# NOTES — pendências da v0.6 (confiabilidade e configurações)
+# NOTES — pendências da v0.9 (Release Candidate)
 
-Lista de verificação da fase descrita no [`PLAN.md`](PLAN.md).
-Cada item deve ser resolvido ou conscientemente adiado (marcar como tal) antes de fechar a entrega em que ele está.
+Lista de verificação da fase descrita no [`PLAN.md`](PLAN.md). Cada item deve ser resolvido ou conscientemente
+adiado (marcar como tal) antes de fechar a entrega em que ele está.
 
-## Antes de começar
+Base: a `main` com a `0.8.11` (merge do PR #44, `b8fc1a0`). A correção da barra de tarefas na tela cheia
+(`858da4a`, só na `feature/0.8`) entra quando passar pela `dev` como `0.8.12`.
 
-- [ ] **A v0.5 na beta.** A `0.5.0` sai pela beta; os `[ ]` do `NOTES.md` da v0.5 são conferidos no teste dela. O que
-      sobrar fica marcado como adiado em `docs/plans/v0.5-notes.md`, e o que pede código entra aqui.
-- [ ] **O canvas:** os cinco quadros novos da Etapa 0 (fileira "Confiabilidade (0.6)") desenhados; falta o Kid conferir.
+## Do uso real (24/11)
 
-## Parte 1 — configurações e atalhos
+- O grupo usa a 0.8.11 sem reclamar do que já funciona.
+- [ ] **Mensagem do convite recusado.** Um amigo viu "Convite inválido, expirado ou já usado" com o convite ainda
+      ativo no Painel: o código chegou errado. A API junta quatro casos num erro só (`ApiError::InvalidInvite`).
+      Separar: "Este convite venceu", "Este convite já foi usado", "Este convite foi revogado" e "Código não
+      encontrado" (o `find_valid` em `identity/invites.rs` vira uma busca pelo código e uma conferência depois).
+- [ ] **Prévia do link do convite** (o Kid aprovou na 0.9, 24/11). A prévia da API recusa a própria VPS
+      (`own_addresses` em `previews/mod.rs`), então o link do convite nunca ganha cartão. O app reconhece o link e
+      monta o cartão ele mesmo pela rota de leitura do convite (`preview`): quem convidou, ou de quem é a conta na
+      recuperação, e quando vence. A proteção da VPS não muda.
+- [ ] **Formatar o PC entra direto** (teste A06). Um amigo formatou e o Kid mandou um convite de recuperação, que
+      funcionou; mas o Kid tinha desvinculado o computador antes, o que libera a chave, então o caso não prova nada
+      sobre a chave. Pelo desenho, formatar não muda a chave e basta instalar o app. Conferir no teste do RC, sem
+      desvincular antes.
+- [ ] **Link para baixar o app**, para mandar a quem formatou ou trocou de PC sem gerar convite (24/11). O
+      `/download` já existe; o Painel › Convites ganha "Copiar link para baixar o app" (decisão 9 do plano).
 
-### Cadeia do microfone
+- [ ] **A janela da conversa privada um pouco mais larga** (pedido do Kid, 24/11). Hoje é `w-[380px]` em
+      `dms/components/DmWindow.tsx` (quadro "Lateral — conversa embaixo"). Proposta: 440 px, com a altura de até
+      540 igual. Conferir que três abertas (a expandida e duas abas de 210) ainda cabem ao lado da lateral numa
+      janela de 1280 px.
 
-- [ ] **O `AudioWorklet` no WebView2** junto do RNNoise: o custo de CPU dos dois na mesma cadeia.
-- [ ] **O portão não corta o começo das palavras** (10 ms para abrir) nem o fim (300 ms para fechar).
-- [ ] **A sensibilidade automática** com ventilador e com teclado mecânico: não abre com o teclado.
-- [ ] **O volume de entrada acima de 100%** não distorce com o RNNoise depois (o ganho vem antes).
-- [ ] **A migração do `noiseStore`**: quem desligou a supressão continua com ela desligada.
-- [ ] **Eco e ganho automático** trocados no meio da chamada: a trilha é refeita e a cadeia volta.
+## Decisões do Kid (24/11)
 
-### Voz e vídeo
-
-- [ ] **O volume de saída** por cima do volume de cada pessoa e do reforço acima de 100% (`boost.ts`).
-- [ ] **Testar microfone** fora da sala devolve o som na saída escolhida; dentro, só o medidor.
-- [ ] **Os padrões da transmissão** chegam ao seletor de fontes, e mudar no seletor não muda o padrão.
-
-### Gancho e atalhos
-
-- [ ] **Um jogo em tela cheia exclusiva** recebe a tecla do pressionar para falar e o Ashtar também.
-- [ ] **Um jogo como administrador** (UIPI): o atalho não chega. Explicar na aba Atalhos.
-- [ ] **Os anti-cheats dos jogos do grupo** não reclamam do gancho.
-- [ ] **O gancho não é desligado pelo Windows** depois de uma hora de uso (o tempo do callback).
-- [ ] **O teclado ABNT2:** os nomes das teclas (Ç, as acentuadas) aparecem certos.
-- [ ] **A tecla segurada** (repetição) dispara o atalho de mutar uma vez só.
-- [ ] **Alt+Tab com a tecla do pressionar para falar apertada:** o portão fecha quando ela solta, mesmo em outra
-      janela.
-- [ ] **Os textos** da aba Atalhos, do aviso de combinação repetida e do "Pressionar para falar: V", revisados.
-
-### Aviso de mutado e som
-
-- [ ] **O clone da trilha** mutada não acende a luz do microfone de novo no Windows nem pesa na CPU.
-- [ ] **O aviso de mutado** não aparece com o barulho de fundo (usa o mesmo limiar do portão).
-- [ ] **O som do pressionar para falar** não vai para a trilha (só quem aperta ouve).
-
-## Parte 2 — confiabilidade
-
-### Voz e transmissão
-
-- [ ] **Quem foi desconectado, movido ou perdeu o acesso** não reconecta.
-- [ ] **A sala arquivada no meio da reconexão:** desiste, com o aviso de arquivada.
-- [ ] **A reconexão durante uma ligação privada** volta para a ligação, e só se a outra pessoa ainda está nela.
-- [ ] **A câmera não volta ligada** depois da reconexão.
-- [ ] **A suspensão do Windows** com a sala aberta: ao voltar, reconecta sem ficar em duas salas.
-- [ ] **A transmissão que volta:** quem assistia continua assistindo, com o mesmo volume e a mesma qualidade.
-- [ ] **O limite de transmissões** (6) não recusa quem está voltando.
-
-### Dispositivos
-
-- [ ] **Bluetooth** que troca de perfil (o fone vira "mãos livres" ao abrir o microfone): não fica em laço de
-      aviso.
-- [ ] **O aviso não repete** quando o mesmo dispositivo some e volta várias vezes seguidas.
-
-### Servidor
-
-- [ ] **A faixa não pisca** em quedas menores que 5 segundos.
-- [ ] **As consultas recarregadas** ao voltar: nada fica velho (não lidas, membros online, canais).
-- [ ] **O `TimeoutLayer`** não corta o WebSocket nem o upload dos logs.
-
-### Qualidade da conexão
-
-- [ ] **O `ConnectionQuality` do LiveKit** chega para todos os participantes, não só para o próprio.
-- [ ] **A mensagem `voice.stats`** não pesa (uma a cada 5 s por pessoa).
-
-### Logs
-
-- [ ] **O tamanho do `.zip`** de 2 dias de log, com uma noite de transmissão.
-- [ ] **O disco da VPS:** a pasta `data/logs/` entra no backup? Decidir (sugestão: não, são de 30 dias).
-- [ ] **O texto do botão** diz que só o dono vê, e que os logs têm nicks.
-
-### Testar conexão e estado do servidor
-
-- [ ] **A sala `teste:{user_id}`** não aparece em lista nenhuma, e o webhook não manda `voice.participants` dela.
-- [ ] **O `ConnectionCheck`** no WebView2: os testes de TURN e de publicar passam com o LiveKit da VPS.
-- [ ] **A pasta `data/backups/`** montada na API (o `compose.yaml`), só para leitura.
-
-## Riscos e cuidados
-
-- [ ] **O gancho global vê todas as teclas do computador.** O Rust só compara com a lista de atalhos e não grava nem
-      manda nada além do nome do atalho; nenhuma tecla vai para o log.
-- [ ] **Os logs saem do computador da pessoa.** Só quando ela clica, nunca sozinhos, e o conteúdo é o mesmo da pasta
-      que ela já pode abrir.
+- **Backup:** o banco (como hoje, todo dia), os emojis do grupo e as fotos de perfil. Os emojis e as fotos vão
+  junto da rotina do banco, mas só o que é novo: os arquivos nunca mudam depois de gravados (o id é o nome), então
+  a cópia manda só os ids que ainda não estão fora da VPS, e na maioria dos dias não manda nada. Anexos, prévias e
+  o resto dos arquivos ficam fora. Na
+  restauração testada do RC, os emojis voltam com o banco; um anexo sem arquivo aparece como indisponível, sem
+  quebrar a mensagem.
+- **Soundboard** (pedido do Kid, 24/11): entra na 0.9, antes da `0.9.0`. Quadro "Soundboard — tocar sons" no canvas.
+  Os sons são do grupo (permissão "Gerenciar sons", Painel › Sons; até 5 s, 1 MB, MP3/OGG/WAV, até 50). O botão
+  Sons fica no painel de voz (embaixo à esquerda) e na barra da chamada, na sala e na ligação; abre a grade para
+  cima. Cada app toca o arquivo guardado (a API só avisa a sala), um som a cada 3 s por pessoa. Enquanto toca, quem
+  tocou ganha o ícone dourado de onda na lista e no bloco, sem o nome nem o emoji do som. Para quem ouve: só a chave
+  geral e o volume do soundboard em Configurações › Notificações, nada de silenciar uma pessoa (decisão do Kid,
+  24/11). Os sons entram no backup junto das fotos e dos emojis.
+- **Soundboard — 4 lugares com atalho** (Kid, 24/11; quadro "Soundboard — atalhos"): a primeira linha da grade tem
+  4 lugares fixos, cada um com um atalho global (padrão Ctrl + Alt + 1 a 4, trocáveis em Configurações › Atalhos ›
+  Soundboard). Arrastar um som para um lugar põe ele lá (ocupado troca; lugar para lugar troca os dois; para fora
+  esvazia), e o botão direito no som tem "Pôr no lugar 1–4". O atalho é do lugar, não do som. Na lista, o som que
+  está num lugar ganha o número dourado no canto. A grade tem 4 colunas, como a linha dos lugares. Os lugares e os
+  atalhos ficam no PC de cada um.
+- **Transmissão nas configurações** (Kid, 24/11, no uso): a pausa da transmissão assistida ao abrir as configurações
+  incomoda. Decisão 27 do plano: a miniatura continua por cima das configurações, e a tela continua sendo baixada.
+- **Bloquear sons** (Kid, 24/11): fica na moderação de voz, vale em todas as salas até liberar, não nas ligações
+  privadas. Decisão 24 do plano.
+- **Congelamento:** entram ajustes pequenos de interface (a prévia do convite, a largura da conversa privada).
