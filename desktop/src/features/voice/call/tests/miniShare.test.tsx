@@ -120,19 +120,26 @@ describe("a miniatura da transmissão", () => {
 		expect(useRoomView.getState().shown).toEqual({ juju: "full" });
 	});
 
-	it("não aparece na Grade, na própria sala nem nas configurações", () => {
+	it("não aparece na Grade nem na própria sala", () => {
 		renderAt(paths.channel("geral"));
 		expect(screen.queryByRole("region")).toBeNull();
 		cleanup();
 
 		act(() => watchShare("juju"));
+		renderAt(paths.voiceRoom);
+		expect(screen.queryByRole("region")).toBeNull();
+	});
+
+	it("nas configurações, continua à vista e baixando (v0.9)", () => {
+		act(() => watchShare("juju"));
 		const router = renderAt(paths.voiceRoom);
 		expect(screen.queryByRole("region")).toBeNull();
 
 		act(() => void router.navigate(paths.settings.voice));
-		expect(screen.queryByRole("region")).toBeNull();
-		// Nas configurações, nada é baixado.
-		expect(useRoomView.getState().shown).toEqual({});
+		expect(
+			screen.getByRole("region", { name: "Transmissão de Juju, em miniatura" }),
+		).toBeInTheDocument();
+		expect(useRoomView.getState().shown).toEqual({ juju: "full" });
 	});
 
 	it("Voltar para a sala abre a sala; o X para de assistir", () => {
