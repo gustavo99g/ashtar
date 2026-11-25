@@ -639,7 +639,7 @@ export type OpenDmRequest = {
 user_id: string, };
 
 /**
- * De onde vem uma permissão (para o `admin permissoes` e o Painel).
+ * De onde vem uma permissão (para o Painel).
  */
 export type Origin = "owner" | "direct";
 

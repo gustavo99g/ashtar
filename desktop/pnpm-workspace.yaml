@@ -1,3 +1,11 @@
 allowBuilds:
   esbuild: false
   unrs-resolver: false
+
+# Avisos de segurança em dependências das ferramentas (eslint, tailwind), revisados na v0.9: nada disso vai
+# para o app, mas o `pnpm audit` fica limpo. Tirar quando as ferramentas trouxerem as versões novas.
+overrides:
+  brace-expansion@>=4.0.0 <5.0.12: ^5.0.12
+  handlebars@<4.7.10: ^4.7.10
+  minimatch@>=7.0.0 <11.0.1: ^11.0.1
+  source-map-js@<1.2.2: ^1.2.2

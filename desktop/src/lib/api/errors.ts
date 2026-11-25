@@ -95,6 +95,10 @@ function hasErrorFields(value: unknown): value is ErrorFields {
 	);
 }
 
+/** O texto de um erro do próprio app (o detalhe fica no log). */
+export const APP_ERROR_MESSAGE =
+	"Algo deu errado no app. Tente de novo; se continuar, use Enviar logs em Configurações › Aplicativo.";
+
 /** O erro de uma resposta que não deu certo, lido do corpo `{ kind, message, min_version?, reason? }`. */
 export function errorFromResponse(status: number, body: unknown): ApiError {
 	if (hasErrorFields(body)) {
@@ -109,7 +113,7 @@ export function errorFromResponse(status: number, body: unknown): ApiError {
 	return new ApiError({
 		status,
 		kind: "http",
-		message: `O servidor respondeu com erro (${status}).`,
+		message: "O servidor não respondeu direito. Tente de novo em instantes.",
 	});
 }
 
@@ -132,9 +136,11 @@ export function errorFromCommand(value: unknown): ApiError {
 			reason: value.reason,
 		});
 	}
+	// O detalhe (um erro do Tauri, em inglês) vai para o log; a pessoa vê o que fazer.
+	console.error("Erro do app ao falar com o servidor:", value);
 	return new ApiError({
 		status: 0,
 		kind: "app",
-		message: `O app falhou ao falar com o servidor: ${String(value)}`,
+		message: APP_ERROR_MESSAGE,
 	});
 }

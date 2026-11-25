@@ -238,7 +238,7 @@ function PickerBody({
 			return <Centered>Procurando janelas e telas...</Centered>;
 		if (loaded.status === "error") {
 			return (
-				<Centered>Não foi possível listar as fontes: {loaded.message}</Centered>
+				<Centered>Não deu para listar as janelas e telas. {loaded.message}</Centered>
 			);
 		}
 		return list;

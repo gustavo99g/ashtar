@@ -165,7 +165,7 @@ pub fn require(user: &User, action: Action) -> Result<(), ApiError> {
     }
 }
 
-/// De onde vem uma permissão (para o `admin permissoes` e o Painel).
+/// De onde vem uma permissão (para o Painel).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, TS)]
 #[serde(rename_all = "snake_case")]
 #[ts(export, export_to = "index.ts")]

@@ -286,7 +286,9 @@ ajuda).
 
 **Tem de acontecer:** a faixa "Sem conexão com o servidor" aparece (não pisca em quedas de menos de 5 s); entrar numa
 sala para no tempo limite com erro, sem ficar em "conectando"; trocar de sala com o token falhando deixa a pessoa na
-sala antiga. Na volta, tudo recarrega sozinho.
+sala antiga. Na volta, tudo recarrega sozinho. Nenhum texto técnico na tela (nada de "Erro interno", código HTTP
+ou inglês): cada erro diz o que fazer. Repetir com a rede lenta (limitar a banda do Wi-Fi ou usar o celular
+roteando com sinal fraco): os carregamentos aparecem e nenhum fica girando para sempre.
 
 **Testado:**
 
@@ -294,7 +296,7 @@ sala antiga. Na volta, tudo recarrega sozinho.
 
 1. Parar o LiveKit; tentar entrar numa sala e trocar de sala.
 
-**Tem de acontecer:** o erro de voz aparece com "Tentar de novo"; o chat continua funcionando; o Painel › Servidor
+**Tem de acontecer:** o erro de voz aparece em português, com "Tentar de novo"; o chat continua funcionando; o Painel › Servidor
 mostra o LiveKit fora.
 
 **Testado:**

@@ -31,7 +31,7 @@ Base: a `main` com a `0.8.11` (merge do PR #44, `b8fc1a0`). A correção da barr
 
 ## Triagem das notas antigas (Etapa 1)
 
-Os 255 itens em aberto das notas da v0.2.2 à v0.8 (e os 5 deste arquivo) ganharam destino, marcado no próprio item:
+Os 255 itens em aberto (250 das notas da v0.2.2 à v0.8 e os 5 deste arquivo) ganharam destino, marcado no próprio item:
 110 provados no uso até a 0.8.11, 26 feitos, 43 obsoletos (a VPS, o app antigo, os experimentos já decididos), 12
 aceitos como regra ou limitação, 55 no roteiro do RC (`docs/testes-rc.md`, com o número do caso) e 9 no
 `BACKLOG.md` (2 já estavam lá; os outros na seção "Da triagem das notas antigas"). A triagem não achou defeito para corrigir antes da 1.0.
@@ -43,6 +43,29 @@ aceitos como regra ou limitação, 55 no roteiro do RC (`docs/testes-rc.md`, com
       4. A ligação tocando com um jogo em tela cheia já roubou o foco do jogo? (A17)
       5. Algum anti-cheat (Vanguard, EAC, BattlEye) já reclamou do Ashtar? (M10)
       6. Alguém usa fone Bluetooth na chamada, e ele já ficou trocando de dispositivo? (M02)
+
+## Revisão antes da 1.0 (Etapa 10)
+
+- [x] **Avisos de segurança.** `pnpm audit` limpo: o `shadcn` foi para as dependências de desenvolvimento, o `vite`
+      subiu para a 7.3.8 e quatro `overrides` no `pnpm-workspace.yaml` (todos de ferramentas, nada vai para o app).
+      `cargo audit` na `api/` sem vulnerabilidade: `sqlx` 0.9.1 com o `libsqlite3-sys` 0.40, e `rustls`, `url`,
+      `tokio`, `ctutils`, `rustix` e `webpki-root-certs` nas versões corrigidas. No `desktop/src-tauri/` também
+      sem vulnerabilidade: o `tauri-plugin-updater` 2.14 trouxe o `zip` 9 no lugar do 4 (seis avisos), mais
+      `cookie`, `quinn`, `rustls`, `url`, `tokio`. Ficam só avisos de "sem manutenção" (`chrono`; e, vindos do
+      Tauri e do GTK do Linux, `proc-macro-error`, `zbus_names`, `zvariant` e o `glib` 0.18), que não têm versão
+      nova para pegar.
+- [ ] **O `src-tauri` não compila aqui** (falta o GTK no Linux da sessão): as atualizações dele são só do
+      `Cargo.lock`, dentro do semver. Conferir o build do Windows no CI da PR e o auto-update na noite de teste
+      (o `tauri-plugin-updater` mudou de versão).
+- [x] **Limites.** Sem números do uso real aqui (os 429 ficam no log da API, no seu computador), os valores
+      continuam: convite 20 tentativas em 10 min, mensagens 5 em 5 s, sons 5 em 30 s com 3 s entre um e outro.
+      Se alguém bater num deles na noite de teste (Etapa 12), anotar aqui.
+- [x] **`admin` enxuto.** Ficaram `dono`, `recuperacao`, `membros`, `backup`, `arquivos-backup` e o `semear`
+      (só no desenvolvimento: recusa se a `PUBLIC_URL` não for local). O resto é no Painel de controle.
+- [x] **Textos de erro.** "Erro interno no servidor" virou "Algo deu errado no servidor. Tente de novo em
+      instantes; se continuar, avise o dono do grupo". Os erros dos comandos do app (captura, transmissão) e os da
+      voz (LiveKit, microfone) vinham em inglês ou técnicos: agora cada tipo tem um texto do que fazer, e o
+      detalhe vai para o log. A passada pelas telas com a API fora do ar e a rede lenta fica no roteiro do RC.
 
 ## Decisões do Kid (24/11)
 

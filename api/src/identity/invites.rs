@@ -402,7 +402,7 @@ pub async fn list(db: &SqlitePool) -> Result<Vec<InviteRecord>, ApiError> {
 type RevokeRow = (String, i64, i64, Option<i64>, i64);
 
 /// Revoga um convite pelo id ou pelo começo dele (no mínimo 4 caracteres,
-/// como o `admin convites` mostra). Quem já entrou com ele continua membro;
+/// como o Painel mostra). Quem já entrou com ele continua membro;
 /// ninguém mais entra.
 pub async fn revoke(
     db: &SqlitePool,

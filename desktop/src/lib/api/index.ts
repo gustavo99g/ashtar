@@ -10,6 +10,7 @@ export { apiFetch, apiJson, jsonRequest } from "./client";
 export { apiUrl, realtimeUrl } from "./config";
 export * from "./endpoints";
 export {
+	APP_ERROR_MESSAGE,
 	ApiError,
 	type ApiErrorKind,
 	type ClientErrorKind,

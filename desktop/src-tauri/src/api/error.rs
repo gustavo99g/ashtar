@@ -89,7 +89,7 @@ impl ApiError {
             Err(_) => Self {
                 status,
                 kind: "http".to_owned(),
-                message: format!("O servidor respondeu com erro ({status})."),
+                message: "O servidor não respondeu direito. Tente de novo em instantes.".to_owned(),
                 min_version: None,
                 reason: None,
             },

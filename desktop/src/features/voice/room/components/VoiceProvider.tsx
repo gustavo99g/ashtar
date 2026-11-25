@@ -55,6 +55,7 @@ import {
 	useRef,
 	useState,
 } from "react";
+import { ApiError } from "@/lib/api";
 import { toast } from "@/components/ui/toast";
 import { findChannel, useOptionalChannelLayout } from "@/features/channels";
 import { useSession } from "@/features/identity";
@@ -195,8 +196,25 @@ interface VoiceTarget {
 	title: string | null;
 }
 
+/**
+ * O texto que a pessoa vê quando a voz falha. Um erro da API já vem em português; os do navegador e
+ * do LiveKit vêm em inglês e técnicos, então viram uma frase do que fazer (o detalhe fica no log).
+ */
 function errorMessage(error: unknown): string {
-	return error instanceof Error ? error.message : String(error);
+	if (error instanceof ApiError) return error.message;
+	return "Não deu para conectar na sala agora. Tente de novo em instantes.";
+}
+
+/** Por que o microfone não funcionou, para depois de "Não foi possível usar o microfone: ". */
+function microphoneReason(error: unknown): string {
+	const name = error instanceof Error ? error.name : "";
+	if (name === "NotAllowedError")
+		return "o acesso foi negado. Confira a permissão do microfone nas configurações do Windows.";
+	if (name === "NotFoundError" || name === "OverconstrainedError")
+		return "ele não foi encontrado. Confira se está conectado.";
+	if (name === "NotReadableError")
+		return "outro programa está usando ele. Feche o programa e tente de novo.";
+	return "tente de novo ou escolha outro em Configurações › Voz e vídeo.";
 }
 
 function toVoiceState(state: ConnectionState): VoiceConnectionState {
@@ -503,7 +521,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 							"Não foi possível ativar o microfone:",
 							microphoneError,
 						);
-						microphoneProblem = `Não foi possível usar o microfone: ${errorMessage(microphoneError)}`;
+						microphoneProblem = `Não foi possível usar o microfone: ${microphoneReason(microphoneError)}`;
 					}
 				}
 				if (cancelled) return;
@@ -662,7 +680,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 				console.warn("Erro ao trocar o estado do microfone:", microphoneError);
 				setError({
 					kind: "microphone",
-					message: `Não foi possível ${enabled ? "ativar" : "desativar"} o microfone: ${errorMessage(microphoneError)}`,
+					message: `Não foi possível ${enabled ? "ativar" : "desativar"} o microfone: ${microphoneReason(microphoneError)}`,
 				});
 				return;
 			}

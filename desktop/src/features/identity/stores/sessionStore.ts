@@ -11,6 +11,7 @@
  */
 import { create } from "zustand";
 import {
+	APP_ERROR_MESSAGE,
 	ApiError,
 	clearSession,
 	isApiError,
@@ -100,9 +101,9 @@ async function afterLoginFailure(error: unknown): Promise<Session> {
 }
 
 function asApiError(error: unknown): ApiError {
-	return isApiError(error)
-		? error
-		: new ApiError({ status: 0, kind: "app", message: String(error) });
+	if (isApiError(error)) return error;
+	console.error("Erro ao abrir a sessão:", error);
+	return new ApiError({ status: 0, kind: "app", message: APP_ERROR_MESSAGE });
 }
 
 /**

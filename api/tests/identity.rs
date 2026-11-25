@@ -1720,7 +1720,7 @@ mod nome_e_modelos {
 
     #[tokio::test]
     async fn sem_modelo_escolhido_o_modelo_sai_dos_numeros() {
-        // O caminho do `admin convite`: ele só dá validade e usos.
+        // Só validade e usos, sem mais nada.
         let (pool, owner) = setup().await;
         let cases = [
             (7 * DAY, 1, "person"),

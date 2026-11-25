@@ -128,10 +128,14 @@ pub enum ApiError {
     /// A sala chegou ao limite de transmissões; o número é o limite.
     #[error("Já tem {0} transmissões nesta sala. Espere uma acabar para transmitir.")]
     ShareLimit(usize),
-    #[error("Erro interno no servidor.")]
+    #[error(
+        "Algo deu errado no servidor. Tente de novo em instantes; se continuar, avise o dono do grupo."
+    )]
     Internal(#[from] sqlx::Error),
     /// Falta configuração no servidor (uma variável do `.env`, por exemplo).
-    #[error("Erro interno no servidor.")]
+    #[error(
+        "Algo deu errado no servidor. Tente de novo em instantes; se continuar, avise o dono do grupo."
+    )]
     Config(String),
     /// O LiveKit não respondeu ou recusou o pedido. O detalhe vai só para o log.
     #[error("Não foi possível consultar a sala de voz agora.")]
@@ -144,7 +148,9 @@ pub enum ApiError {
     #[error("O servidor está sem espaço. O dono já foi avisado.")]
     DiskFull,
     /// Um erro de disco ao gravar ou ler um arquivo. O detalhe vai só para o log.
-    #[error("Erro interno no servidor.")]
+    #[error(
+        "Algo deu errado no servidor. Tente de novo em instantes; se continuar, avise o dono do grupo."
+    )]
     Io(#[from] std::io::Error),
 }
 

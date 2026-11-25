@@ -10,7 +10,7 @@ Ao resolver um item, apague-o daqui e registre o resultado no ADR ou no commit.
 
 Bugs que saem assim que ficarem prontos, pelo auto-update, sem esperar a entrega da ordem.
 
-- [ ] **Enxugar o `admin`** (o que sobrou da Etapa 8; o código de acesso e a rota `/api/voice/join`
+- [x] **Enxugar o `admin`** *(feito na v0.9: ficaram `dono`, `recuperacao`, `membros`, `backup`, `arquivos-backup` e o `semear`, que só roda com a `PUBLIC_URL` local)* (o que sobrou da Etapa 8; o código de acesso e a rota `/api/voice/join`
       já saíram): o Painel de controle cobre `convite`, `convites`, `revogar`, `membros`, `remover`,
       `desvincular`, `beta` e `permissoes`. **Não tirar o `recuperacao`**: se o dono perde o computador, ele
       não consegue abrir o Painel, e esse comando é o único jeito de criar a recuperação dele. Ficariam
