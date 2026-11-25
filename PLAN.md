@@ -79,7 +79,7 @@ Levantado na `main` (`b8fc1a0`), para o plano não refazer:
 | 5 | API: sons, envio e aprovação | Feito |
 | 6 | API e app: tocar na sala e na ligação, atalhos e bloqueio | Feito |
 | 7 | App: a tela Sons e o editor | Feito |
-| 8 | Servidor: backup das fotos, dos emojis e dos sons | Pendente |
+| 8 | Servidor: backup das fotos, dos emojis e dos sons | Feito |
 | 9 | Servidor: restauração testada e produção revisada | Pendente |
 | 10 | Revisão antes da 1.0 | Pendente |
 | 11 | Lançamento da `0.9.0` no beta | Pendente |

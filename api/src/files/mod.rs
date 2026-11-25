@@ -411,6 +411,40 @@ pub async fn take_unused(db: &SqlitePool, now: i64) -> Result<Vec<String>, ApiEr
     Ok(ids)
 }
 
+/// Os arquivos que vão para o R2 na cópia diária (ADR 0036): as fotos de perfil (as anteriores
+/// também), os emojis e os sons. Os anexos e as prévias ficam de fora.
+pub async fn backup_ids(db: &SqlitePool) -> Result<Vec<String>, ApiError> {
+    Ok(sqlx::query_scalar(
+        "SELECT id FROM files WHERE kind IN ('avatar', 'emoji', 'sound') ORDER BY id",
+    )
+    .fetch_all(db)
+    .await?)
+}
+
+/// A lista da cópia dos arquivos: os caminhos dentro da pasta dos arquivos, e quantos estão no
+/// banco sem o arquivo no disco (ficam de fora, senão o rclone para no primeiro que falta).
+#[derive(Debug, PartialEq, Eq)]
+pub struct BackupList {
+    pub paths: Vec<std::path::PathBuf>,
+    pub missing: usize,
+}
+
+pub async fn backup_list(db: &SqlitePool, root: &std::path::Path) -> Result<BackupList, ApiError> {
+    let mut list = BackupList {
+        paths: Vec::new(),
+        missing: 0,
+    };
+    for id in backup_ids(db).await?.iter().filter(|id| valid_id(id)) {
+        let path = store::relative_path(id);
+        if root.join(&path).is_file() {
+            list.paths.push(path);
+        } else {
+            list.missing += 1;
+        }
+    }
+    Ok(list)
+}
+
 /// Quanto os arquivos ocupam, em bytes.
 pub async fn total_size(db: &SqlitePool) -> Result<i64, ApiError> {
     Ok(

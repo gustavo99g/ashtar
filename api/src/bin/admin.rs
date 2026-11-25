@@ -80,6 +80,12 @@ enum Command {
         #[arg(long, default_value_t = 14, value_parser = parse_keep)]
         manter: usize,
     },
+    /// Escreve a lista das fotos, emojis e sons (os caminhos dentro da pasta dos arquivos) que o
+    /// backup.sh manda para o R2 (ADR 0036).
+    ArquivosBackup {
+        /// O arquivo da lista, um caminho por linha.
+        saida: PathBuf,
+    },
 }
 
 #[derive(Clone, Copy, ValueEnum)]
@@ -216,6 +222,14 @@ async fn run(db: &SqlitePool, command: Command) -> Result<(), ApiError> {
                     Origin::Direct => "direta",
                 };
                 println!("{:<20} ({origin})", permission.key());
+            }
+        }
+        Command::ArquivosBackup { saida } => {
+            let store = api::files::FileStore::from_env(&api::logs::data_dir_from_env());
+            let (listed, missing) = files_backup_list(db, store.root(), &saida).await?;
+            println!("Lista com {listed} arquivos em {}", saida.display());
+            if missing > 0 {
+                println!("Sem o arquivo no disco (ficam de fora): {missing}");
             }
         }
         Command::Backup { pasta, manter } => {
@@ -375,6 +389,30 @@ async fn backup(db: &SqlitePool, folder: &Path, keep: usize) -> Result<PathBuf, 
         let _ = std::fs::remove_file(old);
     }
     Ok(file)
+}
+
+/// Escreve em `out` os caminhos (relativos a `root`) das fotos, emojis e sons que existem no
+/// disco. Devolve quantos entraram e quantos estão no banco sem o arquivo.
+async fn files_backup_list(
+    db: &SqlitePool,
+    root: &Path,
+    out: &Path,
+) -> Result<(usize, usize), ApiError> {
+    let list = api::files::backup_list(db, root).await?;
+    let lines: String = list
+        .paths
+        .iter()
+        .map(|path| format!("{}\n", path.to_string_lossy()))
+        .collect();
+    if let Some(folder) = out.parent().filter(|p| !p.as_os_str().is_empty()) {
+        std::fs::create_dir_all(folder).map_err(|e| {
+            ApiError::Config(format!("não foi possível criar {}: {e}", folder.display()))
+        })?;
+    }
+    std::fs::write(out, lines).map_err(|e| {
+        ApiError::Config(format!("não foi possível escrever {}: {e}", out.display()))
+    })?;
+    Ok((list.paths.len(), list.missing))
 }
 
 /// Os nicks dos membros de teste do `semear`.

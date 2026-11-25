@@ -1734,3 +1734,42 @@ mod sons {
         assert_eq!(status, StatusCode::FORBIDDEN);
     }
 }
+
+// ------------------------------------------------------------- cópia dos arquivos (ADR 0036, v0.9)
+
+#[tokio::test]
+async fn a_copia_leva_fotos_emojis_e_sons_e_deixa_os_anexos() {
+    let ctx = setup().await;
+    let token = ctx.owner_token.clone();
+    let mut ids = Vec::new();
+    for query in [
+        "kind=avatar&name=foto.png&width=256&height=256",
+        "kind=emoji&name=kekw.png&width=128&height=128",
+        "kind=attachment&name=print.png&width=10&height=10",
+    ] {
+        let (status, body) = upload(&ctx, &token, query, "image/png", PNG.to_vec()).await;
+        assert_eq!(status, StatusCode::CREATED, "{body}");
+        ids.push(body["id"].as_str().unwrap().to_owned());
+    }
+    let root = ctx.data_dir.join("files");
+    let list = api::files::backup_list(&ctx.db, &root).await.unwrap();
+    let mut expected: Vec<PathBuf> = ids[..2]
+        .iter()
+        .map(|id| api::files::store::relative_path(id))
+        .collect();
+    expected.sort_by_key(|path| path.file_name().unwrap().to_owned());
+    let mut listed = list.paths.clone();
+    listed.sort_by_key(|path| path.file_name().unwrap().to_owned());
+    assert_eq!(listed, expected);
+    assert_eq!(list.missing, 0);
+    // Cada caminho é o do disco, relativo à pasta dos arquivos (o mesmo que vai para o R2).
+    for path in &list.paths {
+        assert!(root.join(path).is_file(), "{}", path.display());
+    }
+
+    // O que sumiu do disco fica de fora, contado.
+    std::fs::remove_file(root.join(&expected[0])).unwrap();
+    let list = api::files::backup_list(&ctx.db, &root).await.unwrap();
+    assert_eq!(list.paths.len(), 1);
+    assert_eq!(list.missing, 1);
+}

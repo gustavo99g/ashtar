@@ -302,6 +302,12 @@ path: string, expires_at: number, };
 export type FileView = { id: string, kind: FileKind, name: string, mime: string, size: number, width: number | null, height: number | null, duration_ms: number | null, thumbnail_id: string | null, };
 
 /**
+ * A cópia dos arquivos que deu certo: o `backup.sh` escreve [`FILES_BACKUP_MARK`] depois do
+ * rclone, com quantos arquivos estavam na lista.
+ */
+export type FilesBackupStatus = { at: number, files: number, };
+
+/**
  * O resumo da original de uma mensagem encaminhada, guardado na hora: a encaminhada continua
  * igual se a original mudar ou for excluída.
  */
@@ -821,6 +827,10 @@ disk: DiskStatus | null,
  * O backup mais novo de `data/backups/`, ou `None` sem nenhum.
  */
 last_backup: BackupStatus | null, 
+/**
+ * A última cópia das fotos, emojis e sons para o R2 (v0.9, ADR 0036), ou `None` sem nenhuma.
+ */
+last_files_backup: FilesBackupStatus | null, 
 /**
  * Quanto os arquivos (fotos, anexos, prévias e emojis) ocupam, em bytes (ADR 0031).
  */
