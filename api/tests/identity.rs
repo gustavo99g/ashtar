@@ -795,7 +795,7 @@ mod regras {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use api::db;
-    use api::error::ApiError;
+    use api::error::{ApiError, InviteRefusal};
     use api::identity::invites::{self, InviteKind, InviteStatus};
     use api::identity::permissions::{self, Origin, Permission};
     use api::identity::{User, devices, users};
@@ -966,7 +966,7 @@ mod regras {
         // A recuperação que ainda não tinha sido usada foi revogada.
         assert!(matches!(
             invites::redeem(&pool, &pending, &key(9), None, NOW + 11).await,
-            Err(ApiError::InvalidInvite)
+            Err(ApiError::InvalidInvite(InviteRefusal::Revoked))
         ));
 
         // O nick ficou livre e a mesma chave pode ser vinculada de novo.
@@ -1006,7 +1006,10 @@ mod regras {
 
         // No instante exato do vencimento já não vale; um segundo antes, vale.
         let late = invites::redeem(&pool, &code, &key(1), Some("Kid"), NOW + 300).await;
-        assert!(matches!(late, Err(ApiError::InvalidInvite)));
+        assert!(matches!(
+            late,
+            Err(ApiError::InvalidInvite(InviteRefusal::Expired))
+        ));
         let ok = invites::redeem(&pool, &code, &key(1), Some("Kid"), NOW + 299).await;
         assert!(ok.is_ok());
     }
@@ -1023,7 +1026,10 @@ mod regras {
             .await
             .unwrap();
         let third = invites::redeem(&pool, &code, &key(3), Some("Tres"), NOW).await;
-        assert!(matches!(third, Err(ApiError::InvalidInvite)));
+        assert!(matches!(
+            third,
+            Err(ApiError::InvalidInvite(InviteRefusal::Used))
+        ));
 
         let history = invites::list(&pool).await.unwrap();
         assert_eq!(history[0].uses.len(), 2);
@@ -1043,7 +1049,10 @@ mod regras {
         invites::revoke(&pool, &owner, &id[..8], NOW).await.unwrap();
 
         let next = invites::redeem(&pool, &code, &key(2), Some("Outro"), NOW).await;
-        assert!(matches!(next, Err(ApiError::InvalidInvite)));
+        assert!(matches!(
+            next,
+            Err(ApiError::InvalidInvite(InviteRefusal::Revoked))
+        ));
         // Quem já entrou continua entrando.
         let (again, _) = devices::login(&pool, &key(1), NOW).await.unwrap();
         assert_eq!(again.id, kid.id);
@@ -1156,7 +1165,7 @@ mod regras {
         ));
         assert!(matches!(
             invites::redeem(&pool, "isto-nao-e-um-codigo", &key(1), Some("Kid"), NOW).await,
-            Err(ApiError::InvalidInvite)
+            Err(ApiError::InvalidInvite(InviteRefusal::NotFound))
         ));
 
         let record = &invites::list(&pool).await.unwrap()[0];
@@ -1220,7 +1229,7 @@ mod regras {
         // Uso único.
         assert!(matches!(
             invites::redeem(&pool, &code, &key(3), None, NOW).await,
-            Err(ApiError::InvalidInvite)
+            Err(ApiError::InvalidInvite(InviteRefusal::Used))
         ));
         assert_eq!(users::list(&pool).await.unwrap().len(), 2);
     }
@@ -1465,7 +1474,8 @@ mod regras {
 
         assert_eq!(successes(&a, &b), 1);
         assert!(
-            matches!(a, Err(ApiError::InvalidInvite)) || matches!(b, Err(ApiError::InvalidInvite))
+            matches!(a, Err(ApiError::InvalidInvite(InviteRefusal::Used)))
+                || matches!(b, Err(ApiError::InvalidInvite(InviteRefusal::Used)))
         );
         assert_eq!(members, 2); // o dono e quem entrou
         assert_eq!(uses, 1);
@@ -1884,17 +1894,18 @@ mod entrada_e_perfil {
             .await
             .unwrap();
 
-        for code in [
-            "AAAA-AAAA-AAAA",
-            "nao-e-codigo",
-            &expired.code,
-            &revoked.code,
-            &used,
-            &orphan.code,
+        for (code, reason) in [
+            ("AAAA-AAAA-AAAA", "not_found"),
+            ("nao-e-codigo", "not_found"),
+            (expired.code.as_str(), "expired"),
+            (revoked.code.as_str(), "revoked"),
+            (used.as_str(), "used"),
+            (orphan.code.as_str(), "revoked"),
         ] {
             let (status, body) = preview(&ctx, code).await;
             assert_eq!(status, StatusCode::BAD_REQUEST, "{code}");
             assert_eq!(body["kind"], "invalid_invite", "{code}");
+            assert_eq!(body["reason"], reason, "{code}");
         }
     }
 
@@ -2857,7 +2868,7 @@ mod pagina {
     }
 
     #[tokio::test]
-    async fn convite_que_nao_vale_responde_200_sem_dizer_por_que() {
+    async fn convite_que_nao_vale_responde_200_com_o_motivo_e_sem_o_nome() {
         let ctx = setup().await;
         let used = new_invite(&ctx).await;
         redeem(&ctx, &used, 1, "Fulano").await;
@@ -2873,18 +2884,21 @@ mod pagina {
         .await
         .unwrap();
 
-        for uri in [
-            "/invite/AAAA-AAAA-AAAA".to_owned(),
-            "/invite/isto-nao-e-codigo".to_owned(),
-            format!("/invite/{used}"),
-            format!("/recovery/{}", expired.code),
+        for (uri, title) in [
+            (
+                "/invite/AAAA-AAAA-AAAA".to_owned(),
+                "Esse convite não vale mais",
+            ),
+            (
+                "/invite/isto-nao-e-codigo".to_owned(),
+                "Esse convite não vale mais",
+            ),
+            (format!("/invite/{used}"), "Esse convite já foi usado"),
+            (format!("/recovery/{}", expired.code), "Esse convite venceu"),
         ] {
             let (status, html) = page(&ctx, &uri).await;
             assert_eq!(status, StatusCode::OK, "{uri}");
-            assert!(
-                html.contains(r#"content="Esse convite não vale mais""#),
-                "{uri}"
-            );
+            assert!(html.contains(&format!(r#"content="{title}""#)), "{uri}");
             assert!(!html.contains("ashtar://"), "{uri}");
             assert!(!html.contains("Kid"), "{uri}");
         }

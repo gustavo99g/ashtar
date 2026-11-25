@@ -18,7 +18,7 @@ use chrono::{DateTime, Datelike, Local, TimeZone};
 use crate::AppState;
 use crate::avatar;
 use crate::db::now;
-use crate::error::ApiError;
+use crate::error::{ApiError, InviteRefusal};
 use crate::identity::invites::{self, InviteKind, InvitePreview};
 use crate::secret;
 
@@ -78,10 +78,11 @@ async fn invite_page(state: &AppState, code: &str, path_kind: InviteKind) -> Res
             let html = valid_page(&state.public_url, &preview, &code, &link, now, &Local);
             html_response(StatusCode::OK, html)
         }
-        Err(ApiError::InvalidInvite) => {
+        Err(ApiError::InvalidInvite(reason)) => {
             state.limiter.record_failure();
-            // 200, para o chat ainda montar o cartão com "Esse convite não vale mais".
-            html_response(StatusCode::OK, invalid_page(&state.public_url, path_kind))
+            // 200, para o chat ainda montar o cartão com o motivo.
+            let html = invalid_page(&state.public_url, path_kind, reason);
+            html_response(StatusCode::OK, html)
         }
         Err(error) => error.into_response(),
     }
@@ -145,23 +146,40 @@ where
 }
 
 /// A página de um convite que não vale: não diz por quê.
-pub fn invalid_page(public_url: &str, path_kind: InviteKind) -> String {
+/// A página de um convite que não vale, com o motivo no título (v0.9). O código que
+/// não existe fica com o texto de antes, que cobre o link copiado pela metade.
+pub fn invalid_page(public_url: &str, path_kind: InviteKind, reason: InviteRefusal) -> String {
+    let (title, text) = match reason {
+        InviteRefusal::NotFound => (
+            "Esse convite não vale mais",
+            "Ele pode ter expirado, sido cancelado ou já ter sido usado. \
+             Peça um link novo ao dono do grupo.",
+        ),
+        InviteRefusal::Expired => (
+            "Esse convite venceu",
+            "Todo convite tem prazo. Peça um link novo ao dono do grupo.",
+        ),
+        InviteRefusal::Used => (
+            "Esse convite já foi usado",
+            "Ele já serviu para quem devia. Peça um link novo ao dono do grupo.",
+        ),
+        InviteRefusal::Revoked => (
+            "Esse convite foi cancelado",
+            "O dono do grupo cancelou esse link. Peça um novo a ele.",
+        ),
+    };
     let body = fill(
         INVALID,
         &[
-            ("titulo", "Esse convite não vale mais"),
-            (
-                "texto",
-                "Ele pode ter expirado, sido cancelado ou já ter sido usado. \
-                 Peça um link novo ao dono do grupo.",
-            ),
+            ("titulo", title),
+            ("texto", text),
             ("rodape", "Quando chegar o link novo, é só clicar nele."),
         ],
     );
     shell(
         public_url,
         tab_title(path_kind),
-        "Esse convite não vale mais",
+        title,
         "Peça um link novo ao dono do grupo.",
         public_url,
         &body,
@@ -368,7 +386,10 @@ mod tests {
                 NOW,
                 &tz,
             ),
-            invalid_page("https://a.test", InviteKind::New),
+            invalid_page("https://a.test", InviteKind::New, InviteRefusal::NotFound),
+            invalid_page("https://a.test", InviteKind::New, InviteRefusal::Expired),
+            invalid_page("https://a.test", InviteKind::Recovery, InviteRefusal::Used),
+            invalid_page("https://a.test", InviteKind::New, InviteRefusal::Revoked),
             blocked_page("https://a.test", InviteKind::Recovery),
         ];
         for html in pages {
@@ -422,12 +443,28 @@ mod tests {
 
     #[test]
     fn vencido_nao_tem_botao_nem_nome() {
-        let html = invalid_page("https://a.test", InviteKind::New);
+        let html = invalid_page("https://a.test", InviteKind::New, InviteRefusal::NotFound);
         assert!(
             html.contains(r#"<meta property="og:title" content="Esse convite não vale mais">"#)
         );
         assert!(html.contains("Quando chegar o link novo, é só clicar nele."));
         assert!(!html.contains("ashtar://"));
         assert!(!html.contains(r#"id="abrir""#));
+    }
+
+    #[test]
+    fn a_pagina_diz_o_motivo_da_recusa() {
+        for (reason, title) in [
+            (InviteRefusal::Expired, "Esse convite venceu"),
+            (InviteRefusal::Used, "Esse convite já foi usado"),
+            (InviteRefusal::Revoked, "Esse convite foi cancelado"),
+        ] {
+            let html = invalid_page("https://a.test", InviteKind::New, reason);
+            assert!(
+                html.contains(&format!(r#"<meta property="og:title" content="{title}">"#)),
+                "{title}"
+            );
+            assert!(!html.contains("ashtar://"));
+        }
     }
 }

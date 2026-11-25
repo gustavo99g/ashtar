@@ -46,6 +46,34 @@ pub enum ErrorKind {
     DiskFull,
 }
 
+/// Por que um convite foi recusado (v0.9): o app e a página do link mostram o motivo certo, em vez de juntar
+/// os quatro casos num texto só. Dizer o motivo não abre brecha: o código tem entropia de sobra para ninguém
+/// achar um por tentativa, e toda recusa continua contando no limite de tentativas.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export, export_to = "index.ts")]
+pub enum InviteRefusal {
+    /// Nenhum convite com esse código (ou o código nem tem o formato de um).
+    NotFound,
+    Expired,
+    /// Todos os usos foram gastos.
+    Used,
+    /// Revogado pelo Painel, ou a recuperação de quem foi removido do grupo.
+    Revoked,
+}
+
+impl InviteRefusal {
+    /// O texto que a pessoa vê.
+    pub fn message(self) -> &'static str {
+        match self {
+            Self::NotFound => "Esse código não existe. Confira se copiou o link inteiro.",
+            Self::Expired => "Esse convite venceu. Peça um novo ao dono do grupo.",
+            Self::Used => "Esse convite já foi usado. Peça um novo ao dono do grupo.",
+            Self::Revoked => "Esse convite foi cancelado. Peça um novo ao dono do grupo.",
+        }
+    }
+}
+
 /// O corpo de toda resposta de erro.
 #[derive(Debug, Serialize, TS)]
 #[ts(export, export_to = "index.ts")]
@@ -56,6 +84,10 @@ pub struct ErrorBody {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub min_version: Option<String>,
+    /// Só no `invalid_invite`: o motivo da recusa. Campo novo da v0.9; o app antigo só lê o `kind`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub reason: Option<InviteRefusal>,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -66,8 +98,8 @@ pub enum ApiError {
     UnknownDevice,
     #[error("Você não tem permissão para isso.")]
     Forbidden,
-    #[error("Convite inválido, expirado ou já usado.")]
-    InvalidInvite,
+    #[error("{}", .0.message())]
+    InvalidInvite(InviteRefusal),
     #[error("{0}")]
     InvalidNick(&'static str),
     #[error("{0}")]
@@ -118,7 +150,7 @@ impl ApiError {
             Self::Unauthenticated => (StatusCode::UNAUTHORIZED, ErrorKind::Unauthenticated),
             Self::UnknownDevice => (StatusCode::UNAUTHORIZED, ErrorKind::UnknownDevice),
             Self::Forbidden => (StatusCode::FORBIDDEN, ErrorKind::Forbidden),
-            Self::InvalidInvite => (StatusCode::BAD_REQUEST, ErrorKind::InvalidInvite),
+            Self::InvalidInvite(_) => (StatusCode::BAD_REQUEST, ErrorKind::InvalidInvite),
             Self::InvalidNick(_) => (StatusCode::UNPROCESSABLE_ENTITY, ErrorKind::InvalidNick),
             Self::InvalidDisplayName(_) => (
                 StatusCode::UNPROCESSABLE_ENTITY,
@@ -172,6 +204,10 @@ impl IntoResponse for ApiError {
             kind,
             message: self.to_string(),
             min_version: None,
+            reason: match self {
+                Self::InvalidInvite(reason) => Some(reason),
+                _ => None,
+            },
         };
         (status, Json(body)).into_response()
     }
@@ -188,6 +224,7 @@ mod tests {
             kind: ErrorKind::NickTaken,
             message: "Esse nick já está em uso.".into(),
             min_version: None,
+            reason: None,
         };
         assert_eq!(
             serde_json::to_value(&body).unwrap(),
@@ -198,6 +235,7 @@ mod tests {
             kind: ErrorKind::ClientOutdated,
             message: "Atualize.".into(),
             min_version: Some("0.2.20".into()),
+            reason: None,
         };
         assert_eq!(
             serde_json::to_value(&body).unwrap(),

@@ -260,7 +260,11 @@ export type ErrorBody = { kind: ErrorKind, message: string,
 /**
  * Só no `client_outdated`: a versão mínima que a API aceita.
  */
-min_version?: string, };
+min_version?: string, 
+/**
+ * Só no `invalid_invite`: o motivo da recusa. Campo novo da v0.9; o app antigo só lê o `kind`.
+ */
+reason?: InviteRefusal, };
 
 /**
  * O `kind` de toda recusa da API. O app decide o que mostrar por ele, nunca
@@ -322,6 +326,13 @@ origin: Origin | null, granted_at: number | null, };
 export type InviteKind = "new" | "recovery";
 
 export type InvitePreviewView = { "kind": "new", invited_by: NameView, expires_at: number, } | { "kind": "recovery", account: NameView, expires_at: number, };
+
+/**
+ * Por que um convite foi recusado (v0.9): o app e a página do link mostram o motivo certo, em vez de juntar
+ * os quatro casos num texto só. Dizer o motivo não abre brecha: o código tem entropia de sobra para ninguém
+ * achar um por tentativa, e toda recusa continua contando no limite de tentativas.
+ */
+export type InviteRefusal = "not_found" | "expired" | "used" | "revoked";
 
 /**
  * Situação de um convite num instante.

@@ -64,7 +64,7 @@ pub async fn preview(
 ) -> Result<Json<InvitePreviewView>, ApiError> {
     state.limiter.check()?;
     let result = invites::preview(&state.db, &code, now()).await;
-    if matches!(result, Err(ApiError::InvalidInvite)) {
+    if matches!(result, Err(ApiError::InvalidInvite(_))) {
         state.limiter.record_failure();
     }
     let preview = result?;

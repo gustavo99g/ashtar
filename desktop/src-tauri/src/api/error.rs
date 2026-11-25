@@ -1,5 +1,5 @@
 //! O erro de uma chamada à API feita pelo Rust, no formato do `ApiError` do frontend
-//! (`desktop/src/lib/api/errors.ts`): `{ status, kind, message, min_version? }`.
+//! (`desktop/src/lib/api/errors.ts`): `{ status, kind, message, min_version?, reason? }`.
 //!
 //! Com o mesmo formato, o `commands.ts` transforma a recusa do comando na mesma classe que o
 //! `apiFetch` lança, e as telas tratam um `login` que falhou igual a qualquer outra chamada.
@@ -24,6 +24,9 @@ pub struct ApiError {
     /// Só no `client_outdated` (426).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub min_version: Option<String>,
+    /// Só no `invalid_invite` (v0.9): o motivo (`not_found`, `expired`, `used`, `revoked`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
 }
 
 /// O corpo de erro da API (`ErrorBody` em `api/src/error.rs`).
@@ -33,6 +36,8 @@ struct ErrorBody {
     message: String,
     #[serde(default)]
     min_version: Option<String>,
+    #[serde(default)]
+    reason: Option<String>,
 }
 
 impl ApiError {
@@ -43,6 +48,7 @@ impl ApiError {
             kind: kind.to_owned(),
             message: message.into(),
             min_version: None,
+            reason: None,
         }
     }
 
@@ -78,12 +84,14 @@ impl ApiError {
                 kind: body.kind,
                 message: body.message,
                 min_version: body.min_version,
+                reason: body.reason,
             },
             Err(_) => Self {
                 status,
                 kind: "http".to_owned(),
                 message: format!("O servidor respondeu com erro ({status})."),
                 min_version: None,
+                reason: None,
             },
         }
     }
@@ -95,6 +103,7 @@ impl ApiError {
             kind: "http".to_owned(),
             message: "O servidor respondeu num formato que o app não entende.".to_owned(),
             min_version: None,
+            reason: None,
         }
     }
 }
@@ -113,6 +122,14 @@ mod tests {
         assert_eq!(error.kind, "client_outdated");
         assert_eq!(error.message, "Atualize.");
         assert_eq!(error.min_version.as_deref(), Some("0.2.2"));
+    }
+
+    #[test]
+    fn le_o_motivo_do_convite_recusado() {
+        let body = br#"{"kind":"invalid_invite","message":"Venceu.","reason":"expired"}"#;
+        let error = ApiError::from_response(400, body);
+        assert_eq!(error.reason.as_deref(), Some("expired"));
+        assert_eq!(serde_json::to_value(&error).unwrap()["reason"], "expired");
     }
 
     #[test]

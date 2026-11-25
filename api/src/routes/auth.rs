@@ -125,7 +125,7 @@ pub async fn redeem(
         now(),
     )
     .await;
-    if matches!(result, Err(ApiError::InvalidInvite)) {
+    if matches!(result, Err(ApiError::InvalidInvite(_))) {
         state.limiter.record_failure();
     }
     let invites::Redeemed {

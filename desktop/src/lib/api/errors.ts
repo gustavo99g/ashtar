@@ -5,7 +5,7 @@
  * Este arquivo só importa tipos: o `lib/tauri` usa a mesma classe sem criar um ciclo com o
  * `client.ts`, que importa o `lib/tauri` por causa do 426.
  */
-import type { ErrorKind } from "./generated";
+import type { ErrorKind, InviteRefusal } from "./generated";
 
 /**
  * Os `kind` que nascem no app, não na API. O Rust (`src-tauri/src/api.rs`) usa os mesmos textos.
@@ -37,18 +37,22 @@ export class ApiError extends Error {
 	readonly kind: ApiErrorKind;
 	/** Só no `client_outdated` (426): a versão mínima que a API aceita. */
 	readonly minVersion: string | null;
+	/** Só no `invalid_invite` (v0.9): por que o convite foi recusado. O servidor antigo não manda. */
+	readonly reason: InviteRefusal | null;
 
 	constructor(init: {
 		status: number;
 		kind: ApiErrorKind;
 		message: string;
 		minVersion?: string | null;
+		reason?: InviteRefusal | null;
 	}) {
 		super(init.message);
 		this.name = "ApiError";
 		this.status = init.status;
 		this.kind = init.kind;
 		this.minVersion = init.minVersion ?? null;
+		this.reason = init.reason ?? null;
 	}
 }
 
@@ -79,6 +83,7 @@ interface ErrorFields {
 	kind: string;
 	message: string;
 	min_version?: string;
+	reason?: InviteRefusal;
 }
 
 function hasErrorFields(value: unknown): value is ErrorFields {
@@ -90,7 +95,7 @@ function hasErrorFields(value: unknown): value is ErrorFields {
 	);
 }
 
-/** O erro de uma resposta que não deu certo, lido do corpo `{ kind, message, min_version? }`. */
+/** O erro de uma resposta que não deu certo, lido do corpo `{ kind, message, min_version?, reason? }`. */
 export function errorFromResponse(status: number, body: unknown): ApiError {
 	if (hasErrorFields(body)) {
 		return new ApiError({
@@ -98,6 +103,7 @@ export function errorFromResponse(status: number, body: unknown): ApiError {
 			kind: body.kind as ApiErrorKind,
 			message: body.message,
 			minVersion: body.min_version,
+			reason: body.reason,
 		});
 	}
 	return new ApiError({
@@ -123,6 +129,7 @@ export function errorFromCommand(value: unknown): ApiError {
 			kind: value.kind as ApiErrorKind,
 			message: value.message,
 			minVersion: value.min_version,
+			reason: value.reason,
 		});
 	}
 	return new ApiError({
