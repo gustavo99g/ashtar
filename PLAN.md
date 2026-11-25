@@ -76,7 +76,7 @@ Levantado na `main` (`b8fc1a0`), para o plano não refazer:
 | 2 | API e app: o motivo do convite recusado | Feito |
 | 3 | App: o cartão do convite no chat | Feito |
 | 4 | App: a conversa mais larga, o link para baixar e a transmissão nas configurações | Feito |
-| 5 | API: sons, envio e aprovação | Pendente |
+| 5 | API: sons, envio e aprovação | Feito |
 | 6 | API e app: tocar na sala e na ligação, atalhos e bloqueio | Pendente |
 | 7 | App: a tela Sons e o editor | Pendente |
 | 8 | Servidor: backup das fotos, dos emojis e dos sons | Pendente |

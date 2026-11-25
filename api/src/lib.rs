@@ -19,6 +19,7 @@ pub mod previews;
 pub mod realtime;
 pub mod routes;
 pub mod secret;
+pub mod sounds;
 pub mod timeout;
 pub mod voice;
 
@@ -223,6 +224,18 @@ pub fn app(state: AppState, policy: Arc<ClientPolicy>) -> Router {
             "/invites",
             get(routes::invites::list).post(routes::invites::create),
         )
+        .route(
+            "/sounds",
+            get(routes::sounds::list).post(routes::sounds::create),
+        )
+        .route("/sounds/mine", get(routes::sounds::mine))
+        .route("/sounds/pending", get(routes::sounds::pending))
+        .route(
+            "/sounds/{id}",
+            patch(routes::sounds::update).delete(routes::sounds::delete),
+        )
+        .route("/sounds/{id}/approve", post(routes::sounds::approve))
+        .route("/sounds/{id}/reject", post(routes::sounds::reject))
         .route("/invites/{code}", get(routes::invites::preview))
         .route("/invites/card/{code}", get(routes::invites::card))
         .route("/invites/{id}/revoke", post(routes::invites::revoke))

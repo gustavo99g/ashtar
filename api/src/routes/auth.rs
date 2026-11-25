@@ -102,6 +102,10 @@ pub struct MeResponse {
     pub can_view_logs: bool,
     /// Se o cartão de quem está numa sala de voz mostra a seção Moderação (v0.8).
     pub can_moderate_voice: bool,
+    /// Se a tela Sons deixa carregar um som (v0.9).
+    pub can_send_sounds: bool,
+    /// Se a tela Sons mostra as abas Aprovação e Todos os sons (v0.9).
+    pub can_approve_sounds: bool,
 }
 
 #[derive(Debug, Deserialize, TS)]
@@ -307,6 +311,12 @@ async fn me_response(state: &AppState, user: &User) -> Result<MeResponse, ApiErr
         can_moderate_voice: effective
             .iter()
             .any(|(p, _)| *p == Permission::ModerateVoice),
+        can_send_sounds: effective
+            .iter()
+            .any(|(p, _)| matches!(p, Permission::SendSounds | Permission::ApproveSounds)),
+        can_approve_sounds: effective
+            .iter()
+            .any(|(p, _)| *p == Permission::ApproveSounds),
     })
 }
 

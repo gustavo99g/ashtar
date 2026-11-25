@@ -26,6 +26,8 @@ pub enum FileKind {
     /// A imagem de uma prévia de link: quem grava é a própria API.
     Preview,
     Emoji,
+    /// Um som do soundboard (v0.9, ADR 0037): o WAV que o editor do app gera.
+    Sound,
 }
 
 impl FileKind {
@@ -37,6 +39,8 @@ impl FileKind {
             // A foto sai do app em 256×256 WebP, e o emoji em 128×128: sobra muito.
             Self::Avatar => (2 * MB, "2 MB"),
             Self::Emoji => (MB, "1 MB"),
+            // 5 s de WAV mono 16 bits a 48 kHz dão uns 470 KB.
+            Self::Sound => (MB, "1 MB"),
         }
     }
 }
@@ -291,12 +295,17 @@ pub async fn mark_used(
     Ok(())
 }
 
-/// Se `user` pode ver `file`: a foto de agora, os emojis e a imagem das prévias, todo mundo do grupo; o anexo, quem
+/// Se `user` pode ver `file`: a foto de agora, os emojis, os sons e a imagem das prévias, todo mundo do grupo; o anexo, quem
 /// enviou e quem lê o canal de uma das mensagens que o usam. A miniatura vale o que vale o arquivo
 /// de que ela é a miniatura.
 pub async fn can_read(db: &SqlitePool, user: &User, file: &FileRecord) -> Result<bool, ApiError> {
     // A imagem de uma prévia veio de um site público: quem está no grupo vê.
-    if matches!(file.kind, FileKind::Emoji | FileKind::Preview) || file.uploader_id == user.id {
+    // O som, aguardando ou aprovado, também: quem aprova precisa ouvir antes.
+    if matches!(
+        file.kind,
+        FileKind::Emoji | FileKind::Preview | FileKind::Sound
+    ) || file.uploader_id == user.id
+    {
         return Ok(true);
     }
     // A foto de perfil, só a de agora: as guardadas para voltar a elas são só de quem enviou.

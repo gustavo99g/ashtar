@@ -554,6 +554,16 @@ pub async fn redeem(
     if new_member {
         // Quem entra vê o histórico sem números de não lidas (ADR 0022).
         crate::chat::read::seed_new_member(&mut tx, &user.id).await?;
+        // "Enviar sons" vem ligada para todo mundo (ADR 0037).
+        sqlx::query(
+            "INSERT OR IGNORE INTO user_permissions (user_id, permission, granted_at)
+             VALUES (?, ?, ?)",
+        )
+        .bind(&user.id)
+        .bind(super::permissions::Permission::SendSounds.key())
+        .bind(now)
+        .execute(&mut *tx)
+        .await?;
     }
 
     tx.commit().await?;

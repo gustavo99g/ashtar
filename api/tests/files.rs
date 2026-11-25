@@ -1508,3 +1508,229 @@ async fn emoji_file(ctx: &Ctx, token: &str, bytes: Vec<u8>, mime: &str) -> Value
     assert_eq!(status, StatusCode::CREATED, "{file}");
     file
 }
+
+// ------------------------------------------------------------------ soundboard (ADR 0037, v0.9)
+
+mod sons {
+    use super::*;
+
+    /// Um WAV mono de 16 bits a 48 kHz com `ms` milissegundos de silêncio.
+    fn wav(ms: u32) -> Vec<u8> {
+        let rate = 48_000u32;
+        let data_len = rate / 1000 * ms * 2;
+        let mut out = Vec::new();
+        out.extend_from_slice(b"RIFF");
+        out.extend_from_slice(&(36 + data_len).to_le_bytes());
+        out.extend_from_slice(b"WAVEfmt ");
+        out.extend_from_slice(&16u32.to_le_bytes());
+        out.extend_from_slice(&1u16.to_le_bytes());
+        out.extend_from_slice(&1u16.to_le_bytes());
+        out.extend_from_slice(&rate.to_le_bytes());
+        out.extend_from_slice(&(rate * 2).to_le_bytes());
+        out.extend_from_slice(&2u16.to_le_bytes());
+        out.extend_from_slice(&16u16.to_le_bytes());
+        out.extend_from_slice(b"data");
+        out.extend_from_slice(&data_len.to_le_bytes());
+        out.resize(out.len() + data_len as usize, 0);
+        out
+    }
+
+    async fn call(
+        ctx: &Ctx,
+        method: &str,
+        uri: &str,
+        token: &str,
+        body: Option<Value>,
+    ) -> (StatusCode, Value) {
+        let (content_type, body) = match body {
+            Some(body) => (Some("application/json"), Body::from(body.to_string())),
+            None => (None, Body::empty()),
+        };
+        let (status, _, bytes) = send(ctx, method, uri, Some(token), content_type, body).await;
+        (
+            status,
+            serde_json::from_slice(&bytes).unwrap_or(Value::Null),
+        )
+    }
+
+    /// Carrega o WAV e envia o som. Devolve a resposta do `POST /api/sounds`.
+    async fn send_sound(ctx: &Ctx, token: &str, name: &str, bytes: Vec<u8>) -> (StatusCode, Value) {
+        let (status, file) =
+            upload(ctx, token, "kind=sound&name=som.wav", "audio/wav", bytes).await;
+        assert_eq!(status, StatusCode::CREATED, "{file}");
+        call(
+            ctx,
+            "POST",
+            "/api/sounds",
+            token,
+            Some(json!({ "file_id": file["id"], "name": name, "emoji": "😮" })),
+        )
+        .await
+    }
+
+    #[tokio::test]
+    async fn o_som_do_membro_espera_a_aprovacao_e_o_do_dono_entra_direto() {
+        let ctx = setup().await;
+        let ju = join(&ctx, "juju", 2, false).await;
+
+        let (status, sound) = send_sound(&ctx, &ju, "Uau", wav(2_400)).await;
+        assert_eq!(status, StatusCode::CREATED, "{sound}");
+        assert_eq!(sound["status"], "pending");
+        assert_eq!(sound["duration_ms"], 2_400);
+        assert_eq!(sound["uploader_name"], "juju");
+
+        // Aguardando: fora da grade, na lista dela e na fila de quem aprova.
+        let (_, approved) = call(&ctx, "GET", "/api/sounds", &ju, None).await;
+        assert_eq!(approved, json!([]));
+        let (_, mine) = call(&ctx, "GET", "/api/sounds/mine", &ju, None).await;
+        assert_eq!(mine[0]["name"], "Uau");
+        let (status, _) = call(&ctx, "GET", "/api/sounds/pending", &ju, None).await;
+        assert_eq!(status, StatusCode::FORBIDDEN);
+        let (_, queue) = call(&ctx, "GET", "/api/sounds/pending", &ctx.owner_token, None).await;
+        assert_eq!(queue.as_array().unwrap().len(), 1);
+
+        let id = sound["id"].as_str().unwrap();
+        let (status, _) = call(
+            &ctx,
+            "POST",
+            &format!("/api/sounds/{id}/approve"),
+            &ju,
+            None,
+        )
+        .await;
+        assert_eq!(status, StatusCode::FORBIDDEN);
+        let (status, done) = call(
+            &ctx,
+            "POST",
+            &format!("/api/sounds/{id}/approve"),
+            &ctx.owner_token,
+            None,
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{done}");
+        assert_eq!(done["status"], "approved");
+        let (_, approved) = call(&ctx, "GET", "/api/sounds", &ju, None).await;
+        assert_eq!(approved[0]["name"], "Uau");
+
+        let (status, own) = send_sound(&ctx, &ctx.owner_token, "Risada", wav(1_800)).await;
+        assert_eq!(status, StatusCode::CREATED);
+        assert_eq!(own["status"], "approved");
+    }
+
+    #[tokio::test]
+    async fn os_limites_do_envio() {
+        let ctx = setup().await;
+        let ju = join(&ctx, "juju", 2, false).await;
+
+        // Mais de 5 s, e o que não é WAV.
+        let (status, body) = send_sound(&ctx, &ju, "Longo", wav(6_000)).await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{body}");
+        let (_, file) = upload(
+            &ctx,
+            &ju,
+            "kind=sound&name=a.mp3",
+            "audio/mpeg",
+            b"ID3\x04resto".to_vec(),
+        )
+        .await;
+        let (status, _) = call(
+            &ctx,
+            "POST",
+            "/api/sounds",
+            &ju,
+            Some(json!({ "file_id": file["id"], "name": "Mp3" })),
+        )
+        .await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+
+        // Três aguardando, no máximo; o nome não repete, sem olhar maiúscula.
+        for name in ["Um", "Dois", "Tres"] {
+            assert_eq!(
+                send_sound(&ctx, &ju, name, wav(500)).await.0,
+                StatusCode::CREATED
+            );
+        }
+        let (status, body) = send_sound(&ctx, &ju, "Quatro", wav(500)).await;
+        assert_eq!(status, StatusCode::CONFLICT, "{body}");
+        let (status, _) = send_sound(&ctx, &ctx.owner_token, "um", wav(500)).await;
+        assert_eq!(status, StatusCode::CONFLICT);
+    }
+
+    #[tokio::test]
+    async fn recusar_avisa_o_motivo_e_quem_enviou_apaga_ou_reenvia() {
+        let ctx = setup().await;
+        let ju = join(&ctx, "juju", 2, false).await;
+        let rafa = join(&ctx, "rafa", 3, false).await;
+        let (_, sound) = send_sound(&ctx, &ju, "Buzina", wav(4_900)).await;
+        let id = sound["id"].as_str().unwrap().to_owned();
+
+        let (status, rejected) = call(
+            &ctx,
+            "POST",
+            &format!("/api/sounds/{id}/reject"),
+            &ctx.owner_token,
+            Some(json!({ "reason": "Muito alto" })),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(rejected["status"], "rejected");
+        let (_, mine) = call(&ctx, "GET", "/api/sounds/mine", &ju, None).await;
+        assert_eq!(mine[0]["reason"], "Muito alto");
+
+        // O nome ficou livre, e outra pessoa não mexe no som dela.
+        let (status, _) = call(&ctx, "DELETE", &format!("/api/sounds/{id}"), &rafa, None).await;
+        assert_eq!(status, StatusCode::FORBIDDEN);
+
+        // Editar e reenviar: o novo substitui o recusado.
+        let (_, file) = upload(&ctx, &ju, "kind=sound&name=b.wav", "audio/wav", wav(3_000)).await;
+        let (status, again) = call(
+            &ctx,
+            "POST",
+            "/api/sounds",
+            &ju,
+            Some(json!({ "file_id": file["id"], "name": "Buzina", "replaces": id })),
+        )
+        .await;
+        assert_eq!(status, StatusCode::CREATED, "{again}");
+        let (_, mine) = call(&ctx, "GET", "/api/sounds/mine", &ju, None).await;
+        assert_eq!(mine.as_array().unwrap().len(), 1);
+        assert_eq!(mine[0]["status"], "pending");
+
+        // Cancelar o que aguarda.
+        let again_id = again["id"].as_str().unwrap();
+        let (status, _) = call(
+            &ctx,
+            "DELETE",
+            &format!("/api/sounds/{again_id}"),
+            &ju,
+            None,
+        )
+        .await;
+        assert_eq!(status, StatusCode::NO_CONTENT);
+        let (_, mine) = call(&ctx, "GET", "/api/sounds/mine", &ju, None).await;
+        assert_eq!(mine, json!([]));
+    }
+
+    #[tokio::test]
+    async fn sem_enviar_sons_nao_envia() {
+        let ctx = setup().await;
+        let ju = join(&ctx, "juju", 2, false).await;
+        let juju = users::get_active_by_nick(&ctx.db, "juju").await.unwrap();
+        let (_, me) = call(&ctx, "GET", "/api/me", &ju, None).await;
+        assert_eq!(me["can_send_sounds"], true);
+        assert_eq!(me["can_approve_sounds"], false);
+
+        api::identity::permissions::set(
+            &ctx.db,
+            &ctx.owner,
+            &juju,
+            api::identity::permissions::Permission::SendSounds,
+            false,
+            now(),
+        )
+        .await
+        .unwrap();
+        let (status, _) = send_sound(&ctx, &ju, "Uau", wav(1_000)).await;
+        assert_eq!(status, StatusCode::FORBIDDEN);
+    }
+}

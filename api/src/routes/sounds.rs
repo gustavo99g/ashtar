@@ -1,0 +1,160 @@
+//! Rotas dos sons do soundboard (ADR 0037, v0.9). Ler os aprovados e os próprios, todo mundo;
+//! enviar, quem tem "Enviar sons"; a fila, aprovar, recusar, renomear e excluir qualquer um, quem
+//! tem "Aprovar sons". Cada mudança nos aprovados manda a lista inteira no `sounds.changed`, e cada
+//! mudança na fila manda o `sounds.queue` com o número.
+
+use axum::Json;
+use axum::extract::{Path, State};
+use axum::http::StatusCode;
+use tokio::io::AsyncReadExt;
+
+use super::auth::CurrentUser;
+use super::extract::ApiJson;
+use crate::AppState;
+use crate::db::now;
+use crate::error::ApiError;
+use crate::files::FileKind;
+use crate::realtime::ServerEvent;
+use crate::sounds::{
+    self, CreateSoundRequest, RejectSoundRequest, Sound, SoundStatus, UpdateSoundRequest,
+};
+
+/// Manda a lista dos aprovados para todos.
+async fn publish_approved(state: &AppState) -> Result<(), ApiError> {
+    let sounds = sounds::list_approved(&state.db).await?;
+    state.hub.publish(&ServerEvent::SoundsChanged { sounds });
+    Ok(())
+}
+
+/// Manda o tamanho da fila para todos.
+async fn publish_queue(state: &AppState) -> Result<(), ApiError> {
+    let pending = sounds::pending_count(&state.db).await?;
+    state.hub.publish(&ServerEvent::SoundsQueue { pending });
+    Ok(())
+}
+
+/// Apaga os bytes dos arquivos que saíram do banco. Uma falha só vai para o log.
+async fn delete_files(state: &AppState, ids: &[String]) {
+    for id in ids {
+        if let Err(error) = state.files.delete(id).await {
+            eprintln!("som {id}: não deu para apagar do disco: {error}");
+        }
+    }
+}
+
+/// `GET /api/sounds`: os aprovados, por nome.
+pub async fn list(
+    State(state): State<AppState>,
+    CurrentUser(_user): CurrentUser,
+) -> Result<Json<Vec<Sound>>, ApiError> {
+    Ok(Json(sounds::list_approved(&state.db).await?))
+}
+
+/// `GET /api/sounds/mine`: os que a pessoa enviou, em qualquer situação.
+pub async fn mine(
+    State(state): State<AppState>,
+    CurrentUser(user): CurrentUser,
+) -> Result<Json<Vec<Sound>>, ApiError> {
+    Ok(Json(sounds::list_mine(&state.db, &user).await?))
+}
+
+/// `GET /api/sounds/pending`: a fila de aprovação. Só com "Aprovar sons".
+pub async fn pending(
+    State(state): State<AppState>,
+    CurrentUser(user): CurrentUser,
+) -> Result<Json<Vec<Sound>>, ApiError> {
+    Ok(Json(sounds::list_pending(&state.db, &user).await?))
+}
+
+/// `POST /api/sounds`: envia um som já carregado pelo `POST /api/files?kind=sound`. O 4º
+/// aguardando, o 51º aprovado e o nome repetido são 409.
+pub async fn create(
+    State(state): State<AppState>,
+    CurrentUser(user): CurrentUser,
+    ApiJson(request): ApiJson<CreateSoundRequest>,
+) -> Result<(StatusCode, Json<Sound>), ApiError> {
+    let file = crate::files::find(&state.db, &request.file_id)
+        .await?
+        .filter(|file| file.kind == FileKind::Sound && file.uploader_id == user.id)
+        .ok_or_else(|| ApiError::InvalidRequest("Esse arquivo não serve para som.".into()))?;
+    let mut bytes = Vec::with_capacity(file.size.max(0) as usize);
+    state
+        .files
+        .open(&file.id)
+        .await?
+        .read_to_end(&mut bytes)
+        .await?;
+    let created = sounds::create(&state.db, &user, &request, &bytes, now()).await?;
+    delete_files(&state, &created.removed_files).await;
+    if created.sound.status == SoundStatus::Approved {
+        publish_approved(&state).await?;
+    }
+    publish_queue(&state).await?;
+    Ok((StatusCode::CREATED, Json(created.sound)))
+}
+
+/// `POST /api/sounds/{id}/approve`: o som entra na grade de todo mundo, e quem enviou é avisado.
+pub async fn approve(
+    State(state): State<AppState>,
+    CurrentUser(user): CurrentUser,
+    Path(id): Path<String>,
+) -> Result<Json<Sound>, ApiError> {
+    let sound = sounds::approve(&state.db, &user, &id, now()).await?;
+    state.hub.publish_to(
+        std::slice::from_ref(&sound.uploaded_by),
+        &ServerEvent::SoundReviewed {
+            sound: sound.clone(),
+        },
+    );
+    publish_approved(&state).await?;
+    publish_queue(&state).await?;
+    Ok(Json(sound))
+}
+
+/// `POST /api/sounds/{id}/reject`: recusa com o motivo (opcional); quem enviou é avisado.
+pub async fn reject(
+    State(state): State<AppState>,
+    CurrentUser(user): CurrentUser,
+    Path(id): Path<String>,
+    ApiJson(request): ApiJson<RejectSoundRequest>,
+) -> Result<Json<Sound>, ApiError> {
+    let sound = sounds::reject(&state.db, &user, &id, request.reason.as_deref(), now()).await?;
+    state.hub.publish_to(
+        std::slice::from_ref(&sound.uploaded_by),
+        &ServerEvent::SoundReviewed {
+            sound: sound.clone(),
+        },
+    );
+    publish_queue(&state).await?;
+    Ok(Json(sound))
+}
+
+/// `PATCH /api/sounds/{id}`: troca o nome e o emoji.
+pub async fn update(
+    State(state): State<AppState>,
+    CurrentUser(user): CurrentUser,
+    Path(id): Path<String>,
+    ApiJson(request): ApiJson<UpdateSoundRequest>,
+) -> Result<Json<Sound>, ApiError> {
+    let sound = sounds::update(&state.db, &user, &id, &request).await?;
+    if sound.status == SoundStatus::Approved {
+        publish_approved(&state).await?;
+    }
+    Ok(Json(sound))
+}
+
+/// `DELETE /api/sounds/{id}`: sai o som e o arquivo.
+pub async fn delete(
+    State(state): State<AppState>,
+    CurrentUser(user): CurrentUser,
+    Path(id): Path<String>,
+) -> Result<StatusCode, ApiError> {
+    let sound = sounds::delete(&state.db, &user, &id).await?;
+    delete_files(&state, std::slice::from_ref(&sound.file_id)).await;
+    match sound.status {
+        SoundStatus::Approved => publish_approved(&state).await?,
+        SoundStatus::Pending => publish_queue(&state).await?,
+        SoundStatus::Rejected => {}
+    }
+    Ok(StatusCode::NO_CONTENT)
+}

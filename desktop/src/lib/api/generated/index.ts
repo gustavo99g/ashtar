@@ -212,6 +212,16 @@ ttl_secs?: number,
  */
 max_uses?: number, };
 
+export type CreateSoundRequest = { 
+/**
+ * Um arquivo `sound` enviado antes pelo `POST /api/files`.
+ */
+file_id: string, name: string, emoji?: string, 
+/**
+ * Um som seu, aguardando ou recusado, que este substitui (o "Editar e reenviar"): sai junto.
+ */
+replaces?: string, };
+
 /**
  * Um convite recém-criado. O código e o link só aparecem aqui.
  */
@@ -275,7 +285,7 @@ export type ErrorKind = "unauthenticated" | "unknown_device" | "forbidden" | "in
 /**
  * Para que o arquivo serve.
  */
-export type FileKind = "avatar" | "attachment" | "preview" | "emoji";
+export type FileKind = "avatar" | "attachment" | "preview" | "emoji" | "sound";
 
 /**
  * O link curto do vídeo: o `<video>` não manda o cabeçalho do token.
@@ -500,7 +510,15 @@ can_view_logs: boolean,
 /**
  * Se o cartão de quem está numa sala de voz mostra a seção Moderação (v0.8).
  */
-can_moderate_voice: boolean, };
+can_moderate_voice: boolean, 
+/**
+ * Se a tela Sons deixa carregar um som (v0.9).
+ */
+can_send_sounds: boolean, 
+/**
+ * Se a tela Sons mostra as abas Aprovação e Todos os sons (v0.9).
+ */
+can_approve_sounds: boolean, };
 
 export type MediaFilter = "media" | "files";
 
@@ -725,6 +743,8 @@ export type RealtimeTicket = { ticket: string,
  */
 expires_in: number, };
 
+export type RejectSoundRequest = { reason?: string, };
+
 export type RenameEmojiRequest = { name: string, };
 
 /**
@@ -782,7 +802,7 @@ export type ServerEvent = { "type": "ready", user_id: string, status: Status, on
 /**
  * O nome de quem moveu, para o aviso.
  */
-by_name: string, } | { "type": "voice.disconnected", by: string, by_name: string, reason: DisconnectReason, } | { "type": "voice.moderated", action: ModerationAction, server_muted: boolean, server_deafened: boolean, by: string, by_name: string, } | { "type": "typing", channel_id: string, user_id: string, } | { "type": "member.joined", person: Person, } | { "type": "user.updated", id: string, display_name: string | null, avatar: string | null, } | { "type": "member.left", user_id: string, } | { "type": "logs.received", report: LogReportView, } | { "type": "channels.changed", version: number, } | { "type": "emojis.changed", emojis: Array<Emoji>, } | { "type": "channel.state", channel_id: string, state: ReadState, } | { "type": "call.ringing", call: CallView, } | { "type": "call.accepted", call: CallView, } | { "type": "call.ended", call_id: string, channel_id: string, outcome: CallOutcome, duration: number | null, };
+by_name: string, } | { "type": "voice.disconnected", by: string, by_name: string, reason: DisconnectReason, } | { "type": "voice.moderated", action: ModerationAction, server_muted: boolean, server_deafened: boolean, by: string, by_name: string, } | { "type": "typing", channel_id: string, user_id: string, } | { "type": "member.joined", person: Person, } | { "type": "user.updated", id: string, display_name: string | null, avatar: string | null, } | { "type": "member.left", user_id: string, } | { "type": "logs.received", report: LogReportView, } | { "type": "channels.changed", version: number, } | { "type": "emojis.changed", emojis: Array<Emoji>, } | { "type": "sounds.changed", sounds: Array<Sound>, } | { "type": "sounds.queue", pending: number, } | { "type": "sounds.reviewed", sound: Sound, } | { "type": "channel.state", channel_id: string, state: ReadState, } | { "type": "call.ringing", call: CallView, } | { "type": "call.accepted", call: CallView, } | { "type": "call.ended", call_id: string, channel_id: string, outcome: CallOutcome, duration: number | null, };
 
 export type ServerStatus = { api: ApiStatus, livekit: LiveKitStatus, 
 /**
@@ -851,6 +871,29 @@ viewers: number, };
  */
 export type Shown = "available" | "away" | "busy";
 
+export type Sound = { id: string, name: string, 
+/**
+ * O emoji que aparece no botão (Unicode), ou nenhum.
+ */
+emoji: string | null, 
+/**
+ * O WAV (`GET /api/files/{id}`).
+ */
+file_id: string, duration_ms: number, uploaded_by: string, 
+/**
+ * O nome de quem enviou, como aparece.
+ */
+uploader_name: string, status: SoundStatus, 
+/**
+ * Só no recusado: o que quem recusou escreveu.
+ */
+reason: string | null, created_at: number, reviewed_at: number | null, };
+
+/**
+ * A situação de um som.
+ */
+export type SoundStatus = "pending" | "approved" | "rejected";
+
 /**
  * O status que a pessoa escolheu.
  */
@@ -876,6 +919,8 @@ export type UpdateMeRequest = {
  * O nome visível novo. Texto vazio ou `null` volta para o nick.
  */
 display_name: string | null, };
+
+export type UpdateSoundRequest = { name: string, emoji?: string, };
 
 export type UserView = { id: string, nick: string, 
 /**

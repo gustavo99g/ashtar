@@ -164,6 +164,17 @@ pub enum ServerEvent {
     EmojisChanged {
         emojis: Vec<crate::chat::emojis::Emoji>,
     },
+    /// Os sons aprovados do soundboard mudaram (v0.9): a lista inteira, para a grade.
+    #[serde(rename = "sounds.changed")]
+    SoundsChanged { sounds: Vec<crate::sounds::Sound> },
+    /// Quantos sons aguardam aprovação (v0.9). Vai para todos; o app só mostra o número a quem
+    /// aprova.
+    #[serde(rename = "sounds.queue")]
+    SoundsQueue { pending: i64 },
+    /// Um som de quem recebe foi aprovado ou recusado (v0.9): só para quem enviou, que ganha o
+    /// aviso.
+    #[serde(rename = "sounds.reviewed")]
+    SoundReviewed { sound: crate::sounds::Sound },
     /// O estado de um canal ou conversa mudou para a pessoa (leu, marcou tudo
     /// como lido, silenciou). Só vai para as conexões dela: é o que zera o
     /// número no outro computador.
@@ -219,6 +230,9 @@ impl ServerEvent {
             | Self::LogsReceived { .. }
             | Self::DiskAlert { .. }
             | Self::EmojisChanged { .. }
+            | Self::SoundsChanged { .. }
+            | Self::SoundsQueue { .. }
+            | Self::SoundReviewed { .. }
             | Self::ChannelsChanged { .. } => false,
         }
     }

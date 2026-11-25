@@ -465,7 +465,11 @@ async fn beta_liga_e_desliga() {
     .unwrap();
     let (_, me) = call(&ctx.router, "GET", "/api/me", Some(&token), None).await;
     assert_eq!(me["update_channel"], "beta");
-    assert_eq!(me["permissions"], json!(["atualizacoes.beta"]));
+    // "Enviar sons" vem de entrada (v0.9).
+    assert_eq!(
+        me["permissions"],
+        json!(["atualizacoes.beta", "sons.enviar"])
+    );
 
     permissions::set(
         &ctx.db,
@@ -1407,10 +1411,17 @@ mod regras {
             .fetch_one(&pool)
             .await
             .unwrap();
-        assert_eq!(rows, 1);
+        // A linha do beta e a do "Enviar sons", que vem de entrada (v0.9).
+        assert_eq!(rows, 2);
 
         let effective = permissions::effective(&pool, &kid).await.unwrap();
-        assert_eq!(effective, [(beta, Origin::Direct)]);
+        assert_eq!(
+            effective,
+            [
+                (beta, Origin::Direct),
+                (Permission::SendSounds, Origin::Direct)
+            ]
+        );
         let owners = permissions::effective(&pool, &owner).await.unwrap();
         assert_eq!(
             owners,
@@ -1420,6 +1431,8 @@ mod regras {
                 (Permission::MoveMembers, Origin::Owner),
                 (Permission::ModerateVoice, Origin::Owner),
                 (Permission::ManageEmojis, Origin::Owner),
+                (Permission::SendSounds, Origin::Owner),
+                (Permission::ApproveSounds, Origin::Owner),
                 (Permission::ViewLogs, Origin::Owner),
             ]
         );
@@ -1441,11 +1454,10 @@ mod regras {
         .execute(&pool)
         .await
         .unwrap();
-        assert!(
-            permissions::effective(&pool, &kid)
-                .await
-                .unwrap()
-                .is_empty()
+        // Só fica o "Enviar sons", que vem de entrada (v0.9).
+        assert_eq!(
+            permissions::effective(&pool, &kid).await.unwrap(),
+            [(Permission::SendSounds, Origin::Direct)]
         );
     }
 
@@ -2438,6 +2450,8 @@ mod painel {
                 "membros.mover",
                 "voz.moderar",
                 "emojis.gerenciar",
+                "sons.enviar",
+                "sons.aprovar",
                 "logs.ver",
                 "convites.criar",
                 "convites.recuperacao",
@@ -2467,16 +2481,18 @@ mod painel {
         assert_eq!(list[3]["kind"], "permission");
         assert_eq!(list[4]["key"], "emojis.gerenciar");
         assert_eq!(list[4]["kind"], "permission");
-        assert_eq!(list[5]["key"], "logs.ver");
-        assert_eq!(list[5]["kind"], "permission");
+        assert_eq!(list[5]["key"], "sons.enviar");
+        assert_eq!(list[6]["key"], "sons.aprovar");
+        assert_eq!(list[7]["key"], "logs.ver");
+        assert_eq!(list[7]["kind"], "permission");
         // As permissões vêm antes das ações.
-        for grant in list.as_array().unwrap()[6..].iter() {
+        for grant in list.as_array().unwrap()[8..].iter() {
             assert_eq!(grant["kind"], "action");
             assert_eq!(grant["granted"], true);
             assert_eq!(grant["origin"], "owner");
         }
 
-        // Membro sem nada.
+        // Membro sem nada além do "Enviar sons", que vem de entrada (v0.9).
         let (_, list) = call(
             &ctx.router,
             "GET",
@@ -2486,6 +2502,11 @@ mod painel {
         )
         .await;
         for grant in list.as_array().unwrap() {
+            if grant["key"] == "sons.enviar" {
+                assert_eq!(grant["granted"], true, "{grant}");
+                assert_eq!(grant["origin"], "direct", "{grant}");
+                continue;
+            }
             assert_eq!(grant["granted"], false, "{grant}");
             assert_eq!(grant["origin"], Value::Null, "{grant}");
         }

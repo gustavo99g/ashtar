@@ -32,7 +32,7 @@ const me = (canMove: boolean, canModerate = false): MeResponse => ({
 	can_create_invite: false,
 	can_view_panel: false,
 	can_manage_channels: false,
-	can_move_members: canMove, can_manage_emojis: false, can_view_logs: false, can_moderate_voice: canModerate,
+	can_move_members: canMove, can_manage_emojis: false, can_view_logs: false, can_moderate_voice: canModerate, can_send_sounds: false, can_approve_sounds: false,
 });
 
 const room = (id: string, name: string) => ({

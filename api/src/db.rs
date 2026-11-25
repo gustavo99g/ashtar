@@ -138,6 +138,7 @@ mod tests {
                 "messages_fts_idx",
                 "reactions",
                 "sessions",
+                "sounds",
                 "user_permissions",
                 "users",
                 "voice_moderation"
@@ -194,6 +195,67 @@ mod tests {
         sqlx::query(
             "INSERT INTO messages (id, channel_id, author_id, client_id, body, created_at)
              VALUES ('m2', 'geral', 'u1', 'c2', '', 11)",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+    }
+
+    /// A 0019 recria a tabela `files` com o tipo `sound` (ADR 0037): os arquivos, a foto, os
+    /// anexos e a busca pelo nome do anexo continuam valendo.
+    #[tokio::test]
+    async fn a_migracao_dos_sons_mantem_os_arquivos() {
+        let options = SqliteConnectOptions::from_str("sqlite::memory:")
+            .unwrap()
+            .foreign_keys(true);
+        let pool = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect_with(options)
+            .await
+            .unwrap();
+        sqlx::migrate!().run_to(18, &pool).await.unwrap();
+        insert_user(&pool, "u1", "Kid").await.unwrap();
+        insert_user(&pool, "u2", "Juju").await.unwrap();
+        for sql in [
+            "INSERT INTO files (id, uploader_id, kind, name, mime, size, created_at, used_at)
+             VALUES ('f1', 'u1', 'avatar', 'foto.webp', 'image/webp', 10, 1, 1)",
+            "UPDATE users SET avatar_id = 'f1' WHERE id = 'u1'",
+            "INSERT INTO voice_moderation (user_id, mic_muted, by_user_id, updated_at)
+             VALUES ('u2', 1, 'u1', 1)",
+        ] {
+            sqlx::query(sql).execute(&pool).await.unwrap();
+        }
+
+        migrate(&pool).await.unwrap();
+
+        let kind: String = sqlx::query_scalar("SELECT kind FROM files WHERE id = 'f1'")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(kind, "avatar");
+        let broken: Vec<(String,)> = sqlx::query_as("PRAGMA foreign_key_check")
+            .fetch_all(&pool)
+            .await
+            .unwrap();
+        assert!(broken.is_empty());
+        // Quem já estava ganha "Enviar sons"; o silenciado continua, sem os sons bloqueados.
+        let granted: Vec<String> = sqlx::query_scalar(
+            "SELECT user_id FROM user_permissions WHERE permission = 'sons.enviar' ORDER BY user_id",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        assert_eq!(granted, ["u1", "u2"]);
+        let (muted, blocked): (bool, bool) = sqlx::query_as(
+            "SELECT mic_muted, sounds_blocked FROM voice_moderation WHERE user_id = 'u2'",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert!(muted && !blocked);
+        sqlx::query(
+            "INSERT INTO files (id, uploader_id, kind, name, mime, size, created_at)
+             VALUES ('f2', 'u2', 'sound', 'uau.wav', 'audio/wav', 10, 2)",
         )
         .execute(&pool)
         .await

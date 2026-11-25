@@ -27,7 +27,7 @@ function renderMenu({ owner = false, manage = false } = {}) {
 		can_create_invite: owner,
 		can_view_panel: owner,
 		can_manage_channels: manage,
-		can_move_members: manage, can_manage_emojis: false, can_view_logs: false, can_moderate_voice: false,
+		can_move_members: manage, can_manage_emojis: false, can_view_logs: false, can_moderate_voice: false, can_send_sounds: false, can_approve_sounds: false,
 	};
 	client.setQueryData(identityKeys.me(), me);
 	render(
