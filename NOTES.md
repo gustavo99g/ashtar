@@ -9,25 +9,40 @@ Base: a `main` com a `0.8.11` (merge do PR #44, `b8fc1a0`). A correção da barr
 ## Do uso real (24/11)
 
 - O grupo usa a 0.8.11 sem reclamar do que já funciona.
-- [ ] **Mensagem do convite recusado.** Um amigo viu "Convite inválido, expirado ou já usado" com o convite ainda
+- [x] *(feito na v0.9 (Etapa 2))* **Mensagem do convite recusado.** Um amigo viu "Convite inválido, expirado ou já usado" com o convite ainda
       ativo no Painel: o código chegou errado. A API junta quatro casos num erro só (`ApiError::InvalidInvite`).
       Separar: "Este convite venceu", "Este convite já foi usado", "Este convite foi revogado" e "Código não
       encontrado" (o `find_valid` em `identity/invites.rs` vira uma busca pelo código e uma conferência depois).
-- [ ] **Prévia do link do convite** (o Kid aprovou na 0.9, 24/11). A prévia da API recusa a própria VPS
+- [x] *(feito na v0.9 (Etapa 3))* **Prévia do link do convite** (o Kid aprovou na 0.9, 24/11). A prévia da API recusa a própria VPS
       (`own_addresses` em `previews/mod.rs`), então o link do convite nunca ganha cartão. O app reconhece o link e
       monta o cartão ele mesmo pela rota de leitura do convite (`preview`): quem convidou, ou de quem é a conta na
       recuperação, e quando vence. A proteção da VPS não muda.
-- [ ] **Formatar o PC entra direto** (teste A06). Um amigo formatou e o Kid mandou um convite de recuperação, que
+- [x] *(roteiro do RC, A06)* **Formatar o PC entra direto** (teste A06). Um amigo formatou e o Kid mandou um convite de recuperação, que
       funcionou; mas o Kid tinha desvinculado o computador antes, o que libera a chave, então o caso não prova nada
       sobre a chave. Pelo desenho, formatar não muda a chave e basta instalar o app. Conferir no teste do RC, sem
       desvincular antes.
-- [ ] **Link para baixar o app**, para mandar a quem formatou ou trocou de PC sem gerar convite (24/11). O
+- [x] *(feito na v0.9 (Etapa 4))* **Link para baixar o app**, para mandar a quem formatou ou trocou de PC sem gerar convite (24/11). O
       `/download` já existe; o Painel › Convites ganha "Copiar link para baixar o app" (decisão 9 do plano).
 
-- [ ] **A janela da conversa privada um pouco mais larga** (pedido do Kid, 24/11). Hoje é `w-[380px]` em
+- [x] *(feito na v0.9 (Etapa 4))* **A janela da conversa privada um pouco mais larga** (pedido do Kid, 24/11). Hoje é `w-[380px]` em
       `dms/components/DmWindow.tsx` (quadro "Lateral — conversa embaixo"). Proposta: 440 px, com a altura de até
       540 igual. Conferir que três abertas (a expandida e duas abas de 210) ainda cabem ao lado da lateral numa
       janela de 1280 px.
+
+## Triagem das notas antigas (Etapa 1)
+
+Os 255 itens em aberto das notas da v0.2.2 à v0.8 (e os 5 deste arquivo) ganharam destino, marcado no próprio item:
+110 provados no uso até a 0.8.11, 26 feitos, 43 obsoletos (a VPS, o app antigo, os experimentos já decididos), 12
+aceitos como regra ou limitação, 55 no roteiro do RC (`docs/testes-rc.md`, com o número do caso) e 9 no
+`BACKLOG.md` (2 já estavam lá; os outros na seção "Da triagem das notas antigas"). A triagem não achou defeito para corrigir antes da 1.0.
+
+- [ ] **Perguntas ao Kid** (os itens marcados "pergunta ao Kid"; sem resposta, ficam no roteiro):
+      1. Alguém já transmitiu um jogo em tela cheia exclusiva (não a janela sem borda)? (M12)
+      2. Alguém tem monitor HDR, ou transmite de notebook com duas placas? (M03)
+      3. Quais placas o grupo tem, e todas já transmitiram (NVIDIA, Intel, AMD)? (M15)
+      4. A ligação tocando com um jogo em tela cheia já roubou o foco do jogo? (A17)
+      5. Algum anti-cheat (Vanguard, EAC, BattlEye) já reclamou do Ashtar? (M10)
+      6. Alguém usa fone Bluetooth na chamada, e ele já ficou trocando de dispositivo? (M02)
 
 ## Decisões do Kid (24/11)
 

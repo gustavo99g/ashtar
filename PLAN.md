@@ -72,7 +72,7 @@ Levantado na `main` (`b8fc1a0`), para o plano não refazer:
 | Etapa | O que | Situação |
 |---|---|---|
 | 0 | Documentos, roadmap, BACKLOG | Feito |
-| 1 | Triagem das notas e roteiro de testes | Pendente |
+| 1 | Triagem das notas e roteiro de testes | Feito |
 | 2 | API e app: o motivo do convite recusado | Feito |
 | 3 | App: o cartão do convite no chat | Feito |
 | 4 | App: a conversa mais larga, o link para baixar e a transmissão nas configurações | Feito |

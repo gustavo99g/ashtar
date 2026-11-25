@@ -51,6 +51,19 @@ Bugs que saem assim que ficarem prontos, pelo auto-update, sem esperar a entrega
 - [x] No cartão do usuário (ADR 0020), "Mover para outra sala": entrou com as várias salas de voz (ADR 0026), junto do
       "Desconectar da voz" e do arrastar entre salas.
 
+## Da triagem das notas antigas (v0.9)
+
+O que as notas da v0.2.2 à v0.8 tinham em aberto e não vale corrigir antes da 1.0. Nenhum é defeito visto no uso.
+
+- [ ] Linha de base de desempenho por preset em release (CPU, memória, intervalos entre quadros), com a comparação
+      estruturada (notas da v0.2.4). O uso não mostrou problema; medir quando houver uma mudança no publicador.
+- [ ] Driver de vídeo atualizado com a transmissão aberta (dispositivo perdido): conferir que acaba com aviso, sem
+      travar (notas da v0.2.4). Raro.
+- [ ] Atalho global para pausar a transmissão (notas da v0.2.4). Hoje é pela bandeja e pelo painel.
+- [ ] "Atualizar agora" na entrada espera sem notícia quando não há versão nova (notas da v0.2.2).
+- [ ] Fechar uma conversa da lista, escondendo sem apagar (notas da v0.3).
+- [ ] Arrastar alguém para outra sala a partir da categoria recolhida (o `AvatarStrip`, notas da v0.5).
+
 ## Mais adiante
 
 As miniaturas foram adiantadas para a v0.2.4 e o aviso de conteúdo protegido entrou na v0.8; Linux, depois da v1.0; sem versão para funcionalidades novas de voz.
