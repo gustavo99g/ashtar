@@ -10,7 +10,11 @@ export type ShortcutId =
 	| "ptt"
 	| "answer"
 	| "decline"
-	| "screenshot";
+	| "screenshot"
+	| "sound1"
+	| "sound2"
+	| "sound3"
+	| "sound4";
 
 export type MouseButton = "middle" | "x1" | "x2";
 
@@ -38,6 +42,10 @@ export const SHORTCUT_IDS: readonly ShortcutId[] = [
 	"answer",
 	"decline",
 	"screenshot",
+	"sound1",
+	"sound2",
+	"sound3",
+	"sound4",
 ];
 
 export const SHORTCUT_NAMES: Record<ShortcutId, string> = {
@@ -47,6 +55,10 @@ export const SHORTCUT_NAMES: Record<ShortcutId, string> = {
 	answer: "Atender ligação",
 	decline: "Recusar ou desligar",
 	screenshot: "Tirar print da transmissão",
+	sound1: "Tocar o som do lugar 1",
+	sound2: "Tocar o som do lugar 2",
+	sound3: "Tocar o som do lugar 3",
+	sound4: "Tocar o som do lugar 4",
 };
 
 /** `Ctrl+Shift+` e a letra. */
@@ -64,6 +76,21 @@ function ctrlShift(letter: string): Shortcut {
 	};
 }
 
+/** `Ctrl+Alt+` e o número, os atalhos dos lugares do soundboard (v0.9). */
+function ctrlAlt(digit: number): Shortcut {
+	return {
+		combo: {
+			ctrl: true,
+			shift: false,
+			alt: true,
+			win: false,
+			key: 0x30 + digit,
+			mouse: null,
+		},
+		label: `Ctrl+Alt+${digit}`,
+	};
+}
+
 export const DEFAULT_SHORTCUTS: Shortcuts = {
 	mute: ctrlShift("M"),
 	deafen: ctrlShift("D"),
@@ -71,6 +98,10 @@ export const DEFAULT_SHORTCUTS: Shortcuts = {
 	answer: ctrlShift("A"),
 	decline: ctrlShift("E"),
 	screenshot: ctrlShift("P"),
+	sound1: ctrlAlt(1),
+	sound2: ctrlAlt(2),
+	sound3: ctrlAlt(3),
+	sound4: ctrlAlt(4),
 };
 
 export function sameCombo(a: Combo, b: Combo): boolean {

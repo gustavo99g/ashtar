@@ -131,6 +131,7 @@ pub enum ServerEvent {
         action: crate::moderation::ModerationAction,
         server_muted: bool,
         server_deafened: bool,
+        sounds_blocked: bool,
         by: String,
         by_name: String,
     },
@@ -175,6 +176,16 @@ pub enum ServerEvent {
     /// aviso.
     #[serde(rename = "sounds.reviewed")]
     SoundReviewed { sound: crate::sounds::Sound },
+    /// Alguém tocou um som (ADR 0037): vai para os outros da sala de voz ou da ligação, que tocam
+    /// o arquivo (`file_id`, guardado no cache do app) e mostram a onda dourada em quem tocou.
+    #[serde(rename = "voice.sound_played")]
+    SoundPlayed {
+        sound_id: String,
+        file_id: String,
+        user_id: String,
+        /// A sala de voz do grupo ou a conversa da ligação.
+        channel_id: String,
+    },
     /// O estado de um canal ou conversa mudou para a pessoa (leu, marcou tudo
     /// como lido, silenciou). Só vai para as conexões dela: é o que zera o
     /// número no outro computador.
@@ -233,6 +244,7 @@ impl ServerEvent {
             | Self::SoundsChanged { .. }
             | Self::SoundsQueue { .. }
             | Self::SoundReviewed { .. }
+            | Self::SoundPlayed { .. }
             | Self::ChannelsChanged { .. } => false,
         }
     }
@@ -686,8 +698,7 @@ impl Hub {
     pub fn set_moderated(
         &self,
         user_id: &str,
-        server_muted: bool,
-        server_deafened: bool,
+        imposed: crate::moderation::Imposed,
     ) -> Option<(String, Vec<ParticipantView>)> {
         let mut inner = self.lock();
         let (room, people) = inner
@@ -695,8 +706,9 @@ impl Hub {
             .iter_mut()
             .find(|(_, people)| people.iter().any(|p| p.user_id == user_id))?;
         for person in people.iter_mut().filter(|p| p.user_id == user_id) {
-            person.server_muted = server_muted;
-            person.server_deafened = server_deafened;
+            person.server_muted = imposed.mic_muted;
+            person.server_deafened = imposed.deafened;
+            person.sounds_blocked = imposed.sounds_blocked;
         }
         Some((room.clone(), people.clone()))
     }

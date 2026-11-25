@@ -8,6 +8,11 @@ import { BellRingIcon, PlayIcon } from "lucide-react";
 import { type ReactNode, useId, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
+import {
+	setSoundboardEnabled,
+	setSoundboardVolume,
+	useSoundboard,
+} from "@/features/sounds";
 import { Switch } from "@/components/ui/switch";
 import { useMe, useMyStatus } from "@/features/identity";
 import {
@@ -139,6 +144,36 @@ export function sampleCard(
 
 type TestState = "idle" | "shown" | "quiet";
 
+/** A chave geral e o volume dos sons do soundboard (v0.9, ADR 0037, decisão 26). */
+function SoundboardRows() {
+	const { enabled, volume } = useSoundboard();
+	return (
+		<>
+			<Row
+				title="Ouvir os sons do soundboard"
+				text="Os sons que as pessoas tocam na sala ou na ligação em que você está."
+				checked={enabled}
+				onChange={setSoundboardEnabled}
+			/>
+			<div className="flex flex-col gap-1.5">
+				<div className="flex items-center justify-between text-xs text-muted-foreground">
+					<span>Volume do soundboard. Também muda na grade de Sons.</span>
+					<span className="shrink-0 pl-4 tabular-nums">{volume}%</span>
+				</div>
+				<Slider
+					aria-label="Volume do soundboard"
+					min={0}
+					max={100}
+					step={1}
+					disabled={!enabled}
+					value={volume}
+					onValueChange={(next) => setSoundboardVolume(next as number)}
+				/>
+			</div>
+		</>
+	);
+}
+
 export function NotificationsSettings() {
 	const prefs = useSettingsStore((state) => state.notifications);
 	const setNotification = useSettingsStore((state) => state.setNotification);
@@ -233,6 +268,10 @@ export function NotificationsSettings() {
 						}
 					/>
 				))}
+			</Section>
+
+			<Section title="Soundboard">
+				<SoundboardRows />
 			</Section>
 
 			<Section title="Teste">

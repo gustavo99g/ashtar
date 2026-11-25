@@ -12,6 +12,9 @@
 //!
 //! **Chat.** O [`SendLimiter`] conta os envios de cada pessoa separados (aqui
 //! há sessão, então dá para saber quem é): 5 mensagens a cada 5 s (ADR 0015).
+//!
+//! **Sons.** O [`SoundLimiter`] faz o mesmo para o soundboard, com mais um intervalo mínimo entre
+//! dois sons: 5 a cada 30 s e 3 s entre um e outro (ADR 0037).
 
 use std::collections::{HashMap, VecDeque};
 use std::sync::Mutex;
@@ -115,9 +118,74 @@ impl SendLimiter {
     }
 }
 
+/// Quantos sons cada pessoa toca: até `max` na janela e nunca dois com menos de `gap` entre eles.
+/// Só na memória, como o [`SendLimiter`].
+pub struct SoundLimiter {
+    max: usize,
+    window: Duration,
+    gap: Duration,
+    played: Mutex<HashMap<String, VecDeque<Instant>>>,
+}
+
+impl SoundLimiter {
+    pub fn new(max: usize, window: Duration, gap: Duration) -> Self {
+        Self {
+            max,
+            window,
+            gap,
+            played: Mutex::new(HashMap::new()),
+        }
+    }
+
+    /// 5 sons a cada 30 segundos, 3 segundos entre um e outro.
+    pub fn default_for_sounds() -> Self {
+        Self::new(5, Duration::from_secs(30), Duration::from_secs(3))
+    }
+
+    /// Conta um som de `user_id`, ou `Err(TooManySounds)` (e aí não conta).
+    pub fn try_play(&self, user_id: &str) -> Result<(), ApiError> {
+        self.try_play_at(user_id, Instant::now())
+    }
+
+    fn try_play_at(&self, user_id: &str, now: Instant) -> Result<(), ApiError> {
+        let mut played = self.played.lock().unwrap();
+        let times = played.entry(user_id.to_owned()).or_default();
+        while times
+            .front()
+            .is_some_and(|t| now.duration_since(*t) >= self.window)
+        {
+            times.pop_front();
+        }
+        let too_soon = times
+            .back()
+            .is_some_and(|t| now.duration_since(*t) < self.gap);
+        if too_soon || times.len() >= self.max {
+            return Err(ApiError::TooManySounds);
+        }
+        times.push_back(now);
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn sons_tem_intervalo_e_limite_na_janela() {
+        let limiter = SoundLimiter::new(3, Duration::from_secs(30), Duration::from_secs(3));
+        let start = Instant::now();
+        let at = |s| start + Duration::from_secs(s);
+        assert!(limiter.try_play_at("a", at(0)).is_ok());
+        // Antes dos 3 s, não.
+        assert!(limiter.try_play_at("a", at(2)).is_err());
+        assert!(limiter.try_play_at("b", at(2)).is_ok());
+        assert!(limiter.try_play_at("a", at(3)).is_ok());
+        assert!(limiter.try_play_at("a", at(6)).is_ok());
+        // O quarto na janela, não; quando o primeiro sai da janela, volta.
+        assert!(limiter.try_play_at("a", at(20)).is_err());
+        assert!(limiter.try_play_at("a", at(30)).is_ok());
+    }
 
     #[test]
     fn envio_trava_por_pessoa_e_solta_na_janela() {

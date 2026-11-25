@@ -4,6 +4,7 @@ import {
 	declineOrHangUp,
 	runCallAction,
 } from "@/features/calls";
+import { useOptionalMe } from "@/features/identity";
 import { playPttSound, playRoomSound } from "@/features/notifications";
 import {
 	SHORTCUT_IDS,
@@ -11,7 +12,9 @@ import {
 	useShortcuts,
 } from "@/features/settings";
 import {
+	requestPlay,
 	setPushToTalkHeld,
+	slotSound,
 	takeScreenshot,
 	useInputChoice,
 	useVoice,
@@ -29,6 +32,7 @@ import { keyInput, mouseInput } from "./windowInput";
  *   falar), com o clique, se ligado em Notificações.
  * - Atender e Recusar ou desligar: só fazem algo com uma ligação tocando, chamando ou no ar.
  * - Tirar print da transmissão: a em foco, a assistida ou a própria (`takeScreenshot`).
+ * - Os lugares do soundboard (v0.9): tocam o som do lugar, com a pessoa numa sala ou ligação.
  *
  * Com o Ashtar em foco, o gancho do Windows não recebe as teclas: a janela manda para o Rust cada
  * tecla e botão que vê, e o Rust trata como as do gancho (também na gravação de um atalho).
@@ -38,6 +42,9 @@ export function GlobalShortcuts() {
 	const voice = useVoice();
 	const latest = useRef(voice);
 	latest.current = voice;
+	const userId = useOptionalMe()?.user.id ?? null;
+	const me = useRef(userId);
+	me.current = userId;
 
 	useEffect(() => {
 		const bindings = SHORTCUT_IDS.flatMap((id) => {
@@ -53,7 +60,7 @@ export function GlobalShortcuts() {
 		let alive = true;
 		let unlisten: (() => void) | null = null;
 		void onShortcut(({ id, pressed }) =>
-			handleShortcut(id as ShortcutId, pressed, latest.current),
+			handleShortcut(id as ShortcutId, pressed, latest.current, me.current),
 		).then((off) => {
 			if (alive) unlisten = off;
 			else off();
@@ -98,6 +105,7 @@ export function handleShortcut(
 	id: ShortcutId,
 	pressed: boolean,
 	voice: Voice,
+	userId: string | null = null,
 ): void {
 	if (id === "ptt") {
 		setPushToTalkHeld(pressed);
@@ -124,5 +132,13 @@ export function handleShortcut(
 				if (taken) playRoomSound("screenshot", { gap: false });
 			});
 			return;
+		case "sound1":
+		case "sound2":
+		case "sound3":
+		case "sound4": {
+			const sound = voice.room ? slotSound(Number(id.slice(5)) - 1) : null;
+			if (sound) void requestPlay(sound, { userId, deafened: voice.isDeafened });
+			return;
+		}
 	}
 }

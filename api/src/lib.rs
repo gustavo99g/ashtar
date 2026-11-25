@@ -36,7 +36,7 @@ use tower_http::cors::CorsLayer;
 use client_policy::ClientPolicy;
 use download::DownloadLink;
 use identity::invites::InviteKind;
-use limiter::{AttemptLimiter, SendLimiter};
+use limiter::{AttemptLimiter, SendLimiter, SoundLimiter};
 use livekit_api::access_token::TokenVerifier;
 use livekit_api::webhooks::WebhookReceiver;
 use realtime::Hub;
@@ -49,6 +49,8 @@ pub struct AppState {
     pub limiter: Arc<AttemptLimiter>,
     /// O limite de envio do chat, por pessoa.
     pub send_limiter: Arc<SendLimiter>,
+    /// O limite dos sons do soundboard, por pessoa (ADR 0037).
+    pub sound_limiter: Arc<SoundLimiter>,
     /// O tempo real: os WebSockets abertos, os tickets e quem está online.
     pub hub: Arc<Hub>,
     /// Confere a assinatura do webhook do LiveKit. `None` sem as chaves no
@@ -89,6 +91,7 @@ impl AppState {
             db,
             limiter: Arc::new(AttemptLimiter::default_for_api()),
             send_limiter: Arc::new(SendLimiter::default_for_chat()),
+            sound_limiter: Arc::new(SoundLimiter::default_for_sounds()),
             hub: Arc::new(Hub::default()),
             webhook: TokenVerifier::new()
                 .ok()
@@ -202,6 +205,11 @@ pub fn app(state: AppState, policy: Arc<ClientPolicy>) -> Router {
             "/voice/moderation/{id}/deafen",
             put(routes::moderation::deafen).delete(routes::moderation::undeafen),
         )
+        .route(
+            "/voice/moderation/{id}/sounds",
+            put(routes::moderation::block_sounds).delete(routes::moderation::unblock_sounds),
+        )
+        .route("/voice/sounds/{id}/play", post(routes::sounds::play))
         .route(
             "/voice/moderation/{id}/camera-off",
             post(routes::moderation::camera_off),

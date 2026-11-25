@@ -85,9 +85,21 @@ export {
 	moderateStopShare,
 	setServerDeafen,
 	setServerMute,
+	setSoundsBlocked,
 	moveMember,
 	createVoiceToken,
 	leaveVoiceState,
 	listVoiceParticipants,
 	putVoiceState,
 } from "./voice";
+export {
+	approveSound,
+	createSound,
+	deleteSound,
+	listMySounds,
+	listPendingSounds,
+	listSounds,
+	playSound,
+	rejectSound,
+	updateSound,
+} from "./sounds";

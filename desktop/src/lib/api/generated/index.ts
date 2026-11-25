@@ -280,7 +280,7 @@ reason?: InviteRefusal, };
  * O `kind` de toda recusa da API. O app decide o que mostrar por ele, nunca
  * pela mensagem.
  */
-export type ErrorKind = "unauthenticated" | "unknown_device" | "forbidden" | "invalid_invite" | "invalid_nick" | "invalid_display_name" | "nick_taken" | "invalid_device_key" | "device_already_linked" | "invalid_request" | "not_found" | "conflict" | "too_many_attempts" | "too_many_messages" | "internal" | "client_outdated" | "share_limit" | "timeout" | "file_too_large" | "disk_full";
+export type ErrorKind = "unauthenticated" | "unknown_device" | "forbidden" | "invalid_invite" | "invalid_nick" | "invalid_display_name" | "nick_taken" | "invalid_device_key" | "device_already_linked" | "invalid_request" | "not_found" | "conflict" | "too_many_attempts" | "too_many_messages" | "too_many_sounds" | "internal" | "client_outdated" | "share_limit" | "timeout" | "file_too_large" | "disk_full";
 
 /**
  * Para que o arquivo serve.
@@ -615,7 +615,7 @@ has_newer?: boolean, };
 /**
  * O que a moderação fez, no `voice.moderated` que vai para a pessoa moderada.
  */
-export type ModerationAction = "mute" | "unmute" | "deafen" | "undeafen" | "camera_off" | "stop_share";
+export type ModerationAction = "mute" | "unmute" | "deafen" | "undeafen" | "camera_off" | "stop_share" | "block_sounds" | "unblock_sounds";
 
 export type MoveMemberRequest = { user_id: string, channel_id: string, };
 
@@ -673,7 +673,11 @@ server_muted: boolean,
 /**
  * Com o áudio desligado pela moderação.
  */
-server_deafened: boolean, };
+server_deafened: boolean, 
+/**
+ * Sem tocar sons pela moderação (ADR 0037): o botão Sons dela fica apagado.
+ */
+sounds_blocked: boolean, };
 
 export type PendingRecovery = { invite_id: string, expires_at: number, };
 
@@ -802,7 +806,11 @@ export type ServerEvent = { "type": "ready", user_id: string, status: Status, on
 /**
  * O nome de quem moveu, para o aviso.
  */
-by_name: string, } | { "type": "voice.disconnected", by: string, by_name: string, reason: DisconnectReason, } | { "type": "voice.moderated", action: ModerationAction, server_muted: boolean, server_deafened: boolean, by: string, by_name: string, } | { "type": "typing", channel_id: string, user_id: string, } | { "type": "member.joined", person: Person, } | { "type": "user.updated", id: string, display_name: string | null, avatar: string | null, } | { "type": "member.left", user_id: string, } | { "type": "logs.received", report: LogReportView, } | { "type": "channels.changed", version: number, } | { "type": "emojis.changed", emojis: Array<Emoji>, } | { "type": "sounds.changed", sounds: Array<Sound>, } | { "type": "sounds.queue", pending: number, } | { "type": "sounds.reviewed", sound: Sound, } | { "type": "channel.state", channel_id: string, state: ReadState, } | { "type": "call.ringing", call: CallView, } | { "type": "call.accepted", call: CallView, } | { "type": "call.ended", call_id: string, channel_id: string, outcome: CallOutcome, duration: number | null, };
+by_name: string, } | { "type": "voice.disconnected", by: string, by_name: string, reason: DisconnectReason, } | { "type": "voice.moderated", action: ModerationAction, server_muted: boolean, server_deafened: boolean, sounds_blocked: boolean, by: string, by_name: string, } | { "type": "typing", channel_id: string, user_id: string, } | { "type": "member.joined", person: Person, } | { "type": "user.updated", id: string, display_name: string | null, avatar: string | null, } | { "type": "member.left", user_id: string, } | { "type": "logs.received", report: LogReportView, } | { "type": "channels.changed", version: number, } | { "type": "emojis.changed", emojis: Array<Emoji>, } | { "type": "sounds.changed", sounds: Array<Sound>, } | { "type": "sounds.queue", pending: number, } | { "type": "sounds.reviewed", sound: Sound, } | { "type": "voice.sound_played", sound_id: string, file_id: string, user_id: string, 
+/**
+ * A sala de voz do grupo ou a conversa da ligação.
+ */
+channel_id: string, } | { "type": "channel.state", channel_id: string, state: ReadState, } | { "type": "call.ringing", call: CallView, } | { "type": "call.accepted", call: CallView, } | { "type": "call.ended", call_id: string, channel_id: string, outcome: CallOutcome, duration: number | null, };
 
 export type ServerStatus = { api: ApiStatus, livekit: LiveKitStatus, 
 /**

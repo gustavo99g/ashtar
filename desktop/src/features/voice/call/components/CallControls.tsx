@@ -10,11 +10,12 @@ import type { ScreenShareController } from "@/features/screen-share";
 import { CameraButton } from "../../camera/components/CameraButton";
 import { ShieldBadge } from "../../members/components/MuteMark";
 import { useVoice } from "../../room/hooks/useVoice";
+import { SoundsButton } from "../../soundboard/components/SoundsButton";
 import { BarButton } from "./buttons";
 import { ShareButton } from "./ShareButton";
 
 /*
- * A barra de baixo da sala: Microfone, Áudio (o deafen), Câmera, Tela e Sair. Sem o controller (ainda
+ * A barra de baixo da sala: Microfone, Áudio (o deafen), Câmera, Tela, Sons (v0.9) e Sair. Sem o controller (ainda
  * conectando), o Tela fica desativado. Na ligação privada, o Sair é o Desligar.
  */
 export function CallControls({
@@ -88,6 +89,7 @@ export function CallControls({
 					<ScreenShareIcon />
 				</BarButton>
 			)}
+			<SoundsButton variant="bar" />
 			<span aria-hidden="true" className="mx-2 h-10 w-px bg-border" />
 			<BarButton
 				label={call ? "Desligar" : "Sair"}

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { acceptRinging, declineOrHangUp } from "@/features/calls";
 import { playPttSound } from "@/features/notifications";
 import {
+	requestPlay,
 	setPushToTalkHeld,
 	useInputChoice,
 	type VoiceContextValue,
@@ -17,6 +18,8 @@ vi.mock("@/features/notifications", () => ({ playPttSound: vi.fn() }));
 vi.mock("@/features/voice", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/features/voice")>()),
 	setPushToTalkHeld: vi.fn(),
+	requestPlay: vi.fn(async () => true),
+	slotSound: (index: number) => (index === 1 ? { id: "buzina" } : null),
 }));
 
 function voice(patch: Partial<VoiceContextValue> = {}): VoiceContextValue {
@@ -73,5 +76,18 @@ describe("os atalhos globais", () => {
 		handleShortcut("decline", true, voice());
 		expect(acceptRinging).toHaveBeenCalled();
 		expect(declineOrHangUp).toHaveBeenCalled();
+	});
+
+	it("os lugares do soundboard tocam o som do lugar, só na voz", () => {
+		handleShortcut("sound2", true, voice({ isDeafened: true }), "kid");
+		expect(requestPlay).toHaveBeenCalledWith(
+			{ id: "buzina" },
+			{ userId: "kid", deafened: true },
+		);
+		vi.mocked(requestPlay).mockClear();
+		handleShortcut("sound1", true, voice(), "kid");
+		handleShortcut("sound2", true, voice({ room: null }), "kid");
+		handleShortcut("sound2", false, voice(), "kid");
+		expect(requestPlay).not.toHaveBeenCalled();
 	});
 });

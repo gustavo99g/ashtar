@@ -2,6 +2,10 @@
 //! enviar, quem tem "Enviar sons"; a fila, aprovar, recusar, renomear e excluir qualquer um, quem
 //! tem "Aprovar sons". Cada mudança nos aprovados manda a lista inteira no `sounds.changed`, e cada
 //! mudança na fila manda o `sounds.queue` com o número.
+//!
+//! Tocar (`POST /api/voice/sounds/{id}/play`) é de quem está numa sala de voz do grupo ou numa
+//! ligação atendida, sem "Bloquear sons" (que só vale nas salas do grupo, como o resto da
+//! moderação), dentro do limite do [`crate::limiter::SoundLimiter`].
 
 use axum::Json;
 use axum::extract::{Path, State};
@@ -10,10 +14,14 @@ use tokio::io::AsyncReadExt;
 
 use super::auth::CurrentUser;
 use super::extract::ApiJson;
+use super::voice::voice_room_of;
 use crate::AppState;
+use crate::calls::{self, CallOutcome};
+use crate::chat::dms;
 use crate::db::now;
 use crate::error::ApiError;
 use crate::files::FileKind;
+use crate::moderation;
 use crate::realtime::ServerEvent;
 use crate::sounds::{
     self, CreateSoundRequest, RejectSoundRequest, Sound, SoundStatus, UpdateSoundRequest,
@@ -141,6 +149,51 @@ pub async fn update(
         publish_approved(&state).await?;
     }
     Ok(Json(sound))
+}
+
+/// `POST /api/voice/sounds/{id}/play`: toca um som aprovado para os outros da sala ou da ligação.
+/// Fora de uma sala e de uma ligação é 409; bloqueado, 403; rápido demais, 429.
+pub async fn play(
+    State(state): State<AppState>,
+    CurrentUser(user): CurrentUser,
+    Path(id): Path<String>,
+) -> Result<StatusCode, ApiError> {
+    let sound = sounds::find_approved(&state.db, &id).await?;
+    let (channel_id, audience) = match voice_room_of(&state, &user.id).await? {
+        Some(room) => {
+            if moderation::get(&state.db, &user.id).await?.sounds_blocked {
+                return Err(ApiError::Forbidden);
+            }
+            let people = state.hub.people_in(&room);
+            (room, people)
+        }
+        None => {
+            let call = calls::current_for(&state.db, &user.id)
+                .await?
+                .filter(|call| call.outcome == CallOutcome::Answered)
+                .ok_or_else(|| {
+                    ApiError::Conflict("Entre numa sala de voz para tocar sons.".into())
+                })?;
+            let dm = dms::get(&state.db, &call.channel_id)
+                .await?
+                .ok_or_else(|| {
+                    ApiError::Conflict("Entre numa sala de voz para tocar sons.".into())
+                })?;
+            (call.channel_id, dm.members.to_vec())
+        }
+    };
+    state.sound_limiter.try_play(&user.id)?;
+    let others: Vec<&String> = audience.iter().filter(|id| **id != user.id).collect();
+    state.hub.publish_to(
+        &others,
+        &ServerEvent::SoundPlayed {
+            sound_id: sound.id,
+            file_id: sound.file_id,
+            user_id: user.id,
+            channel_id,
+        },
+    );
+    Ok(StatusCode::NO_CONTENT)
 }
 
 /// `DELETE /api/sounds/{id}`: sai o som e o arquivo.

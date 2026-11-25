@@ -4,6 +4,7 @@ import { CallBridge } from "@/features/calls";
 import { ChannelDialogs } from "@/features/channels";
 import { DmDock, showDm } from "@/features/dms";
 import { useLoadEmojis } from "@/features/emojis";
+import { useLoadSounds } from "@/features/sounds";
 import { ForwardDialog } from "@/features/forward";
 import { LogsNotices } from "@/features/admin";
 import { JoinNotices } from "@/features/members";
@@ -38,6 +39,8 @@ import { ConnectionBanner } from "./ConnectionBanner";
 export function AppShell() {
 	// Os emojis do grupo: o texto, as reações e o seletor leem do store.
 	useLoadEmojis();
+	// Os sons do grupo: a grade do soundboard e o contador da fila leem do store.
+	useLoadSounds();
 	return (
 		<div className="flex h-full flex-col">
 			<ConnectionBanner />

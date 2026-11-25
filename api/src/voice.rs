@@ -48,6 +48,8 @@ pub struct ParticipantView {
     pub server_muted: bool,
     /// Com o áudio desligado pela moderação.
     pub server_deafened: bool,
+    /// Sem tocar sons pela moderação (ADR 0037): o botão Sons dela fica apagado.
+    pub sounds_blocked: bool,
 }
 
 /// A transmissão de alguém, para o cartão de Assistir de quem está fora da sala (v0.7): a fonte,
@@ -191,6 +193,7 @@ pub async fn join_participants(
             Some(ParticipantView {
                 server_muted: imposed.mic_muted,
                 server_deafened: imposed.deafened,
+                sounds_blocked: imposed.sounds_blocked,
                 user_id: user.id.clone(),
                 nick: user.nick.clone(),
                 display_name: user.display_name.clone(),
@@ -729,7 +732,7 @@ mod tests {
         let rooms = fake(vec![("sala", vec!["kid", "juju"])]);
         let muted = Imposed {
             mic_muted: true,
-            deafened: false,
+            ..Imposed::default()
         };
         restrict(&rooms, "sala", "juju", muted).await.unwrap();
         // Quem já saiu da sala não é erro: o próximo token sai travado.

@@ -33,6 +33,8 @@ pub enum ErrorKind {
     TooManyAttempts,
     /// Mensagens demais em pouco tempo (o limite de envio do chat).
     TooManyMessages,
+    /// Sons demais em pouco tempo, ou antes do intervalo entre um e outro (ADR 0037).
+    TooManySounds,
     Internal,
     /// Da `ClientPolicy`: o app está abaixo da versão mínima (426).
     ClientOutdated,
@@ -121,6 +123,8 @@ pub enum ApiError {
     TooManyAttempts,
     #[error("Calma: muitas mensagens seguidas.")]
     TooManyMessages,
+    #[error("Calma: espere um pouco para tocar outro som.")]
+    TooManySounds,
     /// A sala chegou ao limite de transmissões; o número é o limite.
     #[error("Já tem {0} transmissões nesta sala. Espere uma acabar para transmitir.")]
     ShareLimit(usize),
@@ -169,6 +173,7 @@ impl ApiError {
             Self::Conflict(_) => (StatusCode::CONFLICT, ErrorKind::Conflict),
             Self::TooManyAttempts => (StatusCode::TOO_MANY_REQUESTS, ErrorKind::TooManyAttempts),
             Self::TooManyMessages => (StatusCode::TOO_MANY_REQUESTS, ErrorKind::TooManyMessages),
+            Self::TooManySounds => (StatusCode::TOO_MANY_REQUESTS, ErrorKind::TooManySounds),
             Self::ShareLimit(_) => (StatusCode::CONFLICT, ErrorKind::ShareLimit),
             Self::Timeout => (StatusCode::GATEWAY_TIMEOUT, ErrorKind::Timeout),
             Self::FileTooLarge(_) => (StatusCode::PAYLOAD_TOO_LARGE, ErrorKind::FileTooLarge),

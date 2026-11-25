@@ -106,6 +106,13 @@ export async function setServerDeafen(userId: string, on: boolean): Promise<void
 	});
 }
 
+/** Bloqueia (`on`) ou libera os sons do soundboard de alguém (v0.9). */
+export async function setSoundsBlocked(userId: string, on: boolean): Promise<void> {
+	await apiFetch(`/api/voice/moderation/${encodeURIComponent(userId)}/sounds`, {
+		method: on ? "PUT" : "DELETE",
+	});
+}
+
 /** Desliga a câmera de alguém, de uma vez só: a pessoa pode ligar de novo. */
 export async function moderateCameraOff(userId: string): Promise<void> {
 	await apiFetch(
