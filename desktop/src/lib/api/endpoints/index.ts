@@ -43,7 +43,13 @@ export {
 export { listDms, openDm } from "./dms";
 export { getDetectableGames } from "./games";
 export { createEmoji, deleteEmoji, listEmojis, renameEmoji } from "./emojis";
-export { createInvite, getInvite, listInvites, revokeInvite } from "./invites";
+export {
+	createInvite,
+	getInvite,
+	getInviteCard,
+	listInvites,
+	revokeInvite,
+} from "./invites";
 export {
 	fetchFile,
 	fileLink,

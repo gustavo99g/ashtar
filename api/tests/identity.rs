@@ -2975,3 +2975,88 @@ mod pagina {
         assert_eq!(status, StatusCode::UPGRADE_REQUIRED);
     }
 }
+
+mod cartao_do_convite {
+    use super::*;
+
+    async fn card(ctx: &Ctx, token: Option<&str>, code: &str) -> (StatusCode, Value) {
+        call(
+            &ctx.router,
+            "GET",
+            &format!("/api/invites/card/{code}"),
+            token,
+            None,
+        )
+        .await
+    }
+
+    #[tokio::test]
+    async fn o_cartao_mostra_a_situacao_de_cada_convite() {
+        let ctx = setup().await;
+        let token = session(&ctx, "juliana", 1).await;
+        let pending = invites::create(&ctx.db, &ctx.owner, InviteKind::New, None, DAY, 1, now())
+            .await
+            .unwrap();
+        let revoked = invites::create(&ctx.db, &ctx.owner, InviteKind::New, None, DAY, 1, now())
+            .await
+            .unwrap();
+        invites::revoke_by_id(&ctx.db, &ctx.owner, &revoked.id, now())
+            .await
+            .unwrap();
+        let expired = invites::create(
+            &ctx.db,
+            &ctx.owner,
+            InviteKind::New,
+            None,
+            60,
+            1,
+            now() - 120,
+        )
+        .await
+        .unwrap();
+
+        let (status, body) = card(&ctx, Some(&token), &pending.code).await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        assert_eq!(body["status"], "pending");
+        assert_eq!(body["kind"], "new");
+        assert_eq!(body["person"]["nick"], ctx.owner.nick.as_str());
+        assert_eq!(body["expires_at"], pending.expires_at);
+
+        for (code, expected) in [
+            (revoked.code.as_str(), "revoked"),
+            (expired.code.as_str(), "expired"),
+        ] {
+            let (status, body) = card(&ctx, Some(&token), code).await;
+            assert_eq!(status, StatusCode::OK, "{code}");
+            assert_eq!(body["status"], expected, "{code}");
+            assert_eq!(body["kind"], "new", "{code}");
+        }
+
+        let (status, body) = card(&ctx, Some(&token), "AAAA-AAAA-AAAA").await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(body["status"], "not_found");
+        assert!(body["person"].is_null());
+    }
+
+    #[tokio::test]
+    async fn o_cartao_pede_sessao_e_nao_conta_no_limite() {
+        let ctx = setup().await;
+        let token = session(&ctx, "juliana", 1).await;
+        let invite = invites::create(&ctx.db, &ctx.owner, InviteKind::New, None, DAY, 1, now())
+            .await
+            .unwrap();
+
+        let (status, _) = card(&ctx, None, &invite.code).await;
+        assert_eq!(status, StatusCode::UNAUTHORIZED);
+
+        // Muitos códigos que não existem, vistos no histórico do chat, não travam a entrada.
+        for _ in 0..30 {
+            let (status, _) = card(&ctx, Some(&token), "AAAA-AAAA-AAAA").await;
+            assert_eq!(status, StatusCode::OK);
+        }
+        assert_eq!(
+            redeem(&ctx, &invite.code, 2, "Fulano").await.0,
+            StatusCode::OK
+        );
+    }
+}

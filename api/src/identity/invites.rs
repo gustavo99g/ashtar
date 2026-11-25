@@ -117,8 +117,10 @@ impl NewInvite {
 
 /// Convite novo ou de recuperação.
 // No histórico, o `kind` sai em texto do banco (`InviteView`); o `rename_all` dá ao
-// TypeScript a mesma união, `"new" | "recovery"`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, TS)]
+// TypeScript a mesma união, `"new" | "recovery"`. O cartão do convite (v0.9) manda o tipo
+// direto, com o mesmo texto.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "snake_case")]
 #[ts(export, export_to = "index.ts", rename_all = "snake_case")]
 pub enum InviteKind {
     New,
@@ -653,5 +655,71 @@ pub async fn preview(db: &SqlitePool, code: &str, now: i64) -> Result<InvitePrev
         kind,
         person,
         expires_at: invite.expires_at,
+    })
+}
+
+/// A situação de um convite para o cartão no chat (v0.9): o mesmo motivo da
+/// recusa, ou `Pending` quando ainda vale.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export, export_to = "index.ts")]
+pub enum InviteCardStatus {
+    Pending,
+    NotFound,
+    Expired,
+    Used,
+    Revoked,
+}
+
+impl From<InviteRefusal> for InviteCardStatus {
+    fn from(reason: InviteRefusal) -> Self {
+        match reason {
+            InviteRefusal::NotFound => Self::NotFound,
+            InviteRefusal::Expired => Self::Expired,
+            InviteRefusal::Used => Self::Used,
+            InviteRefusal::Revoked => Self::Revoked,
+        }
+    }
+}
+
+/// O que o cartão do convite mostra. Sem `found` quando o código não existe.
+#[derive(Debug, Clone)]
+pub struct InviteCard {
+    pub status: InviteCardStatus,
+    /// O tipo, a pessoa (quem convidou, ou a conta na recuperação) e a validade.
+    pub found: Option<(InviteKind, User, i64)>,
+}
+
+/// Lê um convite para o cartão no chat, valendo ou não. Só para quem já está no
+/// grupo (a rota pede sessão), então não conta no limite de tentativas: quem vê um
+/// convite velho no histórico não está adivinhando código. A conferência é a do
+/// [`redeem`] e do [`preview`].
+pub async fn card(db: &SqlitePool, code: &str, now: i64) -> Result<InviteCard, ApiError> {
+    let not_found = InviteCard {
+        status: InviteCardStatus::NotFound,
+        found: None,
+    };
+    let Some(code) = secret::normalize_invite_code(code) else {
+        return Ok(not_found);
+    };
+    let Some(invite) = find_by_code(db, &code).await? else {
+        return Ok(not_found);
+    };
+    let (kind, person_id) = match &invite.target_user_id {
+        Some(target) => (InviteKind::Recovery, target.clone()),
+        None => (InviteKind::New, invite.created_by.clone()),
+    };
+    let Some(person) = users::find_by_id(db, &person_id).await? else {
+        return Ok(not_found);
+    };
+    let status = match invite.check(now) {
+        Err(reason) => reason.into(),
+        // Como no `redeem`: a recuperação de quem foi removido não vale.
+        Ok(()) if kind == InviteKind::Recovery && !person.is_active() => InviteCardStatus::Revoked,
+        Ok(()) => InviteCardStatus::Pending,
+    };
+    Ok(InviteCard {
+        status,
+        found: Some((kind, person, invite.expires_at)),
     })
 }

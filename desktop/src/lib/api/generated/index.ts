@@ -321,6 +321,22 @@ export type GrantView = { key: string, kind: GrantKind, label: string, granted: 
 origin: Origin | null, granted_at: number | null, };
 
 /**
+ * A situação de um convite para o cartão no chat (v0.9): o mesmo motivo da
+ * recusa, ou `Pending` quando ainda vale.
+ */
+export type InviteCardStatus = "pending" | "not_found" | "expired" | "used" | "revoked";
+
+/**
+ * O cartão de um link de convite no chat. Sem `kind`, `person` e `expires_at`
+ * quando o código não existe.
+ */
+export type InviteCardView = { status: InviteCardStatus, kind: InviteKind | null, 
+/**
+ * No convite novo, quem convidou; na recuperação, a conta que volta.
+ */
+person: NameView | null, expires_at: number | null, };
+
+/**
  * Convite novo ou de recuperação.
  */
 export type InviteKind = "new" | "recovery";

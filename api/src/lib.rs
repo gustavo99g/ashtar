@@ -224,6 +224,7 @@ pub fn app(state: AppState, policy: Arc<ClientPolicy>) -> Router {
             get(routes::invites::list).post(routes::invites::create),
         )
         .route("/invites/{code}", get(routes::invites::preview))
+        .route("/invites/card/{code}", get(routes::invites::card))
         .route("/invites/{id}/revoke", post(routes::invites::revoke))
         .route("/members", get(routes::members::list))
         .route("/members/{id}", delete(routes::members::remove))
