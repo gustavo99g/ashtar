@@ -1,10 +1,16 @@
-import { PauseIcon, PlayIcon } from "lucide-react";
+import { PauseIcon, PlayIcon, XIcon } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+	Popover,
+	PopoverContent,
+	PopoverTrigger,
+} from "@/components/ui/popover";
 import { Slider } from "@/components/ui/slider";
 import { LoadingState } from "@/components/ui/states";
 import { Switch } from "@/components/ui/switch";
+import { EmojiPicker } from "@/features/emojis";
 import { ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import {
@@ -222,19 +228,12 @@ export function SoundEditor({
 			)}
 
 			<div className="flex items-end gap-3">
-				<label className="flex flex-col gap-1.5">
+				<div className="flex flex-col gap-1.5">
 					<span className="text-xs font-bold tracking-[0.06em] text-muted-foreground uppercase">
 						Emoji
 					</span>
-					<Input
-						aria-label="Emoji do som"
-						value={emoji}
-						maxLength={16}
-						onChange={(event) => setEmoji(event.target.value)}
-						placeholder="🔊"
-						className="w-12 text-center text-lg"
-					/>
-				</label>
+					<EmojiChoice value={emoji} onChange={setEmoji} />
+				</div>
 				<label className="flex min-w-0 flex-1 flex-col gap-1.5">
 					<span className="text-xs font-bold tracking-[0.06em] text-muted-foreground uppercase">
 						Nome
@@ -287,5 +286,55 @@ function Toggle({
 			<Switch variant="blue" checked={checked} onCheckedChange={onChange} />
 			{label}
 		</label>
+	);
+}
+
+/**
+ * O emoji do som: o botão mostra o escolhido (ou o 🔊 apagado, que é o que aparece sem emoji) e abre
+ * o seletor do chat, só com os emojis comuns. O X tira o emoji.
+ */
+function EmojiChoice({
+	value,
+	onChange,
+}: {
+	value: string;
+	onChange: (emoji: string) => void;
+}) {
+	const [open, setOpen] = useState(false);
+	return (
+		<div className="relative">
+			<Popover open={open} onOpenChange={setOpen}>
+				<PopoverTrigger
+					aria-label={value ? `Emoji do som: ${value}. Trocar` : "Escolher o emoji do som"}
+					title="Escolher o emoji"
+					className="flex size-9 items-center justify-center rounded-md border border-input bg-transparent text-lg hover:bg-accent data-popup-open:bg-accent"
+				>
+					{value || <span className="opacity-40">🔊</span>}
+				</PopoverTrigger>
+				<PopoverContent
+					side="top"
+					align="start"
+					className="w-auto gap-0 p-0 data-open:zoom-in-100 data-closed:hidden"
+				>
+					<EmojiPicker
+						unicodeOnly
+						onPick={(picked) => {
+							onChange(picked);
+							setOpen(false);
+						}}
+					/>
+				</PopoverContent>
+			</Popover>
+			{value && (
+				<button
+					type="button"
+					aria-label="Tirar o emoji"
+					onClick={() => onChange("")}
+					className="absolute -top-1.5 -right-1.5 flex size-4 items-center justify-center rounded-full bg-secondary text-muted-foreground hover:text-foreground"
+				>
+					<XIcon className="size-3" />
+				</button>
+			)}
+		</div>
 	);
 }

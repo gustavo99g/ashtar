@@ -22,9 +22,9 @@ import {
 	PopoverContent,
 	PopoverTrigger,
 } from "@/components/ui/popover";
+import { EmojiPicker } from "@/features/emojis";
 import type { FileView, Message } from "@/lib/api";
 import { ImageMenuItems } from "./Attachments";
-import { EmojiPicker } from "./EmojiPicker";
 import {
 	canDelete,
 	canEdit,

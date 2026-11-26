@@ -5,10 +5,14 @@ import {
 	PopoverContent,
 	PopoverTrigger,
 } from "@/components/ui/popover";
-import { customId, useEmojiById } from "@/features/emojis";
+import {
+	customId,
+	EmojiPicker,
+	preloadEmojiGroups,
+	useEmojiById,
+} from "@/features/emojis";
 import { focusWindow } from "@/lib/tauri/window";
 import { cn } from "@/lib/utils";
-import { preloadEmojiGroups } from "../model/emoji";
 import type { Mentionable } from "../model/mentions";
 import {
 	authorName,
@@ -30,7 +34,6 @@ import {
 } from "../stores/replyStore";
 import { useTypingSignal } from "../hooks/useTypingSignal";
 import { AttachmentDrafts } from "./AttachmentDrafts";
-import { EmojiPicker } from "./EmojiPicker";
 import { TypingLine } from "./TypingLine";
 import { EmojiSuggest, useEmojiSuggest } from "./EmojiSuggest";
 import { MentionPicker, useMentionPicker } from "./MentionPicker";

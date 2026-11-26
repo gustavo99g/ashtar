@@ -23,7 +23,7 @@ import { chatKeys } from "../queries";
 import { handleChatRealtime } from "../realtime";
 import { useDrafts } from "../stores/draftStore";
 import { useOutbox } from "../stores/outboxStore";
-import { useRecentEmoji } from "../stores/recentEmojiStore";
+import { useRecentEmoji } from "@/features/emojis";
 import { useReplyStore } from "../stores/replyStore";
 
 const THUMBS = "\u{1F44D}\u{FE0F}";
