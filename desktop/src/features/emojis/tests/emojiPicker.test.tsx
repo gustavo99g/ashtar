@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { type Emoji, fetchFile } from "@/lib/api";
 import { EmojiPicker } from "../components/EmojiPicker";
@@ -32,12 +32,4 @@ describe("o seletor de emoji", () => {
 		expect(await screen.findByText("Do grupo")).toBeInTheDocument();
 	});
 
-	it("só com os comuns (o emoji de um som), sem os do grupo", async () => {
-		render(<EmojiPicker unicodeOnly onPick={() => {}} />);
-		// Os emojis comuns carregados: a primeira categoria já tem dezenas de botões.
-		await waitFor(() =>
-			expect(screen.getAllByRole("button").length).toBeGreaterThan(20),
-		);
-		expect(screen.queryByText("Do grupo")).not.toBeInTheDocument();
-	});
 });

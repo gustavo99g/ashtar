@@ -21,7 +21,9 @@ import {
 	useUpdateSound,
 } from "../queries";
 import { useSoundboard } from "../stores/soundboardPrefs";
+import { EmojiChoice } from "./EmojiChoice";
 import { soundNameProblem } from "./SoundEditor";
+import { SoundEmoji } from "./SoundEmoji";
 import { Waveform } from "./Waveform";
 
 /*
@@ -64,7 +66,7 @@ function SoundIcon({ sound }: { sound: Sound }) {
 			aria-hidden="true"
 			className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-secondary text-lg"
 		>
-			{sound.emoji ?? "🔊"}
+			<SoundEmoji emoji={sound.emoji} className="size-6" />
 		</span>
 	);
 }
@@ -430,14 +432,7 @@ function RenameRow({ sound, onDone }: { sound: Sound; onDone: () => void }) {
 					);
 				}}
 			>
-				<Input
-					aria-label="Emoji do som"
-					value={emoji}
-					maxLength={16}
-					placeholder="🔊"
-					onChange={(event) => setEmoji(event.target.value)}
-					className="w-12 text-center text-lg"
-				/>
+				<EmojiChoice value={emoji} onChange={setEmoji} />
 				<Input
 					aria-label="Nome do som"
 					value={name}

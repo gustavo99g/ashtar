@@ -14,6 +14,7 @@ import { Slider } from "@/components/ui/slider";
 import {
 	SLOT_COUNT,
 	setSlot,
+	SoundEmoji,
 	setSoundboardVolume,
 	useSoundboard,
 	useSounds,
@@ -130,7 +131,7 @@ function SoundFace({ sound }: { sound: Sound }) {
 	return (
 		<>
 			<span aria-hidden="true" className="text-lg leading-none">
-				{sound.emoji ?? "🔊"}
+				<SoundEmoji emoji={sound.emoji} className="size-5" />
 			</span>
 			<span className="w-full truncate text-[11px] font-medium">{sound.name}</span>
 		</>

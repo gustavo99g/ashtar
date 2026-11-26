@@ -1,3 +1,4 @@
+export { SoundEmoji } from "./components/SoundEmoji";
 export { SoundSettings } from "./components/SoundSettings";
 export { onSoundPlayed, type SoundPlayed } from "./model/played";
 export { playSoundFile, preloadSoundFiles } from "./model/player";

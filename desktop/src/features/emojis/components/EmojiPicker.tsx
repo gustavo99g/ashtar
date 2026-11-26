@@ -41,8 +41,6 @@ const GROUP_ICONS: Record<string, LucideIcon> = {
 	flags: FlagIcon,
 };
 
-const NO_GROUP_EMOJIS: ReturnType<typeof useGroupEmojis> = [];
-
 /** Um emoji que não está nos dados (um recente de outra versão): só o próprio texto. */
 function bare(unicode: string): EmojiEntry {
 	return { unicode, label: unicode, terms: "", shortcode: unicode };
@@ -59,11 +57,8 @@ function bare(unicode: string): EmojiEntry {
 export function EmojiPicker({
 	onPick,
 	keepFocus = false,
-	unicodeOnly = false,
 }: {
 	onPick: (emoji: string) => void;
-	/** Sem os emojis do grupo (nem nos Recentes): para o emoji de um som, que é texto. */
-	unicodeOnly?: boolean;
 	/**
 	 * O clique num emoji não tira o foco de onde ele está (o campo de escrever, que o recebe de volta
 	 * depois da primeira escolha).
@@ -78,8 +73,7 @@ export function EmojiPicker({
 	const [picked, setPicked] = useState<string | null>(null);
 	const recent = useRecentEmoji((state) => state.recent);
 	const scroller = useRef<HTMLDivElement>(null);
-	const allGroupEmojis = useGroupEmojis();
-	const groupEmojis = unicodeOnly ? NO_GROUP_EMOJIS : allGroupEmojis;
+	const groupEmojis = useGroupEmojis();
 	const customById = useEmojiById();
 	const custom = useMemo<EmojiGroup | null>(
 		() =>
