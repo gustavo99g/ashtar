@@ -1712,6 +1712,76 @@ mod sons {
     }
 
     #[tokio::test]
+    async fn o_historico_guarda_quem_aprovou_recusou_renomeou_e_excluiu() {
+        let ctx = setup().await;
+        let ju = join(&ctx, "juju", 2, false).await;
+        let (_, uau) = send_sound(&ctx, &ju, "Uau", wav(1_000)).await;
+        let (_, buzina) = send_sound(&ctx, &ju, "Buzina", wav(1_000)).await;
+        let uau = uau["id"].as_str().unwrap().to_owned();
+        let buzina = buzina["id"].as_str().unwrap().to_owned();
+        let owner = &ctx.owner_token;
+
+        call(
+            &ctx,
+            "POST",
+            &format!("/api/sounds/{uau}/approve"),
+            owner,
+            None,
+        )
+        .await;
+        call(
+            &ctx,
+            "POST",
+            &format!("/api/sounds/{buzina}/reject"),
+            owner,
+            Some(json!({ "reason": "Muito alto" })),
+        )
+        .await;
+        send_sound(&ctx, owner, "Risada", wav(1_000)).await;
+        call(
+            &ctx,
+            "PATCH",
+            &format!("/api/sounds/{uau}"),
+            owner,
+            Some(json!({ "name": "Uau 2", "emoji": null })),
+        )
+        .await;
+        call(&ctx, "DELETE", &format!("/api/sounds/{uau}"), owner, None).await;
+
+        // Quem envia não vê o histórico; quem aprova vê, do mais novo para o mais velho.
+        let (status, _) = call(&ctx, "GET", "/api/sounds/history", &ju, None).await;
+        assert_eq!(status, StatusCode::FORBIDDEN);
+        let (status, history) = call(&ctx, "GET", "/api/sounds/history", owner, None).await;
+        assert_eq!(status, StatusCode::OK, "{history}");
+        let rows: Vec<(String, String, String)> = history
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|row| {
+                (
+                    row["action"].as_str().unwrap().to_owned(),
+                    row["place"].as_str().unwrap().to_owned(),
+                    row["detail"].as_str().unwrap_or("").to_owned(),
+                )
+            })
+            .collect();
+        let row = |a: &str, p: &str, d: &str| (a.to_owned(), p.to_owned(), d.to_owned());
+        assert_eq!(
+            rows,
+            vec![
+                row("sons.excluir", "Uau 2", ""),
+                row("sons.renomear", "Uau", "Uau 2"),
+                row("sons.enviar", "Risada", ""),
+                row("sons.recusar", "Buzina", "Muito alto"),
+                row("sons.aprovar", "Uau", ""),
+            ]
+        );
+        assert_eq!(history[4]["target"]["name"], "juju");
+        // O som do próprio dono não tem alvo: ele mesmo enviou.
+        assert!(history[2]["target"].is_null());
+    }
+
+    #[tokio::test]
     async fn sem_enviar_sons_nao_envia() {
         let ctx = setup().await;
         let ju = join(&ctx, "juju", 2, false).await;

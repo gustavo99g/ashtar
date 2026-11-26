@@ -238,6 +238,7 @@ pub fn app(state: AppState, policy: Arc<ClientPolicy>) -> Router {
         )
         .route("/sounds/mine", get(routes::sounds::mine))
         .route("/sounds/pending", get(routes::sounds::pending))
+        .route("/sounds/history", get(routes::sounds::history))
         .route(
             "/sounds/{id}",
             patch(routes::sounds::update).delete(routes::sounds::delete),

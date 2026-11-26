@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/toast";
-import { ApiError, fetchFile, type Sound } from "@/lib/api";
+import { ApiError, type AuditEntry, fetchFile, type Sound } from "@/lib/api";
 import { decodeSound, peaks, seconds } from "../model/audio";
 import { playSoundFile } from "../model/player";
 import {
@@ -448,5 +448,74 @@ function RenameRow({ sound, onDone }: { sound: Sound; onDone: () => void }) {
 				</Button>
 			</form>
 		</li>
+	);
+}
+
+/** A frase de uma linha do histórico: o texto e, em negrito, os nomes. */
+export function historyPhrase(entry: AuditEntry): { text: string; strong?: boolean }[] {
+	const sound = entry.place ?? "";
+	const from = entry.target
+		? [{ text: ", de " }, { text: entry.target.name, strong: true }]
+		: [];
+	const head = [{ text: entry.actor.name, strong: true }];
+	switch (entry.action) {
+		case "sons.aprovar":
+			return [...head, { text: " aprovou " }, { text: sound, strong: true }, ...from];
+		case "sons.recusar":
+			return [...head, { text: " recusou " }, { text: sound, strong: true }, ...from];
+		case "sons.enviar":
+			return [...head, { text: " enviou " }, { text: sound, strong: true }, { text: " direto" }];
+		case "sons.renomear":
+			return entry.detail === sound
+				? [...head, { text: " trocou o emoji de " }, { text: sound, strong: true }]
+				: [
+						...head,
+						{ text: " renomeou " },
+						{ text: sound, strong: true },
+						{ text: " para " },
+						{ text: entry.detail ?? "", strong: true },
+					];
+		case "sons.excluir":
+			return [...head, { text: " excluiu " }, { text: sound, strong: true }, ...from];
+		default:
+			return [...head, { text: ` ${entry.action}` }];
+	}
+}
+
+/** O histórico da aba Aprovação: quem aprovou, recusou, enviou direto, renomeou e excluiu. */
+export function SoundHistoryList({ entries }: { entries: AuditEntry[] }) {
+	return (
+		<ul
+			aria-label="Histórico"
+			className="flex flex-col divide-y divide-border rounded-xl border border-border"
+		>
+			{entries.map((entry) => (
+				<li key={entry.id} className="flex items-start gap-4 px-4 py-2.5">
+					<div className="flex min-w-0 flex-1 flex-col gap-0.5">
+						<span className="text-[13px] text-muted-foreground">
+							{historyPhrase(entry).map((part, index) =>
+								part.strong ? (
+									// biome-ignore lint/suspicious/noArrayIndexKey: as partes são fixas.
+									<strong key={index} className="font-semibold text-foreground">
+										{part.text}
+									</strong>
+								) : (
+									// biome-ignore lint/suspicious/noArrayIndexKey: as partes são fixas.
+									<span key={index}>{part.text}</span>
+								),
+							)}
+						</span>
+						{entry.action === "sons.recusar" && entry.detail && (
+							<span className="text-xs text-muted-foreground italic">
+								Motivo: {entry.detail}
+							</span>
+						)}
+					</div>
+					<span className="shrink-0 font-mono text-xs text-muted-foreground">
+						{when(entry.at)}
+					</span>
+				</li>
+			))}
+		</ul>
 	);
 }

@@ -9,6 +9,7 @@ import {
 	getMe,
 	listMySounds,
 	listPendingSounds,
+	listSoundHistory,
 	type MeResponse,
 	rejectSound,
 	type Sound,
@@ -22,6 +23,7 @@ vi.mock("@/lib/api", async (importOriginal) => ({
 	getMe: vi.fn(),
 	listMySounds: vi.fn(),
 	listPendingSounds: vi.fn(),
+	listSoundHistory: vi.fn(),
 	approveSound: vi.fn(),
 	rejectSound: vi.fn(),
 	deleteSound: vi.fn(),
@@ -85,6 +87,7 @@ beforeEach(() => {
 		sound({ id: "m2", name: "Grilo", status: "pending" }),
 	]);
 	vi.mocked(listPendingSounds).mockResolvedValue([sound({})]);
+	vi.mocked(listSoundHistory).mockResolvedValue([]);
 });
 
 describe("Configurações › Servidor › Sons", () => {
@@ -122,6 +125,40 @@ describe("Configurações › Servidor › Sons", () => {
 		await user.click(screen.getByRole("button", { name: "Voltar" }));
 		await user.click(screen.getByRole("button", { name: "Aprovar" }));
 		expect(approveSound).toHaveBeenCalledWith("s1");
+	});
+
+	it("o histórico mostra quem aprovou e quem recusou, com o motivo", async () => {
+		vi.mocked(getMe).mockResolvedValue(me(true));
+		vi.mocked(listSoundHistory).mockResolvedValue([
+			{
+				id: 2,
+				at: 1,
+				kind: "sounds",
+				action: "sons.recusar",
+				actor: { id: "u1", name: "kid" },
+				target: { id: "u2", name: "juju" },
+				place: "Buzina",
+				detail: "muito alto",
+			},
+			{
+				id: 1,
+				at: 1,
+				kind: "sounds",
+				action: "sons.aprovar",
+				actor: { id: "u1", name: "kid" },
+				target: { id: "u2", name: "juju" },
+				place: "Uau",
+				detail: null,
+			},
+		]);
+		const user = userEvent.setup();
+		renderSettings();
+		await user.click(await screen.findByRole("tab", { name: /Aprovação/ }));
+		const history = await screen.findByRole("list", { name: "Histórico" });
+		const [rejected, approved] = within(history).getAllByRole("listitem");
+		expect(rejected).toHaveTextContent("kid recusou Buzina, de juju");
+		expect(rejected).toHaveTextContent("Motivo: muito alto");
+		expect(approved).toHaveTextContent("kid aprovou Uau, de juju");
 	});
 
 	it("Todos os sons lista os aprovados, e excluir pergunta antes", async () => {

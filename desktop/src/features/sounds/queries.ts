@@ -7,6 +7,7 @@ import {
 	deleteSound,
 	listMySounds,
 	listPendingSounds,
+	listSoundHistory,
 	listSounds,
 	rejectSound,
 	updateSound,
@@ -20,6 +21,7 @@ export const soundsKeys = {
 	approved: () => ["sounds", "approved"] as const,
 	mine: () => ["sounds", "mine"] as const,
 	pending: () => ["sounds", "pending"] as const,
+	history: () => ["sounds", "history"] as const,
 };
 
 /**
@@ -65,12 +67,22 @@ export function usePendingSoundList(enabled: boolean) {
 	});
 }
 
-/** Depois de mudar um som: a lista da pessoa e a fila buscam de novo. */
+/** O histórico da aba Aprovação (só com "Aprovar sons"). */
+export function useSoundHistory(enabled: boolean) {
+	return useQuery({
+		queryKey: soundsKeys.history(),
+		queryFn: listSoundHistory,
+		enabled,
+	});
+}
+
+/** Depois de mudar um som: a lista da pessoa, a fila e o histórico buscam de novo. */
 function useRefresh() {
 	const client = useQueryClient();
 	return () => {
 		void client.invalidateQueries({ queryKey: soundsKeys.mine() });
 		void client.invalidateQueries({ queryKey: soundsKeys.pending() });
+		void client.invalidateQueries({ queryKey: soundsKeys.history() });
 	};
 }
 
