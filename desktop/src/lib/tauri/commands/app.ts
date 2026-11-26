@@ -30,6 +30,11 @@ export function openLogDir() {
 	return call<void>("open_log_dir");
 }
 
+/** Põe a janela em tela cheia (ou tira) e avisa a barra de tarefas do Windows. */
+export function setStageFullscreen(on: boolean) {
+	return call<void>("set_stage_fullscreen", { on });
+}
+
 /** O que a pessoa pediu pelo menu da bandeja durante uma transmissão (`tray.rs`). */
 export type TrayShareAction = "panel" | "pause" | "resume" | "stop";
 

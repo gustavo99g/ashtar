@@ -1,5 +1,5 @@
 //! O registro do grupo (ADR 0034): quem fez o quê, em quem e onde. As rotas de voz, membros,
-//! convites e canais gravam aqui logo depois de fazer a ação; só o dono lê
+//! convites, canais e sons gravam aqui logo depois de fazer a ação; só o dono lê
 //! (`GET /api/admin/audit`), e as ações dele também entram. Guarda 1 ano.
 
 use serde::{Deserialize, Serialize};
@@ -18,6 +18,9 @@ pub enum AuditKind {
     Members,
     Invites,
     Channels,
+    /// Os sons do soundboard (v0.9): aprovar, recusar, enviar direto, renomear e excluir. O
+    /// histórico da aba Aprovação lê só estas.
+    Sounds,
 }
 
 impl AuditKind {
@@ -27,13 +30,20 @@ impl AuditKind {
             Self::Members => "members",
             Self::Invites => "invites",
             Self::Channels => "channels",
+            Self::Sounds => "sounds",
         }
     }
 
     fn from_key(key: &str) -> Option<Self> {
-        [Self::Voice, Self::Members, Self::Invites, Self::Channels]
-            .into_iter()
-            .find(|kind| kind.key() == key)
+        [
+            Self::Voice,
+            Self::Members,
+            Self::Invites,
+            Self::Channels,
+            Self::Sounds,
+        ]
+        .into_iter()
+        .find(|kind| kind.key() == key)
     }
 }
 

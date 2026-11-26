@@ -7,10 +7,15 @@ import { toast } from "@/components/ui/toast";
 import { useOptionalMe } from "@/features/identity";
 import { fetchFile, type Sound } from "@/lib/api";
 import { nameFromFile, soundFileProblem } from "../model/audio";
-import { useMySounds, usePendingSoundList } from "../queries";
+import { useMySounds, usePendingSoundList, useSoundHistory } from "../queries";
 import { usePendingSounds, useSounds } from "../stores/soundsStore";
 import { type EditorSource, SoundEditor } from "./SoundEditor";
-import { AllSoundList, MySoundList, PendingSoundList } from "./SoundLists";
+import {
+	AllSoundList,
+	MySoundList,
+	PendingSoundList,
+	SoundHistoryList,
+} from "./SoundLists";
 
 /*
  * Configurações › Servidor › Sons (v0.9, decisão 21): "Meus sons" para quem envia; "Aprovação" (com
@@ -278,6 +283,7 @@ function MineTab({
 
 function QueueTab() {
 	const query = usePendingSoundList(true);
+	const history = useSoundHistory(true);
 	const total = useSounds().length;
 	if (query.isPending) return <LoadingState className="py-16" />;
 	const sounds = query.data ?? [];
@@ -301,6 +307,18 @@ function QueueTab() {
 				Quem enviou recebe um aviso quando o som é aprovado ou recusado. Sons que você
 				envia entram direto, sem passar por aqui.
 			</p>
+			<div className="mt-4 flex flex-col gap-4">
+				<SectionHeader title="Histórico" aside="as 50 mais recentes" />
+				{history.isPending ? (
+					<LoadingState className="py-8" />
+				) : (history.data ?? []).length === 0 ? (
+					<p className="text-[13px] text-muted-foreground">
+						Quando alguém aprovar, recusar, renomear ou excluir um som, fica anotado aqui.
+					</p>
+				) : (
+					<SoundHistoryList entries={history.data ?? []} />
+				)}
+			</div>
 		</>
 	);
 }

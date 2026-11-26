@@ -5,6 +5,7 @@
  */
 import { apiFetch, apiJson, jsonRequest } from "../client";
 import type {
+	AuditEntry,
 	CreateSoundRequest,
 	RejectSoundRequest,
 	Sound,
@@ -26,6 +27,12 @@ export function listMySounds(): Promise<Sound[]> {
 /** `GET /api/sounds/pending`: a fila de aprovação. */
 export function listPendingSounds(): Promise<Sound[]> {
 	return apiJson<Sound[]>("/api/sounds/pending");
+}
+
+/** `GET /api/sounds/history`: as 50 ações mais novas nos sons (aprovar, recusar, enviar direto,
+ * renomear e excluir), com quem fez. Só para quem aprova. */
+export function listSoundHistory(): Promise<AuditEntry[]> {
+	return apiJson<AuditEntry[]>("/api/sounds/history");
 }
 
 /** `POST /api/sounds`: o 4º aguardando, o 51º aprovado e o nome repetido são `conflict`. */

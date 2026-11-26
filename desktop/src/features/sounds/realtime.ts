@@ -20,10 +20,12 @@ export function handleSoundsRealtime(
 		case "sounds.changed":
 			setSounds(event.sounds);
 			queryClient.setQueryData(soundsKeys.approved(), event.sounds);
+			void queryClient.invalidateQueries({ queryKey: soundsKeys.history() });
 			break;
 		case "sounds.queue":
 			setPendingSounds(event.pending);
 			void queryClient.invalidateQueries({ queryKey: soundsKeys.pending() });
+			void queryClient.invalidateQueries({ queryKey: soundsKeys.history() });
 			break;
 		case "sounds.reviewed": {
 			const { sound } = event;

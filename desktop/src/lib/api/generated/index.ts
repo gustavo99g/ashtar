@@ -24,7 +24,7 @@ export type AuditEntry = { id: number, at: number, kind: AuditKind, action: stri
 /**
  * De que parte do grupo é a linha: o filtro do Painel › Registro.
  */
-export type AuditKind = "voice" | "members" | "invites" | "channels";
+export type AuditKind = "voice" | "members" | "invites" | "channels" | "sounds";
 
 /**
  * Alguém numa linha do registro, com o nome de quando a ação aconteceu.

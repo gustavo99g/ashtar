@@ -6,6 +6,7 @@
  */
 import { isTauri } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { setStageFullscreen } from "./commands/app";
 
 export function minimizeWindow(): void {
 	if (isTauri()) void getCurrentWindow().minimize();
@@ -81,10 +82,11 @@ export function watchWindowMinimized(
 /**
  * Põe a janela em tela cheia (ou tira). É a tela cheia da transmissão: a do próprio WebView2
  * (`requestFullscreen`) numa janela sem a borda do Windows deixava, a cada segunda vez no mesmo
- * monitor, uma faixa branca sem desenhar. Fora do Tauri não faz nada.
+ * monitor, uma faixa branca sem desenhar. O Rust (`set_stage_fullscreen`) também avisa a barra de
+ * tarefas, que senão ficava por cima a partir da segunda vez. Fora do Tauri não faz nada.
  */
 export function setWindowFullscreen(on: boolean): void {
-	if (isTauri()) void getCurrentWindow().setFullscreen(on);
+	if (isTauri()) void setStageFullscreen(on).catch(() => {});
 }
 
 /**

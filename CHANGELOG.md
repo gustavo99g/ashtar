@@ -1,10 +1,16 @@
 # O que há de novo no Ashtar
 
+## 0.9.1
+
+- O emoji de um som agora é escolhido no seletor de emoji, ao enviar e ao renomear, e pode ser um dos emojis do grupo.
+- A aba Aprovação, em Configurações › Servidor › Sons, ganhou o Histórico: quem aprovou, recusou (com o motivo), enviou direto, renomeou ou excluiu cada som. O Painel de controle › Registro também mostra, no filtro Sons.
+- A tela cheia da transmissão não fica mais com a barra de tarefas do Windows por cima na segunda vez que abre.
+
 ## 0.9.0
 
 - Soundboard: na sala de voz e nas ligações, o botão Sons abre a grade com os sons do grupo. Clique num som para todo mundo ouvir, e quem está tocando ganha uma onda dourada na foto. Até 5 sons a cada 30 segundos, com 3 segundos entre um e outro.
 - Os 4 lugares do soundboard: arraste um som para um lugar, ou use o botão direito e "Pôr no lugar". Ctrl + Alt + 1 a 4 tocam os lugares de qualquer janela, e dá para trocar os atalhos em Configurações › Atalhos.
-- Configurações › Servidor › Sons: "Carregar som", ou arraste um arquivo MP3, OGG ou WAV em qualquer lugar da tela. O editor mostra a onda para cortar até 5 segundos, ajustar o volume e escolher o nome e o emoji. Cada pessoa tem até 3 sons esperando aprovação, e o grupo, até 50 sons.
+- Configurações › Servidor › Sons: "Carregar som", ou arraste um arquivo MP3, OGG ou WAV em qualquer lugar da tela. O editor mostra a onda para cortar até 5 segundos, ajustar o volume, dar o nome e escolher o emoji, que pode ser um dos emojis do grupo. Cada pessoa tem até 3 sons esperando aprovação, e o grupo, até 50 sons.
 - Quem tem a nova permissão "Aprovar sons" vê as abas Aprovação, com o número de sons esperando, e Todos os sons, para renomear e excluir. Quem enviou recebe um aviso quando o som é aprovado ou recusado, com o motivo. Os sons de quem aprova entram direto.
 - Em Notificações › Soundboard, desligue os sons dos outros ou mude o volume só para você.
 - Moderar voz ganhou "Bloquear sons": quem foi bloqueado não toca sons em nenhuma sala do grupo até ser liberado. Nas ligações privadas nada muda.

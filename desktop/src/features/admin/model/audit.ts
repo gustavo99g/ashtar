@@ -12,6 +12,7 @@ export const AUDIT_FILTERS: { kind: AuditKind | null; label: string }[] = [
 	{ kind: "members", label: "Membros" },
 	{ kind: "invites", label: "Convites" },
 	{ kind: "channels", label: "Canais" },
+	{ kind: "sounds", label: "Sons" },
 ];
 
 export const KIND_LABEL: Record<AuditKind, string> = {
@@ -19,6 +20,7 @@ export const KIND_LABEL: Record<AuditKind, string> = {
 	members: "Membros",
 	invites: "Convites",
 	channels: "Canais",
+	sounds: "Sons",
 };
 
 /** A frase da ação, em partes: o texto e, em destaque, os nomes. */
@@ -81,6 +83,23 @@ export function auditPhrase(entry: AuditEntry): Phrase {
 			return [t("arquivou "), b(entry.place ?? "")];
 		case "canais.desarquivar":
 			return [t("desarquivou "), b(entry.place ?? "")];
+		case "sons.aprovar":
+			return [t("aprovou o som "), b(entry.place ?? ""), ...(who ? [t(" de "), b(who)] : [])];
+		case "sons.recusar":
+			return [
+				t("recusou o som "),
+				b(entry.place ?? ""),
+				...(who ? [t(" de "), b(who)] : []),
+				...(detail ? [t(`: ${detail}`)] : []),
+			];
+		case "sons.enviar":
+			return [t("enviou o som "), b(entry.place ?? "")];
+		case "sons.renomear":
+			return detail === entry.place
+				? [t("trocou o emoji do som "), b(entry.place ?? "")]
+				: [t("renomeou o som "), b(entry.place ?? ""), t(" para "), b(detail)];
+		case "sons.excluir":
+			return [t("excluiu o som "), b(entry.place ?? ""), ...(who ? [t(" de "), b(who)] : [])];
 		default:
 			return [t(entry.action)];
 	}
@@ -89,6 +108,7 @@ export function auditPhrase(entry: AuditEntry): Phrase {
 /** A coluna Onde: a sala ou o canal; sem lugar, a parte do Painel. */
 export function auditPlace(entry: AuditEntry): string {
 	if (entry.kind === "channels") return KIND_LABEL.channels;
+	if (entry.kind === "sounds") return KIND_LABEL.sounds;
 	if (entry.place) return entry.place;
 	if (entry.action.startsWith("permissoes.")) return "Permissões";
 	return KIND_LABEL[entry.kind];

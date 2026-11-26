@@ -98,6 +98,7 @@ export {
 	deleteSound,
 	listMySounds,
 	listPendingSounds,
+	listSoundHistory,
 	listSounds,
 	playSound,
 	rejectSound,

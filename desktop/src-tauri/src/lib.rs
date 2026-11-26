@@ -135,6 +135,7 @@ pub fn run(log_file: logging::LateFile) {
             commands::app::hardware_acceleration,
             commands::app::set_hardware_acceleration,
             commands::app::restart_app,
+            commands::app::set_stage_fullscreen,
             commands::notifications::notification_show,
             commands::notifications::notification_layout,
             commands::notifications::notification_open,

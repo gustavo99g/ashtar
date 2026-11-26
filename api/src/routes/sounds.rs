@@ -16,16 +16,47 @@ use super::auth::CurrentUser;
 use super::extract::ApiJson;
 use super::voice::voice_room_of;
 use crate::AppState;
+use crate::audit::{self, AuditEntry, AuditKind};
 use crate::calls::{self, CallOutcome};
 use crate::chat::dms;
 use crate::db::now;
 use crate::error::ApiError;
 use crate::files::FileKind;
+use crate::identity::{
+    User,
+    permissions::{self, Permission},
+    users,
+};
 use crate::moderation;
 use crate::realtime::ServerEvent;
 use crate::sounds::{
     self, CreateSoundRequest, RejectSoundRequest, Sound, SoundStatus, UpdateSoundRequest,
 };
+
+/// Grava no registro (e no histórico da aba Aprovação) o que aconteceu com `sound`. O som vai no
+/// `place`, pelo nome; quem enviou é o alvo.
+async fn log(
+    state: &AppState,
+    actor: &User,
+    action: &str,
+    sound: &Sound,
+    detail: Option<String>,
+) -> Result<(), ApiError> {
+    let uploader = users::find_by_id(&state.db, &sound.uploaded_by).await?;
+    audit::record(
+        &state.db,
+        audit::Entry {
+            kind: AuditKind::Sounds,
+            action,
+            actor,
+            target: uploader.as_ref().filter(|user| user.id != actor.id),
+            place: Some(sound.name.clone()),
+            detail,
+        },
+        now(),
+    )
+    .await
+}
 
 /// Manda a lista dos aprovados para todos.
 async fn publish_approved(state: &AppState) -> Result<(), ApiError> {
@@ -95,6 +126,7 @@ pub async fn create(
     let created = sounds::create(&state.db, &user, &request, &bytes, now()).await?;
     delete_files(&state, &created.removed_files).await;
     if created.sound.status == SoundStatus::Approved {
+        log(&state, &user, "sons.enviar", &created.sound, None).await?;
         publish_approved(&state).await?;
     }
     publish_queue(&state).await?;
@@ -108,6 +140,7 @@ pub async fn approve(
     Path(id): Path<String>,
 ) -> Result<Json<Sound>, ApiError> {
     let sound = sounds::approve(&state.db, &user, &id, now()).await?;
+    log(&state, &user, "sons.aprovar", &sound, None).await?;
     state.hub.publish_to(
         std::slice::from_ref(&sound.uploaded_by),
         &ServerEvent::SoundReviewed {
@@ -127,6 +160,7 @@ pub async fn reject(
     ApiJson(request): ApiJson<RejectSoundRequest>,
 ) -> Result<Json<Sound>, ApiError> {
     let sound = sounds::reject(&state.db, &user, &id, request.reason.as_deref(), now()).await?;
+    log(&state, &user, "sons.recusar", &sound, sound.reason.clone()).await?;
     state.hub.publish_to(
         std::slice::from_ref(&sound.uploaded_by),
         &ServerEvent::SoundReviewed {
@@ -144,8 +178,20 @@ pub async fn update(
     Path(id): Path<String>,
     ApiJson(request): ApiJson<UpdateSoundRequest>,
 ) -> Result<Json<Sound>, ApiError> {
+    let before = sounds::find(&state.db, &id).await?;
     let sound = sounds::update(&state.db, &user, &id, &request).await?;
     if sound.status == SoundStatus::Approved {
+        // No registro, o nome de antes; o novo vai no detalhe (igual, só o emoji mudou).
+        if let Some(before) = before.filter(|b| b.name != sound.name || b.emoji != sound.emoji) {
+            log(
+                &state,
+                &user,
+                "sons.renomear",
+                &before,
+                Some(sound.name.clone()),
+            )
+            .await?;
+        }
         publish_approved(&state).await?;
     }
     Ok(Json(sound))
@@ -205,9 +251,24 @@ pub async fn delete(
     let sound = sounds::delete(&state.db, &user, &id).await?;
     delete_files(&state, std::slice::from_ref(&sound.file_id)).await;
     match sound.status {
-        SoundStatus::Approved => publish_approved(&state).await?,
+        SoundStatus::Approved => {
+            log(&state, &user, "sons.excluir", &sound, None).await?;
+            publish_approved(&state).await?
+        }
         SoundStatus::Pending => publish_queue(&state).await?,
         SoundStatus::Rejected => {}
     }
     Ok(StatusCode::NO_CONTENT)
+}
+
+/// `GET /api/sounds/history`: o histórico da aba Aprovação, as 50 ações mais novas (aprovar,
+/// recusar, enviar direto, renomear e excluir), com quem fez. Só para quem aprova.
+pub async fn history(
+    State(state): State<AppState>,
+    CurrentUser(user): CurrentUser,
+) -> Result<Json<Vec<AuditEntry>>, ApiError> {
+    permissions::require_permission(&state.db, &user, Permission::ApproveSounds).await?;
+    Ok(Json(
+        audit::list(&state.db, Some(AuditKind::Sounds), None).await?,
+    ))
 }
