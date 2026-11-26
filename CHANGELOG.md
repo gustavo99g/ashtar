@@ -1,5 +1,11 @@
 # O que há de novo no Ashtar
 
+## 0.9.1
+
+- O emoji de um som agora é escolhido no seletor de emoji, ao enviar e ao renomear, e pode ser um dos emojis do grupo.
+- A aba Aprovação, em Configurações › Servidor › Sons, ganhou o Histórico: quem aprovou, recusou (com o motivo), enviou direto, renomeou ou excluiu cada som. O Painel de controle › Registro também mostra, no filtro Sons.
+- A tela cheia da transmissão não fica mais com a barra de tarefas do Windows por cima na segunda vez que abre.
+
 ## 0.9.0
 
 - Soundboard: na sala de voz e nas ligações, o botão Sons abre a grade com os sons do grupo. Clique num som para todo mundo ouvir, e quem está tocando ganha uma onda dourada na foto. Até 5 sons a cada 30 segundos, com 3 segundos entre um e outro.
