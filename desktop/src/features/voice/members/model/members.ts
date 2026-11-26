@@ -22,6 +22,8 @@ export interface ChannelMember {
 	serverMuted?: boolean;
 	/** Com o áudio desligado pela moderação. */
 	serverDeafened?: boolean;
+	/** Com os sons do soundboard bloqueados pela moderação (v0.9). */
+	soundsBlocked?: boolean;
 	/** Fora da chamada: está com a câmera ligada (dentro, o bloco mostra a própria câmera). */
 	camera?: boolean;
 	/** O que está transmitindo, pelo que o app da pessoa contou à API (o cartão de Assistir). */
@@ -55,6 +57,7 @@ export function memberFromApi(participant: ParticipantView): ChannelMember {
 		deafened: participant.deafened,
 		serverMuted: participant.server_muted,
 		serverDeafened: participant.server_deafened,
+		soundsBlocked: participant.sounds_blocked,
 		camera: participant.camera,
 		share: participant.share
 			? {

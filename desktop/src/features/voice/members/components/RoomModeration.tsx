@@ -1,7 +1,7 @@
 /*
  * A seção Moderação no cartão de quem está numa sala de voz (quadro "Moderação — na voz"). Com
- * "Moderar voz" (v0.8, ADR 0034): Silenciar microfone e Deixar surdo (chaves), Desligar câmera (com
- * ela ligada) e Encerrar transmissão (transmitindo, com a confirmação e o Shift para pular). Com
+ * "Moderar voz" (v0.8, ADR 0034): Silenciar microfone, Deixar surdo e Bloquear sons (chaves; a
+ * última é da v0.9), Desligar câmera (com ela ligada) e Encerrar transmissão (transmitindo, com a confirmação e o Shift para pular). Com
  * "Mover membros" (ADR 0026): Mover para e Desconectar da voz. O dono sempre tem as duas. Nunca no
  * próprio cartão, e ninguém modera o dono. A API manda as ordens para o app da pessoa; aqui só se
  * pede.
@@ -12,6 +12,7 @@ import {
 	HeadphoneOffIcon,
 	LogOutIcon,
 	MicOffIcon,
+	MusicIcon,
 	ScreenShareOffIcon,
 	VideoOffIcon,
 	Volume2Icon,
@@ -44,6 +45,7 @@ import {
 	type Person,
 	setServerDeafen,
 	setServerMute,
+	setSoundsBlocked,
 } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
@@ -73,6 +75,7 @@ export interface ModeratedMember {
 	sharing?: boolean;
 	serverMuted?: boolean;
 	serverDeafened?: boolean;
+	soundsBlocked?: boolean;
 }
 
 function failed(what: string, error: unknown): void {
@@ -156,10 +159,12 @@ export function RoomModeration({
 	// O estado novo aparece na hora; o `voice.participants` confirma.
 	const [muted, setMuted] = useState<boolean | null>(null);
 	const [deafened, setDeafened] = useState<boolean | null>(null);
+	const [soundsOff, setSoundsOff] = useState<boolean | null>(null);
 	const [confirmStop, setConfirmStop] = useState(false);
 	if ((!canMove && !canModerate) || isOwner) return null;
 	const isMuted = muted ?? member.serverMuted === true;
 	const isDeafened = deafened ?? member.serverDeafened === true;
+	const isSoundsOff = soundsOff ?? member.soundsBlocked === true;
 
 	function toggleMute(on: boolean) {
 		setMuted(on);
@@ -174,6 +179,14 @@ export function RoomModeration({
 		setServerDeafen(userId, on).catch((error: unknown) => {
 			setDeafened(null);
 			failed(on ? `desligar o áudio de ${name}` : `devolver o áudio de ${name}`, error);
+		});
+	}
+
+	function toggleSounds(on: boolean) {
+		setSoundsOff(on);
+		setSoundsBlocked(userId, on).catch((error: unknown) => {
+			setSoundsOff(null);
+			failed(on ? `bloquear os sons de ${name}` : `liberar os sons de ${name}`, error);
 		});
 	}
 
@@ -241,6 +254,15 @@ export function RoomModeration({
 							variant="blue"
 							checked={isDeafened}
 							onCheckedChange={toggleDeafen}
+						/>
+					</label>
+					<label className="flex h-8 cursor-pointer items-center gap-2 rounded-md px-2 text-[13px] text-foreground hover:bg-secondary">
+						<MusicIcon aria-hidden="true" className="size-4" />
+						<span className="flex-1">Bloquear sons</span>
+						<Switch
+							variant="blue"
+							checked={isSoundsOff}
+							onCheckedChange={toggleSounds}
 						/>
 					</label>
 					{member.camera && (

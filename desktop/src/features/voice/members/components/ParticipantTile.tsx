@@ -20,6 +20,7 @@ import { useCameraChoice } from "../../camera/stores/cameraChoiceStore";
 import type { ChannelMember } from "../model/members";
 import { ConnectionMark } from "./ConnectionMark";
 import { ConnectionSection } from "./ConnectionSection";
+import { SoundWave } from "../../soundboard/components/SoundWave";
 import { MuteMark } from "./MuteMark";
 import { UserVolume, UserVolumeMark } from "./UserVolume";
 
@@ -215,6 +216,7 @@ function MemberIcons({
 	return (
 		<>
 			<ConnectionMark connection={member.connection} className={size} />
+			<SoundWave userId={member.id} className={size} />
 			{member.sharing && (
 				<ScreenShareIcon
 					aria-label="transmitindo a tela"

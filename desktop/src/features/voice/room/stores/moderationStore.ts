@@ -5,6 +5,9 @@
  *
  * Desligar a câmera e encerrar a transmissão são de uma vez só: ficam em `notice` até o
  * `VoiceProvider` cumprir e mostrar o aviso.
+ *
+ * "Bloquear sons" (v0.9, ADR 0037) não muda nada na chamada: fica em `others`, pela lista da sala
+ * (a própria pessoa também está nela), e apaga o botão Sons de quem foi bloqueado.
  */
 import { create } from "zustand";
 
@@ -21,7 +24,7 @@ interface ModerationState {
 	 * Os outros que a moderação travou, pela última lista de cada sala (`voice.participants`):
 	 * dentro da chamada, a lista vem do LiveKit, que não sabe disso.
 	 */
-	others: Record<string, { muted: boolean; deafened: boolean }>;
+	others: Record<string, { muted: boolean; deafened: boolean; sounds: boolean }>;
 }
 
 export const useModeration = create<ModerationState>()(() => ({
@@ -33,15 +36,22 @@ export const useModeration = create<ModerationState>()(() => ({
 
 /** Guarda o que a moderação impôs a quem está numa lista de sala. */
 export function rememberModerated(
-	people: { user_id: string; server_muted: boolean; server_deafened: boolean }[],
+	people: {
+		user_id: string;
+		server_muted: boolean;
+		server_deafened: boolean;
+		sounds_blocked?: boolean;
+	}[],
 ): void {
 	useModeration.setState((state) => {
 		const others = { ...state.others };
 		for (const person of people) {
-			if (person.server_muted || person.server_deafened) {
+			const sounds = person.sounds_blocked === true;
+			if (person.server_muted || person.server_deafened || sounds) {
 				others[person.user_id] = {
 					muted: person.server_muted,
 					deafened: person.server_deafened,
+					sounds,
 				};
 			} else {
 				delete others[person.user_id];
@@ -49,6 +59,13 @@ export function rememberModerated(
 		}
 		return { others };
 	});
+}
+
+/** Se a moderação bloqueou os sons de `userId`, pela última lista da sala. */
+export function useSoundsBlocked(userId: string | undefined): boolean {
+	return useModeration((state) =>
+		userId ? state.others[userId]?.sounds === true : false,
+	);
 }
 
 export function setImposed(serverMuted: boolean, serverDeafened: boolean): void {

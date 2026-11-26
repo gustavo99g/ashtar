@@ -212,6 +212,16 @@ ttl_secs?: number,
  */
 max_uses?: number, };
 
+export type CreateSoundRequest = { 
+/**
+ * Um arquivo `sound` enviado antes pelo `POST /api/files`.
+ */
+file_id: string, name: string, emoji?: string, 
+/**
+ * Um som seu, aguardando ou recusado, que este substitui (o "Editar e reenviar"): sai junto.
+ */
+replaces?: string, };
+
 /**
  * Um convite recém-criado. O código e o link só aparecem aqui.
  */
@@ -260,18 +270,22 @@ export type ErrorBody = { kind: ErrorKind, message: string,
 /**
  * Só no `client_outdated`: a versão mínima que a API aceita.
  */
-min_version?: string, };
+min_version?: string, 
+/**
+ * Só no `invalid_invite`: o motivo da recusa. Campo novo da v0.9; o app antigo só lê o `kind`.
+ */
+reason?: InviteRefusal, };
 
 /**
  * O `kind` de toda recusa da API. O app decide o que mostrar por ele, nunca
  * pela mensagem.
  */
-export type ErrorKind = "unauthenticated" | "unknown_device" | "forbidden" | "invalid_invite" | "invalid_nick" | "invalid_display_name" | "nick_taken" | "invalid_device_key" | "device_already_linked" | "invalid_request" | "not_found" | "conflict" | "too_many_attempts" | "too_many_messages" | "internal" | "client_outdated" | "share_limit" | "timeout" | "file_too_large" | "disk_full";
+export type ErrorKind = "unauthenticated" | "unknown_device" | "forbidden" | "invalid_invite" | "invalid_nick" | "invalid_display_name" | "nick_taken" | "invalid_device_key" | "device_already_linked" | "invalid_request" | "not_found" | "conflict" | "too_many_attempts" | "too_many_messages" | "too_many_sounds" | "internal" | "client_outdated" | "share_limit" | "timeout" | "file_too_large" | "disk_full";
 
 /**
  * Para que o arquivo serve.
  */
-export type FileKind = "avatar" | "attachment" | "preview" | "emoji";
+export type FileKind = "avatar" | "attachment" | "preview" | "emoji" | "sound";
 
 /**
  * O link curto do vídeo: o `<video>` não manda o cabeçalho do token.
@@ -286,6 +300,12 @@ path: string, expires_at: number, };
  * O que o app sabe de um arquivo.
  */
 export type FileView = { id: string, kind: FileKind, name: string, mime: string, size: number, width: number | null, height: number | null, duration_ms: number | null, thumbnail_id: string | null, };
+
+/**
+ * A cópia dos arquivos que deu certo: o `backup.sh` escreve [`FILES_BACKUP_MARK`] depois do
+ * rclone, com quantos arquivos estavam na lista.
+ */
+export type FilesBackupStatus = { at: number, files: number, };
 
 /**
  * O resumo da original de uma mensagem encaminhada, guardado na hora: a encaminhada continua
@@ -317,11 +337,34 @@ export type GrantView = { key: string, kind: GrantKind, label: string, granted: 
 origin: Origin | null, granted_at: number | null, };
 
 /**
+ * A situação de um convite para o cartão no chat (v0.9): o mesmo motivo da
+ * recusa, ou `Pending` quando ainda vale.
+ */
+export type InviteCardStatus = "pending" | "not_found" | "expired" | "used" | "revoked";
+
+/**
+ * O cartão de um link de convite no chat. Sem `kind`, `person` e `expires_at`
+ * quando o código não existe.
+ */
+export type InviteCardView = { status: InviteCardStatus, kind: InviteKind | null, 
+/**
+ * No convite novo, quem convidou; na recuperação, a conta que volta.
+ */
+person: NameView | null, expires_at: number | null, };
+
+/**
  * Convite novo ou de recuperação.
  */
 export type InviteKind = "new" | "recovery";
 
 export type InvitePreviewView = { "kind": "new", invited_by: NameView, expires_at: number, } | { "kind": "recovery", account: NameView, expires_at: number, };
+
+/**
+ * Por que um convite foi recusado (v0.9): o app e a página do link mostram o motivo certo, em vez de juntar
+ * os quatro casos num texto só. Dizer o motivo não abre brecha: o código tem entropia de sobra para ninguém
+ * achar um por tentativa, e toda recusa continua contando no limite de tentativas.
+ */
+export type InviteRefusal = "not_found" | "expired" | "used" | "revoked";
 
 /**
  * Situação de um convite num instante.
@@ -473,7 +516,15 @@ can_view_logs: boolean,
 /**
  * Se o cartão de quem está numa sala de voz mostra a seção Moderação (v0.8).
  */
-can_moderate_voice: boolean, };
+can_moderate_voice: boolean, 
+/**
+ * Se a tela Sons deixa carregar um som (v0.9).
+ */
+can_send_sounds: boolean, 
+/**
+ * Se a tela Sons mostra as abas Aprovação e Todos os sons (v0.9).
+ */
+can_approve_sounds: boolean, };
 
 export type MediaFilter = "media" | "files";
 
@@ -570,7 +621,7 @@ has_newer?: boolean, };
 /**
  * O que a moderação fez, no `voice.moderated` que vai para a pessoa moderada.
  */
-export type ModerationAction = "mute" | "unmute" | "deafen" | "undeafen" | "camera_off" | "stop_share";
+export type ModerationAction = "mute" | "unmute" | "deafen" | "undeafen" | "camera_off" | "stop_share" | "block_sounds" | "unblock_sounds";
 
 export type MoveMemberRequest = { user_id: string, channel_id: string, };
 
@@ -588,7 +639,7 @@ export type OpenDmRequest = {
 user_id: string, };
 
 /**
- * De onde vem uma permissão (para o `admin permissoes` e o Painel).
+ * De onde vem uma permissão (para o Painel).
  */
 export type Origin = "owner" | "direct";
 
@@ -628,7 +679,11 @@ server_muted: boolean,
 /**
  * Com o áudio desligado pela moderação.
  */
-server_deafened: boolean, };
+server_deafened: boolean, 
+/**
+ * Sem tocar sons pela moderação (ADR 0037): o botão Sons dela fica apagado.
+ */
+sounds_blocked: boolean, };
 
 export type PendingRecovery = { invite_id: string, expires_at: number, };
 
@@ -698,6 +753,8 @@ export type RealtimeTicket = { ticket: string,
  */
 expires_in: number, };
 
+export type RejectSoundRequest = { reason?: string, };
+
 export type RenameEmojiRequest = { name: string, };
 
 /**
@@ -755,7 +812,11 @@ export type ServerEvent = { "type": "ready", user_id: string, status: Status, on
 /**
  * O nome de quem moveu, para o aviso.
  */
-by_name: string, } | { "type": "voice.disconnected", by: string, by_name: string, reason: DisconnectReason, } | { "type": "voice.moderated", action: ModerationAction, server_muted: boolean, server_deafened: boolean, by: string, by_name: string, } | { "type": "typing", channel_id: string, user_id: string, } | { "type": "member.joined", person: Person, } | { "type": "user.updated", id: string, display_name: string | null, avatar: string | null, } | { "type": "member.left", user_id: string, } | { "type": "logs.received", report: LogReportView, } | { "type": "channels.changed", version: number, } | { "type": "emojis.changed", emojis: Array<Emoji>, } | { "type": "channel.state", channel_id: string, state: ReadState, } | { "type": "call.ringing", call: CallView, } | { "type": "call.accepted", call: CallView, } | { "type": "call.ended", call_id: string, channel_id: string, outcome: CallOutcome, duration: number | null, };
+by_name: string, } | { "type": "voice.disconnected", by: string, by_name: string, reason: DisconnectReason, } | { "type": "voice.moderated", action: ModerationAction, server_muted: boolean, server_deafened: boolean, sounds_blocked: boolean, by: string, by_name: string, } | { "type": "typing", channel_id: string, user_id: string, } | { "type": "member.joined", person: Person, } | { "type": "user.updated", id: string, display_name: string | null, avatar: string | null, } | { "type": "member.left", user_id: string, } | { "type": "logs.received", report: LogReportView, } | { "type": "channels.changed", version: number, } | { "type": "emojis.changed", emojis: Array<Emoji>, } | { "type": "sounds.changed", sounds: Array<Sound>, } | { "type": "sounds.queue", pending: number, } | { "type": "sounds.reviewed", sound: Sound, } | { "type": "voice.sound_played", sound_id: string, file_id: string, user_id: string, 
+/**
+ * A sala de voz do grupo ou a conversa da ligação.
+ */
+channel_id: string, } | { "type": "channel.state", channel_id: string, state: ReadState, } | { "type": "call.ringing", call: CallView, } | { "type": "call.accepted", call: CallView, } | { "type": "call.ended", call_id: string, channel_id: string, outcome: CallOutcome, duration: number | null, };
 
 export type ServerStatus = { api: ApiStatus, livekit: LiveKitStatus, 
 /**
@@ -766,6 +827,10 @@ disk: DiskStatus | null,
  * O backup mais novo de `data/backups/`, ou `None` sem nenhum.
  */
 last_backup: BackupStatus | null, 
+/**
+ * A última cópia das fotos, emojis e sons para o R2 (v0.9, ADR 0036), ou `None` sem nenhuma.
+ */
+last_files_backup: FilesBackupStatus | null, 
 /**
  * Quanto os arquivos (fotos, anexos, prévias e emojis) ocupam, em bytes (ADR 0031).
  */
@@ -824,6 +889,29 @@ viewers: number, };
  */
 export type Shown = "available" | "away" | "busy";
 
+export type Sound = { id: string, name: string, 
+/**
+ * O emoji que aparece no botão (Unicode), ou nenhum.
+ */
+emoji: string | null, 
+/**
+ * O WAV (`GET /api/files/{id}`).
+ */
+file_id: string, duration_ms: number, uploaded_by: string, 
+/**
+ * O nome de quem enviou, como aparece.
+ */
+uploader_name: string, status: SoundStatus, 
+/**
+ * Só no recusado: o que quem recusou escreveu.
+ */
+reason: string | null, created_at: number, reviewed_at: number | null, };
+
+/**
+ * A situação de um som.
+ */
+export type SoundStatus = "pending" | "approved" | "rejected";
+
 /**
  * O status que a pessoa escolheu.
  */
@@ -849,6 +937,8 @@ export type UpdateMeRequest = {
  * O nome visível novo. Texto vazio ou `null` volta para o nick.
  */
 display_name: string | null, };
+
+export type UpdateSoundRequest = { name: string, emoji?: string, };
 
 export type UserView = { id: string, nick: string, 
 /**

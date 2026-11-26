@@ -14,6 +14,7 @@ const kid: ParticipantView = {
 	camera: false,
 	server_muted: false,
 	server_deafened: false,
+	sounds_blocked: false,
 };
 
 describe("handleVoiceRealtime", () => {

@@ -1,5 +1,6 @@
 import {
 	DatabaseBackupIcon,
+	FolderSyncIcon,
 	HardDriveIcon,
 	RefreshCwIcon,
 	ServerIcon,
@@ -110,6 +111,28 @@ export function ServerStatusSettings() {
 							tone="bad"
 							value="Nenhum"
 							detail="A pasta data/backups está vazia."
+						/>
+					)}
+					{/* A cópia das fotos, emojis e sons para o R2 (v0.9, ADR 0036). */}
+					{status.data.last_files_backup ? (
+						<Card
+							icon={FolderSyncIcon}
+							title="Cópia dos arquivos"
+							tone={
+								now - status.data.last_files_backup.at > BACKUP_STALE_SECS
+									? "warn"
+									: "ok"
+							}
+							value={ago(status.data.last_files_backup.at, now)}
+							detail={`${status.data.last_files_backup.files} fotos, emojis e sons no R2`}
+						/>
+					) : (
+						<Card
+							icon={FolderSyncIcon}
+							title="Cópia dos arquivos"
+							tone="warn"
+							value="Nenhuma"
+							detail="O backup.sh ainda não copiou as fotos, emojis e sons."
 						/>
 					)}
 				</div>

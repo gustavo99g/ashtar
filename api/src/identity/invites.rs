@@ -24,7 +24,7 @@ use uuid::Uuid;
 
 use super::permissions::{Action, require};
 use super::{User, devices, users};
-use crate::error::ApiError;
+use crate::error::{ApiError, InviteRefusal};
 use crate::secret;
 
 /// Validade padrão: 7 dias.
@@ -117,8 +117,10 @@ impl NewInvite {
 
 /// Convite novo ou de recuperação.
 // No histórico, o `kind` sai em texto do banco (`InviteView`); o `rename_all` dá ao
-// TypeScript a mesma união, `"new" | "recovery"`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, TS)]
+// TypeScript a mesma união, `"new" | "recovery"`. O cartão do convite (v0.9) manda o tipo
+// direto, com o mesmo texto.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "snake_case")]
 #[ts(export, export_to = "index.ts", rename_all = "snake_case")]
 pub enum InviteKind {
     New,
@@ -400,7 +402,7 @@ pub async fn list(db: &SqlitePool) -> Result<Vec<InviteRecord>, ApiError> {
 type RevokeRow = (String, i64, i64, Option<i64>, i64);
 
 /// Revoga um convite pelo id ou pelo começo dele (no mínimo 4 caracteres,
-/// como o `admin convites` mostra). Quem já entrou com ele continua membro;
+/// como o Painel mostra). Quem já entrou com ele continua membro;
 /// ninguém mais entra.
 pub async fn revoke(
     db: &SqlitePool,
@@ -505,7 +507,8 @@ pub async fn redeem(
     nick: Option<&str>,
     now: i64,
 ) -> Result<Redeemed, ApiError> {
-    let code = secret::normalize_invite_code(code).ok_or(ApiError::InvalidInvite)?;
+    let code = secret::normalize_invite_code(code)
+        .ok_or(ApiError::InvalidInvite(InviteRefusal::NotFound))?;
     devices::validate_device_key(device_key)?;
 
     // IMMEDIATE: a transação já começa com a trava de escrita. Duas pessoas
@@ -513,9 +516,7 @@ pub async fn redeem(
     // outra, e a segunda já vê o convite esgotado.
     let mut tx = db.begin_with("BEGIN IMMEDIATE").await?;
 
-    let Some(invite) = find_valid(&mut *tx, &code, now).await? else {
-        return Err(ApiError::InvalidInvite);
-    };
+    let invite = find_valid(&mut *tx, &code, now).await?;
 
     if devices::key_in_use(&mut tx, device_key).await? {
         return Err(ApiError::DeviceAlreadyLinked);
@@ -530,7 +531,10 @@ pub async fn redeem(
             .bind(&target_id)
             .fetch_optional(&mut *tx)
             .await?;
-            (user.ok_or(ApiError::InvalidInvite)?, false)
+            (
+                user.ok_or(ApiError::InvalidInvite(InviteRefusal::Revoked))?,
+                false,
+            )
         }
         _ => {
             let nick = users::validate_nick(nick.unwrap_or_default())?;
@@ -550,6 +554,16 @@ pub async fn redeem(
     if new_member {
         // Quem entra vê o histórico sem números de não lidas (ADR 0022).
         crate::chat::read::seed_new_member(&mut tx, &user.id).await?;
+        // "Enviar sons" vem ligada para todo mundo (ADR 0037).
+        sqlx::query(
+            "INSERT OR IGNORE INTO user_permissions (user_id, permission, granted_at)
+             VALUES (?, ?, ?)",
+        )
+        .bind(&user.id)
+        .bind(super::permissions::Permission::SendSounds.key())
+        .bind(now)
+        .execute(&mut *tx)
+        .await?;
     }
 
     tx.commit().await?;
@@ -560,33 +574,63 @@ pub async fn redeem(
     })
 }
 
-/// Um convite que ainda vale, achado pelo código.
+/// Um convite achado pelo código, valendo ou não.
 #[derive(FromRow)]
-struct ValidInvite {
+struct FoundInvite {
     id: String,
     kind: String,
     target_user_id: Option<String>,
     created_by: String,
     expires_at: i64,
+    revoked_at: Option<i64>,
+    max_uses: i64,
+    uses: i64,
 }
 
-/// O convite com esse código (já normalizado), se ainda vale: não revogado, não
-/// vencido e com uso sobrando. Usar e ler o convite passam por aqui, então os dois
-/// nunca discordam do que é um convite válido.
+impl FoundInvite {
+    /// Se o convite ainda aceita gente agora, ou por que não. A ordem é a do
+    /// [`InviteRecord::status`]: esgotado, revogado, vencido.
+    fn check(&self, now: i64) -> Result<(), InviteRefusal> {
+        if self.uses >= self.max_uses {
+            Err(InviteRefusal::Used)
+        } else if self.revoked_at.is_some() {
+            Err(InviteRefusal::Revoked)
+        } else if self.expires_at <= now {
+            Err(InviteRefusal::Expired)
+        } else {
+            Ok(())
+        }
+    }
+}
+
+/// O convite com esse código (já normalizado), valendo ou não.
+async fn find_by_code<'e>(
+    executor: impl SqliteExecutor<'e>,
+    code: &str,
+) -> Result<Option<FoundInvite>, ApiError> {
+    Ok(sqlx::query_as(
+        "SELECT i.id, i.kind, i.target_user_id, i.created_by, i.expires_at, i.revoked_at, i.max_uses,
+                (SELECT COUNT(*) FROM invite_uses iu WHERE iu.invite_id = i.id) AS uses
+         FROM invites i WHERE i.code_hash = ?",
+    )
+    .bind(secret::hash(code))
+    .fetch_optional(executor)
+    .await?)
+}
+
+/// O convite com esse código (já normalizado), se ainda vale; senão, o
+/// [`ApiError::InvalidInvite`] com o motivo. Usar, ler e o cartão do convite
+/// passam por aqui, então nunca discordam do que é um convite válido.
 async fn find_valid<'e>(
     executor: impl SqliteExecutor<'e>,
     code: &str,
     now: i64,
-) -> Result<Option<ValidInvite>, ApiError> {
-    Ok(sqlx::query_as(
-        "SELECT i.id, i.kind, i.target_user_id, i.created_by, i.expires_at FROM invites i
-         WHERE i.code_hash = ? AND i.revoked_at IS NULL AND i.expires_at > ?
-           AND (SELECT COUNT(*) FROM invite_uses iu WHERE iu.invite_id = i.id) < i.max_uses",
-    )
-    .bind(secret::hash(code))
-    .bind(now)
-    .fetch_optional(executor)
-    .await?)
+) -> Result<FoundInvite, ApiError> {
+    let invite = find_by_code(executor, code)
+        .await?
+        .ok_or(ApiError::InvalidInvite(InviteRefusal::NotFound))?;
+    invite.check(now).map_err(ApiError::InvalidInvite)?;
+    Ok(invite)
 }
 
 /// O que se mostra de um convite antes de usá-lo.
@@ -600,12 +644,11 @@ pub struct InvitePreview {
 
 /// Lê um convite sem gastar nada: para a tela mostrar quem convidou (ou de quem
 /// é a conta) antes do nick. Código inválido, vencido, revogado ou esgotado dá o
-/// mesmo [`ApiError::InvalidInvite`] do [`redeem`].
+/// mesmo [`ApiError::InvalidInvite`] do [`redeem`], com o mesmo motivo.
 pub async fn preview(db: &SqlitePool, code: &str, now: i64) -> Result<InvitePreview, ApiError> {
-    let code = secret::normalize_invite_code(code).ok_or(ApiError::InvalidInvite)?;
-    let invite = find_valid(db, &code, now)
-        .await?
-        .ok_or(ApiError::InvalidInvite)?;
+    let code = secret::normalize_invite_code(code)
+        .ok_or(ApiError::InvalidInvite(InviteRefusal::NotFound))?;
+    let invite = find_valid(db, &code, now).await?;
 
     let (kind, person_id) = match invite.target_user_id {
         Some(target) => (InviteKind::Recovery, target),
@@ -613,14 +656,80 @@ pub async fn preview(db: &SqlitePool, code: &str, now: i64) -> Result<InvitePrev
     };
     let person = users::find_by_id(db, &person_id)
         .await?
-        .ok_or(ApiError::InvalidInvite)?;
+        .ok_or(ApiError::InvalidInvite(InviteRefusal::Revoked))?;
     // Como no `redeem`: a recuperação de quem foi removido não vale.
     if kind == InviteKind::Recovery && !person.is_active() {
-        return Err(ApiError::InvalidInvite);
+        return Err(ApiError::InvalidInvite(InviteRefusal::Revoked));
     }
     Ok(InvitePreview {
         kind,
         person,
         expires_at: invite.expires_at,
+    })
+}
+
+/// A situação de um convite para o cartão no chat (v0.9): o mesmo motivo da
+/// recusa, ou `Pending` quando ainda vale.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export, export_to = "index.ts")]
+pub enum InviteCardStatus {
+    Pending,
+    NotFound,
+    Expired,
+    Used,
+    Revoked,
+}
+
+impl From<InviteRefusal> for InviteCardStatus {
+    fn from(reason: InviteRefusal) -> Self {
+        match reason {
+            InviteRefusal::NotFound => Self::NotFound,
+            InviteRefusal::Expired => Self::Expired,
+            InviteRefusal::Used => Self::Used,
+            InviteRefusal::Revoked => Self::Revoked,
+        }
+    }
+}
+
+/// O que o cartão do convite mostra. Sem `found` quando o código não existe.
+#[derive(Debug, Clone)]
+pub struct InviteCard {
+    pub status: InviteCardStatus,
+    /// O tipo, a pessoa (quem convidou, ou a conta na recuperação) e a validade.
+    pub found: Option<(InviteKind, User, i64)>,
+}
+
+/// Lê um convite para o cartão no chat, valendo ou não. Só para quem já está no
+/// grupo (a rota pede sessão), então não conta no limite de tentativas: quem vê um
+/// convite velho no histórico não está adivinhando código. A conferência é a do
+/// [`redeem`] e do [`preview`].
+pub async fn card(db: &SqlitePool, code: &str, now: i64) -> Result<InviteCard, ApiError> {
+    let not_found = InviteCard {
+        status: InviteCardStatus::NotFound,
+        found: None,
+    };
+    let Some(code) = secret::normalize_invite_code(code) else {
+        return Ok(not_found);
+    };
+    let Some(invite) = find_by_code(db, &code).await? else {
+        return Ok(not_found);
+    };
+    let (kind, person_id) = match &invite.target_user_id {
+        Some(target) => (InviteKind::Recovery, target.clone()),
+        None => (InviteKind::New, invite.created_by.clone()),
+    };
+    let Some(person) = users::find_by_id(db, &person_id).await? else {
+        return Ok(not_found);
+    };
+    let status = match invite.check(now) {
+        Err(reason) => reason.into(),
+        // Como no `redeem`: a recuperação de quem foi removido não vale.
+        Ok(()) if kind == InviteKind::Recovery && !person.is_active() => InviteCardStatus::Revoked,
+        Ok(()) => InviteCardStatus::Pending,
+    };
+    Ok(InviteCard {
+        status,
+        found: Some((kind, person, invite.expires_at)),
     })
 }

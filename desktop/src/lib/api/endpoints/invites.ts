@@ -5,6 +5,7 @@ import { apiFetch, apiJson, jsonRequest } from "../client";
 import type {
 	CreatedInviteView,
 	CreateInviteRequest,
+	InviteCardView,
 	InvitePreviewView,
 	InviteView,
 } from "../generated";
@@ -16,6 +17,16 @@ import type {
  */
 export function getInvite(code: string): Promise<InvitePreviewView> {
 	return apiJson<InvitePreviewView>(`/api/invites/${encodeURIComponent(code)}`);
+}
+
+/**
+ * `GET /api/invites/card/{código}`: a situação do convite para o cartão no chat, valendo ou não.
+ * Pede sessão e não conta no limite de tentativas (v0.9).
+ */
+export function getInviteCard(code: string): Promise<InviteCardView> {
+	return apiJson<InviteCardView>(
+		`/api/invites/card/${encodeURIComponent(code)}`,
+	);
 }
 
 /** `POST /api/invites`: cria um convite pelo modelo. O código e o link só aparecem nesta resposta. */

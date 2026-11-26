@@ -35,15 +35,23 @@ pub enum Permission {
     /// Silencia, deixa surdo, desliga a câmera e encerra a transmissão de alguém numa sala de voz
     /// (v0.8, ADR 0034).
     ModerateVoice,
+    /// Envia sons para o soundboard, que ficam aguardando aprovação (v0.9, ADR 0037). Vem ligada
+    /// para todo mundo: a migração dá a quem já estava, e o convite dá a quem entra.
+    SendSounds,
+    /// Aprova, recusa, renomeia e exclui os sons do grupo; os sons de quem tem entram direto
+    /// (v0.9, ADR 0037).
+    ApproveSounds,
 }
 
 impl Permission {
-    pub const ALL: [Permission; 6] = [
+    pub const ALL: [Permission; 8] = [
         Permission::BetaUpdates,
         Permission::ManageChannels,
         Permission::MoveMembers,
         Permission::ModerateVoice,
         Permission::ManageEmojis,
+        Permission::SendSounds,
+        Permission::ApproveSounds,
         Permission::ViewLogs,
     ];
 
@@ -55,6 +63,8 @@ impl Permission {
             Self::ManageEmojis => "emojis.gerenciar",
             Self::ViewLogs => "logs.ver",
             Self::ModerateVoice => "voz.moderar",
+            Self::SendSounds => "sons.enviar",
+            Self::ApproveSounds => "sons.aprovar",
         }
     }
 
@@ -67,6 +77,8 @@ impl Permission {
             Self::ManageEmojis => "Gerenciar emojis",
             Self::ViewLogs => "Ver logs",
             Self::ModerateVoice => "Moderar voz",
+            Self::SendSounds => "Enviar sons",
+            Self::ApproveSounds => "Aprovar sons",
         }
     }
 
@@ -153,7 +165,7 @@ pub fn require(user: &User, action: Action) -> Result<(), ApiError> {
     }
 }
 
-/// De onde vem uma permissão (para o `admin permissoes` e o Painel).
+/// De onde vem uma permissão (para o Painel).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, TS)]
 #[serde(rename_all = "snake_case")]
 #[ts(export, export_to = "index.ts")]

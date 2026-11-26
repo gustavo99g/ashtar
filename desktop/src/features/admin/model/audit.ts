@@ -49,6 +49,10 @@ export function auditPhrase(entry: AuditEntry): Phrase {
 			return [t("desligou a câmera de "), b(who)];
 		case "voz.encerrar_transmissao":
 			return [t("encerrou a transmissão de "), b(who)];
+		case "voz.bloquear_sons":
+			return [t("bloqueou os sons de "), b(who)];
+		case "voz.liberar_sons":
+			return [t("liberou os sons de "), b(who)];
 		case "voz.mover":
 			return [t("moveu "), b(who), t(" para "), b(detail)];
 		case "voz.desconectar":

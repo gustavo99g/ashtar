@@ -15,7 +15,8 @@ import {
 } from "lucide-react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Spinner } from "@/components/ui/spinner";
-import { CustomEmoji, customId, useEmojiById, useGroupEmojis } from "@/features/emojis";
+import { CustomEmoji } from "./CustomEmoji";
+import { customId, useEmojiById, useGroupEmojis } from "../stores/emojiStore";
 import { cn } from "@/lib/utils";
 import {
 	type EmojiEntry,

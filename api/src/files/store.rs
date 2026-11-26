@@ -20,6 +20,15 @@ pub fn valid_id(id: &str) -> bool {
     (8..=64).contains(&id.len()) && id.bytes().all(|b| b.is_ascii_hexdigit() || b == b'-')
 }
 
+/// Onde o arquivo `id` fica dentro da pasta dos arquivos (`ab/cd/{id}`): o mesmo caminho vai para
+/// o R2 na cópia dos arquivos (ADR 0036).
+pub fn relative_path(id: &str) -> PathBuf {
+    let compact: String = id.chars().filter(|c| *c != '-').collect();
+    // O fim do UUID v7 é o aleatório: as pastas ficam bem espalhadas.
+    let tail = &compact[compact.len().saturating_sub(4)..];
+    Path::new(&tail[..2]).join(&tail[2..]).join(id)
+}
+
 impl FileStore {
     pub fn new(root: impl Into<PathBuf>) -> Self {
         Self { root: root.into() }
@@ -38,10 +47,7 @@ impl FileStore {
     }
 
     fn path_of(&self, id: &str) -> PathBuf {
-        let compact: String = id.chars().filter(|c| *c != '-').collect();
-        // O fim do UUID v7 é o aleatório: as pastas ficam bem espalhadas.
-        let tail = &compact[compact.len().saturating_sub(4)..];
-        self.root.join(&tail[..2]).join(&tail[2..]).join(id)
+        self.root.join(relative_path(id))
     }
 
     /// Começa a gravar o arquivo `id`: os pedaços vão para um `.part`, que só vira o arquivo no

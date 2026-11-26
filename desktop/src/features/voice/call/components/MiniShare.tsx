@@ -69,8 +69,8 @@ import { ShareQualityButton } from "./ShareQualityButton";
  * A miniatura arrasta: enquanto isso, ela cresce um pouco, ganha a borda azul e mostra os seis
  * encaixes (os cantos e o meio de cada lateral), com o mais perto destacado. Solta, vai para ele, que
  * fica gravado. Recolhida, vira uma aba presa na lateral, com quem transmite: o canal fica livre e o
- * som continua; clicar na aba abre de novo. Nas configurações ela some, e a tela deixa de ser
- * baixada até a pessoa sair delas (`shown` do `roomView`).
+ * som continua; clicar na aba abre de novo. Nas configurações ela continua, por cima delas (v0.9:
+ * até a v0.8 ela sumia e a tela parava de ser baixada, e isso incomodou no uso).
  *
  * Montada uma vez, no `AppShell`, numa camada do tamanho da área do canal (empilhada sobre o `main`,
  * que não pode ser posicionado: ver o `AppShell`). A camada deixa o clique passar, e a miniatura o
@@ -80,8 +80,7 @@ export function MiniShare() {
 	const { room } = useVoice();
 	const watching = useRoomView((state) => state.watching);
 	const inRoom = useMatch(paths.voiceRoom) !== null;
-	const inSettings = useMatch(`${paths.settings.root}/*`) !== null;
-	if (!room || watching.length === 0 || inRoom || inSettings) return null;
+	if (!room || watching.length === 0 || inRoom) return null;
 	return <WatchedShare watching={watching} />;
 }
 

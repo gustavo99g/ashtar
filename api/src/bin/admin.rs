@@ -4,7 +4,10 @@
 //! dono: quem tem acesso a este computador já tem acesso ao banco. Pode rodar
 //! com a API no ar (o banco está em modo WAL).
 //!
-//! `cargo run --bin admin -- --help` lista os comandos.
+//! `cargo run --bin admin -- --help` lista os comandos. O resto (convites, membros, permissões,
+//! beta) é no Painel de controle do app; aqui fica só o que precisa de acesso ao computador:
+//! criar o dono, a recuperação do dono (sem o computador, ele não abre o Painel), os backups e a
+//! lista de membros para conferir o banco.
 
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
@@ -13,11 +16,11 @@ use std::time::Duration;
 use api::chat::access::Readable;
 use api::db::{self, now};
 use api::error::ApiError;
-use api::identity::permissions::{self, Origin, Permission};
+use api::identity::permissions::{self, Permission};
 use api::identity::{User, devices, invites, users};
 use api::limiter::SendLimiter;
 use chrono::{DateTime, Local};
-use clap::{Parser, Subcommand, ValueEnum};
+use clap::{Parser, Subcommand};
 use sqlx::SqlitePool;
 
 #[derive(Parser)]
@@ -31,35 +34,14 @@ struct Cli {
 enum Command {
     /// Cria o dono do grupo (uma vez só).
     Dono { nick: String },
-    /// Cria um convite para gente nova. Para mandar no grupo: --validade 5m --usos 8.
-    Convite {
-        /// Validade: 30m, 12h, 7d...
-        #[arg(long, default_value = "7d", value_parser = parse_ttl)]
-        validade: i64,
-        /// Quantas pessoas podem entrar com ele (de 1 a 50).
-        #[arg(long, default_value_t = 1)]
-        usos: i64,
-    },
     /// Cria um convite de recuperação: o membro passa a usar outro computador.
     Recuperacao {
         nick: String,
         #[arg(long, default_value = "7d", value_parser = parse_ttl)]
         validade: i64,
     },
-    /// Histórico de convites: quem criou, quem usou e a situação.
-    Convites,
-    /// Revoga um convite que ainda não foi usado (id ou o começo dele).
-    Revogar { id: String },
     /// Lista os membros, os removidos inclusive.
     Membros,
-    /// Remove um membro do grupo.
-    Remover { nick: String },
-    /// Desvincula o computador de um membro (volta com convite de recuperação).
-    Desvincular { nick: String },
-    /// Liga ou desliga as versões beta para um membro.
-    Beta { nick: String, estado: Estado },
-    /// Mostra as permissões de um membro e de onde cada uma vem.
-    Permissoes { nick: String },
     /// Só no desenvolvimento: cria três membros de teste e enche o #geral de
     /// mensagens dos últimos dias, para ver o chat com histórico. Com
     /// `--conversa`, também uma conversa privada.
@@ -80,12 +62,12 @@ enum Command {
         #[arg(long, default_value_t = 14, value_parser = parse_keep)]
         manter: usize,
     },
-}
-
-#[derive(Clone, Copy, ValueEnum)]
-enum Estado {
-    Ligar,
-    Desligar,
+    /// Escreve a lista das fotos, emojis e sons (os caminhos dentro da pasta dos arquivos) que o
+    /// backup.sh manda para o R2 (ADR 0036).
+    ArquivosBackup {
+        /// O arquivo da lista, um caminho por linha.
+        saida: PathBuf,
+    },
 }
 
 #[tokio::main]
@@ -139,19 +121,6 @@ async fn run(db: &SqlitePool, command: Command) -> Result<(), ApiError> {
             mensagens,
             conversa,
         } => seed(db, &owner, mensagens.into(), conversa, now).await?,
-        Command::Convite { validade, usos } => {
-            let invite = invites::create(
-                db,
-                &owner,
-                invites::InviteKind::New,
-                None,
-                validade,
-                usos,
-                now,
-            )
-            .await?;
-            print_created(&invite);
-        }
         Command::Recuperacao { nick, validade } => {
             let target = users::get_active_by_nick(db, &nick).await?;
             let invite = invites::create(
@@ -170,52 +139,17 @@ async fn run(db: &SqlitePool, command: Command) -> Result<(), ApiError> {
                 target.nick
             );
         }
-        Command::Convites => {
-            for invite in invites::list(db).await? {
-                print_invite(&invite, now);
-            }
-        }
-        Command::Revogar { id } => {
-            invites::revoke(db, &owner, &id, now).await?;
-            println!("Convite revogado.");
-        }
         Command::Membros => {
             for user in users::list(db).await? {
                 print_user(db, &user).await?;
             }
         }
-        Command::Remover { nick } => {
-            let target = users::get_active_by_nick(db, &nick).await?;
-            users::remove(db, &owner, &target, now).await?;
-            println!("{} foi removido.", target.nick);
-        }
-        Command::Desvincular { nick } => {
-            let target = users::get_active_by_nick(db, &nick).await?;
-            devices::unlink(db, &owner, &target).await?;
-            println!("Computador de {} desvinculado.", target.nick);
-        }
-        Command::Beta { nick, estado } => {
-            let target = users::get_active_by_nick(db, &nick).await?;
-            let on = matches!(estado, Estado::Ligar);
-            permissions::set(db, &owner, &target, Permission::BetaUpdates, on, now).await?;
-            println!(
-                "Beta {} para {}.",
-                if on { "ligado" } else { "desligado" },
-                target.nick
-            );
-        }
-        Command::Permissoes { nick } => {
-            let target = users::get_active_by_nick(db, &nick).await?;
-            let effective = permissions::effective(db, &target).await?;
-            if effective.is_empty() {
-                println!("{} não tem permissões além das de membro.", target.nick);
-            }
-            for (permission, origin) in effective {
-                let origin = match origin {
-                    Origin::Owner => "dono",
-                    Origin::Direct => "direta",
-                };
-                println!("{:<20} ({origin})", permission.key());
+        Command::ArquivosBackup { saida } => {
+            let store = api::files::FileStore::from_env(&api::logs::data_dir_from_env());
+            let (listed, missing) = files_backup_list(db, store.root(), &saida).await?;
+            println!("Lista com {listed} arquivos em {}", saida.display());
+            if missing > 0 {
+                println!("Sem o arquivo no disco (ficam de fora): {missing}");
             }
         }
         Command::Backup { pasta, manter } => {
@@ -285,37 +219,6 @@ fn print_created(invite: &invites::CreatedInvite) {
     );
 }
 
-fn print_invite(invite: &invites::InviteRecord, now: i64) {
-    let kind = match &invite.target_nick {
-        Some(target) => format!("recuperação de {target}"),
-        None => "novo".into(),
-    };
-    let status = match invite.status(now) {
-        invites::InviteStatus::Pending => format!("pendente até {}", date(invite.expires_at)),
-        invites::InviteStatus::Exhausted => "esgotado".into(),
-        invites::InviteStatus::Revoked => {
-            format!(
-                "revogado em {}",
-                invite.revoked_at.map(date).unwrap_or_default()
-            )
-        }
-        invites::InviteStatus::Expired => format!("expirou em {}", date(invite.expires_at)),
-    };
-    println!(
-        "{}  {}  criado por {} em {}  {}  ({} de {} usos)",
-        &invite.id[..8],
-        kind,
-        invite.created_by_nick,
-        date(invite.created_at),
-        status,
-        invite.uses.len(),
-        invite.max_uses
-    );
-    for used in &invite.uses {
-        println!("          {} entrou em {}", used.nick, date(used.used_at));
-    }
-}
-
 async fn print_user(db: &SqlitePool, user: &User) -> Result<(), ApiError> {
     let mut tags = Vec::new();
     if user.is_owner {
@@ -375,6 +278,30 @@ async fn backup(db: &SqlitePool, folder: &Path, keep: usize) -> Result<PathBuf, 
         let _ = std::fs::remove_file(old);
     }
     Ok(file)
+}
+
+/// Escreve em `out` os caminhos (relativos a `root`) das fotos, emojis e sons que existem no
+/// disco. Devolve quantos entraram e quantos estão no banco sem o arquivo.
+async fn files_backup_list(
+    db: &SqlitePool,
+    root: &Path,
+    out: &Path,
+) -> Result<(usize, usize), ApiError> {
+    let list = api::files::backup_list(db, root).await?;
+    let lines: String = list
+        .paths
+        .iter()
+        .map(|path| format!("{}\n", path.to_string_lossy()))
+        .collect();
+    if let Some(folder) = out.parent().filter(|p| !p.as_os_str().is_empty()) {
+        std::fs::create_dir_all(folder).map_err(|e| {
+            ApiError::Config(format!("não foi possível criar {}: {e}", folder.display()))
+        })?;
+    }
+    std::fs::write(out, lines).map_err(|e| {
+        ApiError::Config(format!("não foi possível escrever {}: {e}", out.display()))
+    })?;
+    Ok((list.paths.len(), list.missing))
 }
 
 /// Os nicks dos membros de teste do `semear`.

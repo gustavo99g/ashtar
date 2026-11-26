@@ -56,4 +56,7 @@ export { useVoiceChannelId } from "./room/hooks/useVoiceChannelId";
 export { DEFAULT_ROOM_ID } from "./room/model/channel";
 export { useConnectedRoomName, useRoomName } from "./room/hooks/useRoomName";
 export { setPushToTalkHeld } from "./input/chain";
+export { SoundboardBridge } from "./soundboard/components/SoundboardBridge";
+export { SoundWave } from "./soundboard/components/SoundWave";
+export { requestPlay, slotSound } from "./soundboard/model/play";
 export { useInputChoice } from "./input/stores/inputStore";

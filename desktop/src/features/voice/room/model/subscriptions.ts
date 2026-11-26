@@ -13,7 +13,8 @@
  * A transmissão pequena (na fileira de baixo) ou com a qualidade Leve escolhida pede a camada
  * baixa; a grande, a alta (ADR 0024). Sem camadas publicadas, o pedido não muda nada.
  *
- * Na Grade, nas configurações ou no canal sem a miniatura, nenhuma transmissão é baixada: a Grade
+ * Na Grade ou no canal sem a miniatura, nenhuma transmissão é baixada (nas configurações, a
+ * miniatura continua desde a v0.9): a Grade
  * não mostra a imagem, e o vídeo de uma tela gastaria a internet de cada um à toa.
  */
 

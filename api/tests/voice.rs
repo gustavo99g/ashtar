@@ -536,7 +536,8 @@ async fn silenciado_fica_ate_liberar_e_so_o_icone_muda() {
         *moderated,
         json!({
             "type": "voice.moderated", "action": "mute", "server_muted": true,
-            "server_deafened": false, "by": ctx.owner.id, "by_name": "Kid",
+            "server_deafened": false, "sounds_blocked": false, "by": ctx.owner.id,
+            "by_name": "Kid",
         })
     );
     let (list, to) = &events[1];
@@ -678,4 +679,104 @@ async fn a_lista_de_jogos_vem_com_etag() {
     // Sem sessão, não.
     let (status, _) = call(&ctx.router, "GET", "/api/games/detectable", None, None).await;
     assert_eq!(status, StatusCode::UNAUTHORIZED);
+}
+
+/// Um som já aprovado (`buzina`), direto no banco.
+async fn approved_sound(ctx: &Ctx) {
+    sqlx::query(
+        "INSERT INTO files (id, uploader_id, kind, name, mime, size, created_at)
+         VALUES ('arq-buzina', ?, 'sound', 'buzina.wav', 'audio/wav', 100, 0)",
+    )
+    .bind(&ctx.owner.id)
+    .execute(&ctx.db)
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO sounds (id, name, name_key, file_id, duration_ms, uploaded_by, status,
+                             created_at)
+         VALUES ('buzina', 'Buzina', 'buzina', 'arq-buzina', 800, ?, 'approved', 0)",
+    )
+    .bind(&ctx.owner.id)
+    .execute(&ctx.db)
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+async fn tocar_um_som_vai_para_os_outros_da_sala_com_limite() {
+    let ctx = setup().await;
+    approved_sound(&ctx).await;
+    let ana = join(&ctx, "Ana", 2, false).await;
+    let ana_id = member_id(&ctx, &ana).await;
+    let beto = join(&ctx, "Beto", 3, false).await;
+    let beto_id = member_id(&ctx, &beto).await;
+    let play = |token: &str, id: &str| {
+        let router = ctx.router.clone();
+        let (token, path) = (token.to_owned(), format!("/api/voice/sounds/{id}/play"));
+        async move { call(&router, "POST", &path, Some(&token), None).await.0 }
+    };
+
+    // Fora de sala e de ligação: 409.
+    assert_eq!(play(&ana, "buzina").await, StatusCode::CONFLICT);
+    ctx.hub.publish_voice_participants(
+        "sala".into(),
+        vec![person(&ana_id), person(&ctx.owner.id)],
+        Audience::Everyone,
+    );
+    // Som que não existe: 404.
+    assert_eq!(play(&ana, "nada").await, StatusCode::NOT_FOUND);
+    let mut rx = ctx.hub.subscribe();
+    assert_eq!(play(&ana, "buzina").await, StatusCode::NO_CONTENT);
+    let events = drain(&mut rx);
+    assert_eq!(events.len(), 1);
+    let (played, to) = &events[0];
+    assert_eq!(
+        *played,
+        json!({
+            "type": "voice.sound_played", "sound_id": "buzina", "file_id": "arq-buzina",
+            "user_id": ana_id, "channel_id": "sala",
+        })
+    );
+    // Só os outros da sala: nem quem tocou, nem quem está fora.
+    assert!(to.includes(&ctx.owner.id) && !to.includes(&ana_id) && !to.includes(&beto_id));
+    // Logo em seguida: 429.
+    assert_eq!(play(&ana, "buzina").await, StatusCode::TOO_MANY_REQUESTS);
+
+    // "Bloquear sons": vale fora da sala, segue no banco e aparece na lista da sala.
+    let block = format!("/api/voice/moderation/{beto_id}/sounds");
+    let (status, _) = call(&ctx.router, "PUT", &block, Some(&ctx.owner_token), None).await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+    assert!(
+        api::moderation::get(&ctx.db, &beto_id)
+            .await
+            .unwrap()
+            .sounds_blocked
+    );
+    let mut rx = ctx.hub.subscribe();
+    ctx.hub.publish_voice_participants(
+        "sala".into(),
+        vec![person(&ana_id), person(&beto_id), person(&ctx.owner.id)],
+        Audience::Everyone,
+    );
+    assert_eq!(play(&beto, "buzina").await, StatusCode::FORBIDDEN);
+    let room = vec![api::voice::RoomParticipant {
+        identity: beto_id.clone(),
+        screen_sharing: false,
+    }];
+    let views = api::voice::join_participants(&ctx.db, room).await.unwrap();
+    assert!(views[0].sounds_blocked && !views[0].server_muted);
+    drain(&mut rx);
+
+    let (status, _) = call(&ctx.router, "DELETE", &block, Some(&ctx.owner_token), None).await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+    let events = drain(&mut rx);
+    assert_eq!(events[0].0["action"], "unblock_sounds");
+    assert_eq!(events[1].0["participants"][1]["sounds_blocked"], false);
+    assert_eq!(play(&beto, "buzina").await, StatusCode::NO_CONTENT);
+    assert!(
+        api::moderation::get(&ctx.db, &beto_id)
+            .await
+            .unwrap()
+            .is_free()
+    );
 }

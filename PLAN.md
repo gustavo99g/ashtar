@@ -1,466 +1,406 @@
-# Plano — v0.6: confiabilidade e configurações
+# Plano — v0.9: Release Candidate
 
-> As pendências estão em [`NOTES.md`](NOTES.md). O plano da v0.5 está em
-> [`docs/plans/v0.5-salas-e-presenca.md`](docs/plans/v0.5-salas-e-presenca.md).
+> As pendências estão em [`NOTES.md`](NOTES.md). O plano da v0.8 está em
+> [`docs/plans/v0.8-atividade-e-moderacao.md`](docs/plans/v0.8-atividade-e-moderacao.md).
 
-A v0.6 deixa o Ashtar ajustável e confiável para o uso de todo dia. A aba Voz e vídeo ganha o que ficou guardado
-desde a v0.2.2 (volumes, teste de microfone, detecção de voz com sensibilidade, eco e ganho, os padrões da
-transmissão), e uma aba nova, Atalhos, traz o pressionar para falar e os atalhos globais, que funcionam com um jogo
-em foco. Em volta disso, o app passa a se recuperar sozinho de uma queda curta (voz, transmissão nativa e
-servidor), avisa quando o microfone some, mostra a qualidade da conexão de cada pessoa na sala, testa o caminho até o servidor, avisa quem fala
-mutado e manda os logs para o dono com um clique. O dono ganha também o estado do servidor no Painel.
+A v0.9 para de adicionar recursos e deixa o Ashtar pronto para a 1.0. O grupo já usa a 0.8.11 sem reclamar do que
+funciona; o que falta é conferir o que o uso normal não exercita (convite vencido, formatar o PC, API ou LiveKit fora
+do ar, restaurar o backup), fechar as centenas de itens de verificação que ficaram abertos desde a 0.2.4, e corrigir
+o que aparecer. Entram só quatro ajustes pequenos, pedidos no uso real: o motivo certo quando um convite é recusado, o
+cartão do link do convite no chat, a conversa privada um pouco mais larga e a transmissão assistida que continua
+nas configurações. A exceção ao congelamento é o
+**soundboard**, pedido pelo Kid: sons curtos do grupo, enviados por qualquer um e aprovados pelo dono, tocados na sala
+e na ligação. Ele entra antes da `0.9.0`, para passar pelo mesmo teste que o resto. No servidor, o backup passa a levar
+as fotos de perfil, os emojis e os sons, e a restauração é testada de verdade.
 
-Sai numa versão só, a `0.6.0`, pelo beta antes do estável. O trabalho anda em duas partes, mas nenhuma é publicada
-sozinha:
+Sai como `0.9.0`, pelo beta antes do estável, igual às outras. As correções do RC saem como `0.9.x`.
 
 | Parte | O que é | Mexe em |
 |---|---|---|
-| 1 | Configurações: a aba Voz e vídeo completa, o gancho de teclado e mouse, a aba Atalhos, o pressionar para falar com o som dele e o aviso de mutado | App e Rust |
-| 2 | Confiabilidade: reconexão da voz e da transmissão, dispositivos, "Sem conexão com o servidor", qualidade da conexão e Testar conexão, "Enviar logs" e o estado do servidor no Painel | App, Rust e API |
+| 1 | Arrumação: documentos, triagem das notas antigas, roteiro de testes | docs |
+| 2 | Ajustes do uso real: convite recusado, cartão do convite, conversa mais larga | API e app |
+| 3 | Soundboard: enviar, aprovar e tocar sons, com o editor e os atalhos | API e app |
+| 4 | Servidor: backup das fotos, dos emojis e dos sons, restauração testada, produção revisada | API e deploy |
+| 5 | Revisão antes da 1.0: dependências, limites, `admin`, textos | API, Rust e app |
+| 6 | Teste com o grupo e correções | tudo |
 
-**Objetivo da fase:** uma noite inteira de jogo sem ninguém precisar sair e entrar de novo na sala: o pressionar
-para falar funciona com o jogo em foco, uma queda curta de rede volta sozinha, e quando algo der errado o dono
-recebe os logs sem ninguém procurar pasta.
+**Objetivo da fase:** nenhum caminho principal do Ashtar quebra ou deixa alguém num estado sem saída, e o servidor
+volta inteiro de um backup.
 
-**Fora do escopo:** o overlay em jogos e o atalho dele (sem versão); o perfil (nick e foto) e o chat avançado
-(v0.7); a moderação do cartão (v0.8); as pendências da v0.2.4, que continuam fora.
+**Fora do escopo:** recurso novo além dos quatro ajustes e do soundboard (decisão do Kid, 24/11: só ajuste pequeno de
+interface); efeitos no editor de som (eco, tom), silenciar os sons de uma pessoa só e sons por sala; anexos e prévias no backup (decisão do Kid, 24/11); assinatura de código do instalador, Linux, overlay e
+o resto da lista "Depois da v1.0"; clipes e replay (v1.1).
 
-Base: a `dev` com a `0.5.0`. Em cada etapa, `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings` e
-`cargo test` (em `api/` e em `desktop/src-tauri/`) e `pnpm lint`, `pnpm build` e `pnpm test` (em `desktop/`) devem
-passar.
+Base: a `main` com a `0.8.11` (merge do PR #44, `b8fc1a0`). A correção da barra de tarefas na tela cheia
+(`858da4a`, na `feature/0.8`) entra quando o Kid aprovar a `0.8.12` e ela passar pela `dev`. Em cada etapa,
+`cargo fmt --check`, `cargo clippy --all-targets -- -D warnings` e `cargo test` (em `api/` e em
+`desktop/src-tauri/`) e `pnpm lint`, `pnpm build` e `pnpm test` (em `desktop/`) devem passar, também pelo hook de
+pre-push.
 
 ## O que já existe
 
-Levantado na `dev` (`196cb41`), para o plano não refazer:
+Levantado na `main` (`b8fc1a0`), para o plano não refazer:
 
-- **A tela de configurações já existe**, com Perfil, Voz e vídeo, Notificações e Aplicativo, e o Painel de controle
-  do dono. Voz e vídeo tem os dispositivos (Entrada e Saída), a câmera, a supressão de ruído (liga e desliga o
-  RNNoise) e o aviso antes de ligar. Falta o resto do quadro "Configurações — voz e vídeo".
-- **O dispositivo que some já cai no padrão do Windows** (`effectiveDevice` no `VoiceProvider`), e volta quando
-  reaparece, mas sem aviso nenhum.
-- **A API já tem tempo limite do lado do app** (10 s no `lib/api/client.ts`, o erro `timeout`), e o estado "sem
-  conexão" existe como componente (`components/ui/states.tsx`), usado só em algumas telas.
-- **O WebSocket já reconecta sozinho** (`lib/realtime/connection.ts`, com `reconnecting` e `ended`), mas a interface
-  não mostra nada enquanto isso.
-- **A voz já mostra "Sem conexão com a sala"** quando a sala cai, mas só sai dali clicando de novo. As quedas curtas
-  o próprio `livekit-client` resolve (`Reconnecting`), e o painel mostra "Conectando…" no lugar de "Reconectando…".
-- **A transmissão nativa avisa quando cai** (`on_lost` no `media/publisher.rs`), e hoje isso encerra a transmissão.
-- **O ping da chamada já é medido** (`features/voice/dock/model/ping.ts`, do `getStats`) e aparece no painel de voz.
-- **A sessão inválida já leva à tela "Este computador saiu do grupo"** (`unknown_device`, v0.2.2). Só conferir.
-- **A pasta de logs** já aparece em Aplicativo, com "Abrir pasta"; o Rust guarda 7 dias (`logging.rs`).
+- **O convite recusado** é um erro só, `ApiError::InvalidInvite` ("Convite inválido, expirado ou já usado."), para
+  código errado, vencido, revogado e esgotado. O `find_valid` (`identity/invites.rs`) faz tudo numa consulta, e o
+  `redeem` e o `preview` passam por ele. A página do link no navegador (`routes/pages.rs`) também não diz o motivo
+  ("Esse convite não vale mais") e conta a falha no limite de tentativas (`state.limiter`).
+- **O link do convite** é `{PUBLIC_URL}/invite/CÓDIGO` (e `/recovery/CÓDIGO`), servido pela própria API, com as tags
+  `og:` e o `ashtar://invite/CÓDIGO` para abrir o app. Fora do Ashtar (WhatsApp) ele já ganha prévia.
+- **A prévia de links** da API recusa os endereços da própria VPS (`own_addresses` em `previews/mod.rs`), então o
+  link do convite nunca ganha cartão dentro do Ashtar.
+- **O `/download`** já existe (`routes/pages.rs`) e manda para o instalador da última versão estável. É o link para
+  quem formatou ou trocou de PC; falta só ele estar à mão do dono.
+- **A janela da conversa privada** tem `w-[380px]` e até 540 de altura (`dms/components/DmWindow.tsx`); as abas das
+  outras têm 210 (`DmDock.tsx`), até três ao lado da lateral.
+- **O backup** (`deploy/server/backup.sh`, todo dia às 22:30): `admin backup` faz o `VACUUM INTO` em `data/backups/`
+  (as 14 mais recentes) e o `rclone` manda a cópia nova para o R2. Os arquivos (`data/files/`, ADR 0031) ficam fora.
+  A restauração do banco está escrita no `deploy/server/README.md`, mas a dos arquivos não existe.
+- **Os arquivos** têm um `kind` (`avatar`, `attachment`, `preview`, `emoji`) na tabela `files`, e o id é o nome no
+  disco. Um arquivo nunca muda depois de gravado: trocar a foto grava outro id.
+- **As notas antigas** têm cerca de 250 itens `[ ]` de verificação, da `v0.2.4-notes.md` à `v0.8-notes.md`. A raiz
+  ainda tem o `NOTES.md` da v0.6, e o plano e as notas da v0.6 não estão em `docs/plans/`.
+- **Os testes do roadmap** (M01–M10 e A01–A17) estão só listados no `docs/roadmap.md`, sem roteiro.
+- **Os emojis do grupo** (v0.7) são o modelo para os sons: arquivo `emoji` na tabela `files`, permissão "Gerenciar
+  emojis" (`emojis.gerenciar`) e o Painel › Emojis. As permissões guardadas (`identity/permissions.rs`) são dadas uma a
+  uma; nenhuma vem ligada por padrão hoje.
+- **A moderação na voz** (ADR 0034) guarda silenciado e surdo na tabela `voice_moderation`, por pessoa, valendo em
+  todas as salas do grupo até alguém liberar, e não vale nas ligações privadas. Quem modera precisa de "Moderar voz".
 
 ## Progresso
 
-| Etapa | Parte | Descrição | Status |
-|---|---|---|---|
-| 0 | — | Decisões: ADRs 0029 e 0030, roadmap, BACKLOG, canvas | Feita |
-| 1 | 1 | App: a cadeia do microfone (volume de entrada, portão e RNNoise) | Feita |
-| 2 | 1 | App: a aba Voz e vídeo completa | Feita |
-| 3 | 1 | Rust: o gancho de teclado e mouse | Feita |
-| 4 | 1 | App: a aba Atalhos, o pressionar para falar e o aviso de mutado | Feita |
-| 5 | 2 | App: a voz volta sozinha | Feita |
-| 6 | 2 | Rust e app: a transmissão nativa volta sozinha | Feita |
-| 7 | 2 | App: microfone e saída desconectados | Feita |
-| 8 | 2 | API e app: "Sem conexão com o servidor" | Feita |
-| 9 | 2 | API e app: a qualidade da conexão e o Testar conexão | Feita |
-| 10 | 2 | API, Rust e app: "Enviar logs" e o estado do servidor | Feita |
-| 11 | — | Teste com três computadores, sem publicar | Pendente |
-| 12 | — | Lançamento da `0.6.0` | Pendente |
-
-Dependências: a 2 usa a 1; a 4 usa a 1 (o portão abre e fecha pelo atalho) e a 3. A parte 2 não depende da parte
-1 e pode andar em paralelo. A 6 usa a 5 (a transmissão volta depois da voz). A API da 10 pode ir para o servidor antes do
-lançamento: o app atual nunca chama a rota nova.
-
-Branch: `claude/project-thread-oj6xia`, com um pull request para a `dev` que recebe as etapas em commits separados. O
-app só é publicado na Etapa 12, que leva a `dev` para o beta e depois para a `main`.
+| Etapa | O que | Situação |
+|---|---|---|
+| 0 | Documentos, roadmap, BACKLOG | Feito |
+| 1 | Triagem das notas e roteiro de testes | Feito |
+| 2 | API e app: o motivo do convite recusado | Feito |
+| 3 | App: o cartão do convite no chat | Feito |
+| 4 | App: a conversa mais larga, o link para baixar e a transmissão nas configurações | Feito |
+| 5 | API: sons, envio e aprovação | Feito |
+| 6 | API e app: tocar na sala e na ligação, atalhos e bloqueio | Feito |
+| 7 | App: a tela Sons e o editor | Feito |
+| 8 | Servidor: backup das fotos, dos emojis e dos sons | Feito |
+| 9 | Servidor: restauração testada e produção revisada | Pendente |
+| 10 | Revisão antes da 1.0 | Feito |
+| 11 | Lançamento da `0.9.0` no beta | PR aberta para a `dev` |
+| 12 | Noite de teste com o grupo | Pendente |
+| 13 | Correções `0.9.x` e o estável | Pendente |
 
 ## Decisões
 
-As decisões de arquitetura vão para as ADRs, que são a fonte:
+### Combinado (24/11)
 
-- `0029-configuracoes-de-voz-e-atalhos.md`: a cadeia do microfone, a detecção de voz, o pressionar para falar e o
-  gancho de teclado e mouse, o aviso de mutado, o som do pressionar para falar e o volume dos sons (decisões 1 a 8, 18, 19 e 22).
-- `0030-reconexao-e-estados.md`: a reconexão da voz e da transmissão, os dispositivos, a faixa do servidor, a
-  qualidade da conexão, o Testar conexão, os logs e o estado do servidor (decisões 9 a 17, 20 e 21).
-
-### Combinado (20/11)
-
-- **A v0.6 sai numa versão só**, a `0.6.0`.
-- **Entram as duas partes propostas**, com todas as sugestões aceitas: pressionar para falar pelo teclado e pelos
-  botões laterais do mouse; a detecção de voz com a sensibilidade automática e manual; os logs guardados na API e
-  vistos pelo dono no Painel; a qualidade da conexão como um ícone que só aparece quando está ruim, com os números
-  no cartão; os itens abertos do `NOTES.md` da v0.5 conferidos no teste da beta `0.5.0`, e o que sobrar adiado para
-  cá.
-- **Os atalhos de ligação** (Atender e Recusar ou desligar), que estão no quadro "Configurações — atalhos", entram
-  junto, porque usam o mesmo gancho. O atalho do overlay fica fora.
-- **As telas que faltam no canvas** (aviso de dispositivo, faixa do servidor, qualidade da conexão, "Enviar logs" e
-  a lista do Painel) são desenhadas na Etapa 0, no estilo dos quadros vizinhos.
-- **Entram mais quatro (20/11):** o aviso de "você está mutado", o som do pressionar para falar, o Testar conexão e
-  o estado do servidor no Painel. A mensagem não enviada guardada ao fechar o app ficou de fora.
-- **Entra o volume dos sons do Ashtar (20/11).** Voltar para a sala ao reabrir e oferecer os logs depois de um
-  travamento ficaram de fora.
+- **A 0.9 é o Release Candidate.** Não entra recurso novo; entram ajustes pequenos de interface, sem tela nova.
+- **O backup leva o banco, os emojis, as fotos de perfil e os sons**, todo dia, junto. Anexos e prévias ficam fora.
+- **O cartão do link do convite** entra na 0.9.
+- **A conversa privada** fica um pouco mais larga.
+- **Lançamento** igual às outras: `0.9.0` no beta, depois o estável.
+- **O soundboard entra na 0.9**, antes da `0.9.0` (desenhado no canvas, linha "Release Candidate (0.9)": "Soundboard
+  — tocar sons", "Soundboard — atalhos", "Sons — aba Meus sons e editor", "Sons — aba Aprovação", "Sons — aba Todos
+  os sons" e "Sons — arrastando um arquivo").
 
 ### Decidido neste plano
 
-**Configurações e atalhos (parte 1)**
-
-1. **O microfone passa por uma cadeia só**, num `AudioContext`: o volume de entrada (um ganho de 0 a 200%), o
-   RNNoise (se ligado) e o portão da detecção de voz, nessa ordem. É o mesmo processador do LiveKit que hoje põe o
-   RNNoise na trilha (`setProcessor`), e fica ligado sempre que qualquer etapa dele vale alguma coisa. O nível que o
-   medidor e a sensibilidade mostram é o da saída do ganho, antes do portão.
-2. **A detecção de voz é um portão, não um mute.** Abaixo da sensibilidade, o portão manda silêncio na trilha, que
-   continua publicada e sem o ícone de microfone cortado para os outros. Abre em 10 ms e fecha 300 ms depois de a voz
-   cair, para não comer o fim das palavras. A sensibilidade automática segue o ruído de fundo (o piso medido nos
-   últimos segundos, mais uma margem); a manual é uma régua em dB, de -100 a 0, com a marca dourada do quadro.
-3. **O pressionar para falar é o mesmo portão**, aberto pelo atalho em vez da voz, com os mesmos 300 ms para fechar
-   depois de soltar. Os dois modos são exclusivos, como no quadro: escolher um atalho de pressionar para falar não
-   troca o modo sozinho, mas o modo Pressionar para falar sem atalho mostra o aviso para definir um. Com o portão
-   aberto pelo atalho, o seu avatar ganha o anel de quem fala, como hoje.
-4. **Mutado ganha do portão.** Mutar e ensurdecer continuam desligando o microfone como hoje (`setMicrophoneEnabled`);
-   o portão só vale com o microfone ligado.
-5. **Os atalhos globais vêm de um gancho do Windows, no Rust** (`WH_KEYBOARD_LL` e `WH_MOUSE_LL`, numa thread
-   própria com o laço de mensagens). O gancho só olha, nunca segura a tecla: o jogo continua recebendo tudo. O
-   `RegisterHotKey` (e o plugin de atalhos do Tauri) segura a tecla, e por isso não serve (BACKLOG da v0.2.2).
-6. **Atalhos de agora:** Desativar microfone, Desativar áudio, Pressionar para falar, Atender ligação e Recusar ou
-   desligar, como no quadro. Os padrões são os do quadro (`Ctrl+Shift+M`, `Ctrl+Shift+D`, nenhum, `Ctrl+Shift+A` e
-   `Ctrl+Shift+E`). Um atalho é qualquer tecla sozinha, até um modificador (o Ctrl, o Shift), ou um botão do mouse (os
-   laterais, `X1` e `X2`, e o do meio); apertando mais de uma, vira combinação (os modificadores e uma tecla). O
-   clique esquerdo e o direito não podem. (Mudou no teste de 20/11: antes, um modificador sozinho não valia.)
-7. **Gravar um atalho** é como no quadro "Configurações — atalhos (gravando)": Trocar põe a linha gravando, o que a pessoa
-   apertar vira o atalho quando ela solta a primeira tecla, Esc ou Cancelar desiste. Enquanto grava, os atalhos não disparam. A mesma
-   combinação em duas linhas não pode: a nova mostra quem já usa ("Já é o atalho de Desativar microfone").
-8. **Os atalhos e o modo de entrada ficam no computador**, no `settingsStore` (como os dispositivos), e o app manda a
-   lista para o Rust ao abrir e a cada mudança. O Rust só avisa "apertou" e "soltou" com o nome do atalho; quem decide
-   o que fazer é o app.
-
-**Confiabilidade (parte 2)**
-
-9. **A voz volta sozinha.** Quando o `livekit-client` desiste (o `Disconnected` que não foi pedido, nem a sala
-   arquivada, nem a pessoa tirada ou movida), o app pede um token novo e entra de novo na mesma sala, com espera de
-   1, 2, 5, 10, 20 e 30 segundos, e depois a cada 30 até 5 minutos. Durante isso o painel mostra "Reconectando…" (o
-   quadro "Estados e avisos"), com o desligar ao lado. Depois de 5 minutos, fica o "Sem conexão com a sala" de hoje,
-   com Tentar de novo. O mute e o surdo voltam como estavam; a câmera não volta (decisão da v0.4: nunca liga
-   sozinha).
-10. **O Windows acordando conta como queda.** Ao voltar da suspensão, o app reconecta a voz na hora, sem esperar o
-    LiveKit perceber.
-11. **A transmissão nativa volta sozinha.** Quando a `:screen` cai e a voz continua, o Rust entra de novo com um
-    token novo, sem parar a captura nem o encoder, e quem assiste vê "Conexão perdida — reconectando" no lugar da
-    imagem por alguns segundos. Quem transmite vê o aviso "Conexão perdida" do quadro. Se a voz também caiu, a
-    transmissão espera a voz voltar e entra em seguida. Se não voltar em 2 minutos, acaba como hoje.
-12. **Microfone desconectado:** o app troca para o padrão do Windows na hora, sem sair da sala, e mostra o aviso
-    "Seu microfone foi desconectado — usando o padrão do Windows". Quando o escolhido volta, troca de volta e o aviso
-    some. Sem nenhum microfone, entra mutado, com o aviso "Nenhum microfone encontrado". A saída segue a mesma regra,
-    com o aviso dela.
-13. **"Sem conexão com o servidor"** é uma faixa no alto da janela, embaixo da barra de título, que aparece quando o
-    WebSocket fica mais de 5 segundos sem conectar (quedas menores não piscam nada). Mostra a próxima tentativa
-    ("Tentando de novo em 8 s") e Tentar agora. Quando volta, a faixa some e o app recarrega o que pode ter mudado
-    (canais, membros, não lidas e as mensagens do canal aberto). A voz não depende da faixa: com a API fora e o
-    LiveKit no ar, a sala continua.
-14. **A API ganha tempo limite** de 30 segundos por pedido (o `TimeoutLayer` do `tower-http`), com o erro `timeout`
-    no mesmo formato dos outros. As rotas de upload (logs) ficam com 120.
-15. **A qualidade da conexão aparece só quando está ruim.** Um ícone de sinal no bloco da pessoa, em laranja
-    (Instável) ou vermelho (Ruim), lido do `ConnectionQuality` que o LiveKit já calcula para cada um; com a conexão
-    boa, nada. No cartão da pessoa (na sala), a seção Conexão mostra o ping e a perda de pacotes dela. Os números vêm
-    da própria pessoa: cada app manda os seus a cada 5 segundos por uma mensagem de dados da sala (como o surdo). O
-    app antigo não manda, e o cartão mostra só o ícone.
-16. **"Enviar logs"** em Configurações › Aplicativo junta os logs dos últimos 2 dias num `.zip` (no Rust), com a
-    versão do app e do Windows, e manda para a API (`POST /api/logs`, até 10 MB). Um campo opcional deixa a pessoa
-    dizer o que aconteceu. A API grava o arquivo no disco, ao lado do banco, e guarda os últimos 30 dias. Os logs não
-    têm mensagens, mas têm nicks e ids; o texto do botão diz que só o dono vê.
-17. **O dono vê os logs no Painel**, numa tela nova, Logs: quem mandou, quando, a versão, o que a pessoa escreveu, e
-    Baixar. Só o dono (a permissão é dele, não vira permissão por pessoa). Quando chega um, o dono recebe o aviso no
-    canto, como o de quem entrou no grupo.
-
-**Os extras de 20/11**
-
-18. **"Você está mutado"** aparece no painel de voz por 3 segundos quando a pessoa fala com o microfone mutado (não
-    surda). O nível vem de um clone da trilha do microfone, que continua aberto enquanto ela está mutada (o mute do
-    LiveKit desliga a trilha publicada, e o clone não). Não repete enquanto ela continua falando, e não aparece no
-    pressionar para falar com o atalho solto. Uma chave em Voz e vídeo, ligada por padrão.
-19. **O som do pressionar para falar:** um clique curto ao abrir e outro ao fechar o portão pelo atalho, original
-    como os outros sons. Uma chave em Notificações, desligada por padrão. Só quem aperta ouve.
-20. **Testar conexão**, em Voz e vídeo: usa o `ConnectionCheck` do `livekit-client` numa sala só da pessoa
-    (`teste:{user_id}`, com um token de 1 minuto do `POST /api/voice/test-token`) e mostra o ping até o servidor, se
-    a voz vai pelo caminho direto (UDP) ou pelo reserva (TCP, mais lento), e se dá para publicar. Leva uns 10
-    segundos; numa sala, o teste lê os números da conexão que já existe, sem abrir outra.
-21. **O estado do servidor**, numa tela Servidor do Painel de controle, só para o dono: a API (versão e há quanto
-    tempo está no ar), o LiveKit (responde ou não, e em quanto tempo), o disco livre na pasta de dados e o último
-    backup (o arquivo mais novo de `data/backups/`). Atualiza ao abrir e com um botão; sem aviso nem histórico.
-22. **O volume dos sons do Ashtar** é uma régua no alto de Configurações › Notificações, de 0 a 100% (padrão 100%),
-    que vale para todos os sons do app: mensagem, menção, toque da ligação, os sons da sala e o do pressionar para
-    falar. Fica separada da voz e do volume de saída, que continuam sem mexer nos sons. O botão de ouvir de cada som
-    usa a régua.
-
----
-
-## Etapa 0: ADRs, roadmap, BACKLOG e canvas
-
-Só documentos e desenho.
-
-- O `PLAN.md` e o `NOTES.md` da v0.5 vão para `docs/plans/`, e a raiz recebe estes. Os `[ ]` da v0.5 que o teste da
-  beta `0.5.0` não resolver ficam marcados como adiados lá, e os que pedem código entram no `NOTES.md` da v0.6.
-- ADR **0029** (decisões 1 a 8, 18 e 19) e ADR **0030** (decisões 9 a 17, 20 e 21). A 0030 atualiza a 0016 (a sala) e a 0017 (o
-  publicador nativo, que passa a reconectar).
-- `docs/roadmap.md`: a v0.6 com a versão única, os atalhos de ligação, a lista do que já existia e o "Enviar logs"
-  com o Painel.
-- `BACKLOG.md`: saem os dois itens da v0.6 (a aba Voz e vídeo e o "Reconectando"), e o "Abrir pasta de logs" da
-  v0.2.2, que já existe.
-- Canvas: os quadros "Aviso — dispositivo desconectado", "Faixa — sem conexão com o servidor", "Voz — qualidade da
-  conexão" (o bloco e o cartão), "Configurações — aplicativo (enviar logs)" e "Painel de controle — logs"; depois,
-  "Voz — você está mutado", "Configurações — testar conexão" e "Painel de controle — servidor".
-
-**Pronto quando:** as duas ADRs estão em `docs/adr/`, a 0016 e a 0017 apontam para elas, o roadmap tem a v0.6 nova e
-os cinco quadros estão no canvas.
-
----
-
-# Parte 1: configurações e atalhos
-
-## Etapa 1: app, a cadeia do microfone
-
-`features/voice/noise/` vira `features/voice/input/`.
-
-- O processador de hoje (`rnnoise.ts`, `createProcessor`) vira a cadeia da decisão 1: `GainNode` do volume de
-  entrada, o RNNoise opcional e o portão, num `AudioWorklet` só para o portão (mede o nível em blocos de 10 ms e
-  aplica o ganho com rampa curta, sem clique).
-- Um store `inputStore` com o volume de entrada, o modo (`voice` ou `ptt`), a sensibilidade (`auto` ou um número em
-  dB), o eco e o ganho automático. O `noiseStore` entra nele, migrando o valor guardado.
-- O nível medido sai da cadeia para a interface (`useInputLevel`), a 20 por segundo, sem passar por estado do React a
-  cada bloco.
-- O `switchNoiseSuppression` vira `applyInputChain`: põe, troca ou tira o processador quando qualquer opção muda,
-  também no meio da chamada. Eco e ganho automático mudam as restrições da captura (`restartTrack`).
-- O portão expõe `setHeld(boolean)` para o pressionar para falar (Etapa 4).
-- Testes: o portão abre acima e fecha 300 ms abaixo; a sensibilidade automática segue o piso; a migração do
-  `noiseStore`.
-
-**Pronto quando:** com o volume de entrada em 50% a voz chega mais baixa para os outros; com a sensibilidade manual
-alta, falar baixo não passa e o ícone de microfone dos outros não muda.
-
-## Etapa 2: app, a aba Voz e vídeo completa
-
-`features/voice/devices/components/VoiceSettings.tsx`, seguindo o quadro "Configurações — voz e vídeo".
-
-- **Dispositivos:** a régua de volume embaixo de Entrada e de Saída. O volume de saída multiplica todas as vozes e
-  transmissões (o `RoomAudio` e o `boost.ts`), por cima do volume de cada pessoa.
-- **Testar microfone:** abre o microfone escolhido pela mesma cadeia e devolve o som na saída escolhida, com o
-  medidor de 20 barras do quadro. Parar de testar fecha tudo. Numa sala, o teste não toca o próprio som (eco para os
-  outros): só o medidor, lido da trilha publicada.
-- **Modo de entrada:** os dois cartões, Detecção de voz e Pressionar para falar, o atalho com Gravar atalho (a mesma
-  gravação da Etapa 4) e o bloco da sensibilidade, com a chave do automático e a régua com a marca dourada, que
-  passa a ser arrastável com o automático desligado.
-- **Processamento de voz:** Supressão de ruído (a de hoje), Cancelamento de eco e Controle automático de ganho.
-- **Compartilhamento de tela:** Qualidade padrão (os presets do publicador nativo: Movimento e Nitidez) e Áudio
-  padrão; o seletor de fontes passa a abrir com esses valores. A nota de conteúdo protegido fica.
-- As seções de hoje (Câmera e Ligações) continuam, depois de Processamento.
-- Testes: o volume de saída por cima do volume da pessoa; o teste para ao sair da tela.
-
-**Pronto quando:** o quadro confere, e cada opção vale no meio de uma chamada, sem sair da sala.
-
-## Etapa 3: Rust, o gancho de teclado e mouse
-
-`desktop/src-tauri/src/shortcuts/` (novo).
-
-- Uma thread com `SetWindowsHookExW(WH_KEYBOARD_LL)` e `WH_MOUSE_LL` e o laço `GetMessageW`. Cada evento atualiza o
-  conjunto de teclas apertadas e compara com a lista de atalhos; o callback devolve sempre `CallNextHookEx` (decisão
-  5) e faz o mínimo (o Windows desliga um gancho que demora mais de ~300 ms): manda o evento por um canal para outra
-  thread, que fala com o Tauri.
-- Comandos: `shortcuts_set(lista)` e `shortcuts_record(bool)` (no modo gravar, manda cada combinação apertada para o
-  app e não dispara nenhum atalho). Eventos para o app: `shortcut` com `{ id, pressed }` e `shortcut-recorded` com a
-  combinação.
-- As teclas guardadas pelo código virtual (`VK_*`), com o nome mostrado vindo do `GetKeyNameTextW` (o teclado ABNT2
-  mostra o nome certo).
-- Repetição do teclado (a tecla segurada manda vários `WM_KEYDOWN`) conta uma vez. Soltar qualquer tecla da
-  combinação solta o atalho.
-- Testes do casamento das combinações (sem o Windows): modificadores em qualquer ordem, a repetição, o botão do
-  mouse com e sem modificador.
-
-**Pronto quando:** com o Ashtar minimizado e um jogo em foco, o app recebe "apertou" e "soltou" do atalho, e o jogo
-continua recebendo a tecla.
-
-## Etapa 4: app, a aba Atalhos, o pressionar para falar e o aviso de mutado
-
-`features/settings/` ganha a tela Atalhos, seguindo os quadros "Configurações — atalhos" e "(gravando)".
-
-- A aba Atalhos no menu, em Ajustes, depois de Voz e vídeo. As seções Voz (Desativar microfone, Desativar áudio,
-  Pressionar para falar) e Ligações (Atender ligação, Recusar ou desligar). Sem a seção Overlay.
-- Cada linha: as teclas, Trocar (ou Definir, quando não tem) e o X para tirar. Restaurar padrões no alto.
-- `useGlobalShortcuts`, montado uma vez no `AppShell`: manda a lista para o Rust e liga cada atalho à ação (o
-  `toggleMute`, o `toggleDeafen`, o `setHeld` do portão, o atender e o recusar da ligação que está tocando).
-- O modo Pressionar para falar: o portão fica fechado até o atalho, e o painel de voz mostra a tecla embaixo do nome
-  da sala ("Pressionar para falar: V").
-- O som do pressionar para falar (decisão 19), com a chave em Notificações, e a régua do volume dos sons (decisão
-  22), aplicada no `playRoomSound` e nos sons de mensagem, menção e toque.
-- O aviso "Você está mutado" (decisão 18): o clone da trilha, o detector com o mesmo limiar do portão, o aviso no
-  painel de voz e a chave em Voz e vídeo.
-- Testes: duas linhas com a mesma combinação; gravar e cancelar; o atalho de atender sem ligação tocando não faz
-  nada; o aviso de mutado não repete falando sem parar, e não aparece surdo.
-
-**Pronto quando:** dá para jogar com o pressionar para falar no botão lateral do mouse, e mutar pelo teclado, sem
-tirar o foco do jogo.
-
----
-
-# Parte 2: confiabilidade
-
-## Etapa 5: app, a voz volta sozinha
-
-`features/voice/room/components/VoiceProvider.tsx`.
-
-- O `Disconnected` que não foi pedido (decisão 9) não limpa a sala: muda o estado para `reconnecting` e agenda a
-  próxima tentativa, pelo mesmo caminho do "tentar de novo" (`attempt` no `VoiceTarget`).
-- O `VoiceConnection` mostra "Reconectando…" (o quadro) para o `reconnecting` do LiveKit e para as tentativas do app,
-  e não mais "Conectando…".
-- O Rust avisa o app quando o Windows volta da suspensão (`WM_POWERBROADCAST`, `PBT_APMRESUMEAUTOMATIC`), e o app
-  força uma tentativa na hora (decisão 10).
-- A transmissão que o app assiste volta a ser assinada sozinha, e a miniatura continua.
-- Testes: a sequência de esperas; o `Disconnected` pedido, o arquivado e o movido não tentam de novo; o mute e o
-  surdo voltam.
-
-**Pronto quando:** tirar o cabo de rede por 20 segundos e devolver traz a pessoa de volta para a sala, com o mesmo
-mute, sem clicar em nada.
-
-## Etapa 6: Rust e app, a transmissão nativa volta sozinha
-
-`media/publisher.rs`, `media/share.rs` e `features/screen-share/`.
-
-- O `on_lost` deixa de encerrar a transmissão: o `Publisher` guarda a captura e o encoder, pede um token novo da
-  `:screen` ao app (um evento, que o app responde com o comando de sempre) e entra de novo, republicando as trilhas
-  (decisão 11).
-- O app mostra o aviso "Conexão perdida" do quadro para quem transmite, e quem assiste vê "Reconectando a
-  transmissão…" no bloco.
-- Depois de 2 minutos sem voltar, acaba como hoje, com o aviso "A transmissão caiu".
-- Testes: o `share_e2e.rs` ganha o caso de derrubar a `:screen` e ver a trilha voltar.
-
-**Pronto quando:** derrubar a conexão de quem transmite por 10 segundos e devolver traz a transmissão de volta para
-quem assistia, sem ninguém clicar.
-
-**Como ficou:** o `ShareManager` avisa `screen-share-link-lost` e para só o áudio; o `NativeScreenShare` pede o token
-e chama `screen_share_reconnect` (esperas de 1, 2, 5, 10, 20 e 30 s), com o mesmo nome de trilha. O `Publisher` entra
-de novo e republica o vídeo com o mesmo encoder e a mesma pausa; o áudio recomeça pelo manager. A transmissão vive
-enquanto a pessoa fica na mesma sala, e não por conexão da voz: uma queda da voz não a derruba. Quem assiste vê
-"Reconectando a transmissão…" pela qualidade `lost` da LiveKit. Os testes do manager cobrem a queda, a volta, a falha
-e a desistência; o caso no `share_e2e.rs` fica para rodar no Windows.
-
-## Etapa 7: app, microfone e saída desconectados
-
-`features/voice/devices/` e `features/voice/room/`.
-
-- Quando o dispositivo efetivo muda porque o escolhido sumiu (decisão 12), o aviso do quadro "Aviso — dispositivo
-  desconectado" aparece no canto, e some quando ele volta ou com o X.
-- A troca no meio da chamada usa o `switchActiveDevice` do LiveKit, e a cadeia do microfone é refeita na trilha nova.
-- Sem nenhum microfone: entra mutado com o aviso; quando um aparece, o aviso oferece Ativar microfone.
-- Testes: sumir e voltar; trocar pela tela de configurações na chamada.
-
-**Pronto quando:** tirar o fone USB no meio da sala passa a voz para o microfone do notebook com o aviso, e devolver
-o fone volta para ele.
-
-**Como ficou:** o `DeviceNotices` (no painel de voz) compara a situação dos dispositivos a cada leitura
-(`deviceNotices.ts`): o escolhido que some avisa com o nome do padrão do Windows, e o aviso fecha quando ele volta. A
-troca em si já era do `switchDevice`, e o LiveKit refaz o processador (a cadeia do microfone) na trilha nova. Sem
-nenhum microfone, a entrada nem tenta abrir: fica mutada com "Microfone indisponível", e o primeiro que aparece
-oferece Ativar microfone.
-
-## Etapa 8: API e app, "Sem conexão com o servidor"
-
-`api/src/lib.rs` e `desktop/src/app/`.
-
-- API: o `TimeoutLayer` (decisão 14), com o erro `timeout` no formato de sempre e um teste.
-- App: a faixa do quadro "Faixa — sem conexão com o servidor" no `AppShell`, lendo o `useRealtimeStatus`; o
-  `connection.ts` expõe quando é a próxima tentativa e um `retryNow()`.
-- Ao voltar, o `RealtimeBridge` invalida as consultas de canais, membros, não lidas e do canal aberto.
-- Mandar mensagem com a faixa aparecendo usa o estado de envio de hoje, com o "Tentar de novo".
-- Conferir que a sessão inválida leva à tela "Este computador saiu do grupo", e que um 401 qualquer refaz o login
-  antes de desistir.
-
-**Pronto quando:** derrubar a API por 30 segundos mostra a faixa, a sala de voz continua, e quando a API volta a
-faixa some e as mensagens mandadas por outros nesse tempo aparecem.
-
-**Como ficou:** na API, o middleware `timeout.rs` (e não o `TimeoutLayer`, para o erro sair no corpo de sempre, com o
-`kind` `timeout` e o 504) vale para as rotas do `/api`, fora o WebSocket; o `UPLOAD_TIMEOUT` (120 s) fica para os
-logs. No app, o `connection.ts` expõe a próxima tentativa e o `retryNow`, e a `ConnectionBanner` fica em cima da
-moldura (as configurações não a cobrem). A busca do que mudou na volta já existia (o `ready` com `resumed`).
-
-## Etapa 9: API e app, a qualidade da conexão e o Testar conexão
-
-`features/voice/room/` e o cartão do usuário.
-
-- O ícone do quadro "Voz — qualidade da conexão" no `ParticipantTile`, lendo o `ConnectionQualityChanged` (decisão
-  15). Também na linha da pessoa na lista da sala, ao lado do nome.
-- A mensagem de dados `voice.stats` (`{ ping, loss }`) a cada 5 segundos, no mesmo tópico do surdo, só para a sala.
-  O ping vem do `ping.ts`; a perda, do `getStats` da trilha do microfone.
-- A seção Conexão no cartão da pessoa na sala: ping, perda e o texto (Boa, Instável, Ruim).
-- API: `POST /api/voice/test-token`, um token de 1 minuto para a sala `teste:{user_id}`, que só a própria pessoa
-  acessa e que o webhook ignora (ninguém vê a pessoa "entrar" nela).
-- App: Testar conexão em Voz e vídeo, seguindo o quadro "Configurações — testar conexão" (decisão 20).
-
-**Pronto quando:** limitar a rede de um computador (perda de 10% no `clumsy`) faz o ícone aparecer para os outros, e o
-cartão dele mostra a perda; com o UDP bloqueado no firewall, o Testar conexão diz que a voz vai pelo caminho reserva.
-
-**Como ficou:** a marca (`ConnectionMark`) sai do `connectionQuality` de cada participante (`poor` é Instável, `lost`
-é Ruim), no bloco e na lista da sala. Os números vão no tópico do surdo como `{ stats: { ping, loss } }`, que o app
-antigo ignora, e ficam no `voiceStatsStore`. O Testar conexão não usa o `ConnectionCheck` do LiveKit (o teste de
-publicar dele exige falar no microfone): entra na `teste:{id}`, publica um som mudo por 4 segundos e lê o ping, o
-caminho (o candidato escolhido: UDP é direto; TCP ou TURN, reserva) e os pacotes que saíram. O webhook ignora as salas
-`teste:`.
-
-## Etapa 10: API, Rust e app, "Enviar logs" e o estado do servidor
-
-`api/src/routes/logs.rs` (novo), `desktop/src-tauri/src/logging.rs` e `features/updater/components/AppSettings.tsx`.
-
-- API: `POST /api/logs` (corpo `.zip` com o texto e a versão nos cabeçalhos, até 10 MB, um a cada 5 minutos por
-  pessoa), `GET /api/logs` e `GET /api/logs/{id}`, as duas só para o dono. Os arquivos ficam em
-  `data/logs/`, com uma linha na tabela `log_reports`; a limpeza dos 30 dias roda junto do backup. O evento
-  `logs.received` para o dono.
-- Rust: o comando `logs_bundle`, que junta os arquivos dos últimos 2 dias e um `info.txt` (versão do app, do Windows,
-  da GPU) num `.zip` na memória.
-- App: o botão "Enviar logs" em Aplicativo, ao lado de "Abrir pasta", com o campo "O que aconteceu?" e a confirmação
-  ("Logs enviados. O dono vai ver."). A tela Logs no Painel de controle, e o aviso no canto para o dono.
-- O estado do servidor (decisão 21): `GET /api/admin/status` só para o dono, e a tela Servidor no Painel, seguindo o
-  quadro "Painel de controle — servidor". O `compose.yaml` da VPS monta a pasta `data/backups/` na API só para
-  leitura, se ainda não monta.
-- Testes: o limite de tamanho e de frequência; quem não é dono recebe 404 na lista e no estado; a limpeza; o estado
-  com o LiveKit fora.
-
-**Pronto quando:** um membro manda os logs pelo app e o dono baixa o `.zip` pelo Painel; o Painel mostra o último
-backup e o disco livre da VPS.
-
-**Como ficou:** a pasta dos dados é o `DATA_DIR`, ou a pasta do banco do `DATABASE_URL` (no contêiner, `/data`, que já
-monta os backups: o `compose.yaml` não muda). O "O que aconteceu?" vai na query (`?note=`), e a versão no
-`X-App-Version` de sempre. O limite de 10 MB é lido do corpo cru, e o `.zip` sem a assinatura é recusado. O Rust junta
-os logs com o crate `zip` (o mesmo que o `webrtc-sys-build` já baixa) e devolve os bytes crus (`ipc::Response`); o
-Windows vem do registro e a placa do DXGI. A feature `admin` do app tem o Enviar logs, as telas Logs e Servidor e o
-aviso do dono.
-
----
-
-## Etapa 11: teste com três computadores
-
-Sem publicar. Os cenários:
-
-- uma hora de jogo com o pressionar para falar no botão do mouse e o mute pelo teclado, com o jogo em tela cheia;
-- a detecção de voz com o automático, com ventilador e teclado de fundo;
-- tirar o cabo de rede de quem transmite por 20 segundos; suspender o computador de quem está na sala e voltar;
-- tirar e devolver o fone USB no meio da sala;
-- derrubar a API por um minuto, com a sala aberta;
-- falar mutado, e usar o pressionar para falar com o som ligado;
-- o Testar conexão em casa e numa rede que bloqueia UDP;
-- mandar os logs e baixar no Painel, e conferir o estado do servidor.
-
-## Etapa 12: lançamento da `0.6.0`
-
-- `0.6.0` no beta, uma semana de uso, depois o estável. Problema no beta vira `0.6.1`.
-- As notas do "O que há de novo" (`CHANGELOG.md`), revisadas.
-- A API da Etapa 10 já está no servidor desde antes.
-
----
-
-## Riscos
-
-- **O gancho de teclado é o ponto mais delicado.** Um callback lento faz o Windows desligar o gancho em silêncio, e
-  um jogo rodando como administrador não manda as teclas para um app comum (UIPI). O primeiro caso é tratado com o
-  canal (o callback só copia o evento); o segundo é aceito e explicado na aba Atalhos. Alguns anti-cheats olham
-  ganchos globais: o Discord usa o mesmo caminho, mas conferir com os jogos do grupo na Etapa 11.
-- **O portão mexe no áudio de todo mundo.** Uma sensibilidade automática ruim corta palavras. Por isso o padrão é o
-  automático com margem folgada, e a régua mostra o nível ao vivo.
-- **A reconexão não pode trazer de volta quem não devia voltar.** Quem foi desconectado, movido, ou perdeu o acesso à
-  sala (v0.5) não reconecta; os testes da Etapa 5 cobrem cada motivo.
+**Convite (parte 2)**
+
+1. **O motivo da recusa vai para a pessoa.** O `InvalidInvite` ganha o motivo: `NotFound` ("Esse código não existe.
+   Confira se copiou o link inteiro."), `Expired` ("Esse convite venceu. Peça um novo ao dono do grupo."), `Used`
+   ("Esse convite já foi usado.") e `Revoked` ("Esse convite foi cancelado."). O `find_valid` vira `find_by_code`
+   (só pelo hash) e uma conferência em Rust, que o `redeem`, o `preview` e a página usam, para os três nunca
+   discordarem. O `kind` do erro continua `invalid_invite`, com um campo `reason` no corpo, para o app antigo seguir
+   funcionando.
+2. **Dizer o motivo não abre brecha.** O código tem entropia de sobra para ninguém achar um por tentativa, e toda
+   recusa continua contando no limite de tentativas. Saber que um código existe e venceu não dá acesso a nada.
+3. **A página do navegador** usa o mesmo motivo no título ("Esse convite venceu", "Esse convite já foi usado"…), e o
+   código não encontrado fica com o texto de hoje.
+
+**O cartão do convite (parte 2)**
+
+4. **Quem monta o cartão é o app**, não a prévia da API. A proteção da VPS (`own_addresses`) não muda. O app reconhece
+   no texto da mensagem os links `{PUBLIC_URL}/invite/CÓDIGO`, `{PUBLIC_URL}/recovery/CÓDIGO` e `ashtar://…`, e
+   desenha o cartão embaixo, no lugar da prévia.
+5. **Rota nova, só para quem está no grupo:** `GET /api/invites/preview/{código}`, autenticada, devolve o tipo, a
+   pessoa (quem convidou, ou de quem é a conta na recuperação), a validade e a situação (`pending`, `expired`,
+   `used`, `revoked`, `not_found`). Ela **não conta no limite de tentativas**, porque quem vê o cartão de um convite
+   velho no histórico não está adivinhando código. A rota pública (`/invite/…`) continua contando.
+6. **O cartão:** o ícone do Ashtar, "Convite de Kid para o Ashtar" (ou "Trocar de computador · conta de Fulano"), a
+   validade em palavras ("Vale até amanhã, 08:00", a mesma função `valid_until`) e um botão Copiar link. Um convite que
+   não vale mais fica apagado, com o motivo ("Venceu", "Já foi usado", "Cancelado"). Quem já está no grupo não tem o
+   que fazer com o convite, então o cartão não tem botão de entrar. A situação é buscada ao mostrar e guardada por 1
+   minuto, com até 5 cartões por tela.
+7. **O link do convite não ganha também a prévia da API**: a API já não busca, e o app ignora prévias vindas de
+   `{PUBLIC_URL}`.
+
+**Ajustes de interface (parte 2)**
+
+8. **A conversa privada passa de 380 para 440 px** de largura, com a mesma altura. Numa janela de 1280 px com a
+   lateral aberta, a expandida e duas abas de 210 ainda cabem; se não couberem, a última aba vira o "+N" (o
+   `DOCK_SLOTS` passa a depender da largura disponível).
+9. **O link para baixar fica à mão do dono:** em Painel › Convites, um botão "Copiar link para baixar o app" copia o
+   `{PUBLIC_URL}/download`. É o que se manda para quem formatou o PC: pelo desenho, a conta volta sozinha sem
+   convite nem recuperação (teste A06). Sem tela nova.
+27. **A transmissão assistida não para nas configurações** (pedido do Kid, 24/11, no uso). Hoje a miniatura some e a
+    tela deixa de ser baixada ao abrir as configurações (`inSettings` em `MiniShare.tsx`), e isso incomoda. Passa a
+    seguir: a miniatura aparece por cima das configurações, no canto de baixo à direita, com o mesmo recolher, X,
+    volume e "Voltar para a sala", e a assinatura continua (`shown` do `roomView`). Recolhida, vira a aba na lateral,
+    como no canal. As conversas privadas continuam escondidas nas configurações.
+
+**Servidor (parte 4)**
+
+10. **A cópia dos arquivos é incremental, no mesmo horário do banco.** Um comando novo do `admin`,
+    `admin arquivos-backup`, lista os ids dos arquivos `avatar`, `emoji` e `sound` que existem no banco. O `backup.sh` passa
+    essa lista para `rclone copy --files-from … --ignore-existing` de `data/files/` para `r2:{bucket}/{prefixo}/files/`.
+    Como um arquivo nunca muda, o que já está no R2 não sobe de novo; na maioria dos dias não sobe nada.
+11. **As fotos anteriores** ("Fotos anteriores" do Perfil) também são `avatar` e entram, para a pessoa conseguir voltar
+    a uma delas depois de uma restauração.
+12. **Nada é apagado do R2** pela cópia: um emoji ou uma foto apagados no app ficam lá. O volume é pequeno (fotos de
+    256 px, emojis de 128 px e sons de até 1 MB, no máximo 50 aprovados); se um dia pesar, uma limpeza mensal entra depois.
+13. **Restaurar = banco + arquivos.** O `deploy/server/README.md` ganha o passo de baixar a pasta `files/` do R2
+    para `data/files/` antes de subir a API. Um anexo sem o arquivo aparece como "Arquivo indisponível", sem quebrar a
+    mensagem nem a conversa (conferir no teste; se quebrar, é correção da Etapa 9).
+14. **A restauração é testada numa cópia, não na VPS de produção:** a API de casa (ou um contêiner local) sobe com o
+    backup do R2 e o app aponta para ela pelo `VITE_API_URL` de desenvolvimento.
+
+**Revisão e testes (partes 5 e 6)**
+
+15. **A triagem das notas antigas** marca como feito o que o uso do grupo já provou (com a versão em que foi visto),
+    passa para o roteiro de testes o que o uso não exercita, e manda para o `BACKLOG.md` o que não vale corrigir antes
+    da 1.0, com o motivo. Nenhum `[ ]` fica sem destino.
+16. **O roteiro de testes** fica em `docs/testes-rc.md`: cada caso com o passo a passo, o que tem de acontecer e quem
+    testou em qual versão. Os casos do roadmap são renumerados e ganham os que vieram depois (lista abaixo).
+17. **Correção no RC é só correção.** O que aparecer no teste e for recurso novo vai para o `BACKLOG.md`, com a versão
+    sugerida. Depois da `0.9.0`, isso vale também para o soundboard.
+
+**Soundboard (parte 3)**
+
+18. **Os sons são do grupo**, até 50 aprovados. Um som tem arquivo (kind novo `sound` na tabela `files`), nome (até
+    24 caracteres), emoji, quem enviou e a situação: `pending`, `approved` ou `rejected`, com o motivo e quem decidiu.
+    O nome não pode repetir o de outro som aprovado ou aguardando (sem diferenciar maiúscula), e a recusa diz isso na
+    hora do envio.
+19. **Duas permissões novas.** "Enviar sons" (`sons.enviar`) vem ligada para todo mundo: a migração dá a quem já está
+    no grupo, e entrar por convite dá a quem chega. Dá para tirar de alguém em Membros. "Aprovar sons"
+    (`sons.aprovar`) aprova, recusa, renomeia e exclui qualquer som; o dono tem as duas.
+20. **O envio passa por aprovação.** O som enviado fica `pending`, com até 3 aguardando por pessoa. Quem tem "Aprovar
+    sons" envia direto como aprovado. Aprovar ou recusar (com motivo opcional) avisa quem enviou, pelo tempo real e
+    pela notificação. O recusado fica na lista da pessoa, com o motivo, até ela apagar ou editar e reenviar. Aprovar
+    com 50 sons no grupo é recusado com "O grupo já tem 50 sons. Exclua um antes de aprovar outro."
+21. **Uma tela só, Configurações › Servidor › Sons**, com abas pela permissão: "Meus sons" para todos (o que a pessoa
+    enviou, com Aguardando, Aprovado e Recusado com o motivo; ouvir, editar e cancelar enquanto aguarda),
+    "Aprovação" (a fila, com contador dourado) e "Todos os sons" (os aprovados, com ouvir, renomear e excluir), as duas
+    só com "Aprovar sons". O botão é "Carregar som", e arrastar um arquivo em qualquer lugar da tela faz o mesmo. O
+    Painel › Sons dos primeiros desenhos sai.
+22. **O editor fica no app, antes do envio.** O app decodifica o arquivo (MP3, OGG ou WAV, de qualquer duração e até
+    10 MB) e mostra a onda com duas alças para escolher o trecho de até 5 s, o play só do trecho, um volume (-12 a +6
+    dB), "Igualar volume" (normaliza o pico) e "Suavizar início" e "Suavizar fim" (fade curto). O que sobe é sempre o
+    trecho já editado, em WAV mono de 48 kHz (5 s dão uns 470 KB), para não precisar de codificador no app. A API
+    confere de novo: só WAV, até 5 s pela duração lida do arquivo e até 1 MB. Eco, tom e outros efeitos ficam fora.
+23. **Tocar é um aviso da API, e cada app toca o seu arquivo.** `POST /api/voice/sounds/{id}/play` só aceita som
+    aprovado, de quem está numa sala ou numa ligação e não está com os sons bloqueados. A API manda o
+    `voice.sound_played` para quem está na mesma sala ou ligação, e cada app toca o arquivo que já guardou, no volume
+    do soundboard. Limite por pessoa, conferido na API: um som a cada 3 s e no máximo 5 a cada 30 s. Enquanto toca, quem
+    tocou ganha a onda dourada na lista e no bloco, sem o nome nem o emoji do som.
+24. **Bloquear sons é moderação de voz.** No cartão da pessoa na sala, junto de Silenciar e Deixar surdo, quem tem
+    "Moderar voz" tem "Bloquear sons" e "Liberar sons". Vira a coluna `sounds_blocked` na `voice_moderation` e vale
+    como o silenciar (ADR 0034): em todas as salas do grupo até alguém liberar, fora das ligações privadas, com
+    registro no audit. Para quem foi bloqueado, o botão Sons fica apagado com "Um moderador bloqueou seus sons". Confirmado pelo Kid (24/11).
+25. **A grade e os atalhos** (quadros "Soundboard — tocar sons" e "Soundboard — atalhos"): o botão Sons fica no painel
+    de voz e na barra da chamada, na sala e na ligação; a grade tem 4 colunas, a busca e o volume. A primeira linha tem
+    4 lugares, cada um com um atalho global (padrão Ctrl + Alt + 1 a 4, em Configurações › Atalhos › Soundboard).
+    Arrastar um som para um lugar põe ele lá, e o botão direito tem "Pôr no lugar 1–4"; o som que está num lugar ganha
+    o número dourado na lista. Os lugares ficam no PC de cada um. Um som excluído que estava num lugar deixa o lugar
+    vazio com "Som removido".
+26. **Para quem ouve, só a chave geral e o volume**, em Configurações › Notificações. Nada de silenciar os sons de uma
+    pessoa (decisão do Kid, 24/11).
+
+## Roteiro de testes
+
+### Mídia
+
+```text
+M01 — Dois participantes
+M02 — Microfone, mute e deafen
+M03 — Screen Share (Movimento e Nitidez)
+M04 — Screen Share + áudio
+M05 — Terceiro participante
+M06 — Reentrada
+M07 — Reconexão (queda curta de rede e volta da suspensão)
+M08 — Duas transmissões simultâneas, foco e miniaturas
+M09 — Ligação privada, com tela compartilhada
+M10 — Supressão de ruído, cancelamento de eco e pressionar para falar com um jogo em foco
+M11 — Câmera na sala e na ligação
+M12 — Transmitir o jogo pelo cartão, dentro e fora da sala
+M13 — Moderação na voz (silenciar, surdo, câmera, encerrar transmissão)
+M14 — Print da transmissão
+M15 — Placa AMD com o encoder da placa falhando (AMF e plano B)
+M16 — Janela que muda de tamanho e jogo que troca de janela (LoL)
+M17 — Soundboard na sala e na ligação (tocar, atalho com um jogo em foco, onda dourada, volume e chave geral)
+M18 — Bloquear e liberar os sons de alguém, e o limite de 5 sons em 30 s
+```
+
+### Aplicação
+
+```text
+A01 — Convite válido
+A02 — Código errado
+A03 — Convite vencido
+A04 — Convite já usado e convite cancelado
+A05 — Convite de recuperação
+A06 — Formatar o PC e entrar direto, sem desvincular
+A07 — Hardware com UUID inválido
+A08 — Dispositivo desvinculado
+A09 — API indisponível
+A10 — LiveKit indisponível
+A11 — Navegação texto + voz
+A12 — Atualização automática
+A13 — Cliente abaixo da versão mínima
+A14 — Mensagem privada
+A15 — Troca de nome e foto
+A16 — Menção em canal silenciado
+A17 — Ligação recebida estando numa sala
+A18 — Versão no canal beta antes de todos
+A19 — Cartão do convite no chat
+A20 — Anexos, prévia de link e busca (e assistir uma transmissão com as configurações abertas)
+A21 — Enviar som: carregar, arrastar, cortar, volume e o limite de 3 aguardando
+A22 — Aprovar e recusar som, com o aviso para quem enviou e o limite de 50
+A23 — Lugares do soundboard: arrastar, trocar, esvaziar e som excluído
+```
+
+### Servidor
+
+```text
+S01 — Backup do banco, das fotos, dos emojis e dos sons no R2
+S02 — Restauração completa numa cópia
+S03 — Servidor fora do ar avisa no celular
+```
+
+## Etapa 0: Documentos, roadmap e BACKLOG
+
+Só documentos.
+
+- O `PLAN.md` e o `NOTES.md` da v0.8 vão para `docs/plans/` (o plano já está lá: só conferir); o plano e as notas da
+  v0.6 também, que ficaram fora; a raiz recebe estes.
+- `docs/roadmap.md`: a v0.9 diz que sai na `0.9.0`, com o roteiro novo (M01–M18, A01–A23, S01–S03), os quatro ajustes,
+  o soundboard e o backup das fotos, dos emojis e dos sons; a v0.8 diz que saiu na `0.8.0` e foi até a `0.8.11`.
+- `BACKLOG.md`: a "Cópia dos arquivos" de "Mais adiante" passa a falar só dos anexos e das prévias.
+- ADR `0036-backup-das-fotos-emojis-e-sons.md`, com as decisões 10 a 14.
+- ADR `0037-soundboard.md`, com as decisões 18 a 26. A decisão 27 vai como adendo no ADR 0024 (miniatura).
+
+## Etapa 1: Triagem das notas e roteiro de testes
+
+Só documentos, com o Kid respondendo o que o grupo já usou.
+
+- Passar pelas notas `v0.2.4` a `v0.8` em `docs/plans/` e dar destino a cada `[ ]` (decisão 15). O que precisar da
+  memória do Kid ("isso já aconteceu com vocês?") vira uma lista curta numa mensagem só, não uma pergunta por item.
+- Escrever o `docs/testes-rc.md` (decisão 16).
+- O `NOTES.md` da raiz ganha as correções que a triagem achou.
+
+**Pronto quando:** nenhum `[ ]` antigo sem destino, e o roteiro escrito.
+
+## Etapa 2: API e app, o motivo do convite recusado
+
+- `identity/invites.rs`: `find_by_code` e a conferência (decisão 1), com testes para os quatro motivos e para o
+  `redeem` e o `preview` darem o mesmo.
+- `error.rs`: o `reason` no corpo do `invalid_invite`, exportado para o TypeScript.
+- `routes/pages.rs`: o título pelo motivo (decisão 3).
+- App: a tela de convite e a de recuperação mostram o texto do motivo.
+
+## Etapa 3: App, o cartão do convite no chat
+
+- API: `GET /api/invites/preview/{código}` (decisão 5), com teste de que não conta no limite e de que pede sessão.
+- App: reconhecer os links (decisão 4), o cartão (decisão 6) e ignorar a prévia de `{PUBLIC_URL}` (decisão 7). Num
+  canal, numa conversa privada e numa mensagem encaminhada.
+
+## Etapa 4: App, a conversa mais larga, o link para baixar e a transmissão nas configurações
+
+- `DmWindow.tsx`: 440 px; `DmDock.tsx`: as abas que cabem (decisão 8). Conferir em 1280, 1366 e 1920 px.
+- Painel › Convites: "Copiar link para baixar o app" (decisão 9).
+- `MiniShare.tsx`: a miniatura nas configurações (decisão 27), numa camada por cima delas, e a assinatura seguindo.
+  Conferir que ela não cobre o Salvar nem o teste de microfone de Voz e vídeo (recolhida, a aba sai do caminho).
+
+## Etapa 5: API, sons, envio e aprovação
+
+- Migração: a tabela `sounds` (decisão 18), o kind `sound` em `files`, as permissões `sons.enviar` e `sons.aprovar`
+  (decisão 19), com `sons.enviar` dada a todos os membros, e a coluna `sounds_blocked` em `voice_moderation`.
+- Rotas: enviar, listar os meus, listar a fila, listar os aprovados, aprovar, recusar com motivo, renomear, excluir e
+  cancelar o meu enquanto aguarda (decisão 20). A conferência do arquivo lê a duração do WAV (decisão 22).
+- O aviso de aprovado e recusado, pelo tempo real e pela notificação, e o contador da fila para quem aprova.
+- Testes: os limites (3 aguardando, 50 aprovados, 5 s, 1 MB, nome repetido), as permissões e quem envia aprovado
+  direto.
+
+## Etapa 6: API e app, tocar na sala e na ligação, atalhos e bloqueio
+
+- API: `POST /api/voice/sounds/{id}/play` e o `voice.sound_played` (decisão 23), com os dois limites; "Bloquear sons"
+  e "Liberar sons" nas rotas de moderação (decisão 24). Testes do limite, do bloqueio e de quem não está na sala.
+- App: o botão Sons no painel de voz e na barra da chamada, a grade, tocar com o cache dos arquivos, a onda dourada em
+  quem tocou, e a chave geral e o volume em Configurações › Notificações (decisões 25 e 26).
+- App: os 4 lugares, arrastar e "Pôr no lugar", os atalhos globais (o mesmo mecanismo do pressionar para falar) e o
+  "Som removido".
+- App: "Bloquear sons" no cartão da pessoa na sala, e o botão apagado para quem foi bloqueado.
+
+## Etapa 7: App, a tela Sons e o editor
+
+- Configurações › Servidor › Sons com as três abas e o contador (decisão 21); sai o Painel › Sons.
+- O editor (decisão 22): decodificar com o Web Audio, a onda, as alças, o play do trecho, o volume, igualar e
+  suavizar, e gerar o WAV. Teste do corte e do WAV gerado (duração e tamanho).
+- Carregar som e arrastar um arquivo em qualquer lugar da tela.
+
+## Etapa 8: Servidor, backup das fotos, dos emojis e dos sons
+
+- `admin arquivos-backup` (decisão 10), com teste, levando os sons junto.
+- `backup.sh`: a cópia incremental depois do banco. Uma falha na cópia dos arquivos aparece no log
+  (`/var/log/ashtar-backup.log`) e não desfaz o backup do banco.
+- O Painel › Servidor mostra o último backup dos arquivos junto do último do banco.
+- A imagem da API sai pelo Actions e a VPS atualiza (o Kid roda; o passo a passo vai no README).
+
+## Etapa 9: Servidor, restauração testada e produção revisada
+
+- Restaurar numa cópia (decisão 14): baixar o último backup e a pasta `files/` do R2, subir, entrar pelo app e
+  conferir membros, histórico, fotos, emojis e um anexo indisponível (S02).
+- `deploy/server/README.md`: o passo a passo da restauração completa (decisão 13).
+- Revisar o `api.env` e o `.env` da VPS contra o `.env.example` (variável sobrando ou faltando), o
+  `MIN_CLIENT_VERSION`, e o UptimeRobot (S03).
+- Disco, CPU, memória e tráfego da VPS num mês de uso, anotados no README.
+
+## Etapa 10: Revisão antes da 1.0
+
+- `cargo audit` (em `api/` e em `desktop/src-tauri/`) e `pnpm audit`: atualizar o que tiver aviso de segurança; o que
+  não der, anotado no `NOTES.md` com o motivo.
+- Os limites de tentativas e de envio revisados com o uso real.
+- O `admin` enxuto (item de "Correções fora de ordem" do `BACKLOG.md`): ficam `dono`, `backup`, `arquivos-backup`,
+  `recuperacao` e `membros`.
+- Os textos de erro e de carregamento: passar pelas telas principais com a API fora do ar e com a rede lenta, e
+  trocar todo texto técnico ou genérico ("Erro interno") que a pessoa possa ver por um que diga o que fazer.
+
+## Etapa 11: Lançamento da `0.9.0` no beta
+
+- `CHANGELOG.md` com a seção `0.9.0`, a versão no `package.json` e no `tauri.conf.json`.
+- A `feature/0.9` vai para a `dev`, que publica no beta.
+
+## Etapa 12: Noite de teste com o grupo
+
+- O roteiro inteiro (M, A e S), com a `0.9.0` do beta. O que precisa de mais de um PC é feito na mesma noite.
+- Uma noite inteira de uso medindo memória e CPU do app (o cache de `blob:` do chat, a transmissão de várias horas).
+- O M15 com a RX 7600 do amigo do Kid.
+- Cada falha vira um item no `NOTES.md`, com o caso do roteiro.
+
+## Etapa 13: Correções `0.9.x` e o estável
+
+- Cada correção sai como `0.9.x` pelo beta; o caso que falhou é testado de novo nela.
+- Com o roteiro todo passando numa versão só, o PR da `dev` para a `main` promove para o estável.
+- A 1.0 é a fase seguinte: o grupo usar o Ashtar como ferramenta principal por algumas semanas, como diz o roadmap.
+
+## Riscos e cuidados
+
+- **A triagem pode virar uma lista enorme de testes.** O uso do grupo já cobre muita coisa; só entra no roteiro o
+  que o uso normal não exercita ou o que já quebrou antes.
+- **O motivo da recusa muda o corpo do erro.** O app antigo só lê o `kind`; o `reason` é campo novo e opcional.
+- **A rota do cartão não conta no limite de tentativas.** Ela pede sessão de quem já está no grupo; quem não está não
+  chega nela.
+- **O `rclone --files-from` com milhares de ids:** a lista sai num arquivo temporário, não numa linha de comando.
+- **A restauração na VPS de produção apagaria o que entrou depois do backup.** Por isso o teste é numa cópia.
+- **O RC não pode virar mais uma versão de recursos.** Pedido novo que aparecer no teste vai para o `BACKLOG.md`.
+- **O soundboard é um recurso grande dentro do RC.** Ele entra inteiro antes da `0.9.0` e passa pelo mesmo roteiro
+  (M17, M18, A21–A23); depois do beta, só correção.
+- **Spam de sons numa sala.** Os limites ficam na API, não só no app, e quem modera pode bloquear.
+- **Decodificar áudio no app:** um arquivo estranho pode não abrir no Web Audio. O editor mostra "Não deu para abrir
+  esse arquivo. Tente MP3, OGG ou WAV." em vez de travar.

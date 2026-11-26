@@ -925,7 +925,7 @@ encontrar uma mensagem antiga pela busca
 
 # v0.8 — Atividade, moderação e refinamentos
 
-Sai numa versão só, a `0.8.0`. O plano está em
+Saiu na `0.8.0` e foi até a `0.8.11`, com as correções do uso. O plano está em
 [`docs/plans/v0.8-atividade-e-moderacao.md`](plans/v0.8-atividade-e-moderacao.md); as decisões, nas ADRs 0033 e 0034.
 
 ## Objetivo
@@ -966,59 +966,102 @@ O grupo usa o aplicativo no lugar de outras ferramentas sem pedir nada essencial
 
 # v0.9 — Release Candidate
 
+Sai na `0.9.0`, pelo beta antes do estável; as correções do RC saem como `0.9.x`. O plano está no `PLAN.md` da raiz
+(depois, em `docs/plans/v0.9-release-candidate.md`); as decisões novas, nas ADRs 0036 e 0037.
+
 ## Objetivo
 
-Parar de adicionar funcionalidades e estabilizar.
+Parar de adicionar funcionalidades e estabilizar. Nenhum caminho principal quebra ou deixa alguém num estado sem
+saída, e o servidor volta inteiro de um backup.
 
 ## Estabilidade
 
 * corrigir bugs;
 * eliminar estados inconsistentes;
-* revisar mensagens de erro, carregamentos e reconexão.
+* revisar mensagens de erro, carregamentos e reconexão;
+* dar destino a todo item de verificação aberto das fases anteriores.
+
+## Ajustes do uso real
+
+* o motivo certo quando um convite é recusado (código errado, vencido, já usado, cancelado);
+* o cartão do link do convite no chat, montado pelo app;
+* a conversa privada um pouco mais larga e o link para baixar o app à mão no Painel;
+* a transmissão assistida continua, na miniatura, com as configurações abertas.
+
+## Soundboard
+
+A exceção ao congelamento, pedida pelo Kid (ADR 0037): sons curtos do grupo, enviados por qualquer um com um editor
+de corte e volume no app, aprovados por quem tem "Aprovar sons", tocados na sala e na ligação pela grade ou por 4
+atalhos. Quem modera a voz pode bloquear os sons de alguém.
 
 ## Testes
+
+O roteiro, com o passo a passo de cada caso, fica em `docs/testes-rc.md`.
 
 ### Mídia
 
 ```text
 M01 — Dois participantes
-M02 — Microfone
-M03 — Screen Share
+M02 — Microfone, mute e deafen
+M03 — Screen Share (Movimento e Nitidez)
 M04 — Screen Share + áudio
 M05 — Terceiro participante
 M06 — Reentrada
-M07 — Reconexão
-M08 — Duas transmissões simultâneas
-M09 — Ligação privada
-M10 — Supressão de ruído e cancelamento de eco
+M07 — Reconexão (queda curta de rede e volta da suspensão)
+M08 — Duas transmissões simultâneas, foco e miniaturas
+M09 — Ligação privada, com tela compartilhada
+M10 — Supressão de ruído, cancelamento de eco e pressionar para falar com um jogo em foco
+M11 — Câmera na sala e na ligação
+M12 — Transmitir o jogo pelo cartão, dentro e fora da sala
+M13 — Moderação na voz (silenciar, surdo, câmera, encerrar transmissão)
+M14 — Print da transmissão
+M15 — Placa AMD com o encoder da placa falhando (AMF e plano B)
+M16 — Janela que muda de tamanho e jogo que troca de janela (LoL)
+M17 — Soundboard na sala e na ligação
+M18 — Bloquear e liberar os sons de alguém, e o limite de sons
 ```
 
 ### Aplicação
 
 ```text
 A01 — Convite válido
-A02 — Convite inválido
-A03 — Convite expirado
-A04 — Convite de recuperação
-A05 — Dispositivo desvinculado
-A06 — Reinstalação do Windows
+A02 — Código errado
+A03 — Convite vencido
+A04 — Convite já usado e convite cancelado
+A05 — Convite de recuperação
+A06 — Formatar o PC e entrar direto, sem desvincular
 A07 — Hardware com UUID inválido
-A08 — API indisponível
-A09 — LiveKit indisponível
-A10 — Navegação texto + voz
-A11 — Atualização automática
-A12 — Cliente abaixo da versão mínima
-A13 — Mensagem privada
-A14 — Troca de nick e foto
-A15 — Menção em canal silenciado
-A16 — Ligação recebida estando numa sala
-A17 — Versão no canal beta antes de todos
+A08 — Dispositivo desvinculado
+A09 — API indisponível
+A10 — LiveKit indisponível
+A11 — Navegação texto + voz
+A12 — Atualização automática
+A13 — Cliente abaixo da versão mínima
+A14 — Mensagem privada
+A15 — Troca de nome e foto
+A16 — Menção em canal silenciado
+A17 — Ligação recebida estando numa sala
+A18 — Versão no canal beta antes de todos
+A19 — Cartão do convite no chat
+A20 — Anexos, prévia de link e busca
+A21 — Enviar som
+A22 — Aprovar e recusar som
+A23 — Lugares do soundboard
+```
+
+### Servidor
+
+```text
+S01 — Backup do banco, das fotos, dos emojis e dos sons no R2
+S02 — Restauração completa numa cópia
+S03 — Servidor fora do ar avisa no celular
 ```
 
 ## Infraestrutura
 
 * configuração de produção revisada;
-* restauração do backup testada (banco e arquivos), a partir da cópia fora da VPS;
+* backup das fotos de perfil, dos emojis e dos sons junto do banco (ADR 0036); anexos e prévias ficam fora;
+* restauração do backup testada (banco e arquivos), a partir da cópia fora da VPS, numa cópia do servidor;
 * tráfego e custo da VPS revisados com o uso real.
 
 ---
@@ -1184,11 +1227,11 @@ Funcionalidades que podem ser avaliadas posteriormente:
 - criptografia ponta a ponta das mensagens privadas;
 - bots;
 - threads;
-- emojis personalizados;
+- ~~emojis personalizados~~ (v0.7);
 - busca avançada;
 - sistema elaborado de cargos e permissões por canal;
 - assinatura de código do instalador (elimina o aviso do SmartScreen);
-- soundboard;
+- ~~soundboard~~ (v0.9);
 ```
 
 Nenhuma delas é necessária para o uso principal do grupo.
@@ -1243,7 +1286,10 @@ v0.8
 27. Moderação na voz + registro
 
 v0.9
-28. Release Candidate
+28. Ajustes do uso real (convite, cartão do convite, conversa privada, transmissão nas configurações)
+29. Soundboard
+30. Backup das fotos, dos emojis e dos sons + restauração testada
+31. Revisão, noite de teste e Release Candidate
 
 v1.0
 ```

@@ -21,7 +21,7 @@ import { SessionWatcher } from "@/features/identity";
 import { resetStreamWatch } from "@/features/notifications";
 import { useApplyTheme } from "@/features/settings";
 import { UpdateNotice, WhatsNewDialog } from "@/features/updater";
-import { useVoice, VoiceProvider } from "@/features/voice";
+import { SoundboardBridge, useVoice, VoiceProvider } from "@/features/voice";
 import { paths } from "@/lib/paths";
 import { queryClient } from "@/lib/query";
 import { IdleReporter } from "@/features/presence";
@@ -55,6 +55,7 @@ export function App() {
 				<RealtimeBridge />
 				<IdleReporter />
 				<GlobalShortcuts />
+				<SoundboardBridge />
 				<TooltipProvider>
 					<AppToaster>
 						<RouterProvider router={router} />

@@ -2,6 +2,7 @@ import { CrownIcon, XIcon } from "lucide-react";
 import { type ReactNode, useEffect } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useMe } from "@/features/identity";
+import { usePendingSounds } from "@/features/sounds";
 import { paths } from "@/lib/paths";
 import { cn } from "@/lib/utils";
 
@@ -64,6 +65,10 @@ export function SettingsLayout() {
 	const isOwner = useMe().data?.user.is_owner === true;
 	const showEmojis = useMe().data?.can_manage_emojis === true;
 	const showLogs = useMe().data?.can_view_logs === true;
+	// Sons (v0.9): quem envia ou aprova; o contador dourado é a fila, para quem aprova.
+	const showSounds = useMe().data?.can_send_sounds === true;
+	const canApproveSounds = useMe().data?.can_approve_sounds === true;
+	const pendingSounds = usePendingSounds();
 
 	useEffect(() => {
 		const onKeyDown = (event: KeyboardEvent) => {
@@ -93,11 +98,27 @@ export function SettingsLayout() {
 					<MenuItem to={paths.settings.notifications}>Notificações</MenuItem>
 					<MenuItem to={paths.settings.app}>Aplicativo</MenuItem>
 				</MenuGroup>
-				{showServer && (
+				{(showServer || showSounds) && (
 					<>
 						<MenuSeparator />
 						<MenuGroup label="Servidor">
-							<MenuItem to={paths.settings.archived}>Arquivados</MenuItem>
+							{showSounds && (
+								<MenuItem to={paths.settings.sounds}>
+									<span className="flex-1">Sons</span>
+									{canApproveSounds && pendingSounds > 0 && (
+										<span
+											role="img"
+											aria-label={`${pendingSounds} aguardando aprovação`}
+											className="flex size-[18px] items-center justify-center rounded-full bg-gold text-[11px] font-bold text-gold-foreground"
+										>
+											{pendingSounds}
+										</span>
+									)}
+								</MenuItem>
+							)}
+							{showServer && (
+								<MenuItem to={paths.settings.archived}>Arquivados</MenuItem>
+							)}
 						</MenuGroup>
 					</>
 				)}

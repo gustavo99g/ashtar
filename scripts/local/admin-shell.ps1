@@ -28,17 +28,10 @@ Write-Host 'Administração do Ashtar. Use:  admin <comando>' -ForegroundColor C
 Write-Host @'
 
   admin membros                       lista os membros
-  admin convite                       convite novo (7 dias, 1 uso)
-  admin convite --validade 5m --usos 8   convite para mandar no grupo
-  admin convites                      histórico de convites
   admin recuperacao <nick>            troca o computador de um membro
-  admin revogar <id>                  revoga um convite que ainda não foi usado
-  admin remover <nick>                remove um membro
-  admin desvincular <nick>            solta o computador de um membro
-  admin beta <nick> ligar|desligar    liga ou desliga o beta de um membro
-  admin permissoes <nick>             mostra as permissões de um membro
   admin dono <nick>                   cria o dono (uma vez só)
   admin backup .\backups              copia o banco para a pasta
+  (convites, membros e permissões: no Painel de controle do app)
   admin --help                        a lista completa
 
 '@

@@ -10,7 +10,15 @@ import { toast } from "@/components/ui/toast";
 import { ApiError, hidePreviews, type LinkPreview, type Message } from "@/lib/api";
 import { useFileUrl } from "@/lib/fileCache";
 import { openLink } from "@/lib/tauri/opener";
+import { isOwnServerLink } from "../model/inviteLinks";
 import { replaceMessage } from "../queries";
+
+/** As prévias que a API mandou, sem as do próprio servidor: o convite ganha o cartão do app. */
+function shownPreviews(message: Message): LinkPreview[] {
+	return (message.previews ?? []).filter(
+		(preview) => !isOwnServerLink(preview.url),
+	);
+}
 
 function PreviewCard({
 	preview,
@@ -82,13 +90,13 @@ interface LinkPreviewsProps {
 }
 
 export function LinkPreviews(props: LinkPreviewsProps) {
-	if ((props.message.previews ?? []).length === 0) return null;
+	if (shownPreviews(props.message).length === 0) return null;
 	return <PreviewList {...props} />;
 }
 
 function PreviewList({ message, mine }: LinkPreviewsProps) {
 	const queryClient = useQueryClient();
-	const previews = message.previews ?? [];
+	const previews = shownPreviews(message);
 
 	async function hide() {
 		try {

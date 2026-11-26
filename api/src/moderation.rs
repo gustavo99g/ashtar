@@ -13,16 +13,19 @@ use ts_rs::TS;
 
 use crate::error::ApiError;
 
-/// O que a moderação impôs a alguém. Os dois desligados é ninguém moderado.
+/// O que a moderação impôs a alguém. Tudo desligado é ninguém moderado.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct Imposed {
     pub mic_muted: bool,
     pub deafened: bool,
+    /// Sem tocar sons do soundboard (ADR 0037). Não muda nada no LiveKit: quem barra é a rota de
+    /// tocar.
+    pub sounds_blocked: bool,
 }
 
 impl Imposed {
     pub fn is_free(self) -> bool {
-        !self.mic_muted && !self.deafened
+        !self.mic_muted && !self.deafened && !self.sounds_blocked
     }
 
     /// As fontes que o token de voz deixa publicar: sem o microfone para quem foi silenciado;
@@ -70,6 +73,8 @@ pub enum ModerationAction {
     Undeafen,
     CameraOff,
     StopShare,
+    BlockSounds,
+    UnblockSounds,
 }
 
 impl ModerationAction {
@@ -82,39 +87,44 @@ impl ModerationAction {
             Self::Undeafen => "voz.liberar_audio",
             Self::CameraOff => "voz.desligar_camera",
             Self::StopShare => "voz.encerrar_transmissao",
+            Self::BlockSounds => "voz.bloquear_sons",
+            Self::UnblockSounds => "voz.liberar_sons",
         }
     }
 }
 
 /// O estado imposto a `user_id`.
 pub async fn get(db: &SqlitePool, user_id: &str) -> Result<Imposed, ApiError> {
-    let row: Option<(bool, bool)> =
-        sqlx::query_as("SELECT mic_muted, deafened FROM voice_moderation WHERE user_id = ?")
-            .bind(user_id)
-            .fetch_optional(db)
-            .await?;
+    let row: Option<(bool, bool, bool)> = sqlx::query_as(
+        "SELECT mic_muted, deafened, sounds_blocked FROM voice_moderation WHERE user_id = ?",
+    )
+    .bind(user_id)
+    .fetch_optional(db)
+    .await?;
     Ok(row
-        .map(|(mic_muted, deafened)| Imposed {
+        .map(|(mic_muted, deafened, sounds_blocked)| Imposed {
             mic_muted,
             deafened,
+            sounds_blocked,
         })
         .unwrap_or_default())
 }
 
 /// Todo mundo que está moderado agora.
 pub async fn all(db: &SqlitePool) -> Result<HashMap<String, Imposed>, ApiError> {
-    let rows: Vec<(String, bool, bool)> =
-        sqlx::query_as("SELECT user_id, mic_muted, deafened FROM voice_moderation")
+    let rows: Vec<(String, bool, bool, bool)> =
+        sqlx::query_as("SELECT user_id, mic_muted, deafened, sounds_blocked FROM voice_moderation")
             .fetch_all(db)
             .await?;
     Ok(rows
         .into_iter()
-        .map(|(id, mic_muted, deafened)| {
+        .map(|(id, mic_muted, deafened, sounds_blocked)| {
             (
                 id,
                 Imposed {
                     mic_muted,
                     deafened,
+                    sounds_blocked,
                 },
             )
         })
@@ -137,15 +147,17 @@ pub async fn set(
             .await?;
     } else {
         sqlx::query(
-            "INSERT INTO voice_moderation (user_id, mic_muted, deafened, by_user_id, updated_at)
-             VALUES (?, ?, ?, ?, ?)
+            "INSERT INTO voice_moderation
+                 (user_id, mic_muted, deafened, sounds_blocked, by_user_id, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?)
              ON CONFLICT (user_id) DO UPDATE SET mic_muted = excluded.mic_muted,
-                 deafened = excluded.deafened, by_user_id = excluded.by_user_id,
-                 updated_at = excluded.updated_at",
+                 deafened = excluded.deafened, sounds_blocked = excluded.sounds_blocked,
+                 by_user_id = excluded.by_user_id, updated_at = excluded.updated_at",
         )
         .bind(user_id)
         .bind(imposed.mic_muted)
         .bind(imposed.deafened)
+        .bind(imposed.sounds_blocked)
         .bind(by)
         .bind(now)
         .execute(db)
@@ -162,7 +174,7 @@ mod tests {
     fn silenciado_publica_tudo_menos_o_microfone() {
         let muted = Imposed {
             mic_muted: true,
-            deafened: false,
+            ..Imposed::default()
         };
         assert_eq!(
             muted.token_sources(),
@@ -180,8 +192,8 @@ mod tests {
     #[test]
     fn surdo_nao_recebe_e_liberado_volta_ao_normal() {
         let deaf = Imposed {
-            mic_muted: false,
             deafened: true,
+            ..Imposed::default()
         };
         assert!(!deaf.permission().can_subscribe);
         assert!(deaf.token_sources().is_empty());

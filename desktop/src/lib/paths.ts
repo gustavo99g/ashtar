@@ -36,6 +36,8 @@ export const paths = {
 		audit: "/settings/audit",
 		/** Servidor › Arquivados: só no menu de quem gerencia os canais. */
 		archived: "/settings/archived",
+		/** Servidor › Sons: quem envia ou aprova sons (v0.9). */
+		sounds: "/settings/sounds",
 		/** Painel › Emojis: quem tem "Gerenciar emojis" (v0.7). */
 		emojis: "/settings/emojis",
 	},

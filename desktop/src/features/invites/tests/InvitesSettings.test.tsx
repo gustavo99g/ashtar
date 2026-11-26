@@ -233,3 +233,19 @@ describe("InvitesSettings: histórico", () => {
 		);
 	});
 });
+
+describe("InvitesSettings: link para baixar", () => {
+	it("copia o /download da API", async () => {
+		vi.mocked(listInvites).mockResolvedValue([]);
+		const user = userEvent.setup();
+		renderPage();
+
+		await user.click(
+			screen.getByRole("button", { name: "Copiar link para baixar o app" }),
+		);
+		expect(await navigator.clipboard.readText()).toBe(
+			"http://127.0.0.1:3000/download",
+		);
+		expect(screen.getByRole("button", { name: "Link copiado" })).toBeTruthy();
+	});
+});

@@ -23,11 +23,12 @@ import { useInputChoice } from "../../input/stores/inputStore";
 import { DockButton } from "../../call/components/buttons";
 import { ShareButton } from "../../call/components/ShareButton";
 import { setCameraOn } from "../../camera/hooks/useLocalCamera";
+import { SoundsButton } from "../../soundboard/components/SoundsButton";
 import { useCameraState } from "../../camera/stores/cameraStore";
 
 /*
  * O painel "Voz conectada" no pé da coluna, enquanto há chamada: Conectando ou Conectada (com o
- * ping), desconectar, a Câmera (liga e desliga, como a da barra da sala) e o Tela. Desde a 0.6, Reconectando
+ * ping), desconectar, a Câmera (liga e desliga, como a da barra da sala), o Tela e o Sons (v0.9). Desde a 0.6, Reconectando
  * enquanto a voz volta sozinha de uma queda (ADR 0030).
  *
  * Na ligação privada (ADR 0023), o painel diz "Em ligação", em azul, com quem, e o botão é o
@@ -81,7 +82,7 @@ export function VoiceConnection() {
 					<PhoneOffIcon className="size-[18px]" strokeWidth={1.75} />
 				</button>
 			</div>
-			<div className="grid grid-cols-2 gap-1.5 pr-1">
+			<div className="grid grid-cols-3 gap-1.5 pr-1">
 				<DockCameraButton />
 				{room && screenShare ? (
 					<ShareButton controller={screenShare} variant="dock" />
@@ -91,6 +92,7 @@ export function VoiceConnection() {
 						Tela
 					</DockButton>
 				)}
+				<SoundsButton variant="dock" />
 			</div>
 		</section>
 	);

@@ -50,6 +50,7 @@ export function useLiveMembers(): LiveMember[] {
 			serverDeafened: participant.isLocal
 				? own.serverDeafened
 				: own.others[participant.identity]?.deafened === true,
+			soundsBlocked: own.others[participant.identity]?.sounds === true,
 			connection: trouble(participant.connectionQuality),
 		}));
 }

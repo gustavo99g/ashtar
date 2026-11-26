@@ -1,5 +1,21 @@
 # O que há de novo no Ashtar
 
+## 0.9.0
+
+- Soundboard: na sala de voz e nas ligações, o botão Sons abre a grade com os sons do grupo. Clique num som para todo mundo ouvir, e quem está tocando ganha uma onda dourada na foto. Até 5 sons a cada 30 segundos, com 3 segundos entre um e outro.
+- Os 4 lugares do soundboard: arraste um som para um lugar, ou use o botão direito e "Pôr no lugar". Ctrl + Alt + 1 a 4 tocam os lugares de qualquer janela, e dá para trocar os atalhos em Configurações › Atalhos.
+- Configurações › Servidor › Sons: "Carregar som", ou arraste um arquivo MP3, OGG ou WAV em qualquer lugar da tela. O editor mostra a onda para cortar até 5 segundos, ajustar o volume e escolher o nome e o emoji. Cada pessoa tem até 3 sons esperando aprovação, e o grupo, até 50 sons.
+- Quem tem a nova permissão "Aprovar sons" vê as abas Aprovação, com o número de sons esperando, e Todos os sons, para renomear e excluir. Quem enviou recebe um aviso quando o som é aprovado ou recusado, com o motivo. Os sons de quem aprova entram direto.
+- Em Notificações › Soundboard, desligue os sons dos outros ou mude o volume só para você.
+- Moderar voz ganhou "Bloquear sons": quem foi bloqueado não toca sons em nenhuma sala do grupo até ser liberado. Nas ligações privadas nada muda.
+- Convite: quando um código não serve, a tela diz o motivo (código errado, vencido, já usado ou cancelado) e o que fazer.
+- Um link de convite mandado no chat vira um cartão, com quem convidou, até quando vale e o Copiar link. Se ele já não vale, o cartão fica apagado e diz por quê.
+- Painel de controle › Convites: "Copiar link para baixar" o app, para mandar junto com o convite.
+- A conversa privada ficou mais larga.
+- A transmissão que você assiste não some mais ao abrir as Configurações: ela fica numa miniatura por cima.
+- As fotos, os emojis e os sons do grupo entram no backup diário, junto com o banco. Painel de controle › Servidor mostra quando foi a última cópia.
+- As mensagens de erro dizem o que fazer, em vez de "Erro interno" ou um texto técnico em inglês.
+
 ## 0.8.11
 
 - Transmitir pela placa de vídeo ficou mais confiável nas AMD: o Ashtar testa o encoder antes de começar e, se ele falhar, usa o encoder da AMD direto ou o processador, em vez de a tela sair preta.

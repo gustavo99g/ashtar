@@ -1,9 +1,10 @@
-import { Outlet } from "react-router-dom";
+import { Outlet, useMatch } from "react-router-dom";
 import { ActivitySync } from "@/features/activity";
 import { CallBridge } from "@/features/calls";
 import { ChannelDialogs } from "@/features/channels";
 import { DmDock, showDm } from "@/features/dms";
 import { useLoadEmojis } from "@/features/emojis";
+import { useLoadSounds } from "@/features/sounds";
 import { ForwardDialog } from "@/features/forward";
 import { LogsNotices } from "@/features/admin";
 import { JoinNotices } from "@/features/members";
@@ -11,6 +12,8 @@ import { NotificationsBridge, RoomSounds } from "@/features/notifications";
 import { ChannelNav, ServerMenu } from "@/features/server";
 import { SideDock } from "@/features/side-panel";
 import { MiniShare, VoiceDock } from "@/features/voice";
+import { paths } from "@/lib/paths";
+import { cn } from "@/lib/utils";
 import { ConnectionBanner } from "./ConnectionBanner";
 /*
  * A moldura de quem já entrou: a coluna do servidor à esquerda, a rota no meio e a lateral
@@ -36,6 +39,8 @@ import { ConnectionBanner } from "./ConnectionBanner";
 export function AppShell() {
 	// Os emojis do grupo: o texto, as reações e o seletor leem do store.
 	useLoadEmojis();
+	// Os sons do grupo: a grade do soundboard e o contador da fila leem do store.
+	useLoadSounds();
 	return (
 		<div className="flex h-full flex-col">
 			<ConnectionBanner />
@@ -45,6 +50,9 @@ export function AppShell() {
 }
 
 function AppFrame() {
+	// Nas configurações, a camada da miniatura sobe por cima delas (v0.9): a transmissão assistida
+	// continua à vista, em vez de parar até a pessoa sair.
+	const inSettings = useMatch(`${paths.settings.root}/*`) !== null;
 	return (
 		<div className="relative flex min-h-0 flex-1">
 			<aside
@@ -63,8 +71,14 @@ function AppFrame() {
 					<Outlet />
 				</main>
 				{/* A transmissão assistida, em miniatura, quando a pessoa sai da sala. A camada tem o
-				    tamanho do `main` e deixa o clique passar; só a miniatura o recebe. */}
-				<div className="pointer-events-none relative col-start-1 row-start-1">
+				    tamanho do `main` e deixa o clique passar; só a miniatura o recebe. Nas
+				    configurações, ela fica por cima delas (`z-40`). */}
+				<div
+					className={cn(
+						"pointer-events-none relative col-start-1 row-start-1",
+						inSettings && "z-40",
+					)}
+				>
 					<MiniShare />
 				</div>
 				{/* As conversas privadas abertas, embaixo e encostadas na lateral: outra camada do

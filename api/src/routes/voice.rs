@@ -695,6 +695,7 @@ mod tests {
             Imposed {
                 mic_muted: true,
                 deafened: true,
+                sounds_blocked: false,
             },
         )
         .unwrap();

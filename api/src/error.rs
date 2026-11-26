@@ -33,6 +33,8 @@ pub enum ErrorKind {
     TooManyAttempts,
     /// Mensagens demais em pouco tempo (o limite de envio do chat).
     TooManyMessages,
+    /// Sons demais em pouco tempo, ou antes do intervalo entre um e outro (ADR 0037).
+    TooManySounds,
     Internal,
     /// Da `ClientPolicy`: o app está abaixo da versão mínima (426).
     ClientOutdated,
@@ -46,6 +48,34 @@ pub enum ErrorKind {
     DiskFull,
 }
 
+/// Por que um convite foi recusado (v0.9): o app e a página do link mostram o motivo certo, em vez de juntar
+/// os quatro casos num texto só. Dizer o motivo não abre brecha: o código tem entropia de sobra para ninguém
+/// achar um por tentativa, e toda recusa continua contando no limite de tentativas.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export, export_to = "index.ts")]
+pub enum InviteRefusal {
+    /// Nenhum convite com esse código (ou o código nem tem o formato de um).
+    NotFound,
+    Expired,
+    /// Todos os usos foram gastos.
+    Used,
+    /// Revogado pelo Painel, ou a recuperação de quem foi removido do grupo.
+    Revoked,
+}
+
+impl InviteRefusal {
+    /// O texto que a pessoa vê.
+    pub fn message(self) -> &'static str {
+        match self {
+            Self::NotFound => "Esse código não existe. Confira se copiou o link inteiro.",
+            Self::Expired => "Esse convite venceu. Peça um novo ao dono do grupo.",
+            Self::Used => "Esse convite já foi usado. Peça um novo ao dono do grupo.",
+            Self::Revoked => "Esse convite foi cancelado. Peça um novo ao dono do grupo.",
+        }
+    }
+}
+
 /// O corpo de toda resposta de erro.
 #[derive(Debug, Serialize, TS)]
 #[ts(export, export_to = "index.ts")]
@@ -56,6 +86,10 @@ pub struct ErrorBody {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub min_version: Option<String>,
+    /// Só no `invalid_invite`: o motivo da recusa. Campo novo da v0.9; o app antigo só lê o `kind`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub reason: Option<InviteRefusal>,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -66,8 +100,8 @@ pub enum ApiError {
     UnknownDevice,
     #[error("Você não tem permissão para isso.")]
     Forbidden,
-    #[error("Convite inválido, expirado ou já usado.")]
-    InvalidInvite,
+    #[error("{}", .0.message())]
+    InvalidInvite(InviteRefusal),
     #[error("{0}")]
     InvalidNick(&'static str),
     #[error("{0}")]
@@ -89,13 +123,19 @@ pub enum ApiError {
     TooManyAttempts,
     #[error("Calma: muitas mensagens seguidas.")]
     TooManyMessages,
+    #[error("Calma: espere um pouco para tocar outro som.")]
+    TooManySounds,
     /// A sala chegou ao limite de transmissões; o número é o limite.
     #[error("Já tem {0} transmissões nesta sala. Espere uma acabar para transmitir.")]
     ShareLimit(usize),
-    #[error("Erro interno no servidor.")]
+    #[error(
+        "Algo deu errado no servidor. Tente de novo em instantes; se continuar, avise o dono do grupo."
+    )]
     Internal(#[from] sqlx::Error),
     /// Falta configuração no servidor (uma variável do `.env`, por exemplo).
-    #[error("Erro interno no servidor.")]
+    #[error(
+        "Algo deu errado no servidor. Tente de novo em instantes; se continuar, avise o dono do grupo."
+    )]
     Config(String),
     /// O LiveKit não respondeu ou recusou o pedido. O detalhe vai só para o log.
     #[error("Não foi possível consultar a sala de voz agora.")]
@@ -108,7 +148,9 @@ pub enum ApiError {
     #[error("O servidor está sem espaço. O dono já foi avisado.")]
     DiskFull,
     /// Um erro de disco ao gravar ou ler um arquivo. O detalhe vai só para o log.
-    #[error("Erro interno no servidor.")]
+    #[error(
+        "Algo deu errado no servidor. Tente de novo em instantes; se continuar, avise o dono do grupo."
+    )]
     Io(#[from] std::io::Error),
 }
 
@@ -118,7 +160,7 @@ impl ApiError {
             Self::Unauthenticated => (StatusCode::UNAUTHORIZED, ErrorKind::Unauthenticated),
             Self::UnknownDevice => (StatusCode::UNAUTHORIZED, ErrorKind::UnknownDevice),
             Self::Forbidden => (StatusCode::FORBIDDEN, ErrorKind::Forbidden),
-            Self::InvalidInvite => (StatusCode::BAD_REQUEST, ErrorKind::InvalidInvite),
+            Self::InvalidInvite(_) => (StatusCode::BAD_REQUEST, ErrorKind::InvalidInvite),
             Self::InvalidNick(_) => (StatusCode::UNPROCESSABLE_ENTITY, ErrorKind::InvalidNick),
             Self::InvalidDisplayName(_) => (
                 StatusCode::UNPROCESSABLE_ENTITY,
@@ -137,6 +179,7 @@ impl ApiError {
             Self::Conflict(_) => (StatusCode::CONFLICT, ErrorKind::Conflict),
             Self::TooManyAttempts => (StatusCode::TOO_MANY_REQUESTS, ErrorKind::TooManyAttempts),
             Self::TooManyMessages => (StatusCode::TOO_MANY_REQUESTS, ErrorKind::TooManyMessages),
+            Self::TooManySounds => (StatusCode::TOO_MANY_REQUESTS, ErrorKind::TooManySounds),
             Self::ShareLimit(_) => (StatusCode::CONFLICT, ErrorKind::ShareLimit),
             Self::Timeout => (StatusCode::GATEWAY_TIMEOUT, ErrorKind::Timeout),
             Self::FileTooLarge(_) => (StatusCode::PAYLOAD_TOO_LARGE, ErrorKind::FileTooLarge),
@@ -172,6 +215,10 @@ impl IntoResponse for ApiError {
             kind,
             message: self.to_string(),
             min_version: None,
+            reason: match self {
+                Self::InvalidInvite(reason) => Some(reason),
+                _ => None,
+            },
         };
         (status, Json(body)).into_response()
     }
@@ -188,6 +235,7 @@ mod tests {
             kind: ErrorKind::NickTaken,
             message: "Esse nick já está em uso.".into(),
             min_version: None,
+            reason: None,
         };
         assert_eq!(
             serde_json::to_value(&body).unwrap(),
@@ -198,6 +246,7 @@ mod tests {
             kind: ErrorKind::ClientOutdated,
             message: "Atualize.".into(),
             min_version: Some("0.2.20".into()),
+            reason: None,
         };
         assert_eq!(
             serde_json::to_value(&body).unwrap(),
