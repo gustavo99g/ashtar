@@ -20,6 +20,7 @@ const DESCRIPTIONS: Partial<Record<ShortcutId, string>> = {
 	ptt: "Segurando, seu microfone abre. Vale com o modo Pressionar para falar, em Voz e vídeo.",
 	screenshot:
 		"Copia a transmissão em foco (ou a que você assiste, ou a sua) para a área de transferência.",
+	sound1: "O som que você pôs no lugar 1 da grade de Sons, na sala ou na ligação.",
 };
 
 export function ShortcutsSettings() {
@@ -60,6 +61,11 @@ export function ShortcutsSettings() {
 			</Group>
 			<Group title="Transmissão">
 				<ShortcutRow id="screenshot" recorder={recorder} />
+			</Group>
+			<Group title="Soundboard">
+				{(["sound1", "sound2", "sound3", "sound4"] as const).map((id) => (
+					<ShortcutRow key={id} id={id} recorder={recorder} />
+				))}
 			</Group>
 		</div>
 	);

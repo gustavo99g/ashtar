@@ -16,7 +16,8 @@ import { closeDm, minimizeDm } from "../stores/openDmsStore";
 import { DmAvatar } from "./DmAvatar";
 
 /**
- * A janela de uma conversa privada, como no quadro "Lateral — conversa embaixo": 380 de largura
+ * A janela de uma conversa privada, como no quadro "Lateral — conversa embaixo": 440 de largura (380 até a
+ * v0.8; o Kid achou curta no uso)
  * e até 540 de altura, presa embaixo, com os cantos de cima arredondados. No cabeçalho, quem é, se
  * está online (ou Ocupado), minimizar e fechar. O corpo é a mesma conversa de um canal de texto
  * (`ChatConversation`): o histórico em páginas, o rascunho, o "Tentar de novo", os links e o
@@ -55,7 +56,7 @@ export function DmWindow({
 					closeDm(conversation.id);
 				}
 			}}
-			className="pointer-events-auto flex h-[min(540px,calc(100%-16px))] w-[380px] flex-col rounded-t-xl border border-b-0 border-border-strong bg-card shadow-[0_-8px_30px_rgba(0,0,0,0.45)]"
+			className="pointer-events-auto flex h-[min(540px,calc(100%-16px))] w-[440px] flex-col rounded-t-xl border border-b-0 border-border-strong bg-card shadow-[0_-8px_30px_rgba(0,0,0,0.45)]"
 		>
 			<header className="flex h-[52px] shrink-0 items-center gap-2.5 border-b border-border pr-1.5 pl-3">
 				<DmAvatar person={person} presence={presence} size={32} />

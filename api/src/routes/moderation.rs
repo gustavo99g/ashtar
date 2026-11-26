@@ -61,10 +61,14 @@ async fn change(
         ModerationAction::Unmute => imposed.mic_muted = false,
         ModerationAction::Deafen => imposed.deafened = true,
         ModerationAction::Undeafen => imposed.deafened = false,
+        ModerationAction::BlockSounds => imposed.sounds_blocked = true,
+        ModerationAction::UnblockSounds => imposed.sounds_blocked = false,
         ModerationAction::CameraOff | ModerationAction::StopShare => {
             unreachable!("desligar a câmera e encerrar a transmissão não são chaves")
         }
     }
+    // Bloquear sons vale fora da sala também: é uma chave, como as outras, mas não depende do
+    // LiveKit, e a pessoa pode entrar depois.
     if room.is_none() && matches!(action, ModerationAction::Mute | ModerationAction::Deafen) {
         return Err(ApiError::NotFound(
             "Essa pessoa não está numa sala de voz.".into(),
@@ -74,15 +78,15 @@ async fn change(
     log(state, user, &target, action, room.as_deref()).await?;
     // O LiveKit primeiro: liberado, o app da pessoa reabre o microfone assim que recebe o evento, e
     // a permissão já tem de estar de volta.
-    if let Some(room) = &room {
+    let sounds_only = matches!(
+        action,
+        ModerationAction::BlockSounds | ModerationAction::UnblockSounds
+    );
+    if let Some(room) = room.as_deref().filter(|_| !sounds_only) {
         voice::restrict_now(room, &target.id, imposed).await;
     }
     notify(state, user, &target, action, imposed);
-    if let Some((room, list)) =
-        state
-            .hub
-            .set_moderated(&target.id, imposed.mic_muted, imposed.deafened)
-    {
+    if let Some((room, list)) = state.hub.set_moderated(&target.id, imposed) {
         let to = access::audience(&state.db, &room).await?;
         state.hub.publish_voice_participants(room, list, to);
     }
@@ -124,6 +128,7 @@ fn notify(state: &AppState, by: &User, target: &User, action: ModerationAction, 
             action,
             server_muted: imposed.mic_muted,
             server_deafened: imposed.deafened,
+            sounds_blocked: imposed.sounds_blocked,
             by: by.id.clone(),
             by_name: by.shown_name().to_owned(),
         },
@@ -164,6 +169,24 @@ pub async fn undeafen(
     Path(id): Path<String>,
 ) -> Result<StatusCode, ApiError> {
     change(&state, &user, &id, ModerationAction::Undeafen).await
+}
+
+/// `PUT /api/voice/moderation/{user_id}/sounds`: bloqueia os sons do soundboard (ADR 0037).
+pub async fn block_sounds(
+    State(state): State<AppState>,
+    CurrentUser(user): CurrentUser,
+    Path(id): Path<String>,
+) -> Result<StatusCode, ApiError> {
+    change(&state, &user, &id, ModerationAction::BlockSounds).await
+}
+
+/// `DELETE /api/voice/moderation/{user_id}/sounds`: libera os sons.
+pub async fn unblock_sounds(
+    State(state): State<AppState>,
+    CurrentUser(user): CurrentUser,
+    Path(id): Path<String>,
+) -> Result<StatusCode, ApiError> {
+    change(&state, &user, &id, ModerationAction::UnblockSounds).await
 }
 
 /// `POST /api/voice/moderation/{user_id}/camera-off`: desliga a câmera. A pessoa pode ligar de novo.

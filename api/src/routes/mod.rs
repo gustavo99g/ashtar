@@ -16,5 +16,6 @@ pub mod pages;
 pub mod people;
 pub mod read;
 pub mod realtime;
+pub mod sounds;
 pub mod voice;
 pub mod webhooks;

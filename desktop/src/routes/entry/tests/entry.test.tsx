@@ -574,6 +574,25 @@ describe("estados e erros", () => {
 		},
 	);
 
+	it.each([
+		["expired", "Esse convite venceu"],
+		["used", "Esse convite já foi usado"],
+		["revoked", "Esse convite foi cancelado"],
+		["not_found", "Esse convite não vale mais"],
+	])("o convite recusado diz o motivo (%s)", async (reason, title) => {
+		const fetchSpy = vi
+			.spyOn(globalThis, "fetch")
+			.mockResolvedValue(
+				Response.json(
+					{ kind: "invalid_invite", message: "x", reason },
+					{ status: 400 },
+				),
+			);
+		renderAt(paths.entry.invite("AAAA-BBBB-CCCC"), { status: "noAccount" });
+		await screen.findByRole("heading", { name: title });
+		fetchSpy.mockRestore();
+	});
+
 	it("muitas tentativas ao entrar: Tentar de novo manda o mesmo nick", async () => {
 		vi.mocked(redeem)
 			.mockRejectedValueOnce(error("too_many_attempts", 429))

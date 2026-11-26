@@ -131,6 +131,7 @@ pub enum ServerEvent {
         action: crate::moderation::ModerationAction,
         server_muted: bool,
         server_deafened: bool,
+        sounds_blocked: bool,
         by: String,
         by_name: String,
     },
@@ -163,6 +164,27 @@ pub enum ServerEvent {
     #[serde(rename = "emojis.changed")]
     EmojisChanged {
         emojis: Vec<crate::chat::emojis::Emoji>,
+    },
+    /// Os sons aprovados do soundboard mudaram (v0.9): a lista inteira, para a grade.
+    #[serde(rename = "sounds.changed")]
+    SoundsChanged { sounds: Vec<crate::sounds::Sound> },
+    /// Quantos sons aguardam aprovação (v0.9). Vai para todos; o app só mostra o número a quem
+    /// aprova.
+    #[serde(rename = "sounds.queue")]
+    SoundsQueue { pending: i64 },
+    /// Um som de quem recebe foi aprovado ou recusado (v0.9): só para quem enviou, que ganha o
+    /// aviso.
+    #[serde(rename = "sounds.reviewed")]
+    SoundReviewed { sound: crate::sounds::Sound },
+    /// Alguém tocou um som (ADR 0037): vai para os outros da sala de voz ou da ligação, que tocam
+    /// o arquivo (`file_id`, guardado no cache do app) e mostram a onda dourada em quem tocou.
+    #[serde(rename = "voice.sound_played")]
+    SoundPlayed {
+        sound_id: String,
+        file_id: String,
+        user_id: String,
+        /// A sala de voz do grupo ou a conversa da ligação.
+        channel_id: String,
     },
     /// O estado de um canal ou conversa mudou para a pessoa (leu, marcou tudo
     /// como lido, silenciou). Só vai para as conexões dela: é o que zera o
@@ -219,6 +241,10 @@ impl ServerEvent {
             | Self::LogsReceived { .. }
             | Self::DiskAlert { .. }
             | Self::EmojisChanged { .. }
+            | Self::SoundsChanged { .. }
+            | Self::SoundsQueue { .. }
+            | Self::SoundReviewed { .. }
+            | Self::SoundPlayed { .. }
             | Self::ChannelsChanged { .. } => false,
         }
     }
@@ -672,8 +698,7 @@ impl Hub {
     pub fn set_moderated(
         &self,
         user_id: &str,
-        server_muted: bool,
-        server_deafened: bool,
+        imposed: crate::moderation::Imposed,
     ) -> Option<(String, Vec<ParticipantView>)> {
         let mut inner = self.lock();
         let (room, people) = inner
@@ -681,8 +706,9 @@ impl Hub {
             .iter_mut()
             .find(|(_, people)| people.iter().any(|p| p.user_id == user_id))?;
         for person in people.iter_mut().filter(|p| p.user_id == user_id) {
-            person.server_muted = server_muted;
-            person.server_deafened = server_deafened;
+            person.server_muted = imposed.mic_muted;
+            person.server_deafened = imposed.deafened;
+            person.sounds_blocked = imposed.sounds_blocked;
         }
         Some((room.clone(), people.clone()))
     }

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError, isRetryable } from "@/lib/api";
-import { accountMarker, login, redeem } from "../commands";
+import { accountMarker, login, openLogDir, redeem } from "../commands";
 
 const { invoke } = vi.hoisted(() => ({ invoke: vi.fn() }));
 vi.mock("@tauri-apps/api/core", () => ({ invoke, Channel: class {} }));
@@ -92,5 +92,25 @@ describe("login e redeem", () => {
 
 		const error = await login().catch((caught: unknown) => caught);
 		expect(error).toMatchObject({ status: 0, kind: "app" });
+	});
+});
+
+describe("os erros dos comandos", () => {
+	it("trocam o texto técnico do Rust por um que diz o que fazer, e guardam o detalhe", async () => {
+		const log = vi.spyOn(console, "error").mockImplementation(() => {});
+		invoke.mockRejectedValue({
+			kind: "VideoCapture",
+			message: "falha na captura de vídeo: DXGI_ERROR_ACCESS_LOST",
+		});
+
+		const error = await openLogDir().catch((caught: unknown) => caught);
+		expect(error).toEqual({
+			kind: "VideoCapture",
+			message:
+				"Não deu para capturar a imagem. Tente de novo ou escolha outra fonte.",
+			detail: "falha na captura de vídeo: DXGI_ERROR_ACCESS_LOST",
+		});
+		expect(log).toHaveBeenCalled();
+		log.mockRestore();
 	});
 });

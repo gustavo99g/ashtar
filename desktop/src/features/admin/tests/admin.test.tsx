@@ -172,6 +172,7 @@ describe("o Painel", () => {
 				at: Math.floor(Date.now() / 1000) - 3600,
 				size: 2048,
 			},
+			last_files_backup: { at: Math.floor(Date.now() / 1000) - 7200, files: 37 },
 			files_bytes: 3 * 1024 ** 3,
 		};
 		vi.mocked(getServerStatus).mockResolvedValue(status);
@@ -182,6 +183,7 @@ describe("o Painel", () => {
 		expect(screen.getByText("20 GB livres")).toBeInTheDocument();
 		expect(screen.getByText(/os arquivos ocupam 3 GB/)).toBeInTheDocument();
 		expect(screen.getByText("há 1 h")).toBeInTheDocument();
+		expect(screen.getByText("37 fotos, emojis e sons no R2")).toBeInTheDocument();
 	});
 
 	it("o logs.received atualiza a lista e avisa", () => {

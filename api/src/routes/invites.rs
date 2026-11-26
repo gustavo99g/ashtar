@@ -4,6 +4,9 @@
 //! convite antes de a pessoa ter conta. Ela conta no limite de tentativas como
 //! o `redeem`; senão viraria um jeito de testar códigos sem limite.
 //!
+//! `GET /api/invites/card/{código}` é a do cartão do convite no chat (v0.9): pede
+//! sessão e não conta no limite, porque quem já está no grupo não está adivinhando.
+//!
 //! As outras são do Painel: criar, listar e revogar. Chamam as mesmas funções
 //! de `identity/` que o `admin`, e cada uma confere a ação com
 //! `permissions::require` antes de tudo.
@@ -22,7 +25,8 @@ use crate::db::now;
 use crate::error::ApiError;
 use crate::identity::User;
 use crate::identity::invites::{
-    self, CreatedInvite, InviteKind, InviteRecord, InviteStatus, NewInvite, Preset,
+    self, CreatedInvite, InviteCardStatus, InviteKind, InviteRecord, InviteStatus, NewInvite,
+    Preset,
 };
 use crate::identity::permissions::{Action, require};
 
@@ -64,7 +68,7 @@ pub async fn preview(
 ) -> Result<Json<InvitePreviewView>, ApiError> {
     state.limiter.check()?;
     let result = invites::preview(&state.db, &code, now()).await;
-    if matches!(result, Err(ApiError::InvalidInvite)) {
+    if matches!(result, Err(ApiError::InvalidInvite(_))) {
         state.limiter.record_failure();
     }
     let preview = result?;
@@ -78,6 +82,39 @@ pub async fn preview(
             account: person,
             expires_at: preview.expires_at,
         },
+    }))
+}
+
+/// O cartão de um link de convite no chat. Sem `kind`, `person` e `expires_at`
+/// quando o código não existe.
+#[derive(Debug, Serialize, TS)]
+#[ts(export, export_to = "index.ts")]
+pub struct InviteCardView {
+    pub status: InviteCardStatus,
+    pub kind: Option<InviteKind>,
+    /// No convite novo, quem convidou; na recuperação, a conta que volta.
+    pub person: Option<NameView>,
+    pub expires_at: Option<i64>,
+}
+
+/// `GET /api/invites/card/{código}`: a situação do convite para o cartão do chat.
+pub async fn card(
+    State(state): State<AppState>,
+    CurrentUser(_user): CurrentUser,
+    Path(code): Path<String>,
+) -> Result<Json<InviteCardView>, ApiError> {
+    let card = invites::card(&state.db, &code, now()).await?;
+    let (kind, person, expires_at) = match card.found {
+        Some((kind, person, expires_at)) => {
+            (Some(kind), Some(NameView::from(&person)), Some(expires_at))
+        }
+        None => (None, None, None),
+    };
+    Ok(Json(InviteCardView {
+        status: card.status,
+        kind,
+        person,
+        expires_at,
     }))
 }
 

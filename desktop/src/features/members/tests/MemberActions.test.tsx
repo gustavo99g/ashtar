@@ -74,7 +74,7 @@ beforeEach(() => {
 		can_create_invite: true,
 		can_view_panel: true,
 		can_manage_channels: true,
-		can_move_members: true, can_manage_emojis: false, can_view_logs: false, can_moderate_voice: false,
+		can_move_members: true, can_manage_emojis: false, can_view_logs: false, can_moderate_voice: false, can_send_sounds: false, can_approve_sounds: false,
 	});
 	vi.mocked(listMembers).mockResolvedValue([owner, juju]);
 });

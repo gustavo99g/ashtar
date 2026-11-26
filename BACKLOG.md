@@ -10,7 +10,7 @@ Ao resolver um item, apague-o daqui e registre o resultado no ADR ou no commit.
 
 Bugs que saem assim que ficarem prontos, pelo auto-update, sem esperar a entrega da ordem.
 
-- [ ] **Enxugar o `admin`** (o que sobrou da Etapa 8; o código de acesso e a rota `/api/voice/join`
+- [x] **Enxugar o `admin`** *(feito na v0.9: ficaram `dono`, `recuperacao`, `membros`, `backup`, `arquivos-backup` e o `semear`, que só roda com a `PUBLIC_URL` local)* (o que sobrou da Etapa 8; o código de acesso e a rota `/api/voice/join`
       já saíram): o Painel de controle cobre `convite`, `convites`, `revogar`, `membros`, `remover`,
       `desvincular`, `beta` e `permissoes`. **Não tirar o `recuperacao`**: se o dono perde o computador, ele
       não consegue abrir o Painel, e esse comando é o único jeito de criar a recuperação dele. Ficariam
@@ -51,6 +51,19 @@ Bugs que saem assim que ficarem prontos, pelo auto-update, sem esperar a entrega
 - [x] No cartão do usuário (ADR 0020), "Mover para outra sala": entrou com as várias salas de voz (ADR 0026), junto do
       "Desconectar da voz" e do arrastar entre salas.
 
+## Da triagem das notas antigas (v0.9)
+
+O que as notas da v0.2.2 à v0.8 tinham em aberto e não vale corrigir antes da 1.0. Nenhum é defeito visto no uso.
+
+- [ ] Linha de base de desempenho por preset em release (CPU, memória, intervalos entre quadros), com a comparação
+      estruturada (notas da v0.2.4). O uso não mostrou problema; medir quando houver uma mudança no publicador.
+- [ ] Driver de vídeo atualizado com a transmissão aberta (dispositivo perdido): conferir que acaba com aviso, sem
+      travar (notas da v0.2.4). Raro.
+- [ ] Atalho global para pausar a transmissão (notas da v0.2.4). Hoje é pela bandeja e pelo painel.
+- [ ] "Atualizar agora" na entrada espera sem notícia quando não há versão nova (notas da v0.2.2).
+- [ ] Fechar uma conversa da lista, escondendo sem apagar (notas da v0.3).
+- [ ] Arrastar alguém para outra sala a partir da categoria recolhida (o `AvatarStrip`, notas da v0.5).
+
 ## Mais adiante
 
 As miniaturas foram adiantadas para a v0.2.4 e o aviso de conteúdo protegido entrou na v0.8; Linux, depois da v1.0; sem versão para funcionalidades novas de voz.
@@ -60,9 +73,9 @@ As miniaturas foram adiantadas para a v0.2.4 e o aviso de conteúdo protegido en
 - [ ] O overlay em jogos, desenhado no canvas e sem versão (a câmera entrou na v0.4).
 - [ ] `@todos`, silenciar com prazo e grupos privados com mais de duas pessoas (fora da v0.3).
 - [ ] Moderação nas ligações privadas e o "Jogando X" visível para os outros (fora da v0.8, 22/11).
-- [ ] Cópia dos arquivos (fotos, anexos, prévias e emojis) fora da VPS: o R2 como segunda implementação do
-      `FileStore` (ADR 0031) ou uma cópia periódica de `data/files`, ou o snapshot do provedor. Adiado pelo Kid em
-      20/11; até lá os arquivos ficam fora do backup.
+- [ ] Cópia dos anexos e das prévias fora da VPS: o R2 como segunda implementação do `FileStore` (ADR 0031), uma
+      cópia periódica de `data/files` ou o snapshot do provedor. As fotos de perfil, os emojis e os sons já vão no
+      backup desde a v0.9 (ADR 0036); os anexos e as prévias ficaram fora por decisão do Kid (24/11).
 - [ ] O cartão "Evento do grupo" do quadro "Canal de texto — paleta Ashtar" (criar evento, confirmar presença,
       lembrete), "Ouvindo música" e o player de áudio no chat: sem versão.
 - [ ] Um segundo tema (claro, por exemplo). A troca por `data-theme` já existe desde a v0.2.2 (ADR 0012);

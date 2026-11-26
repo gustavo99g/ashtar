@@ -11,6 +11,7 @@ import {
 	moderateStopShare,
 	moveMember,
 	setServerMute,
+	setSoundsBlocked,
 } from "@/lib/api";
 import { RoomModeration } from "../components/RoomModeration";
 
@@ -21,6 +22,7 @@ vi.mock("@/lib/api", async (importOriginal) => ({
 	moveMember: vi.fn(),
 	disconnectMember: vi.fn(),
 	setServerMute: vi.fn(),
+	setSoundsBlocked: vi.fn(),
 	moderateStopShare: vi.fn(),
 }));
 
@@ -32,7 +34,7 @@ const me = (canMove: boolean, canModerate = false): MeResponse => ({
 	can_create_invite: false,
 	can_view_panel: false,
 	can_manage_channels: false,
-	can_move_members: canMove, can_manage_emojis: false, can_view_logs: false, can_moderate_voice: canModerate,
+	can_move_members: canMove, can_manage_emojis: false, can_view_logs: false, can_moderate_voice: canModerate, can_send_sounds: false, can_approve_sounds: false,
 });
 
 const room = (id: string, name: string) => ({
@@ -47,7 +49,7 @@ const room = (id: string, name: string) => ({
 
 function renderModeration(
 	onDone = vi.fn(),
-	member: { sharing?: boolean; serverMuted?: boolean } = {},
+	member: { sharing?: boolean; serverMuted?: boolean; soundsBlocked?: boolean } = {},
 	people: { id: string; is_owner: boolean }[] = [],
 ) {
 	const client = new QueryClient({
@@ -175,6 +177,18 @@ describe("moderar a voz pelo cartão", () => {
 		await user.click(toggle);
 		expect(setServerMute).toHaveBeenCalledWith("juju", true);
 		expect(toggle).toBeChecked();
+	});
+
+	it("Bloquear sons é uma chave: ligada, libera", async () => {
+		vi.mocked(getMe).mockResolvedValue(me(false, true));
+		vi.mocked(setSoundsBlocked).mockResolvedValue();
+		const user = userEvent.setup();
+		renderModeration(vi.fn(), { soundsBlocked: true });
+		const toggle = await screen.findByRole("switch", { name: "Bloquear sons" });
+		expect(toggle).toBeChecked();
+		await user.click(toggle);
+		expect(setSoundsBlocked).toHaveBeenCalledWith("juju", false);
+		expect(toggle).not.toBeChecked();
 	});
 
 	it("Encerrar transmissão pergunta antes, e o Shift pula", async () => {

@@ -83,6 +83,7 @@ fn outdated(min_version: &Version) -> Response {
             "Esta versão do Ashtar é antiga demais. A atualização para a {min_version} está sendo baixada; reinicie quando o aviso aparecer."
         ),
         min_version: Some(min_version.to_string()),
+        reason: None,
     };
     (StatusCode::UPGRADE_REQUIRED, Json(body)).into_response()
 }

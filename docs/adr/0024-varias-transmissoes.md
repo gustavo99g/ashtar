@@ -75,3 +75,10 @@ estatísticas aberto (`inboundHealth.ts`), e copiar um quadro na resolução que
 - Atualiza a ADR 0017 (o publicador continua sem simulcast até a Etapa 1) e o trecho da ADR 0023 sobre a trava de
   uma transmissão por vez, que deixa de existir também na ligação.
 - Sinal para rever: a medição da VPS passar do plano, ou o grupo pedir mais de 6.
+
+## Adendo (v0.9): a miniatura nas configurações
+
+Até a v0.8, abrir as configurações escondia a miniatura e parava de baixar a transmissão até a pessoa sair delas. No
+uso, isso incomodou o Kid (24/11). A partir da v0.9, a miniatura aparece por cima das configurações, no canto de baixo
+à direita, com os mesmos controles, e a transmissão continua sendo baixada. As conversas privadas continuam escondidas
+nas configurações.

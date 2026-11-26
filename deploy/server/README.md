@@ -25,7 +25,7 @@ app ──UDP 7882 / TCP 7881 / TURN 3478──→ LiveKit                      
 | `setup.sh` | Instala o Docker, abre o firewall, ajusta UDP e fuso, e gera `.env`, `livekit.yaml`, `Caddyfile` e `api.env`. |
 | `livekit.yaml.template` | Config do LiveKit; o `setup.sh` preenche domínio, chave e segredo. |
 | `Caddyfile.template` | HTTPS dos domínios; o bloco da API só entra quando há domínio da API. |
-| `backup.sh` | Backup do banco no R2; o `setup.sh` agenda para as 22:30. |
+| `backup.sh` | Backup do banco no R2 e a cópia das fotos, emojis e sons; o `setup.sh` agenda para as 22:30. |
 
 Gerados pelo `setup.sh`, só na VPS (estão no `.gitignore`): `.env` (domínios, chave do LiveKit, R2),
 `api.env` (variáveis da API), `livekit.yaml` e `Caddyfile`. O banco fica em `data/`.
@@ -166,14 +166,34 @@ Depois `./setup.sh` (ele agenda as 22:30) e um teste na hora: `./backup.sh`. Na 
 recentes, em `data/backups/`. Desligue a tarefa do Agendador do Windows quando o banco de casa parar de ser
 usado.
 
-**Restauração, testada uma vez:** baixe um backup do R2, ponha no lugar do `data/ashtar.db` (com a API parada,
-`docker compose stop api`, e sem os `-wal`/`-shm` antigos), `docker compose up -d api` e confira no app.
+Depois do banco, o mesmo `backup.sh` copia as fotos de perfil (as anteriores também), os emojis e os sons para
+`{bucket}/{prefixo}/files/` (v0.9, ADR 0036). Só sobe o que ainda não está lá, porque um arquivo nunca muda, e nada
+é apagado do R2. Se essa parte falhar, o banco já foi enviado: a falha fica no log e o script sai com erro. Cada
+cópia que dá certo grava `data/backups/arquivos-ok`, e o Painel › Servidor mostra a última.
+
+**Restauração completa (banco e arquivos):**
+
+1. Pare a API: `docker compose stop api`.
+2. Baixe o backup do banco mais novo do R2 e ponha no lugar do `data/ashtar.db`, sem os `-wal`/`-shm` antigos.
+3. Baixe os arquivos para `data/files/` com o rclone (as mesmas variáveis do `backup.sh`):
+
+   ```bash
+   docker run --rm -v "$PWD/data:/data" \
+     -e RCLONE_CONFIG_R2_TYPE=s3 -e RCLONE_CONFIG_R2_PROVIDER=Cloudflare \
+     -e RCLONE_CONFIG_R2_ACCESS_KEY_ID=... -e RCLONE_CONFIG_R2_SECRET_ACCESS_KEY=... \
+     -e RCLONE_CONFIG_R2_ENDPOINT=https://<conta>.r2.cloudflarestorage.com \
+     rclone/rclone:1.75.2 copy r2:<bucket>/<prefixo>/files /data/files
+   ```
+
+4. `docker compose up -d api` e confira no app: membros, histórico, fotos, emojis e sons. Os anexos e as prévias não
+   têm cópia: aparecem como "Arquivo indisponível", e a mensagem continua lá.
 
 ### Arquivos (v0.7)
 
 As fotos de perfil, os anexos do chat, as imagens das prévias de link e os emojis do grupo ficam em
-`data/files/` (a variável `FILES_DIR` troca a pasta). **Eles não entram no backup**: se o disco da VPS se perder,
-os arquivos vão junto, e as mensagens ficam (ADR 0031). A cópia no R2 está no BACKLOG.
+`data/files/` (a variável `FILES_DIR` troca a pasta), junto dos sons do soundboard (v0.9). As fotos, os emojis e os
+sons têm cópia no R2 (veja Backup); os anexos e as prévias não: se o disco da VPS se perder, eles vão junto, e as
+mensagens ficam (ADR 0031).
 
 A API apaga sozinha, de hora em hora, o que foi enviado e não usado em 24 horas. Com menos de 1 GB livre ela
 recusa envios, e o dono recebe um aviso no app quando o disco passa de 80% (no máximo um por dia). O Painel ›

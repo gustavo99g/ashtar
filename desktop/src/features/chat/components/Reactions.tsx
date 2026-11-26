@@ -5,11 +5,15 @@ import {
 	PopoverContent,
 	PopoverTrigger,
 } from "@/components/ui/popover";
-import { CustomEmoji, customId, useEmojiById } from "@/features/emojis";
+import {
+	CustomEmoji,
+	customId,
+	EmojiPicker,
+	useEmojiById,
+} from "@/features/emojis";
 import type { Message } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { authorName } from "../model/messages";
-import { EmojiPicker } from "./EmojiPicker";
 import { pickReaction } from "./MessageActions";
 import type { MessageActionsValue } from "./messageContext";
 

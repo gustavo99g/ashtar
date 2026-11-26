@@ -20,6 +20,7 @@ import {
 	LiveBadge,
 	MuteMark,
 	RoomModeration,
+	SoundWave,
 	useGuardedJoin,
 	UserVolume,
 	useVoice,
@@ -145,6 +146,7 @@ function MemberRow({
 			</span>
 			<span className="ml-auto flex shrink-0 items-center gap-1">
 				<ConnectionMark connection={member.connection} className="size-3.5" />
+				<SoundWave userId={member.id} className="size-3.5" />
 				{member.camera && (
 					<VideoIcon
 						aria-label="câmera ligada"

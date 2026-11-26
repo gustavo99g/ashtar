@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { EmptyMedia } from "@/components/ui/empty";
 import { Spinner } from "@/components/ui/spinner";
 import { useSession } from "@/features/identity";
-import { ApiError, isApiError } from "@/lib/api";
+import { ApiError, type InviteRefusal, isApiError } from "@/lib/api";
 import { paths } from "@/lib/paths";
 import { cn } from "@/lib/utils";
 import { useUpdateNow } from "../hooks/useUpdateNow";
@@ -38,7 +38,8 @@ export function EntryProblem({ error: failure, onRetry }: EntryProblemProps) {
 		: new ApiError({ status: 0, kind: "app", message: String(failure) });
 	if (error.kind === "client_outdated")
 		return <OutdatedProblem minVersion={error.minVersion} />;
-	if (error.kind === "invalid_invite") return <InvalidInviteProblem />;
+	if (error.kind === "invalid_invite")
+		return <InvalidInviteProblem reason={error.reason} />;
 
 	const retry = (variant: "primary" | "secondary") => (
 		<Button
@@ -103,21 +104,57 @@ export function EntryProblem({ error: failure, onRetry }: EntryProblemProps) {
 	);
 }
 
-/** "Esse convite não vale mais": volta para o campo de colar, na tela de onde a pessoa veio. */
-function InvalidInviteProblem() {
+/**
+ * O título e o texto de cada motivo (v0.9). Sem motivo (o servidor antigo) ou com o código que não
+ * existe, fica o texto de antes, que cobre o link copiado pela metade.
+ */
+const INVALID_INVITE: Record<
+	InviteRefusal,
+	{ title: string; description: string }
+> = {
+	not_found: {
+		title: "Esse convite não vale mais",
+		description:
+			"Confira se copiou o link inteiro. Se copiou, peça um link novo ao dono.",
+	},
+	expired: {
+		title: "Esse convite venceu",
+		description: "Todo convite tem prazo. Peça um link novo ao dono.",
+	},
+	used: {
+		title: "Esse convite já foi usado",
+		description: "Ele já serviu para quem devia. Peça um link novo ao dono.",
+	},
+	revoked: {
+		title: "Esse convite foi cancelado",
+		description: "O dono cancelou esse link. Peça um novo a ele.",
+	},
+};
+
+const UNKNOWN_REASON = {
+	title: "Esse convite não vale mais",
+	description:
+		"Ele pode ter expirado, sido cancelado ou já ter sido usado. Peça um link novo ao dono.",
+};
+
+/** O convite recusado, com o motivo: volta para o campo de colar, na tela de onde a pessoa veio. */
+function InvalidInviteProblem({ reason }: { reason: InviteRefusal | null }) {
 	const session = useSession();
 	const navigate = useNavigate();
 	const pasteScreen =
 		session.status === "leftGroup"
 			? paths.entry.leftGroup
 			: paths.entry.noInvite;
+	const { title, description } = reason
+		? INVALID_INVITE[reason]
+		: UNKNOWN_REASON;
 
 	return (
 		<Problem
 			tone="warning"
 			icon={Link2OffIcon}
-			title="Esse convite não vale mais"
-			description="Ele pode ter expirado, sido cancelado ou já ter sido usado. Peça um link novo ao dono."
+			title={title}
+			description={description}
 			action={
 				<Button
 					variant="secondary"

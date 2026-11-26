@@ -25,6 +25,8 @@ pub struct ServerStatus {
     pub disk: Option<DiskStatus>,
     /// O backup mais novo de `data/backups/`, ou `None` sem nenhum.
     pub last_backup: Option<BackupStatus>,
+    /// A última cópia das fotos, emojis e sons para o R2 (v0.9, ADR 0036), ou `None` sem nenhuma.
+    pub last_files_backup: Option<FilesBackupStatus>,
     /// Quanto os arquivos (fotos, anexos, prévias e emojis) ocupam, em bytes (ADR 0031).
     #[ts(type = "number")]
     pub files_bytes: i64,
@@ -69,6 +71,20 @@ pub struct BackupStatus {
     #[ts(type = "number")]
     pub size: u64,
 }
+
+/// A cópia dos arquivos que deu certo: o `backup.sh` escreve [`FILES_BACKUP_MARK`] depois do
+/// rclone, com quantos arquivos estavam na lista.
+#[derive(Debug, Serialize, TS, PartialEq, Eq)]
+#[ts(export, export_to = "index.ts")]
+pub struct FilesBackupStatus {
+    #[ts(type = "number")]
+    pub at: i64,
+    #[ts(type = "number")]
+    pub files: u64,
+}
+
+/// O arquivo que marca a última cópia dos arquivos, em `data/backups/`.
+pub const FILES_BACKUP_MARK: &str = "arquivos-ok";
 
 /// O filtro e a página do `GET /api/admin/audit`.
 #[derive(Debug, Deserialize)]
@@ -130,6 +146,7 @@ pub async fn status(
         livekit,
         disk: disk(&state.data_dir),
         last_backup: last_backup(&state.data_dir.join("backups")),
+        last_files_backup: last_files_backup(&state.data_dir.join("backups")),
         files_bytes: crate::files::total_size(&state.db).await?,
     }))
 }
@@ -183,9 +200,37 @@ pub fn last_backup(dir: &Path) -> Option<BackupStatus> {
     })
 }
 
+/// A marca da última cópia dos arquivos: a data é a do arquivo, e o conteúdo, quantos foram.
+pub fn last_files_backup(dir: &Path) -> Option<FilesBackupStatus> {
+    let path = dir.join(FILES_BACKUP_MARK);
+    let meta = std::fs::metadata(&path).ok()?;
+    let at = meta
+        .modified()
+        .ok()
+        .and_then(|time| time.duration_since(std::time::UNIX_EPOCH).ok())
+        .map_or(0, |d| d.as_secs() as i64);
+    let files = std::fs::read_to_string(&path)
+        .ok()
+        .and_then(|text| text.trim().parse().ok())
+        .unwrap_or(0);
+    Some(FilesBackupStatus { at, files })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_marca_da_copia_dos_arquivos_diz_quantos_foram() {
+        let dir = std::env::temp_dir().join(format!("ashtar-files-mark-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        assert!(last_files_backup(&dir).is_none());
+        std::fs::write(dir.join(FILES_BACKUP_MARK), "42\n").unwrap();
+        let last = last_files_backup(&dir).unwrap();
+        assert_eq!(last.files, 42);
+        assert!(last.at > 0);
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
 
     #[test]
     fn o_ultimo_backup_e_o_de_nome_maior() {

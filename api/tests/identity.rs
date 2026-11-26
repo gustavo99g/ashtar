@@ -465,7 +465,11 @@ async fn beta_liga_e_desliga() {
     .unwrap();
     let (_, me) = call(&ctx.router, "GET", "/api/me", Some(&token), None).await;
     assert_eq!(me["update_channel"], "beta");
-    assert_eq!(me["permissions"], json!(["atualizacoes.beta"]));
+    // "Enviar sons" vem de entrada (v0.9).
+    assert_eq!(
+        me["permissions"],
+        json!(["atualizacoes.beta", "sons.enviar"])
+    );
 
     permissions::set(
         &ctx.db,
@@ -795,7 +799,7 @@ mod regras {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use api::db;
-    use api::error::ApiError;
+    use api::error::{ApiError, InviteRefusal};
     use api::identity::invites::{self, InviteKind, InviteStatus};
     use api::identity::permissions::{self, Origin, Permission};
     use api::identity::{User, devices, users};
@@ -966,7 +970,7 @@ mod regras {
         // A recuperação que ainda não tinha sido usada foi revogada.
         assert!(matches!(
             invites::redeem(&pool, &pending, &key(9), None, NOW + 11).await,
-            Err(ApiError::InvalidInvite)
+            Err(ApiError::InvalidInvite(InviteRefusal::Revoked))
         ));
 
         // O nick ficou livre e a mesma chave pode ser vinculada de novo.
@@ -1006,7 +1010,10 @@ mod regras {
 
         // No instante exato do vencimento já não vale; um segundo antes, vale.
         let late = invites::redeem(&pool, &code, &key(1), Some("Kid"), NOW + 300).await;
-        assert!(matches!(late, Err(ApiError::InvalidInvite)));
+        assert!(matches!(
+            late,
+            Err(ApiError::InvalidInvite(InviteRefusal::Expired))
+        ));
         let ok = invites::redeem(&pool, &code, &key(1), Some("Kid"), NOW + 299).await;
         assert!(ok.is_ok());
     }
@@ -1023,7 +1030,10 @@ mod regras {
             .await
             .unwrap();
         let third = invites::redeem(&pool, &code, &key(3), Some("Tres"), NOW).await;
-        assert!(matches!(third, Err(ApiError::InvalidInvite)));
+        assert!(matches!(
+            third,
+            Err(ApiError::InvalidInvite(InviteRefusal::Used))
+        ));
 
         let history = invites::list(&pool).await.unwrap();
         assert_eq!(history[0].uses.len(), 2);
@@ -1043,7 +1053,10 @@ mod regras {
         invites::revoke(&pool, &owner, &id[..8], NOW).await.unwrap();
 
         let next = invites::redeem(&pool, &code, &key(2), Some("Outro"), NOW).await;
-        assert!(matches!(next, Err(ApiError::InvalidInvite)));
+        assert!(matches!(
+            next,
+            Err(ApiError::InvalidInvite(InviteRefusal::Revoked))
+        ));
         // Quem já entrou continua entrando.
         let (again, _) = devices::login(&pool, &key(1), NOW).await.unwrap();
         assert_eq!(again.id, kid.id);
@@ -1156,7 +1169,7 @@ mod regras {
         ));
         assert!(matches!(
             invites::redeem(&pool, "isto-nao-e-um-codigo", &key(1), Some("Kid"), NOW).await,
-            Err(ApiError::InvalidInvite)
+            Err(ApiError::InvalidInvite(InviteRefusal::NotFound))
         ));
 
         let record = &invites::list(&pool).await.unwrap()[0];
@@ -1220,7 +1233,7 @@ mod regras {
         // Uso único.
         assert!(matches!(
             invites::redeem(&pool, &code, &key(3), None, NOW).await,
-            Err(ApiError::InvalidInvite)
+            Err(ApiError::InvalidInvite(InviteRefusal::Used))
         ));
         assert_eq!(users::list(&pool).await.unwrap().len(), 2);
     }
@@ -1398,10 +1411,17 @@ mod regras {
             .fetch_one(&pool)
             .await
             .unwrap();
-        assert_eq!(rows, 1);
+        // A linha do beta e a do "Enviar sons", que vem de entrada (v0.9).
+        assert_eq!(rows, 2);
 
         let effective = permissions::effective(&pool, &kid).await.unwrap();
-        assert_eq!(effective, [(beta, Origin::Direct)]);
+        assert_eq!(
+            effective,
+            [
+                (beta, Origin::Direct),
+                (Permission::SendSounds, Origin::Direct)
+            ]
+        );
         let owners = permissions::effective(&pool, &owner).await.unwrap();
         assert_eq!(
             owners,
@@ -1411,6 +1431,8 @@ mod regras {
                 (Permission::MoveMembers, Origin::Owner),
                 (Permission::ModerateVoice, Origin::Owner),
                 (Permission::ManageEmojis, Origin::Owner),
+                (Permission::SendSounds, Origin::Owner),
+                (Permission::ApproveSounds, Origin::Owner),
                 (Permission::ViewLogs, Origin::Owner),
             ]
         );
@@ -1432,11 +1454,10 @@ mod regras {
         .execute(&pool)
         .await
         .unwrap();
-        assert!(
-            permissions::effective(&pool, &kid)
-                .await
-                .unwrap()
-                .is_empty()
+        // Só fica o "Enviar sons", que vem de entrada (v0.9).
+        assert_eq!(
+            permissions::effective(&pool, &kid).await.unwrap(),
+            [(Permission::SendSounds, Origin::Direct)]
         );
     }
 
@@ -1465,7 +1486,8 @@ mod regras {
 
         assert_eq!(successes(&a, &b), 1);
         assert!(
-            matches!(a, Err(ApiError::InvalidInvite)) || matches!(b, Err(ApiError::InvalidInvite))
+            matches!(a, Err(ApiError::InvalidInvite(InviteRefusal::Used)))
+                || matches!(b, Err(ApiError::InvalidInvite(InviteRefusal::Used)))
         );
         assert_eq!(members, 2); // o dono e quem entrou
         assert_eq!(uses, 1);
@@ -1698,7 +1720,7 @@ mod nome_e_modelos {
 
     #[tokio::test]
     async fn sem_modelo_escolhido_o_modelo_sai_dos_numeros() {
-        // O caminho do `admin convite`: ele só dá validade e usos.
+        // Só validade e usos, sem mais nada.
         let (pool, owner) = setup().await;
         let cases = [
             (7 * DAY, 1, "person"),
@@ -1884,17 +1906,18 @@ mod entrada_e_perfil {
             .await
             .unwrap();
 
-        for code in [
-            "AAAA-AAAA-AAAA",
-            "nao-e-codigo",
-            &expired.code,
-            &revoked.code,
-            &used,
-            &orphan.code,
+        for (code, reason) in [
+            ("AAAA-AAAA-AAAA", "not_found"),
+            ("nao-e-codigo", "not_found"),
+            (expired.code.as_str(), "expired"),
+            (revoked.code.as_str(), "revoked"),
+            (used.as_str(), "used"),
+            (orphan.code.as_str(), "revoked"),
         ] {
             let (status, body) = preview(&ctx, code).await;
             assert_eq!(status, StatusCode::BAD_REQUEST, "{code}");
             assert_eq!(body["kind"], "invalid_invite", "{code}");
+            assert_eq!(body["reason"], reason, "{code}");
         }
     }
 
@@ -2427,6 +2450,8 @@ mod painel {
                 "membros.mover",
                 "voz.moderar",
                 "emojis.gerenciar",
+                "sons.enviar",
+                "sons.aprovar",
                 "logs.ver",
                 "convites.criar",
                 "convites.recuperacao",
@@ -2456,16 +2481,18 @@ mod painel {
         assert_eq!(list[3]["kind"], "permission");
         assert_eq!(list[4]["key"], "emojis.gerenciar");
         assert_eq!(list[4]["kind"], "permission");
-        assert_eq!(list[5]["key"], "logs.ver");
-        assert_eq!(list[5]["kind"], "permission");
+        assert_eq!(list[5]["key"], "sons.enviar");
+        assert_eq!(list[6]["key"], "sons.aprovar");
+        assert_eq!(list[7]["key"], "logs.ver");
+        assert_eq!(list[7]["kind"], "permission");
         // As permissões vêm antes das ações.
-        for grant in list.as_array().unwrap()[6..].iter() {
+        for grant in list.as_array().unwrap()[8..].iter() {
             assert_eq!(grant["kind"], "action");
             assert_eq!(grant["granted"], true);
             assert_eq!(grant["origin"], "owner");
         }
 
-        // Membro sem nada.
+        // Membro sem nada além do "Enviar sons", que vem de entrada (v0.9).
         let (_, list) = call(
             &ctx.router,
             "GET",
@@ -2475,6 +2502,11 @@ mod painel {
         )
         .await;
         for grant in list.as_array().unwrap() {
+            if grant["key"] == "sons.enviar" {
+                assert_eq!(grant["granted"], true, "{grant}");
+                assert_eq!(grant["origin"], "direct", "{grant}");
+                continue;
+            }
             assert_eq!(grant["granted"], false, "{grant}");
             assert_eq!(grant["origin"], Value::Null, "{grant}");
         }
@@ -2716,8 +2748,8 @@ mod sala {
         assert_eq!(
             json,
             json!([
-                { "user_id": carla.id, "nick": "carla", "display_name": null, "screen_sharing": true, "avatar": null, "mic_off": false, "deafened": false, "camera": false, "server_muted": false, "server_deafened": false },
-                { "user_id": ju.id, "nick": "juliana", "display_name": "juju", "screen_sharing": false, "avatar": null, "mic_off": false, "deafened": false, "camera": false, "server_muted": false, "server_deafened": false },
+                { "user_id": carla.id, "nick": "carla", "display_name": null, "screen_sharing": true, "avatar": null, "mic_off": false, "deafened": false, "camera": false, "server_muted": false, "server_deafened": false, "sounds_blocked": false },
+                { "user_id": ju.id, "nick": "juliana", "display_name": "juju", "screen_sharing": false, "avatar": null, "mic_off": false, "deafened": false, "camera": false, "server_muted": false, "server_deafened": false, "sounds_blocked": false },
             ])
         );
     }
@@ -2857,7 +2889,7 @@ mod pagina {
     }
 
     #[tokio::test]
-    async fn convite_que_nao_vale_responde_200_sem_dizer_por_que() {
+    async fn convite_que_nao_vale_responde_200_com_o_motivo_e_sem_o_nome() {
         let ctx = setup().await;
         let used = new_invite(&ctx).await;
         redeem(&ctx, &used, 1, "Fulano").await;
@@ -2873,18 +2905,21 @@ mod pagina {
         .await
         .unwrap();
 
-        for uri in [
-            "/invite/AAAA-AAAA-AAAA".to_owned(),
-            "/invite/isto-nao-e-codigo".to_owned(),
-            format!("/invite/{used}"),
-            format!("/recovery/{}", expired.code),
+        for (uri, title) in [
+            (
+                "/invite/AAAA-AAAA-AAAA".to_owned(),
+                "Esse convite não vale mais",
+            ),
+            (
+                "/invite/isto-nao-e-codigo".to_owned(),
+                "Esse convite não vale mais",
+            ),
+            (format!("/invite/{used}"), "Esse convite já foi usado"),
+            (format!("/recovery/{}", expired.code), "Esse convite venceu"),
         ] {
             let (status, html) = page(&ctx, &uri).await;
             assert_eq!(status, StatusCode::OK, "{uri}");
-            assert!(
-                html.contains(r#"content="Esse convite não vale mais""#),
-                "{uri}"
-            );
+            assert!(html.contains(&format!(r#"content="{title}""#)), "{uri}");
             assert!(!html.contains("ashtar://"), "{uri}");
             assert!(!html.contains("Kid"), "{uri}");
         }
@@ -2959,5 +2994,90 @@ mod pagina {
         // A API continua exigindo a versão do app.
         let (status, _, _) = get(&router, &format!("/api/invites/{code}")).await;
         assert_eq!(status, StatusCode::UPGRADE_REQUIRED);
+    }
+}
+
+mod cartao_do_convite {
+    use super::*;
+
+    async fn card(ctx: &Ctx, token: Option<&str>, code: &str) -> (StatusCode, Value) {
+        call(
+            &ctx.router,
+            "GET",
+            &format!("/api/invites/card/{code}"),
+            token,
+            None,
+        )
+        .await
+    }
+
+    #[tokio::test]
+    async fn o_cartao_mostra_a_situacao_de_cada_convite() {
+        let ctx = setup().await;
+        let token = session(&ctx, "juliana", 1).await;
+        let pending = invites::create(&ctx.db, &ctx.owner, InviteKind::New, None, DAY, 1, now())
+            .await
+            .unwrap();
+        let revoked = invites::create(&ctx.db, &ctx.owner, InviteKind::New, None, DAY, 1, now())
+            .await
+            .unwrap();
+        invites::revoke_by_id(&ctx.db, &ctx.owner, &revoked.id, now())
+            .await
+            .unwrap();
+        let expired = invites::create(
+            &ctx.db,
+            &ctx.owner,
+            InviteKind::New,
+            None,
+            60,
+            1,
+            now() - 120,
+        )
+        .await
+        .unwrap();
+
+        let (status, body) = card(&ctx, Some(&token), &pending.code).await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        assert_eq!(body["status"], "pending");
+        assert_eq!(body["kind"], "new");
+        assert_eq!(body["person"]["nick"], ctx.owner.nick.as_str());
+        assert_eq!(body["expires_at"], pending.expires_at);
+
+        for (code, expected) in [
+            (revoked.code.as_str(), "revoked"),
+            (expired.code.as_str(), "expired"),
+        ] {
+            let (status, body) = card(&ctx, Some(&token), code).await;
+            assert_eq!(status, StatusCode::OK, "{code}");
+            assert_eq!(body["status"], expected, "{code}");
+            assert_eq!(body["kind"], "new", "{code}");
+        }
+
+        let (status, body) = card(&ctx, Some(&token), "AAAA-AAAA-AAAA").await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(body["status"], "not_found");
+        assert!(body["person"].is_null());
+    }
+
+    #[tokio::test]
+    async fn o_cartao_pede_sessao_e_nao_conta_no_limite() {
+        let ctx = setup().await;
+        let token = session(&ctx, "juliana", 1).await;
+        let invite = invites::create(&ctx.db, &ctx.owner, InviteKind::New, None, DAY, 1, now())
+            .await
+            .unwrap();
+
+        let (status, _) = card(&ctx, None, &invite.code).await;
+        assert_eq!(status, StatusCode::UNAUTHORIZED);
+
+        // Muitos códigos que não existem, vistos no histórico do chat, não travam a entrada.
+        for _ in 0..30 {
+            let (status, _) = card(&ctx, Some(&token), "AAAA-AAAA-AAAA").await;
+            assert_eq!(status, StatusCode::OK);
+        }
+        assert_eq!(
+            redeem(&ctx, &invite.code, 2, "Fulano").await.0,
+            StatusCode::OK
+        );
     }
 }

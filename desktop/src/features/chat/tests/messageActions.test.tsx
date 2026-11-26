@@ -23,7 +23,7 @@ import { chatKeys } from "../queries";
 import { handleChatRealtime } from "../realtime";
 import { useDrafts } from "../stores/draftStore";
 import { useOutbox } from "../stores/outboxStore";
-import { useRecentEmoji } from "../stores/recentEmojiStore";
+import { useRecentEmoji } from "@/features/emojis";
 import { useReplyStore } from "../stores/replyStore";
 
 const THUMBS = "\u{1F44D}\u{FE0F}";
@@ -117,7 +117,7 @@ function renderChat() {
 		can_create_invite: true,
 		can_view_panel: true,
 		can_manage_channels: true,
-		can_move_members: true, can_manage_emojis: false, can_view_logs: false, can_moderate_voice: false,
+		can_move_members: true, can_manage_emojis: false, can_view_logs: false, can_moderate_voice: false, can_send_sounds: false, can_approve_sounds: false,
 	});
 	render(
 		<QueryClientProvider client={client}>
