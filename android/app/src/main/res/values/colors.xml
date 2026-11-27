@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="background">#FF0F1220</color>
+    <color name="foreground">#FFF2F3F7</color>
+    <color name="muted">#FF9AA0B4</color>
+    <color name="gold">#FFE0B354</color>
+    <color name="error">#FFF2777A</color>
+    <color name="icon_background">#FF1B2A6B</color>
+</resources>

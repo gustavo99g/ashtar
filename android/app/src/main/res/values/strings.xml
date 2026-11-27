@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Ashtar Transmissor</string>
+    <string name="tile_label">Transmitir</string>
+    <string name="tile_starting">Conectando…</string>
+    <string name="channel_name">Transmissão</string>
+
+    <string name="pair_help">No Ashtar do computador, abra Configurações › Voz e vídeo › Aparelhos de transmissão, toque em Parear um aparelho e digite aqui o código.</string>
+    <string name="server_hint">Endereço do servidor (https://…)</string>
+    <string name="code_hint">Código (XXXX-XXXX-XXXX)</string>
+    <string name="pair">Parear</string>
+    <string name="error_pair_fields">Preencha o endereço do servidor e o código.</string>
+
+    <string name="paired_as">%1$s · pareado com %2$s</string>
+    <string name="target_now">A tela vai %1$s.</string>
+    <string name="target_none">Você não está em nenhuma sala ou ligação. Entre por um computador para transmitir.</string>
+    <string name="stream">Transmitir</string>
+    <string name="stop">Parar</string>
+    <string name="refresh">Atualizar</string>
+    <string name="forget">Desparear</string>
+    <string name="quality">Qualidade</string>
+    <string name="quality_motion">1080p · 60 fps</string>
+    <string name="quality_light">720p · 60 fps</string>
+    <string name="game_audio">Enviar o áudio do jogo</string>
+
+    <string name="status_starting">Conectando…</string>
+    <string name="status_live">Transmitindo %1$s, com o áudio do jogo.</string>
+    <string name="status_live_no_audio">Transmitindo %1$s, sem áudio.</string>
+    <string name="notification_starting">Conectando…</string>
+    <string name="notification_live">Transmitindo %1$s</string>
+
+    <string name="stopped_owner_left">A transmissão parou: você saiu da sala ou da ligação.</string>
+    <string name="stopped_room_closed">A transmissão parou: a sala fechou.</string>
+    <string name="stopped_duplicate">A transmissão parou: ela começou em outro lugar.</string>
+    <string name="stopped_connection">A transmissão parou: a conexão caiu.</string>
+    <string name="stopped_by_system">A transmissão parou pelo Android.</string>
+    <string name="error_not_paired">Este aparelho não está pareado.</string>
+    <string name="error_publish">Não deu para publicar a tela. Tente de novo.</string>
+    <string name="error_generic">Algo deu errado ao transmitir. Tente de novo.</string>
+</resources>
