@@ -1433,6 +1433,7 @@ mod regras {
                 (Permission::ManageEmojis, Origin::Owner),
                 (Permission::SendSounds, Origin::Owner),
                 (Permission::ApproveSounds, Origin::Owner),
+                (Permission::StreamFromDevice, Origin::Owner),
                 (Permission::ViewLogs, Origin::Owner),
             ]
         );
@@ -2452,6 +2453,7 @@ mod painel {
                 "emojis.gerenciar",
                 "sons.enviar",
                 "sons.aprovar",
+                "transmissao.aparelho",
                 "logs.ver",
                 "convites.criar",
                 "convites.recuperacao",
@@ -2483,10 +2485,11 @@ mod painel {
         assert_eq!(list[4]["kind"], "permission");
         assert_eq!(list[5]["key"], "sons.enviar");
         assert_eq!(list[6]["key"], "sons.aprovar");
-        assert_eq!(list[7]["key"], "logs.ver");
-        assert_eq!(list[7]["kind"], "permission");
+        assert_eq!(list[7]["key"], "transmissao.aparelho");
+        assert_eq!(list[8]["key"], "logs.ver");
+        assert_eq!(list[8]["kind"], "permission");
         // As permissões vêm antes das ações.
-        for grant in list.as_array().unwrap()[8..].iter() {
+        for grant in list.as_array().unwrap()[9..].iter() {
             assert_eq!(grant["kind"], "action");
             assert_eq!(grant["granted"], true);
             assert_eq!(grant["origin"], "owner");

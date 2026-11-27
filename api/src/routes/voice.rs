@@ -122,32 +122,51 @@ pub async fn screen_token(
     ApiJson(request): ApiJson<VoiceTokenRequest>,
 ) -> Result<Json<JoinVoiceResponse>, ApiError> {
     check_room(&state, &user, &request.channel_id).await?;
-    let room = list_room(&request.channel_id).await?;
+    let token =
+        issue_screen_token(&user, &request.channel_id, &screen_identity(&user.id), None).await?;
+    Ok(Json(token))
+}
+
+/// O token de uma conexão de tela de `user` na sala `channel_id`, já conferida pelo [`check_room`]:
+/// a do computador (`{id}:screen`) ou a de um aparelho de transmissão (`{id}:screen-{aparelho}`,
+/// ADR 0038, com o nome dele em `source`). Só com `user` na sala pela voz, e com a sala abaixo do
+/// limite de transmissões, sem contar a própria `identity` (quem troca de fonte pede de novo).
+pub(crate) async fn issue_screen_token(
+    user: &User,
+    channel_id: &str,
+    identity: &str,
+    source: Option<&str>,
+) -> Result<JoinVoiceResponse, ApiError> {
+    let room = list_room(channel_id).await?;
     if !in_room(&room, &user.id) {
         return Err(ApiError::Conflict(
             "Entre na sala de voz antes de transmitir.".into(),
         ));
     }
     let limit = max_shares();
-    if other_shares(&room, &user.id) >= limit {
+    if other_shares(&voice::list_screens(channel_id).await?, identity) >= limit {
         return Err(ApiError::ShareLimit(limit));
     }
     let (api_key, api_secret, url) = livekit_env().map_err(ApiError::Config)?;
     let token = create_screen_token(
         &api_key,
         &api_secret,
-        &request.channel_id,
-        &user.id,
-        user.shown_name(),
-        &user.nick,
+        channel_id,
+        identity,
+        ScreenOwner {
+            user_id: &user.id,
+            display_name: user.shown_name(),
+            nick: &user.nick,
+            source,
+        },
     )
     .map_err(ApiError::Config)?;
-    Ok(Json(JoinVoiceResponse {
+    Ok(JoinVoiceResponse {
         token,
         url,
         server_muted: false,
         server_deafened: false,
-    }))
+    })
 }
 
 /// Quanto tempo o token do Testar conexão vale: o teste leva uns 10 segundos.
@@ -188,7 +207,7 @@ fn create_test_token(api_key: &str, api_secret: &str, user_id: &str) -> Result<S
 
 /// Que sala é a de um token: uma sala de voz do grupo ou a de uma ligação privada.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum RoomKind {
+pub(crate) enum RoomKind {
     Voice,
     Call,
 }
@@ -196,7 +215,11 @@ enum RoomKind {
 /// Se `user` pode entrar na sala `channel_id`: uma sala de voz aberta, ou a
 /// conversa privada dele com a ligação atendida. A conversa dos outros cai no
 /// mesmo 404 de uma sala que não existe; a própria, sem ligação atendida, 409.
-async fn check_room(state: &AppState, user: &User, channel_id: &str) -> Result<RoomKind, ApiError> {
+pub(crate) async fn check_room(
+    state: &AppState,
+    user: &User,
+    channel_id: &str,
+) -> Result<RoomKind, ApiError> {
     validate_channel_id(channel_id)?;
     if let Some(dm) = dms::find_for(&state.db, &user.id, channel_id).await? {
         return if calls::is_answered(&state.db, &dm.id).await? {
@@ -216,10 +239,12 @@ fn in_room(room: &[RoomParticipant], user_id: &str) -> bool {
     room.iter().any(|p| p.identity == user_id)
 }
 
-/// Quantas pessoas, fora `user_id`, estão transmitindo na sala.
-fn other_shares(room: &[RoomParticipant], user_id: &str) -> usize {
-    room.iter()
-        .filter(|p| p.screen_sharing && p.identity != user_id)
+/// Quantas transmissões, fora a conexão `identity`, estão no ar na sala. Cada fonte conta uma: o
+/// computador e o aparelho da mesma pessoa são duas (ADR 0038).
+fn other_shares(screens: &[voice::ScreenConnection], identity: &str) -> usize {
+    screens
+        .iter()
+        .filter(|screen| screen.publishing && screen.identity != identity)
         .count()
 }
 
@@ -230,22 +255,36 @@ pub struct ParticipantsQuery {
     pub channel_id: String,
 }
 
+/// De quem é a tela de um token, e o que vai nos metadados dela.
+struct ScreenOwner<'a> {
+    user_id: &'a str,
+    display_name: &'a str,
+    nick: &'a str,
+    /// O nome do aparelho de transmissão (ADR 0038); `None` na tela do computador.
+    source: Option<&'a str>,
+}
+
 /// Monta o token da tela: publica só a tela e o áudio dela, não assina nada (quem transmite já
 /// ouve a sala pela voz) e não manda dados. O dono e o nick dele vão nos metadados
 /// (`{"screenOf": id, "nick": "..."}`), com o mesmo nome da voz: o app mostra a tela como de quem
-/// transmite.
+/// transmite. A tela de um aparelho leva também o nome dele (`"source": "Odin 3"`).
 fn create_screen_token(
     api_key: &str,
     api_secret: &str,
     channel_id: &str,
-    user_id: &str,
-    display_name: &str,
-    nick: &str,
+    identity: &str,
+    owner: ScreenOwner<'_>,
 ) -> Result<String, String> {
+    let metadata = match owner.source {
+        Some(source) => {
+            json!({ "screenOf": owner.user_id, "nick": owner.nick, "source": source })
+        }
+        None => json!({ "screenOf": owner.user_id, "nick": owner.nick }),
+    };
     AccessToken::with_api_key(api_key, api_secret)
-        .with_identity(&screen_identity(user_id))
-        .with_name(display_name)
-        .with_metadata(&json!({ "screenOf": user_id, "nick": nick }).to_string())
+        .with_identity(identity)
+        .with_name(owner.display_name)
+        .with_metadata(&metadata.to_string())
         .with_ttl(SCREEN_TOKEN_TTL)
         .with_grants(VideoGrants {
             room_join: true,
@@ -577,9 +616,13 @@ mod tests {
             "chave",
             "segredo-de-teste-comprido",
             "geral",
-            "id-1",
-            "Kid",
-            "kid",
+            &screen_identity("id-1"),
+            ScreenOwner {
+                user_id: "id-1",
+                display_name: "Kid",
+                nick: "kid",
+                source: None,
+            },
         )
         .unwrap();
         let claims = TokenVerifier::with_api_key("chave", "segredo-de-teste-comprido")
@@ -597,6 +640,35 @@ mod tests {
             ["screen_share", "screen_share_audio"]
         );
         assert_eq!(claims.exp - claims.nbf, 5 * 60);
+    }
+
+    #[test]
+    fn token_do_aparelho_leva_o_nome_dele() {
+        let token = create_screen_token(
+            "chave",
+            "segredo-de-teste-comprido",
+            "geral",
+            &voice::device_screen_identity("id-1", "odin"),
+            ScreenOwner {
+                user_id: "id-1",
+                display_name: "Kid",
+                nick: "kid",
+                source: Some("Odin 3"),
+            },
+        )
+        .unwrap();
+        let claims = TokenVerifier::with_api_key("chave", "segredo-de-teste-comprido")
+            .verify(&token)
+            .unwrap();
+        assert_eq!(claims.sub, "id-1:screen-odin");
+        assert_eq!(
+            claims.metadata,
+            r#"{"nick":"kid","screenOf":"id-1","source":"Odin 3"}"#
+        );
+        assert_eq!(
+            claims.video.can_publish_sources,
+            ["screen_share", "screen_share_audio"]
+        );
     }
 
     #[test]
@@ -618,19 +690,33 @@ mod tests {
 
     #[test]
     fn a_propria_transmissao_nao_conta_no_limite() {
-        let person = |identity: &str, screen_sharing| RoomParticipant {
+        let screen = |identity: &str, publishing| voice::ScreenConnection {
             identity: identity.into(),
-            screen_sharing,
+            owner: voice::screen_owner(identity).unwrap().into(),
+            publishing,
         };
-        let room = [
-            person("kid", true),
-            person("juju", true),
-            person("marcao", false),
-            person("rafa", true),
+        let screens = [
+            screen("kid:screen", true),
+            screen("juju:screen", true),
+            screen("marcao:screen", false),
+            screen("rafa:screen", true),
         ];
-        assert_eq!(other_shares(&room, "kid"), 2);
-        assert_eq!(other_shares(&room, "marcao"), 3);
-        assert_eq!(other_shares(&[], "kid"), 0);
+        assert_eq!(other_shares(&screens, "kid:screen"), 2);
+        assert_eq!(other_shares(&screens, "marcao:screen"), 3);
+        assert_eq!(other_shares(&[], "kid:screen"), 0);
+    }
+
+    #[test]
+    fn o_aparelho_e_o_computador_contam_cada_um() {
+        let screen = |identity: &str| voice::ScreenConnection {
+            identity: identity.into(),
+            owner: "kid".into(),
+            publishing: true,
+        };
+        let screens = [screen("kid:screen"), screen("kid:screen-odin")];
+        assert_eq!(other_shares(&screens, "kid:screen"), 1);
+        assert_eq!(other_shares(&screens, "kid:screen-odin"), 1);
+        assert_eq!(other_shares(&screens, "kid:screen-outro"), 2);
     }
 
     #[test]

@@ -41,10 +41,13 @@ pub enum Permission {
     /// Aprova, recusa, renomeia e exclui os sons do grupo; os sons de quem tem entram direto
     /// (v0.9, ADR 0037).
     ApproveSounds,
+    /// Pareia um aparelho de transmissão, como o Odin 3, que transmite a tela para onde a pessoa está
+    /// (ADR 0038). Ninguém recebe de saída: só o dono tem, até alguém dar.
+    StreamFromDevice,
 }
 
 impl Permission {
-    pub const ALL: [Permission; 8] = [
+    pub const ALL: [Permission; 9] = [
         Permission::BetaUpdates,
         Permission::ManageChannels,
         Permission::MoveMembers,
@@ -52,6 +55,7 @@ impl Permission {
         Permission::ManageEmojis,
         Permission::SendSounds,
         Permission::ApproveSounds,
+        Permission::StreamFromDevice,
         Permission::ViewLogs,
     ];
 
@@ -65,6 +69,7 @@ impl Permission {
             Self::ModerateVoice => "voz.moderar",
             Self::SendSounds => "sons.enviar",
             Self::ApproveSounds => "sons.aprovar",
+            Self::StreamFromDevice => "transmissao.aparelho",
         }
     }
 
@@ -79,6 +84,7 @@ impl Permission {
             Self::ModerateVoice => "Moderar voz",
             Self::SendSounds => "Enviar sons",
             Self::ApproveSounds => "Aprovar sons",
+            Self::StreamFromDevice => "Transmitir de um aparelho",
         }
     }
 

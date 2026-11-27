@@ -13,7 +13,7 @@ import { type ComponentProps, type ReactNode, useEffect, useRef } from "react";
 import { Slider } from "@/components/ui/slider";
 import { Spinner } from "@/components/ui/spinner";
 import { Avatar } from "@/features/identity";
-import { shareOwner } from "@/features/screen-share";
+import { shareKey } from "@/features/screen-share";
 import { cn } from "@/lib/utils";
 import {
 	CameraVideo,
@@ -93,7 +93,7 @@ export function ScreenStage({
 	fullscreen,
 	onToggleFullscreen,
 }: ScreenStageProps) {
-	const owner = shareOwner(share.participant.identity);
+	const owner = shareKey(share.participant.identity);
 	useShownAs(owner, "full");
 	const { remoteAudio, heard } = useShareAudio(share);
 
@@ -273,7 +273,7 @@ export function SmallShare({
 	sharer: ChannelMember;
 	onFocus: () => void;
 }) {
-	const owner = shareOwner(share.participant.identity);
+	const owner = shareKey(share.participant.identity);
 	useShownAs(owner, "small");
 	useShareAudio(share);
 	const ready = share.publication.isSubscribed && share.publication.track;

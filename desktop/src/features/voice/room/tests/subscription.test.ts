@@ -84,6 +84,20 @@ describe("o que a sala baixa", () => {
 		}
 	});
 
+	it("a tela de um aparelho tem a chave própria, e a do próprio aparelho pode ser assistida", () => {
+		const odin = "eu:screen-odin";
+		expect(wantsTrack(Track.Source.ScreenShare, odin, watching(odin), "eu")).toBe(
+			true,
+		);
+		// Assistir a tela do computador não baixa a do aparelho, nem o contrário.
+		expect(
+			wantsTrack(Track.Source.ScreenShare, "juju:screen-odin", watching("juju"), "eu"),
+		).toBe(false);
+		expect(
+			wantsTrack(Track.Source.ScreenShare, "juju:screen", watching("juju:screen-odin"), "eu"),
+		).toBe(false);
+	});
+
 	it("assina e cancela só o que muda", () => {
 		const mic = publication(Track.Source.Microphone, false);
 		const screen = publication(Track.Source.ScreenShare, false);

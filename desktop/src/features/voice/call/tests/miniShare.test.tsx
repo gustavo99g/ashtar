@@ -27,9 +27,9 @@ vi.mock("@livekit/components-react", () => ({
 }));
 /** A qualidade da conexão de quem transmite, como a LiveKit dá. */
 const quality = vi.hoisted(() => ({ current: "excellent" }));
-vi.mock("@/features/screen-share", () => ({
+vi.mock("@/features/screen-share", async (importOriginal) => ({
+	...(await importOriginal<object>()),
 	useScreenShares: vi.fn(),
-	shareOwner: (identity: string) => identity.replace(/:screen$/, ""),
 }));
 
 /** A transmissão da juju, já assinada, sem áudio. */
@@ -73,7 +73,7 @@ beforeEach(() => {
 	});
 	vi.mocked(useVoice).mockReturnValue({ room: {} } as never);
 	vi.mocked(useLiveMembers).mockReturnValue([juju] as never);
-	const jujuShare = { track: share, ownerId: "juju", isOwn: false };
+	const jujuShare = { track: share, ownerId: "juju", key: "juju", source: null, isOwn: false };
 
 	vi.mocked(useScreenShares).mockReturnValue([jujuShare]);
 });
@@ -86,7 +86,7 @@ describe("a miniatura da transmissão", () => {
 	it("a conexão de quem transmite caída mostra que ela está voltando", () => {
 		quality.current = "lost";
 		vi.mocked(useScreenShares).mockReturnValue([
-			{ track: share, ownerId: "juju", isOwn: false },
+			{ track: share, ownerId: "juju", key: "juju", source: null, isOwn: false },
 		]);
 		act(() => watchShare("juju"));
 		renderAt(paths.channel("geral"));
@@ -102,7 +102,7 @@ describe("a miniatura da transmissão", () => {
 			...share,
 			publication: { ...share.publication, isMuted: true },
 		} as unknown as TrackReference;
-		const pausedShare = { track: paused, ownerId: "juju", isOwn: false };
+		const pausedShare = { track: paused, ownerId: "juju", key: "juju", source: null, isOwn: false };
 		vi.mocked(useScreenShares).mockReturnValue([pausedShare]);
 		act(() => watchShare("juju"));
 		renderAt(paths.channel("geral"));
@@ -256,8 +256,8 @@ describe("a miniatura da transmissão", () => {
 		} as unknown as TrackReference;
 		vi.mocked(useLiveMembers).mockReturnValue([juju, marcao] as never);
 		vi.mocked(useScreenShares).mockReturnValue([
-			{ track: share, ownerId: "juju", isOwn: false },
-			{ track: marcaoTrack, ownerId: "marcao", isOwn: false },
+			{ track: share, ownerId: "juju", key: "juju", source: null, isOwn: false },
+			{ track: marcaoTrack, ownerId: "marcao", key: "marcao", source: null, isOwn: false },
 		]);
 		act(() => {
 			watchShare("juju");

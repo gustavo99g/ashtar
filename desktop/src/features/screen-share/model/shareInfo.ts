@@ -78,19 +78,76 @@ export function compareShares(a: ShareCandidate, b: ShareCandidate): number {
 /**
  * O fim da identidade da conexão que transmite a tela de alguém (`{id}:screen`, ADR 0017). Para o
  * resto do app, ela é "a tela de fulano", não um participante a mais.
+ *
+ * Desde o ADR 0038, um aparelho de transmissão (como o Odin 3) publica a tela do dono numa conexão
+ * a mais, `{id}:screen-{aparelho}`: é outra transmissão da mesma pessoa, ao lado da do computador.
  */
 export const SCREEN_SUFFIX = ":screen";
 
-/** Se a identidade é a de uma tela. */
+/**
+ * O dono da identidade de uma tela (`{id}:screen` ou `{id}:screen-{aparelho}`), ou `null` se ela
+ * não é de uma tela. Nenhum id de membro tem `:`, então o dono é o que vem antes do primeiro.
+ */
+function screenOwnerOf(identity: string): string | null {
+	const colon = identity.indexOf(":");
+	if (colon <= 0) return null;
+	const rest = identity.slice(colon);
+	const isScreen =
+		rest === SCREEN_SUFFIX ||
+		(rest.startsWith(`${SCREEN_SUFFIX}-`) &&
+			rest.length > SCREEN_SUFFIX.length + 1);
+	return isScreen ? identity.slice(0, colon) : null;
+}
+
+/** Se a identidade é a de uma tela, do computador ou de um aparelho. */
 export function isScreenIdentity(identity: string): boolean {
-	return identity.endsWith(SCREEN_SUFFIX);
+	return screenOwnerOf(identity) !== null;
 }
 
 /** De quem é a identidade: a tela de alguém é desse alguém; o resto é de si mesmo. */
 export function shareOwner(identity: string): string {
-	return isScreenIdentity(identity)
-		? identity.slice(0, -SCREEN_SUFFIX.length)
-		: identity;
+	return screenOwnerOf(identity) ?? identity;
+}
+
+/**
+ * A chave de uma transmissão, para tudo que guarda algo por transmissão (o que está aberto, o
+ * foco, o volume, o que está à vista): a do computador é o id do dono, como sempre foi; a de um
+ * aparelho é a identidade inteira (`{id}:screen-{aparelho}`), para não se misturar com a dele.
+ * Uma chave que já é uma chave volta igual.
+ */
+export function shareKey(identity: string): string {
+	return identity.endsWith(SCREEN_SUFFIX) ? shareOwner(identity) : identity;
+}
+
+/** Se a chave é a de um aparelho de transmissão. */
+export function isDeviceShareKey(key: string): boolean {
+	return isScreenIdentity(key);
+}
+
+/** A identidade da conexão de uma transmissão, pela chave dela. */
+export function screenIdentityOf(key: string): string {
+	return isDeviceShareKey(key) ? key : `${key}${SCREEN_SUFFIX}`;
+}
+
+/**
+ * O nome do aparelho que publica a tela, dos metadados que a API pôs no token
+ * (`{"screenOf": ..., "source": "Odin 3"}`), ou `null` na tela do computador.
+ */
+export function shareSource(metadata: string | undefined): string | null {
+	if (!metadata) return null;
+	try {
+		const parsed: unknown = JSON.parse(metadata);
+		if (typeof parsed !== "object" || parsed === null) return null;
+		const { source } = parsed as Record<string, unknown>;
+		return typeof source === "string" && source.trim() ? source.trim() : null;
+	} catch {
+		return null;
+	}
+}
+
+/** "Kid · Odin 3": o nome de quem transmite, com o aparelho quando a tela vem de um. */
+export function sharerLabel(name: string, source: string | null): string {
+	return source ? `${name} · ${source}` : name;
 }
 
 /** "1080p · 30 fps": a qualidade escolhida, para quem assiste. */

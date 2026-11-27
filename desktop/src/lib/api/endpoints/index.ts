@@ -103,3 +103,9 @@ export {
 	rejectSound,
 	updateSound,
 } from "./sounds";
+export {
+	createStreamPairCode,
+	listStreamDevices,
+	renameStreamDevice,
+	unlinkStreamDevice,
+} from "./streamDevices";

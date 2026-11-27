@@ -18,7 +18,10 @@
  */
 import { RoomEvent, type RemoteParticipant } from "livekit-client";
 import { useEffect, useRef } from "react";
-import { useScreenShareState } from "@/features/screen-share";
+import {
+	isScreenIdentity,
+	useScreenShareState,
+} from "@/features/screen-share";
 import { useCameraState, useMaybeVoice } from "@/features/voice";
 import { playRoomSound } from "../model/roomSounds";
 
@@ -66,7 +69,7 @@ export function RoomSounds() {
 		const stopping = new Map<string, ReturnType<typeof setTimeout>>();
 		const changed = (participant: RemoteParticipant, came: boolean) => {
 			const identity = participant.identity;
-			if (identity.endsWith(SCREEN_SUFFIX)) {
+			if (isScreenIdentity(identity)) {
 				if (identity === mine) return;
 				const pending = stopping.get(identity);
 				if (came) {

@@ -139,6 +139,8 @@ mod tests {
                 "reactions",
                 "sessions",
                 "sounds",
+                "stream_devices",
+                "stream_pair_codes",
                 "user_permissions",
                 "users",
                 "voice_moderation"

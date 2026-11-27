@@ -17,7 +17,6 @@ import {
 	type VideoTrack,
 } from "livekit-client";
 import { toast } from "@/components/ui/toast";
-import type { ScreenShareController } from "@/features/screen-share";
 import { useSettingsStore } from "@/features/settings";
 import {
 	openScreenshotDir,
@@ -25,10 +24,13 @@ import {
 	screenshotImage,
 	screenshotSource,
 } from "@/lib/tauri/commands";
+import {
+	type ScreenShareController,
+	screenIdentityOf,
+	shareOwner,
+} from "@/features/screen-share";
 import { useRoomView } from "./stores/roomViewStore";
 
-/** O sufixo da identidade da conexão da tela (`{id}:screen`, ADR 0017). */
-const SCREEN = ":screen";
 
 /** Quanto esperar o primeiro quadro de um `<video>` montado só para o print. */
 const FRAME_WAIT_MS = 2000;
@@ -59,8 +61,8 @@ export function screenshotName(person: string, at = new Date()): string {
 
 function personName(room: Room, id: string): string {
 	const participant: RemoteParticipant | undefined =
-		room.remoteParticipants.get(id) ??
-		room.remoteParticipants.get(`${id}${SCREEN}`);
+		room.remoteParticipants.get(shareOwner(id)) ??
+		room.remoteParticipants.get(screenIdentityOf(id));
 	return participant?.name?.trim() || id;
 }
 
@@ -173,7 +175,7 @@ export async function takeScreenshot(
 			return true;
 		}
 		const publication = room.remoteParticipants
-			.get(`${target.ownerId}${SCREEN}`)
+			.get(screenIdentityOf(target.ownerId))
 			?.getTrackPublication(Track.Source.ScreenShare);
 		const track = publication?.videoTrack;
 		const png = track ? await grabFrame(track) : null;

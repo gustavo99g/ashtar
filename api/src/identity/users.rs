@@ -537,6 +537,15 @@ pub async fn remove(
         .bind(&target.id)
         .execute(&mut *tx)
         .await?;
+    // Os aparelhos de transmissão (ADR 0038) e os códigos que ainda valiam caem junto.
+    sqlx::query("DELETE FROM stream_devices WHERE user_id = ?")
+        .bind(&target.id)
+        .execute(&mut *tx)
+        .await?;
+    sqlx::query("DELETE FROM stream_pair_codes WHERE user_id = ?")
+        .bind(&target.id)
+        .execute(&mut *tx)
+        .await?;
     // Sai da lista de todo canal restrito (ADR 0028). As conversas privadas
     // ficam: o histórico continua da outra pessoa.
     sqlx::query(

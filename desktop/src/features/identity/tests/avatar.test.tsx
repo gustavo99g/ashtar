@@ -42,7 +42,7 @@ function me(user: UserView = kid): MeResponse {
 		can_create_invite: true,
 		can_view_panel: true,
 		can_manage_channels: false,
-		can_move_members: false, can_manage_emojis: false, can_view_logs: false, can_moderate_voice: false, can_send_sounds: false, can_approve_sounds: false,
+		can_move_members: false, can_manage_emojis: false, can_view_logs: false, can_moderate_voice: false, can_send_sounds: false, can_approve_sounds: false, can_stream_from_device: false,
 	};
 }
 

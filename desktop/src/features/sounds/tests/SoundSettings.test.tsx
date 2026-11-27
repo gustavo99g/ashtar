@@ -42,6 +42,7 @@ const me = (approve: boolean): MeResponse => ({
 	can_moderate_voice: false,
 	can_send_sounds: true,
 	can_approve_sounds: approve,
+	can_stream_from_device: false,
 });
 
 const sound = (patch: Partial<Sound>): Sound => ({

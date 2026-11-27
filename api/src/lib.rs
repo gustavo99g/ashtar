@@ -218,6 +218,15 @@ pub fn app(state: AppState, policy: Arc<ClientPolicy>) -> Router {
             "/voice/moderation/{id}/stop-share",
             post(routes::moderation::stop_share),
         )
+        .route("/stream-devices", get(routes::stream_devices::list))
+        .route(
+            "/stream-devices/pair-code",
+            post(routes::stream_devices::pair_code),
+        )
+        .route(
+            "/stream-devices/{id}",
+            patch(routes::stream_devices::rename).delete(routes::stream_devices::unlink),
+        )
         .route("/auth/redeem", post(routes::auth::redeem))
         .route("/auth/login", post(routes::auth::login))
         .route("/me", get(routes::auth::me).patch(routes::auth::update_me))
@@ -365,9 +374,19 @@ pub fn app(state: AppState, policy: Arc<ClientPolicy>) -> Router {
         ))
         .with_state(state.clone());
     // Fora da `ClientPolicy`: o WebSocket do navegador não manda cabeçalho, e o
-    // webhook vem do LiveKit. Cada um confere quem chama do seu jeito.
+    // webhook vem do LiveKit. Cada um confere quem chama do seu jeito. O aparelho de
+    // transmissão (ADR 0038) tem versão própria, que não segue a do app.
     let outside_policy = Router::new()
         .route("/api/realtime", get(routes::realtime::connect))
+        .route(
+            "/api/stream-devices/pair",
+            post(routes::stream_devices::pair),
+        )
+        .route("/api/stream-devices/self", get(routes::stream_devices::me))
+        .route(
+            "/api/stream-devices/self/screen-token",
+            post(routes::stream_devices::screen_token),
+        )
         .route("/webhooks/livekit", post(routes::webhooks::livekit))
         .with_state(state);
 

@@ -17,5 +17,6 @@ pub mod people;
 pub mod read;
 pub mod realtime;
 pub mod sounds;
+pub mod stream_devices;
 pub mod voice;
 pub mod webhooks;

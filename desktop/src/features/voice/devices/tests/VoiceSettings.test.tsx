@@ -7,6 +7,11 @@ import type { DeviceInfo } from "../model/devices";
 import { chooseDevice, useDeviceChoice } from "../stores/deviceChoiceStore";
 
 // A câmera tem os próprios testes; aqui, só o áudio.
+// O "Aparelhos de transmissão" só aparece com a permissão; aqui, sem ela e sem a API.
+vi.mock("@/features/identity", async (importOriginal) => ({
+	...(await importOriginal<object>()),
+	useMe: () => ({ data: undefined }),
+}));
 vi.mock("../../camera/components/CameraOptions", () => ({
 	CameraOptions: () => null,
 }));
