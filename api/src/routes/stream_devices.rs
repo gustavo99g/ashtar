@@ -100,6 +100,13 @@ pub struct PairStreamDeviceResponse {
     pub device: StreamDevice,
 }
 
+/// `GET /api/stream-devices/hello`: "aqui é um Ashtar". Sem sessão e fora da versão mínima: o
+/// Transmissor procura a API na rede local (o modo Local, para desenvolver) perguntando isso a cada
+/// endereço do Wi-Fi. Não diz nada além disso.
+pub async fn hello() -> Json<serde_json::Value> {
+    Json(serde_json::json!({ "app": "ashtar" }))
+}
+
 /// `POST /api/stream-devices/pair`: o aparelho troca o código pela sessão dele. Sem sessão; conta
 /// no limite de tentativas, como o convite.
 pub async fn pair(

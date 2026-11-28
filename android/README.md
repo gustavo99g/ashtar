@@ -8,10 +8,16 @@ tem chat, voz nem lista de canais.
 
 1. Baixe o APK do último run do **CI Android** (artefato `ashtar-transmissor`) e instale no Odin
    (permita instalar de fontes desconhecidas).
-2. No Ashtar do computador: Configurações › Dispositivos › **Parear um aparelho**. Digite no
-   Transmissor o endereço do servidor e o código de 6 números (vale 3 minutos).
-3. Entre numa sala ou ligação pelo computador. No Odin, toque em **Transmitir** (ou no bloco
-   **Transmitir** das Configurações rápidas) e confirme a captura do Android.
+2. No Ashtar do computador: Configurações › Dispositivos › **Parear um aparelho**.
+3. No Transmissor, escolha o servidor:
+   - **Internet**: o endereço do Ashtar de casa (vem preenchido quando o CI tem a variável
+     `VITE_API_URL`).
+   - **Local (dev)**: o app procura a API no Wi-Fi sozinho e preenche o IP e a porta. A API precisa
+     escutar na rede: `BIND_ADDR=0.0.0.0:3000` no `.env`, com a porta liberada no firewall.
+4. Digite os 6 números do código (valem 3 minutos): o pareamento sai sozinho.
+5. Logo depois, o Android pergunta se pode pôr o bloco **Transmitir** nas Configurações rápidas.
+   Com ele, é puxar a barra e tocar: aparece só a confirmação da captura (o Android sempre pede) e a
+   tela vai para onde você está. No ar, o bloco vira **Parar transmissão**.
 
 Na lista da sala, o Odin aparece como uma entrada à parte, com o controle no lugar da foto e o
 selo de transmissão: clicar nele assiste. Na tela da chamada, a transmissão é "Kid · Odin 3", ao lado

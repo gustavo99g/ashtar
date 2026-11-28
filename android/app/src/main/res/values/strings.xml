@@ -1,34 +1,67 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Ashtar Transmissor</string>
+    <string name="app_title">Transmissor</string>
+    <string name="app_subtitle">A tela deste aparelho no Ashtar</string>
     <string name="tile_label">Transmitir</string>
+    <string name="tile_label_stop">Parar transmissão</string>
     <string name="tile_starting">Conectando…</string>
+    <string name="tile_unpaired">Toque para parear</string>
     <string name="channel_name">Transmissão</string>
 
-    <string name="pair_help">No Ashtar do computador, abra Configurações › Dispositivos, toque em Parear um aparelho e digite aqui o código de 6 números.</string>
-    <string name="server_hint">Endereço do servidor (https://…)</string>
-    <string name="code_hint">Código (6 números)</string>
+    <!-- Parear -->
+    <string name="pair_title">Parear com o Ashtar</string>
+    <string name="pair_help">No computador, abra Configurações › Dispositivos e toque em Parear um aparelho.</string>
+    <string name="label_server">Servidor</string>
+    <string name="mode_internet">Internet</string>
+    <string name="mode_local">Local (dev)</string>
+    <string name="server_hint">https://seu-ashtar.ts.net</string>
+    <string name="local_hint">192.168.0.10:3000</string>
+    <string name="local_searching">Procurando o Ashtar no Wi-Fi…</string>
+    <string name="local_found">Achei o Ashtar em %1$s</string>
+    <string name="local_not_found">Não achei no Wi-Fi. Confira se a API está com BIND_ADDR=0.0.0.0:3000, ou digite o endereço.</string>
+    <string name="local_no_wifi">Sem Wi-Fi. Conecte o aparelho na mesma rede do computador.</string>
+    <string name="local_search">Procurar</string>
+    <string name="label_code">Código</string>
+    <string name="code_hint">000000</string>
+    <string name="code_help">Os 6 números que o computador mostra. Valem 3 minutos.</string>
     <string name="pair">Parear</string>
-    <string name="error_pair_fields">Preencha o endereço do servidor e o código.</string>
+    <string name="pairing">Pareando…</string>
+    <string name="error_pair_server">Escolha o servidor: digite o endereço ou procure no Wi-Fi.</string>
+    <string name="error_pair_code">Digite os 6 números do código.</string>
 
-    <string name="paired_as">%1$s · pareado com %2$s</string>
-    <string name="target_now">A tela vai %1$s.</string>
-    <string name="target_none">Você não está em nenhuma sala ou ligação. Entre por um computador para transmitir.</string>
+    <!-- Pareado -->
+    <string name="paired_as">%1$s · de %2$s</string>
+    <string name="target_room">A tela vai para a sala</string>
+    <string name="target_call">A tela vai para a ligação com</string>
+    <string name="target_none_label">Você não está em nenhuma sala</string>
+    <string name="target_none">Entre numa sala ou ligação pelo computador</string>
+    <string name="target_loading">Procurando onde você está…</string>
+    <string name="refresh">Atualizar</string>
     <string name="stream">Transmitir</string>
     <string name="stop">Parar</string>
-    <string name="refresh">Atualizar</string>
+    <string name="stop_stream">Parar transmissão</string>
+    <string name="connecting">Conectando…</string>
+    <string name="live_badge">AO VIVO</string>
+    <string name="live_detail">%1$s · com o áudio do jogo</string>
+    <string name="live_detail_no_audio">%1$s · sem áudio</string>
+    <string name="label_quality">Qualidade</string>
+    <string name="quality_light">720p · Leve</string>
+    <string name="quality_motion">1080p · Nítida</string>
+    <string name="quality_help">A leve gasta metade da internet e esquenta menos o aparelho.</string>
+    <string name="game_audio">Áudio do jogo</string>
+    <string name="game_audio_help">Vai junto com a tela. O microfone nunca vai.</string>
+    <string name="tile_title">Atalho rápido</string>
+    <string name="tile_help">Um botão Transmitir nas Configurações rápidas: puxe a barra e toque.</string>
+    <string name="tile_help_manual">Puxe as Configurações rápidas, toque no lápis e arraste o bloco Transmitir.</string>
+    <string name="tile_added">Já está nas Configurações rápidas.</string>
+    <string name="tile_add">Adicionar</string>
+    <string name="server_label">Servidor: %1$s</string>
     <string name="forget">Desparear</string>
-    <string name="quality">Qualidade</string>
-    <string name="quality_motion">1080p · 60 fps</string>
-    <string name="quality_light">720p · 60 fps</string>
-    <string name="game_audio">Enviar o áudio do jogo</string>
 
-    <string name="status_starting">Conectando…</string>
-    <string name="status_live">Transmitindo %1$s, com o áudio do jogo.</string>
-    <string name="status_live_no_audio">Transmitindo %1$s, sem áudio.</string>
+    <!-- Notificação e serviço -->
     <string name="notification_starting">Conectando…</string>
     <string name="notification_live">Transmitindo %1$s</string>
-
     <string name="stopped_owner_left">A transmissão parou: você saiu da sala ou da ligação.</string>
     <string name="stopped_room_closed">A transmissão parou: a sala fechou.</string>
     <string name="stopped_duplicate">A transmissão parou: ela começou em outro lugar.</string>

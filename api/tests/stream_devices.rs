@@ -204,6 +204,10 @@ async fn o_aparelho_fica_fora_da_versao_minima_do_app() {
     )
     .await;
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{body}");
+    // O "aqui é um Ashtar" do modo Local também: sem sessão e sem versão.
+    let (status, body) = call(&router, "GET", "/api/stream-devices/hello", None, None).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body, json!({ "app": "ashtar" }));
     let (status, _) = call(&router, "GET", "/api/stream-devices", None, None).await;
     assert_eq!(status, StatusCode::UPGRADE_REQUIRED);
 }

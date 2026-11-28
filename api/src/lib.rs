@@ -379,6 +379,10 @@ pub fn app(state: AppState, policy: Arc<ClientPolicy>) -> Router {
     let outside_policy = Router::new()
         .route("/api/realtime", get(routes::realtime::connect))
         .route(
+            "/api/stream-devices/hello",
+            get(routes::stream_devices::hello),
+        )
+        .route(
             "/api/stream-devices/pair",
             post(routes::stream_devices::pair),
         )

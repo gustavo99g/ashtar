@@ -1,9 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- As cores do tema escuro do Ashtar do computador (ashtar-dark.css). -->
 <resources>
-    <color name="background">#FF0F1220</color>
-    <color name="foreground">#FFF2F3F7</color>
-    <color name="muted">#FF9AA0B4</color>
-    <color name="gold">#FFE0B354</color>
-    <color name="error">#FFF2777A</color>
-    <color name="icon_background">#FF1B2A6B</color>
+    <color name="background">#FF070B16</color>
+    <color name="surface">#FF0C1220</color>
+    <color name="surface_raised">#FF111A2F</color>
+    <color name="surface_hover">#FF18233D</color>
+    <color name="border">#FF1B2741</color>
+    <color name="border_strong">#FF22304E</color>
+    <color name="foreground">#FFE2E8F0</color>
+    <color name="muted">#FFA3B8DE</color>
+    <color name="subtle">#FF6F84AD</color>
+    <color name="primary">#FF2563EB</color>
+    <color name="primary_pressed">#FF1D4ED8</color>
+    <color name="primary_soft">#262563EB</color>
+    <color name="ring">#FF3B82F6</color>
+    <color name="gold">#FFF6C228</color>
+    <color name="gold_border">#66F6C228</color>
+    <color name="gold_wash">#1AF6C228</color>
+    <color name="on_gold">#FF070B16</color>
+    <color name="stop">#FFDC2626</color>
+    <color name="stop_pressed">#FFB91C1C</color>
+    <color name="ok">#FF4ADE80</color>
+    <color name="error">#FFFCA5A5</color>
+    <color name="icon_background">#FF2563EB</color>
+    <color name="icon_sky">#FFE0F2FE</color>
 </resources>
