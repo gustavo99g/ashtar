@@ -40,9 +40,20 @@ jobs:
       - name: Testes
         run: ./gradlew --no-daemon testDebugUnitTest
 
+      # A chave fixa (segredos ANDROID_KEYSTORE_BASE64 e ANDROID_KEYSTORE_PASSWORD): com ela, o APK
+      # novo instala por cima do antigo. Sem os segredos, sai com a chave de debug, como antes.
+      - name: Chave do APK
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$ANDROID_KEYSTORE_BASE64" ]; then
+            echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > app/transmissor.jks
+          fi
+
       - name: APK
         env:
           ASHTAR_API_URL: ${{ vars.VITE_API_URL }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
         run: ./gradlew --no-daemon assembleRelease "-PashtarApiUrl=${ASHTAR_API_URL}"
 
       - uses: actions/upload-artifact@v4

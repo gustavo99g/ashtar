@@ -34,6 +34,21 @@ da tela do computador se ela também estiver no ar. Se você sair da sala, a tra
 - O nome da trilha segue o formato do app (`screen-share:{"t","q","s"}`), então quem assiste vê
   a qualidade e o horário como numa transmissão do computador.
 
+## Atualizar sem desparear
+
+Para o APK novo instalar por cima do antigo, ele precisa sair sempre com a mesma chave (e o CI já
+põe o número do run como versão). Uma vez só, no PC:
+
+```powershell
+keytool -genkeypair -keystore transmissor.jks -storetype PKCS12 -alias transmissor -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Ashtar Transmissor"
+[Convert]::ToBase64String([IO.File]::ReadAllBytes("transmissor.jks")) | Set-Clipboard
+```
+
+No GitHub, em Settings › Secrets and variables › Actions, crie `ANDROID_KEYSTORE_BASE64` (o que foi
+para a área de transferência) e `ANDROID_KEYSTORE_PASSWORD` (a senha que o keytool pediu). Guarde o
+`transmissor.jks` fora do repositório: sem ele, a próxima chave é outra e é preciso parear de novo.
+Sem os segredos, o CI assina com a chave de debug, que muda a cada run.
+
 ## Desenvolver
 
 Precisa do JDK 17 e do Android SDK (36). `./gradlew testDebugUnitTest` roda os testes e

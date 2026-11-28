@@ -15,7 +15,8 @@ android {
         // O Android 10 é o primeiro com a captura do áudio dos apps (AudioPlaybackCapture).
         minSdk = 29
         targetSdk = 35
-        versionCode = 1
+        // Cada run do CI um número maior: o APK novo instala por cima do antigo.
+        versionCode = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 1
         versionName = "0.1.0"
         buildConfigField("String", "DEFAULT_API_URL", "\"${ashtarApiUrl.replace("\"", "")}\"")
     }
@@ -24,11 +25,27 @@ android {
         buildConfig = true
     }
 
+    // A chave fixa do Transmissor, dos segredos do GitHub (o CI a escreve em `transmissor.jks`):
+    // assinado sempre com ela, o APK novo instala por cima do antigo sem desparear. Sem ela (um build
+    // local, ou o CI sem os segredos), sai com a chave de debug da máquina.
+    val keystore = file("transmissor.jks")
+    val keystorePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD").orEmpty()
+    val fixedKey = keystore.exists() && keystorePassword.isNotEmpty()
+    signingConfigs {
+        if (fixedKey) {
+            create("transmissor") {
+                storeFile = keystore
+                storePassword = keystorePassword
+                keyAlias = System.getenv("ANDROID_KEY_ALIAS")?.takeIf { it.isNotBlank() } ?: "transmissor"
+                keyPassword = keystorePassword
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
-            // Sem chave de assinatura própria, o release sai com a de debug: o APK é instalado à mão.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName(if (fixedKey) "transmissor" else "debug")
         }
     }
 
