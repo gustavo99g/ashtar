@@ -40,6 +40,7 @@ import {
 } from "@/lib/api";
 import { shortDate } from "@/lib/date";
 import { cn } from "@/lib/utils";
+import { DevicePicture } from "./DevicePicture";
 
 const devicesKey = ["stream-devices"] as const;
 
@@ -492,11 +493,8 @@ function DeviceRow({ device, fresh }: { device: StreamDevice; fresh: boolean }) 
 			)}
 		>
 			<div className="flex items-center gap-3">
-				<span
-					aria-hidden="true"
-					className="flex size-10 shrink-0 items-center justify-center rounded-full bg-secondary text-muted-foreground"
-				>
-					<GamepadIcon className="size-5" />
+				<span className="flex w-16 shrink-0 items-center justify-center">
+					<DevicePicture name={device.name} size={40} />
 				</span>
 				{editing ? (
 					<form onSubmit={save} className="flex min-w-0 flex-1 items-center gap-2">

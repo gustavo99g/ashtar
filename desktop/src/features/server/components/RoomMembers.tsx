@@ -1,4 +1,4 @@
-import { EyeIcon, GamepadIcon, VideoIcon } from "lucide-react";
+import { EyeIcon, VideoIcon } from "lucide-react";
 import { type ReactElement, useState } from "react";
 import { useMatch, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import {
 import { COLLAPSED_AVATARS } from "@/features/channels";
 import { Avatar } from "@/features/identity";
 import { UserCardPopup } from "@/features/members";
+import { DevicePicture } from "@/features/screen-share";
 import {
 	type ChannelMember,
 	ConnectionMark,
@@ -94,7 +95,7 @@ export function AvatarStrip({ members }: { members: ChannelMember[] }) {
 			<span className="flex -space-x-1.5">
 				{shown.map((member) =>
 					member.device ? (
-						<DeviceIcon key={member.id} size={20} />
+						<DevicePicture key={member.id} name={member.name} size={20} />
 					) : (
 						<Avatar
 							key={member.id}
@@ -111,19 +112,6 @@ export function AvatarStrip({ members }: { members: ChannelMember[] }) {
 					+{rest}
 				</span>
 			)}
-		</span>
-	);
-}
-
-/** O "avatar" de um aparelho de transmissão: o controle no lugar da foto. */
-function DeviceIcon({ size }: { size: number }) {
-	return (
-		<span
-			aria-hidden="true"
-			style={{ width: size, height: size }}
-			className="flex shrink-0 items-center justify-center rounded-full bg-secondary text-muted-foreground ring-2 ring-card"
-		>
-			<GamepadIcon style={{ width: size * 0.6, height: size * 0.6 }} />
 		</span>
 	);
 }
@@ -158,7 +146,7 @@ function DeviceRow({
 					"text-muted-foreground hover:bg-secondary hover:text-foreground",
 				)}
 			>
-				<DeviceIcon size={22} />
+				<DevicePicture name={member.name} size={22} />
 				<span className="min-w-0 truncate">{member.name}</span>
 				<span className="ml-auto flex shrink-0 items-center gap-1">
 					{member.sharing && <LiveBadge />}
