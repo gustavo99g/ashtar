@@ -231,7 +231,7 @@ function Devices() {
 
 function Page({ children }: { children: ReactNode }) {
 	return (
-		<div className="@container flex w-full max-w-[880px] flex-col gap-8 py-20 pr-28 pl-32">
+		<div className="@container flex w-full flex-col gap-8 py-20 pr-28 pl-32">
 			{children}
 		</div>
 	);
