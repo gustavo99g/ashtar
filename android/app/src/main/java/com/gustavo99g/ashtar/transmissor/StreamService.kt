@@ -13,6 +13,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.hardware.display.DisplayManager
+import android.net.wifi.WifiManager
 import android.os.Build
 import android.os.IBinder
 import android.service.quicksettings.TileService
@@ -47,8 +48,14 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import livekit.org.webrtc.RtpParameters
+import livekit.org.webrtc.VideoFrame
+import livekit.org.webrtc.VideoSink
+import java.util.concurrent.atomic.AtomicLong
 
 /**
  * O serviço em primeiro plano que transmite (ADR 0038). Recebe a permissão de captura que a tela
@@ -66,7 +73,15 @@ class StreamService : Service() {
     private var audioTrack: LocalAudioTrack? = null
     private var gameAudio: GameAudio? = null
     private var session: Job? = null
+    private var watchdog: Job? = null
+    private var publishOptions: VideoTrackPublishOptions? = null
+    private var wifiLock: WifiManager.WifiLock? = null
+    private var liveLabel: String? = null
     private var finished = false
+
+    /** Conta os quadros que a captura do Android entrega, para o [StallDetector]. */
+    private val capturedFrames = AtomicLong()
+    private val frameCounter = VideoSink { _: VideoFrame -> capturedFrames.incrementAndGet() }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -86,6 +101,7 @@ class StreamService : Service() {
                 // O Android 14 exige o serviço em primeiro plano, com o tipo da captura, antes de
                 // abrir a captura da tela.
                 goForeground(getString(R.string.notification_starting))
+                holdWifi()
                 StreamState.set(StreamStatus.Starting)
                 refreshTile()
                 session = scope.launch { run(projection) }
@@ -124,18 +140,21 @@ class StreamService : Service() {
                 onStop = { scope.launch { finish(getString(R.string.stopped_by_system)) } },
             )
             screenTrack = track
+            track.addRenderer(frameCounter)
             track.startCapture()
-            val published = local.publishVideoTrack(
-                track,
-                VideoTrackPublishOptions(
-                    name = name,
-                    videoEncoding = VideoEncoding(quality.bitrateBps, quality.fps),
-                    // Uma camada só, como o publicador do computador (ADR 0017).
-                    simulcast = false,
-                    videoCodec = VideoCodec.H264.codecName,
-                    source = Track.Source.SCREEN_SHARE,
-                ),
+            val options = VideoTrackPublishOptions(
+                name = name,
+                videoEncoding = VideoEncoding(quality.bitrateBps, quality.fps),
+                // Uma camada só, como o publicador do computador (ADR 0017).
+                simulcast = false,
+                videoCodec = VideoCodec.H264.codecName,
+                source = Track.Source.SCREEN_SHARE,
+                // O padrão da tela (manter a resolução) derruba os quadros quase a zero quando a
+                // rede aperta, e a imagem parece congelada. Num jogo vale mais seguir andando.
+                degradationPreference = RtpParameters.DegradationPreference.BALANCED,
             )
+            publishOptions = options
+            val published = local.publishVideoTrack(track, options)
             if (!published) {
                 finish(getString(R.string.error_publish))
                 return
@@ -144,7 +163,9 @@ class StreamService : Service() {
 
             StreamState.set(StreamStatus.Live(grant.target, audio))
             refreshTile()
+            liveLabel = grant.target.label
             notify(getString(R.string.notification_live, grant.target.label))
+            watchdog = scope.launch { watch() }
 
             room.events.collect { event ->
                 if (event is RoomEvent.Disconnected) {
@@ -213,6 +234,77 @@ class StreamService : Service() {
         }
     }
 
+    /**
+     * Confere a cada [WATCH_INTERVAL_MS] se a imagem continua saindo. Se a captura entrega quadros
+     * e o WebRTC não manda nenhum, publica a tela de novo (sem pedir a captura outra vez). Mostra
+     * na notificação quantos quadros por segundo estão saindo, para dar para ver quando trava.
+     */
+    private suspend fun watch() {
+        val detector = StallDetector()
+        var lastRepublish = 0L
+        while (scope.isActive && !finished) {
+            delay(WATCH_INTERVAL_MS)
+            val track = screenTrack ?: return
+            val sent = runCatching { framesSent(track) }.getOrNull()
+            val result = detector.check(capturedFrames.get(), sent)
+            val fps = (result.sentDelta * 1000 / WATCH_INTERVAL_MS).toInt()
+            val label = liveLabel ?: continue
+            when (result.verdict) {
+                StallDetector.Verdict.SendStuck -> {
+                    val now = System.currentTimeMillis()
+                    if (now - lastRepublish < REPUBLISH_COOLDOWN_MS) continue
+                    lastRepublish = now
+                    Log.w(TAG, "a imagem parou de sair; publicando a tela de novo")
+                    notify(getString(R.string.notification_recovering))
+                    republish(track)
+                    detector.reset()
+                }
+                StallDetector.Verdict.CaptureIdle -> {
+                    Log.w(TAG, "a captura do Android não entrega quadros")
+                    notify(getString(R.string.notification_idle, label))
+                }
+                StallDetector.Verdict.Ok -> {
+                    if (result.sentDelta > 0) notify(getString(R.string.notification_live_fps, label, fps))
+                }
+            }
+        }
+    }
+
+    /** Quantos quadros de vídeo o WebRTC já mandou desta tela (`null`: ainda sem números). */
+    private suspend fun framesSent(track: LocalScreencastVideoTrack): Long? {
+        val report = track.getRTCStats() ?: return null
+        return report.statsMap.values
+            .filter { it.type == "outbound-rtp" && it.members["kind"] == "video" }
+            .mapNotNull { (it.members["framesSent"] as? Number)?.toLong() }
+            .maxOrNull()
+    }
+
+    private suspend fun republish(track: LocalScreencastVideoTrack) {
+        val local = room?.localParticipant ?: return
+        val options = publishOptions ?: return
+        try {
+            local.unpublishTrack(track, stopOnUnpublish = false)
+            if (!local.publishVideoTrack(track, options)) finish(getString(R.string.error_publish))
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            Log.e(TAG, "não deu para publicar a tela de novo", error)
+            finish(getString(R.string.error_publish))
+        }
+    }
+
+    /** O Wi-Fi em modo de baixa latência enquanto transmite, sem economia de energia no meio. */
+    private fun holdWifi() {
+        if (wifiLock != null) return
+        val wifi = applicationContext.getSystemService(WifiManager::class.java) ?: return
+        wifiLock = runCatching {
+            wifi.createWifiLock(WifiManager.WIFI_MODE_FULL_LOW_LATENCY, TAG).apply {
+                setReferenceCounted(false)
+                acquire()
+            }
+        }.getOrNull()
+    }
+
     /** O tamanho da tela inteira agora, em pixels (com as barras do sistema). */
     private fun displaySize(): Pair<Int, Int> {
         val display = getSystemService(DisplayManager::class.java)?.getDisplay(Display.DEFAULT_DISPLAY)
@@ -235,10 +327,16 @@ class StreamService : Service() {
     private fun finish(reason: String?) {
         if (finished) return
         finished = true
+        watchdog?.cancel()
+        watchdog = null
+        runCatching { wifiLock?.release() }
+        wifiLock = null
+        liveLabel = null
         audioTrack?.setAudioBufferCallback(null)
         gameAudio?.release()
         gameAudio = null
         audioTrack = null
+        runCatching { screenTrack?.removeRenderer(frameCounter) }
         runCatching { screenTrack?.stop() }
         screenTrack = null
         room?.let {
@@ -321,6 +419,8 @@ class StreamService : Service() {
         private const val ACTION_START = "com.gustavo99g.ashtar.transmissor.START"
         private const val ACTION_STOP = "com.gustavo99g.ashtar.transmissor.STOP"
         private const val EXTRA_PROJECTION = "projection"
+        private const val WATCH_INTERVAL_MS = 2_000L
+        private const val REPUBLISH_COOLDOWN_MS = 20_000L
 
         /** Começa a transmissão com a permissão de captura que o Android acabou de dar. */
         fun start(context: Context, projection: Intent) {

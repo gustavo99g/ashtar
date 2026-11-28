@@ -62,6 +62,9 @@
     <!-- Notificação e serviço -->
     <string name="notification_starting">Conectando…</string>
     <string name="notification_live">Transmitindo %1$s</string>
+    <string name="notification_live_fps">Transmitindo %1$s · %2$d fps</string>
+    <string name="notification_idle">Transmitindo %1$s · a tela não muda há um tempo</string>
+    <string name="notification_recovering">A imagem travou. Reconectando o vídeo…</string>
     <string name="stopped_owner_left">A transmissão parou: você saiu da sala ou da ligação.</string>
     <string name="stopped_room_closed">A transmissão parou: a sala fechou.</string>
     <string name="stopped_duplicate">A transmissão parou: ela começou em outro lugar.</string>
