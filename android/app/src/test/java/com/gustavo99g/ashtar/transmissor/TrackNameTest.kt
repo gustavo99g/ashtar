@@ -31,4 +31,20 @@ class TrackNameTest {
         assertEquals(Quality.LIGHT, Quality.fromKey("4k"))
         assertEquals(Quality.LIGHT, Quality.fromKey(null))
     }
+
+    @Test
+    fun `a captura segue a proporção da tela, deitada ou em pé`() {
+        // 16:9: o de sempre.
+        assertEquals(1280 to 720, Quality.LIGHT.captureSize(1920, 1080))
+        assertEquals(1280 to 720, Quality.LIGHT.captureSize(1080, 1920))
+        // Mais larga que 16:9 (20:9): o lado maior acompanha.
+        assertEquals(1600 to 720, Quality.LIGHT.captureSize(2400, 1080))
+        assertEquals(2400 to 1080, Quality.MOTION.captureSize(1080, 2400))
+        // Nunca maior que a tela.
+        assertEquals(1280 to 720, Quality.MOTION.captureSize(1280, 720))
+        // Sempre par.
+        assertEquals(1334 to 720, Quality.LIGHT.captureSize(2001, 1080))
+        // Sem saber a tela, o tamanho da qualidade.
+        assertEquals(1280 to 720, Quality.LIGHT.captureSize(0, 0))
+    }
 }

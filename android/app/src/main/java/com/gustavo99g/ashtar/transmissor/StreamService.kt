@@ -12,10 +12,13 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
+import android.hardware.display.DisplayManager
 import android.os.Build
 import android.os.IBinder
 import android.service.quicksettings.TileService
+import android.util.DisplayMetrics
 import android.util.Log
+import android.view.Display
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
@@ -112,7 +115,11 @@ class StreamService : Service() {
                 mediaProjectionPermissionResultData = projection,
                 options = LocalVideoTrackOptions(
                     isScreencast = true,
-                    captureParams = VideoCaptureParameter(quality.width, quality.height, quality.fps),
+                    // A proporção da tela de verdade (o Odin não é 16:9); a LiveKit gira sozinha.
+                    captureParams = displaySize().let { (w, h) ->
+                        val (long, short) = quality.captureSize(w, h)
+                        VideoCaptureParameter(long, short, quality.fps)
+                    },
                 ),
                 onStop = { scope.launch { finish(getString(R.string.stopped_by_system)) } },
             )
@@ -204,6 +211,16 @@ class StreamService : Service() {
             Log.w(TAG, "sem o áudio do jogo", error)
             false
         }
+    }
+
+    /** O tamanho da tela inteira agora, em pixels (com as barras do sistema). */
+    private fun displaySize(): Pair<Int, Int> {
+        val display = getSystemService(DisplayManager::class.java)?.getDisplay(Display.DEFAULT_DISPLAY)
+            ?: return 0 to 0
+        val metrics = DisplayMetrics()
+        @Suppress("DEPRECATION")
+        display.getRealMetrics(metrics)
+        return metrics.widthPixels to metrics.heightPixels
     }
 
     private fun disconnectReason(reason: DisconnectReason): String? = when (reason) {

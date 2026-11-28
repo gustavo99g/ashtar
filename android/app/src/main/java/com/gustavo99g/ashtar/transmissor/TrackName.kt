@@ -51,7 +51,24 @@ enum class Quality(
     LIGHT("720p60", "720p · 60 fps", 1280, 720, 60, 4_000_000),
     ;
 
+    /**
+     * O tamanho da captura (o lado maior e o menor) com a proporção da tela de verdade: a altura da
+     * qualidade (720 ou 1080) no lado menor, e o maior acompanhando a tela. A LiveKit usa um tamanho
+     * fixo (1280 × 720, 16:9) e gira conforme a tela; numa tela mais larga que 16:9, como a do Odin, a
+     * imagem saía achatada. Nunca passa do tamanho da própria tela, e os lados são pares (o H.264 pede).
+     */
+    fun captureSize(displayWidth: Int, displayHeight: Int): Pair<Int, Int> {
+        val long = maxOf(displayWidth, displayHeight)
+        val short = minOf(displayWidth, displayHeight)
+        if (long <= 0 || short <= 0) return width to height
+        val captureShort = even(minOf(height, short))
+        val captureLong = even(minOf(long.toLong() * captureShort / short, long.toLong()).toInt())
+        return captureLong to captureShort
+    }
+
     companion object {
         fun fromKey(key: String?): Quality = entries.firstOrNull { it.key == key } ?: LIGHT
+
+        private fun even(n: Int) = n - n % 2
     }
 }
