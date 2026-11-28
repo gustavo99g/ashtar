@@ -30,7 +30,12 @@ saída: só o dono tem. Abrir para outros é dar a permissão em Membros.
 
 **Outra identidade na sala:** `{id}:screen-{aparelho}`, ao lado da `{id}:screen` do computador. O dono é o que vem
 antes do primeiro `:` (nenhum id de membro tem `:`). O token leva nos metadados o nome do aparelho
-(`{"screenOf": id, "nick": "...", "source": "Odin 3"}`), e quem assiste vê "Kid · Odin 3". No app, cada transmissão
+(`{"screenOf": id, "nick": "...", "source": "Odin 3"}`), e quem assiste vê "Kid · Odin 3".
+
+**Na lista da sala, o aparelho é uma entrada à parte** (pedido do Kid no primeiro teste): o controle no lugar da
+foto, o nome do aparelho e o selo de transmissão, e clicar já assiste (sem cartão de perfil). A tela do aparelho
+não marca o dono como transmitindo: só a do computador marca. A API manda os aparelhos no `devices` da entrada do
+dono (`ParticipantView`), e o aviso "começou a transmitir" sai para cada aparelho, com o nome dele. No app, cada transmissão
 tem uma chave: a do computador continua sendo o id do dono, e a do aparelho é a identidade inteira; tudo que guarda
 algo por transmissão (aberta, foco, volume, à vista) usa a chave. A do próprio aparelho não é "a própria
 transmissão": o dono pode assistir.

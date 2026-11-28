@@ -7,7 +7,9 @@ import { useSession } from "@/features/identity";
 import {
 	type ChannelMember,
 	memberFromApi,
+	membersFromApi,
 	sharingFirst,
+	useLiveDevices,
 	useLiveMembers,
 	useGuardedJoin,
 	useVoice,
@@ -183,6 +185,7 @@ function VoiceChannel(props: RowProps) {
 
 function LiveVoiceChannel(props: RowProps) {
 	const live = useLiveMembers();
+	const devices = useLiveDevices();
 	// O que cada um transmite vem da API (o app de quem transmite conta), não do LiveKit.
 	const { data } = useVoiceParticipants(props.channel.id, { enabled: false });
 	const shares = new Map(
@@ -191,11 +194,14 @@ function LiveVoiceChannel(props: RowProps) {
 			return share ? [[participant.user_id, share] as const] : [];
 		}),
 	);
-	const members = live.map((member) =>
-		member.sharing && shares.has(member.id)
-			? { ...member, share: shares.get(member.id) }
-			: member,
-	);
+	const members = [
+		...live.map((member) =>
+			member.sharing && shares.has(member.id)
+				? { ...member, share: shares.get(member.id) }
+				: member,
+		),
+		...devices,
+	];
 	return <VoiceChannelRow {...props} members={members} inCall />;
 }
 
@@ -205,7 +211,7 @@ function ApiVoiceChannel({ inCall, ...props }: RowProps & { inCall: boolean }) {
 	return (
 		<VoiceChannelRow
 			{...props}
-			members={data?.map(memberFromApi) ?? []}
+			members={membersFromApi(data ?? [])}
 			inCall={inCall}
 		/>
 	);

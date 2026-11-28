@@ -64,7 +64,7 @@ const layout: Layout = {
 };
 
 function person(id: string, sharing = false): ParticipantView {
-	return { user_id: id, nick: id, display_name: null, screen_sharing: sharing, mic_off: false, deafened: false, camera: false, server_muted: false, server_deafened: false, sounds_blocked: false };
+	return { user_id: id, nick: id, display_name: null, screen_sharing: sharing, mic_off: false, deafened: false, camera: false, server_muted: false, server_deafened: false, sounds_blocked: false, devices: [] };
 }
 
 function renderNav({ manage = false, at = paths.channel("geral") } = {}) {
@@ -246,6 +246,25 @@ describe("a coluna de canais", () => {
 		expect(
 			await screen.findByRole("menuitem", { name: "Voltar a ouvir" }),
 		).toBeInTheDocument();
+	});
+
+	it("o aparelho que transmite aparece como uma entrada à parte, com o selo, que assiste", async () => {
+		vi.mocked(listVoiceParticipants).mockImplementation(async (id) =>
+			id === "squad"
+				? [{ ...person("ana"), devices: [{ identity: "ana:screen-odin", name: "Odin 3" }] }]
+				: [],
+		);
+		renderNav();
+		const squad = await screen.findByRole("list", {
+			name: "Quem está na Squad",
+		});
+		const rows = within(squad).getAllByRole("button");
+		// Quem transmite sobe: o Odin vem antes da dona.
+		expect(rows.map((row) => row.getAttribute("aria-label") ?? row.textContent)).toEqual([
+			"Assistir Odin 3 de ana",
+			expect.stringContaining("ana"),
+		]);
+		expect(within(rows[0] as HTMLElement).getByText(/ao vivo|transmitindo/i)).toBeVisible();
 	});
 
 	it("clicar em alguém da sala abre o cartão da pessoa", async () => {

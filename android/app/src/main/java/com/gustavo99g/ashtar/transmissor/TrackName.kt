@@ -44,14 +44,14 @@ enum class Quality(
     val fps: Int,
     val bitrateBps: Int,
 ) {
-    /** Movimento: o padrão, para jogos. */
+    /** Movimento: a imagem inteira da tela, para quando a internet aguenta. */
     MOTION("1080p60", "1080p · 60 fps", 1920, 1080, 60, 8_000_000),
 
-    /** Leve: para quando a internet do portátil não aguenta. */
+    /** Leve: o padrão. Metade dos dados, e o portátil esquenta e gasta menos bateria. */
     LIGHT("720p60", "720p · 60 fps", 1280, 720, 60, 4_000_000),
     ;
 
     companion object {
-        fun fromKey(key: String?): Quality = entries.firstOrNull { it.key == key } ?: MOTION
+        fun fromKey(key: String?): Quality = entries.firstOrNull { it.key == key } ?: LIGHT
     }
 }

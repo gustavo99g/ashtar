@@ -44,12 +44,25 @@ pub struct ParticipantView {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[ts(optional = nullable)]
     pub share: Option<ShareInfo>,
+    /// As telas dos aparelhos de transmissão dela na sala (ADR 0038). A lista mostra cada uma como
+    /// uma entrada à parte, logo depois da pessoa; não marcam a pessoa como transmitindo.
+    pub devices: Vec<DeviceShareView>,
     /// Silenciada pela moderação (ADR 0034): o microfone vermelho com o escudo.
     pub server_muted: bool,
     /// Com o áudio desligado pela moderação.
     pub server_deafened: bool,
     /// Sem tocar sons pela moderação (ADR 0037): o botão Sons dela fica apagado.
     pub sounds_blocked: bool,
+}
+
+/// A tela de um aparelho de transmissão na sala (ADR 0038), na entrada do dono.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, TS)]
+#[ts(export, export_to = "index.ts")]
+pub struct DeviceShareView {
+    /// A identidade da conexão (`{dono}:screen-{aparelho}`): é a chave da transmissão no app.
+    pub identity: String,
+    /// O nome do aparelho ("Odin 3").
+    pub name: String,
 }
 
 /// A transmissão de alguém, para o cartão de Assistir de quem está fora da sala (v0.7): a fonte,
@@ -118,10 +131,13 @@ impl VoiceFlags {
 
 /// Quem o LiveKit diz que está na sala: a identidade do token (o id do membro)
 /// e se tem uma trilha de tela publicada.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct RoomParticipant {
     pub identity: String,
+    /// Transmite pelo computador (a `:screen`) ou pela própria conexão.
     pub screen_sharing: bool,
+    /// As telas dos aparelhos dela que estão no ar (ADR 0038).
+    pub devices: Vec<DeviceShareView>,
 }
 
 /// O fim da identidade da conexão que transmite a tela de alguém (`{user_id}:screen`): o app
@@ -247,9 +263,9 @@ pub fn drop_device_screens_in_background(room: String, user_id: String) {
 }
 
 /// Da resposta do LiveKit para o que a lista usa, na ordem em que entraram.
-/// A `:screen` de alguém (e a `:screen-{aparelho}`, ADR 0038) não vira participante: só marca o
-/// dono como transmitindo. Sem o dono na
-/// sala (ele saiu e a tela ainda não), ela fica de fora.
+/// A `:screen` de alguém não vira participante: só marca o dono como transmitindo. A
+/// `:screen-{aparelho}` (ADR 0038) também não, mas vai na entrada do dono como um aparelho, que a
+/// lista mostra à parte. Sem o dono na sala (ele saiu e a tela ainda não), a tela fica de fora.
 pub fn room_participants(mut infos: Vec<ParticipantInfo>) -> Vec<RoomParticipant> {
     infos.sort_by_key(|info| (info.joined_at, info.joined_at_ms));
     let shares_screen = |info: &ParticipantInfo| {
@@ -257,19 +273,45 @@ pub fn room_participants(mut infos: Vec<ParticipantInfo>) -> Vec<RoomParticipant
             .iter()
             .any(|track| track.source() == TrackSource::ScreenShare)
     };
-    let screens: Vec<&str> = infos
+    let publishing: Vec<&ParticipantInfo> = infos
         .iter()
-        .filter(|info| shares_screen(info))
-        .filter_map(|info| screen_owner(&info.identity))
+        .filter(|info| is_screen_identity(&info.identity) && shares_screen(info))
         .collect();
     infos
         .iter()
         .filter(|info| !is_screen_identity(&info.identity))
-        .map(|info| RoomParticipant {
-            screen_sharing: shares_screen(info) || screens.contains(&info.identity.as_str()),
-            identity: info.identity.clone(),
+        .map(|info| {
+            let own = |screen: &&&ParticipantInfo| {
+                screen_owner(&screen.identity) == Some(info.identity.as_str())
+            };
+            let pc = publishing
+                .iter()
+                .filter(own)
+                .any(|screen| !is_device_screen_identity(&screen.identity));
+            RoomParticipant {
+                screen_sharing: shares_screen(info) || pc,
+                identity: info.identity.clone(),
+                devices: publishing
+                    .iter()
+                    .filter(own)
+                    .filter(|screen| is_device_screen_identity(&screen.identity))
+                    .map(|screen| DeviceShareView {
+                        identity: screen.identity.clone(),
+                        name: device_name(&screen.metadata),
+                    })
+                    .collect(),
+            }
         })
         .collect()
+}
+
+/// O nome do aparelho, dos metadados que a API pôs no token (`"source": "Odin 3"`).
+fn device_name(metadata: &str) -> String {
+    serde_json::from_str::<serde_json::Value>(metadata)
+        .ok()
+        .and_then(|value| value.get("source")?.as_str().map(str::to_owned))
+        .filter(|name| !name.trim().is_empty())
+        .unwrap_or_else(|| "Aparelho".to_owned())
 }
 
 /// Junta a lista do LiveKit com o banco: o nick e o nome visível saem do membro
@@ -302,6 +344,7 @@ pub async fn join_participants(
                 nick: user.nick.clone(),
                 display_name: user.display_name.clone(),
                 screen_sharing: participant.screen_sharing,
+                devices: participant.devices,
                 avatar: user.avatar_id.clone(),
                 ..ParticipantView::default()
             })
@@ -721,19 +764,31 @@ mod tests {
     }
 
     #[test]
-    fn a_tela_do_aparelho_marca_o_dono_e_conta_como_outra_conexao() {
+    fn a_tela_do_aparelho_vai_a_parte_e_conta_como_outra_conexao() {
+        let mut odin = participant("juju:screen-odin", 14, &[TrackSource::ScreenShare]);
+        odin.metadata = r#"{"screenOf":"juju","nick":"juju","source":"Odin 3"}"#.into();
         let infos = vec![
             participant("kid", 10, &[TrackSource::Microphone]),
             participant("juju", 11, &[TrackSource::Microphone]),
             participant("kid:screen", 12, &[TrackSource::ScreenShare]),
             participant("kid:screen-odin", 13, &[TrackSource::ScreenShare]),
-            participant("juju:screen-odin", 14, &[TrackSource::ScreenShare]),
+            odin,
+            // Entrou, mas ainda não publicou: não aparece.
+            participant("kid:screen-tab", 15, &[]),
         ];
-        let sharing: Vec<(String, bool)> = room_participants(infos.clone())
-            .into_iter()
-            .map(|p| (p.identity, p.screen_sharing))
+        let room = room_participants(infos.clone());
+        let sharing: Vec<(&str, bool)> = room
+            .iter()
+            .map(|p| (p.identity.as_str(), p.screen_sharing))
             .collect();
-        assert_eq!(sharing, [("kid".into(), true), ("juju".into(), true)]);
+        // A Juju só transmite pelo aparelho: ela mesma não está transmitindo.
+        assert_eq!(sharing, [("kid", true), ("juju", false)]);
+        let device = |identity: &str, name: &str| DeviceShareView {
+            identity: identity.into(),
+            name: name.into(),
+        };
+        assert_eq!(room[0].devices, [device("kid:screen-odin", "Aparelho")]);
+        assert_eq!(room[1].devices, [device("juju:screen-odin", "Odin 3")]);
         let screens: Vec<(String, String)> = screen_connections(&infos)
             .into_iter()
             .filter(|screen| screen.publishing)

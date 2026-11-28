@@ -25,9 +25,10 @@ class TrackNameTest {
     }
 
     @Test
-    fun `a qualidade desconhecida vira a de jogo`() {
+    fun `a qualidade desconhecida vira a leve, o padrão`() {
         assertEquals(Quality.LIGHT, Quality.fromKey("720p60"))
-        assertEquals(Quality.MOTION, Quality.fromKey("4k"))
-        assertEquals(Quality.MOTION, Quality.fromKey(null))
+        assertEquals(Quality.MOTION, Quality.fromKey("1080p60"))
+        assertEquals(Quality.LIGHT, Quality.fromKey("4k"))
+        assertEquals(Quality.LIGHT, Quality.fromKey(null))
     }
 }

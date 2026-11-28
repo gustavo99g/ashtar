@@ -2,9 +2,38 @@ import { describe, expect, it } from "vitest";
 import {
 	type ChannelMember,
 	memberFromApi,
+	membersFromApi,
 	peopleNowLabel,
 	sharingFirst,
 } from "../model/members";
+
+describe("membersFromApi", () => {
+	it("cada aparelho vira uma entrada à parte, logo depois do dono, que não fica transmitindo", () => {
+		const person = (id: string, devices: { identity: string; name: string }[] = []) => ({
+			user_id: id,
+			nick: id,
+			display_name: id === "u1" ? "Kid" : null,
+			screen_sharing: false,
+			mic_off: false,
+			deafened: false,
+			camera: false,
+			server_muted: false,
+			server_deafened: false,
+			sounds_blocked: false,
+			devices,
+		});
+		const members = membersFromApi([
+			person("u1", [{ identity: "u1:screen-ab12", name: "Odin 3" }]),
+			person("u2"),
+		]);
+		expect(members.map((m) => [m.id, m.name, m.sharing])).toEqual([
+			["u1", "Kid", false],
+			["u1:screen-ab12", "Odin 3", true],
+			["u2", "u2", false],
+		]);
+		expect(members[1]?.device).toEqual({ ownerId: "u1", ownerName: "Kid" });
+	});
+});
 
 describe("memberFromApi", () => {
 	it("usa o nome visível (sem ele, o nick) e o estado que o app contou", () => {
@@ -20,6 +49,7 @@ describe("memberFromApi", () => {
 				server_muted: false,
 				server_deafened: false,
 				sounds_blocked: false,
+				devices: [],
 			}),
 		).toEqual({
 			id: "u1",
@@ -45,6 +75,7 @@ describe("memberFromApi", () => {
 				server_muted: false,
 				server_deafened: false,
 				sounds_blocked: false,
+				devices: [],
 			}),
 		).toEqual({
 			id: "u2",

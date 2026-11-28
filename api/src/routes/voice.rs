@@ -676,11 +676,12 @@ mod tests {
         let room = [
             RoomParticipant {
                 identity: "kid".into(),
-                screen_sharing: false,
+                ..RoomParticipant::default()
             },
             RoomParticipant {
                 identity: "juju".into(),
                 screen_sharing: true,
+                ..RoomParticipant::default()
             },
         ];
         assert!(in_room(&room, "kid"));

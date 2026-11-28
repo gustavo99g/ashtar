@@ -13,15 +13,16 @@ tem chat, voz nem lista de canais.
 3. Entre numa sala ou ligação pelo computador. No Odin, toque em **Transmitir** (ou no bloco
    **Transmitir** das Configurações rápidas) e confirme a captura do Android.
 
-Para o grupo, a tela aparece como "Kid · Odin 3", ao lado da tela do computador se ela também
-estiver no ar. Se você sair da sala, a transmissão do Odin cai.
+Na lista da sala, o Odin aparece como uma entrada à parte, com o controle no lugar da foto e o
+selo de transmissão: clicar nele assiste. Na tela da chamada, a transmissão é "Kid · Odin 3", ao lado
+da tela do computador se ela também estiver no ar. Se você sair da sala, a transmissão do Odin cai.
 
 ## Como funciona
 
 - O pareamento troca o código por uma sessão só do aparelho, que só pede o token da tela
   (`/api/stream-devices/self/*`).
-- O vídeo sai pelo MediaProjection, em H.264 pelo encoder de hardware, a 1080p60 (8 Mbps) ou
-  720p60 (4 Mbps), numa camada só, como o publicador do computador.
+- O vídeo sai pelo MediaProjection, em H.264 pelo encoder de hardware, a 720p60 (4 Mbps,
+  o padrão) ou 1080p60 (8 Mbps), numa camada só, como o publicador do computador.
 - O áudio do jogo sai pela captura de áudio dos apps do Android (10 ou mais novo); o microfone é
   zerado antes (`GameAudio.kt`). Jogos que bloqueiam a captura saem sem som.
 - O nome da trilha segue o formato do app (`screen-share:{"t","q","s"}`), então quem assiste vê

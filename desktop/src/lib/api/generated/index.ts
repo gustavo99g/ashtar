@@ -240,6 +240,19 @@ export type DetectableGame = {
  */
 exe: string, name: string, };
 
+/**
+ * A tela de um aparelho de transmissão na sala (ADR 0038), na entrada do dono.
+ */
+export type DeviceShareView = { 
+/**
+ * A identidade da conexão (`{dono}:screen-{aparelho}`): é a chave da transmissão no app.
+ */
+identity: string, 
+/**
+ * O nome do aparelho ("Odin 3").
+ */
+name: string, };
+
 export type DeviceView = { linked_at: number, };
 
 export type DisconnectMemberRequest = { user_id: string, };
@@ -700,6 +713,11 @@ camera: boolean,
  * transmite.
  */
 share?: ShareInfo | null, 
+/**
+ * As telas dos aparelhos de transmissão dela na sala (ADR 0038). A lista mostra cada uma como
+ * uma entrada à parte, logo depois da pessoa; não marcam a pessoa como transmitindo.
+ */
+devices: Array<DeviceShareView>, 
 /**
  * Silenciada pela moderação (ADR 0034): o microfone vermelho com o escudo.
  */
