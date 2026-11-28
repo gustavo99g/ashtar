@@ -28,7 +28,7 @@ use crate::voice;
 #[derive(Debug, Serialize, TS)]
 #[ts(export, export_to = "index.ts")]
 pub struct PairCodeResponse {
-    /// No formato `XXXX-XXXX-XXXX`.
+    /// 6 números, como `042917`.
     pub code: String,
     /// Em segundos (Unix).
     pub expires_at: i64,

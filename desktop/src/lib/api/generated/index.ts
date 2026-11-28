@@ -665,7 +665,7 @@ export type Origin = "owner" | "direct";
  */
 export type PairCodeResponse = { 
 /**
- * No formato `XXXX-XXXX-XXXX`.
+ * 6 números, como `042917`.
  */
 code: string, 
 /**

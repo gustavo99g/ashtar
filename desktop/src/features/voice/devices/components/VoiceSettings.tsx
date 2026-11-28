@@ -9,11 +9,7 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { useMe } from "@/features/identity";
-import {
-	ShareDefaultsSection,
-	StreamDevicesSection,
-} from "@/features/screen-share";
+import { ShareDefaultsSection } from "@/features/screen-share";
 import { useSettingsStore } from "@/features/settings";
 import { openScreenshotDir } from "@/lib/tauri/commands";
 import { cn } from "@/lib/utils";
@@ -67,8 +63,6 @@ interface Option {
 
 export function VoiceSettings() {
 	const devices = useAudioDevices({ revealNames: true });
-	// Os aparelhos de transmissão (ADR 0038), só para quem tem a permissão.
-	const canStreamFromDevice = useMe().data?.can_stream_from_device === true;
 	// O "Ligar para fulano?" (v0.3) e o "Trocar de sala?" (v0.5): o "Não perguntar de novo" do
 	// próprio aviso desliga; aqui liga de volta.
 	const askBeforeCall = useSettingsStore((state) => state.askBeforeCall);
@@ -156,11 +150,6 @@ export function VoiceSettings() {
 			<Section title="Compartilhamento de tela">
 				<ShareDefaultsSection />
 			</Section>
-			{canStreamFromDevice && (
-				<Section title="Aparelhos de transmissão" gap="gap-3">
-					<StreamDevicesSection />
-				</Section>
-			)}
 			<Section title="Prints" gap="gap-1">
 				<SettingSwitch
 					title="Salvar prints no computador"

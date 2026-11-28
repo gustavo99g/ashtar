@@ -31,6 +31,7 @@ import {
 	SoundsSettingsRoute,
 	LogsSettingsRoute,
 	AuditSettingsRoute,
+	DevicesSettingsRoute,
 	ServerSettingsRoute,
 	InvitesSettingsRoute,
 	MembersSettingsRoute,
@@ -77,6 +78,7 @@ export const routes: RouteObject[] = [
 							{ index: true, element: <Navigate to="profile" replace /> },
 							{ path: "profile", element: <ProfileSettingsRoute /> },
 							{ path: "voice", element: <VoiceSettingsRoute /> },
+							{ path: "devices", element: <DevicesSettingsRoute /> },
 							{ path: "shortcuts", element: <ShortcutsSettingsRoute /> },
 							{ path: "activity", element: <ActivitySettingsRoute /> },
 							{

@@ -2,8 +2,8 @@
 //! o dono está, numa sala de voz ou numa ligação privada.
 //!
 //! Não é o dispositivo do membro ([`super::devices`]): o membro continua com o computador dele, e o
-//! aparelho é uma fonte a mais, ligada a ele. O desktop gera um código de pareamento (10 minutos,
-//! uma vez só); o aparelho troca o código por um token de sessão próprio. Esse token não passa no
+//! aparelho é uma fonte a mais, ligada a ele. O desktop gera um código de pareamento (6 números,
+//! 3 minutos, uma vez só); o aparelho troca o código por um token de sessão próprio. Esse token não passa no
 //! [`super::devices::authenticate`] (outra tabela), então o aparelho não chega a nenhuma rota do
 //! app: só às rotas `/api/stream-devices/self/*`, pelo extrator `CurrentStreamDevice`.
 //!
@@ -20,8 +20,15 @@ use super::permissions::{Permission, require_permission};
 use crate::error::ApiError;
 use crate::secret;
 
-/// Quanto o código de pareamento vale, em segundos.
-pub const PAIR_CODE_TTL_SECS: i64 = 10 * 60;
+/// Quanto o código de pareamento vale, em segundos. Curto porque o código é curto: 6 números,
+/// uma vez só, e o pareamento conta no limite de tentativas.
+pub const PAIR_CODE_TTL_SECS: i64 = 3 * 60;
+
+/// Quantos números tem o código de pareamento.
+pub const PAIR_CODE_DIGITS: usize = 6;
+
+/// Quantas vezes tentar outro código quando o sorteado já está em uso por outra pessoa.
+const PAIR_CODE_ATTEMPTS: usize = 5;
 
 /// Quantos aparelhos uma pessoa pode ter. É proteção da VPS: cada um é uma transmissão a mais.
 pub const MAX_DEVICES_PER_USER: i64 = 3;
@@ -44,6 +51,32 @@ pub struct StreamDevice {
     pub last_seen_at: i64,
 }
 
+/// Um código de pareamento novo: 6 números, como `042917`.
+pub fn new_pair_code() -> String {
+    // O maior múltiplo de 1.000.000 que cabe num u32: acima dele, sorteia de novo, para nenhum
+    // número sair mais que os outros.
+    const LIMIT: u32 = u32::MAX - u32::MAX % 1_000_000;
+    loop {
+        let mut bytes = [0u8; 4];
+        getrandom::fill(&mut bytes).expect("o sistema deveria fornecer bytes aleatórios");
+        let n = u32::from_le_bytes(bytes);
+        if n < LIMIT {
+            return format!("{:06}", n % 1_000_000);
+        }
+    }
+}
+
+/// O código como o aparelho mandou, sem espaços e traços (`"042 917"` vira `"042917"`). `None` se
+/// não forem 6 números.
+pub fn normalize_pair_code(code: &str) -> Option<String> {
+    let digits: String = code
+        .chars()
+        .filter(|c| !c.is_whitespace() && *c != '-')
+        .collect();
+    (digits.len() == PAIR_CODE_DIGITS && digits.bytes().all(|b| b.is_ascii_digit()))
+        .then_some(digits)
+}
+
 /// O nome que fica guardado: sem espaços nas pontas, de 1 a 32 caracteres. Vazio vira "Aparelho".
 pub fn normalize_name(name: Option<&str>) -> Result<String, ApiError> {
     let name = name.map(str::trim).unwrap_or_default();
@@ -58,7 +91,7 @@ pub fn normalize_name(name: Option<&str>) -> Result<String, ApiError> {
     Ok(name.to_owned())
 }
 
-/// Um código novo para `user` parear um aparelho, no formato `XXXX-XXXX-XXXX`. O código anterior
+/// Um código novo para `user` parear um aparelho: 6 números, por 3 minutos. O código anterior
 /// dele, se ainda valia, deixa de valer.
 pub async fn create_pair_code(
     db: &SqlitePool,
@@ -75,8 +108,6 @@ pub async fn create_pair_code(
             "Você já tem {MAX_DEVICES_PER_USER} aparelhos. Desvincule um para parear outro."
         )));
     }
-    let code = secret::new_invite_code();
-    let normalized = secret::normalize_invite_code(&code).expect("o código gerado é válido");
     let expires_at = now + PAIR_CODE_TTL_SECS;
     let mut tx = db.begin().await?;
     sqlx::query("DELETE FROM stream_pair_codes WHERE user_id = ? OR expires_at <= ?")
@@ -84,15 +115,28 @@ pub async fn create_pair_code(
         .bind(now)
         .execute(&mut *tx)
         .await?;
-    sqlx::query(
-        "INSERT INTO stream_pair_codes (code_hash, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)",
-    )
-    .bind(secret::hash(&normalized))
-    .bind(&user.id)
-    .bind(now)
-    .bind(expires_at)
-    .execute(&mut *tx)
-    .await?;
+    // Com 6 números, o sorteado pode ser o código ainda válido de outra pessoa: sorteia de novo.
+    let mut code = None;
+    for _ in 0..PAIR_CODE_ATTEMPTS {
+        let candidate = new_pair_code();
+        let inserted = sqlx::query(
+            "INSERT INTO stream_pair_codes (code_hash, user_id, created_at, expires_at)
+             VALUES (?, ?, ?, ?) ON CONFLICT (code_hash) DO NOTHING",
+        )
+        .bind(secret::hash(&candidate))
+        .bind(&user.id)
+        .bind(now)
+        .bind(expires_at)
+        .execute(&mut *tx)
+        .await?;
+        if inserted.rows_affected() == 1 {
+            code = Some(candidate);
+            break;
+        }
+    }
+    let code = code.ok_or_else(|| {
+        ApiError::Conflict("Não deu para gerar o código agora. Tente de novo.".into())
+    })?;
     tx.commit().await?;
     Ok((code, expires_at))
 }
@@ -107,7 +151,7 @@ pub struct Paired {
 /// O texto de todo código recusado: não existe, venceu ou já foi usado.
 fn invalid_code() -> ApiError {
     ApiError::InvalidRequest(
-        "Esse código não vale mais. Gere outro no Ashtar, em Configurações › Voz e vídeo.".into(),
+        "Esse código não vale mais. Gere outro no Ashtar, em Configurações › Dispositivos.".into(),
     )
 }
 
@@ -119,7 +163,7 @@ pub async fn pair(
     now: i64,
 ) -> Result<Paired, ApiError> {
     let name = normalize_name(name)?;
-    let normalized = secret::normalize_invite_code(code).ok_or_else(invalid_code)?;
+    let normalized = normalize_pair_code(code).ok_or_else(invalid_code)?;
     let mut tx = db.begin().await?;
     let user_id: Option<String> = sqlx::query_scalar(
         "DELETE FROM stream_pair_codes WHERE code_hash = ? AND expires_at > ? RETURNING user_id",
@@ -274,6 +318,22 @@ mod tests {
         assert_eq!(normalize_name(Some(" Odin 3 ")).unwrap(), "Odin 3");
         assert!(normalize_name(Some(&"a".repeat(33))).is_err());
         assert!(normalize_name(Some("Odin\n3")).is_err());
+    }
+
+    #[test]
+    fn o_codigo_sao_6_numeros() {
+        for _ in 0..200 {
+            let code = new_pair_code();
+            assert_eq!(code.len(), 6);
+            assert!(code.bytes().all(|b| b.is_ascii_digit()));
+            assert_eq!(normalize_pair_code(&code).as_deref(), Some(code.as_str()));
+        }
+        assert_eq!(normalize_pair_code(" 042 917 ").as_deref(), Some("042917"));
+        assert_eq!(normalize_pair_code("042-917").as_deref(), Some("042917"));
+        assert_eq!(normalize_pair_code("04291"), None);
+        assert_eq!(normalize_pair_code("0429178"), None);
+        assert_eq!(normalize_pair_code("ABCD-EFGH-JKMN"), None);
+        assert_eq!(normalize_pair_code("０４２９１７"), None);
     }
 
     #[test]

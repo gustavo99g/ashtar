@@ -20,8 +20,9 @@ com o token da sessão guardado como SHA-256. Esse token não passa no `CurrentU
 rota do app, só às `/api/stream-devices/self/*`, pelo `CurrentStreamDevice`. Cai quando o dono desvincula ou é
 removido.
 
-**Pareamento pelo app.** Configurações › Voz e vídeo › Aparelhos de transmissão gera um código no formato do convite
-(`XXXX-XXXX-XXXX`), que vale 10 minutos e uma vez só (`stream_pair_codes`). O aparelho manda
+**Pareamento pelo app.** Configurações › Dispositivos (uma aba própria, só para quem tem a permissão) gera um código
+de 6 números, que vale 3 minutos e uma vez só (`stream_pair_codes`). Curto para digitar no portátil; a segurança
+vem do prazo curto, do uso único e do limite de tentativas do pareamento. O aparelho manda
 `POST /api/stream-devices/pair { code, name }` e recebe a sessão. O pareamento conta no limite de tentativas, como o
 convite.
 

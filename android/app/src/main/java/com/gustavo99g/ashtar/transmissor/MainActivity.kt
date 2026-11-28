@@ -25,7 +25,7 @@ import kotlinx.coroutines.withContext
 
 /**
  * A única tela do Transmissor. Sem pareamento: o endereço do servidor e o código que o Ashtar
- * mostra em Configurações › Voz e vídeo › Aparelhos de transmissão. Pareado: para onde a tela vai
+ * mostra em Configurações › Dispositivos. Pareado: para onde a tela vai
  * agora, a qualidade, o áudio do jogo e o botão Transmitir.
  */
 class MainActivity : ComponentActivity() {

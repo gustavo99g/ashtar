@@ -5,9 +5,9 @@
     <string name="tile_starting">Conectando…</string>
     <string name="channel_name">Transmissão</string>
 
-    <string name="pair_help">No Ashtar do computador, abra Configurações › Voz e vídeo › Aparelhos de transmissão, toque em Parear um aparelho e digite aqui o código.</string>
+    <string name="pair_help">No Ashtar do computador, abra Configurações › Dispositivos, toque em Parear um aparelho e digite aqui o código de 6 números.</string>
     <string name="server_hint">Endereço do servidor (https://…)</string>
-    <string name="code_hint">Código (XXXX-XXXX-XXXX)</string>
+    <string name="code_hint">Código (6 números)</string>
     <string name="pair">Parear</string>
     <string name="error_pair_fields">Preencha o endereço do servidor e o código.</string>
 

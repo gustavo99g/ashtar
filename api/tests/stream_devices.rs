@@ -115,7 +115,15 @@ async fn pair_code(ctx: &Ctx, token: &str) -> String {
     )
     .await;
     assert_eq!(status, StatusCode::OK, "{body}");
-    body["code"].as_str().unwrap().to_owned()
+    // 6 números, por 3 minutos.
+    let code = body["code"].as_str().unwrap().to_owned();
+    assert!(
+        code.len() == 6 && code.bytes().all(|b| b.is_ascii_digit()),
+        "{code}"
+    );
+    let ttl = body["expires_at"].as_i64().unwrap() - now();
+    assert!((179..=180).contains(&ttl), "{ttl}");
+    code
 }
 
 async fn pair(ctx: &Ctx, code: &str) -> (StatusCode, Value) {
@@ -192,7 +200,7 @@ async fn o_aparelho_fica_fora_da_versao_minima_do_app() {
         "POST",
         "/api/stream-devices/pair",
         None,
-        Some(json!({ "code": "0000-0000-0000" })),
+        Some(json!({ "code": "000000" })),
     )
     .await;
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{body}");

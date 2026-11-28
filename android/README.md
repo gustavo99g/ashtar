@@ -8,8 +8,8 @@ tem chat, voz nem lista de canais.
 
 1. Baixe o APK do último run do **CI Android** (artefato `ashtar-transmissor`) e instale no Odin
    (permita instalar de fontes desconhecidas).
-2. No Ashtar do computador: Configurações › Voz e vídeo › Aparelhos de transmissão › **Parear um
-   aparelho**. Digite o código no Transmissor, com o endereço do servidor.
+2. No Ashtar do computador: Configurações › Dispositivos › **Parear um aparelho**. Digite no
+   Transmissor o endereço do servidor e o código de 6 números (vale 3 minutos).
 3. Entre numa sala ou ligação pelo computador. No Odin, toque em **Transmitir** (ou no bloco
    **Transmitir** das Configurações rápidas) e confirme a captura do Android.
 

@@ -24,6 +24,7 @@ export const paths = {
 		root: "/settings",
 		profile: "/settings/profile",
 		voice: "/settings/voice",
+		devices: "/settings/devices",
 		shortcuts: "/settings/shortcuts",
 		activity: "/settings/activity",
 		notifications: "/settings/notifications",
