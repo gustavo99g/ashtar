@@ -1,12 +1,21 @@
 import { type ParticipantPerson, participantPerson } from "@/features/identity";
 import type { ScreenShareController } from "../model/controller";
+import { sharerLabel } from "../model/shareInfo";
 import { openSourcePicker } from "../stores/pickerStore";
 import { useScreenShareState } from "./useScreenShareState";
 import type { ScreenShare } from "./useScreenShares";
 
-/** Quem transmite `share`: o nome e o nick vêm da `:screen` (a API repete os do dono), o id é o dono. */
+/**
+ * Quem transmite `share`: o nome e o nick vêm da `:screen` (a API repete os do dono), o id é o dono.
+ * A tela de um aparelho leva o nome dele junto ("Kid · Odin 3", ADR 0038).
+ */
 export function sharePerson(share: ScreenShare): ParticipantPerson {
-	return { ...participantPerson(share.track.participant), id: share.ownerId };
+	const person = participantPerson(share.track.participant);
+	return {
+		...person,
+		id: share.ownerId,
+		name: sharerLabel(person.name, share.source),
+	};
 }
 
 /**

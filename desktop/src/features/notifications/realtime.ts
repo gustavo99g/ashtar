@@ -107,17 +107,27 @@ function onParticipants(
 	participants: ParticipantView[],
 	queryClient: QueryClient,
 ): void {
+	// Cada transmissão pela chave dela: a da pessoa (o computador) e a de cada aparelho (ADR 0038).
+	const streams = participants.flatMap((p) => [
+		...(p.screen_sharing
+			? [{ key: p.user_id, owner: p.user_id, person: p, title: null }]
+			: []),
+		...(p.devices ?? []).map((device) => ({
+			key: device.identity,
+			owner: p.user_id,
+			person: p,
+			title: device.name,
+		})),
+	]);
 	const before = sharing.get(channelId);
-	const now = new Set(
-		participants.filter((p) => p.screen_sharing).map((p) => p.user_id),
-	);
+	const now = new Set(streams.map((stream) => stream.key));
 	sharing.set(channelId, now);
 	if (!before) return;
 
 	const me = useUnreadStore.getState().me;
 	const context = useNotificationContext.getState();
-	const started = participants.filter(
-		(p) => p.screen_sharing && !before.has(p.user_id) && p.user_id !== me,
+	const started = streams.filter(
+		(stream) => !before.has(stream.key) && stream.owner !== me,
 	);
 	if (started.length === 0) return;
 	const decision = decide({
@@ -131,17 +141,19 @@ function onParticipants(
 
 	const layout = queryClient.getQueryData<Layout>(channelsKeys.layout());
 	const room = layout && findChannel(layout, channelId);
-	for (const person of started) {
+	for (const { key, person, title } of started) {
 		const target: CardTarget = {
 			kind: "stream",
 			channelId,
-			userId: person.user_id,
+			userId: key,
 		};
+		const name = person.display_name ?? person.nick;
 		show({
 			key: cardKey(target),
 			kind: "stream",
 			person: { nick: person.nick, displayName: person.display_name },
-			title: person.display_name ?? person.nick,
+			// O aparelho vem com o nome dele, como na tela da sala: "Kid · Odin 3".
+			title: title ? `${name} · ${title}` : name,
 			context: room?.name ?? "Sala",
 			body: "começou a transmitir",
 			sound: null,

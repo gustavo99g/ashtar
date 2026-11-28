@@ -19,7 +19,7 @@ use crate::error::ApiError;
 use crate::identity::permissions::{self, Action, Permission};
 use crate::identity::status::{self, Status};
 use crate::identity::users::Person;
-use crate::identity::{User, devices, invites, users};
+use crate::identity::{User, devices, invites, stream_devices, users};
 use crate::realtime::ServerEvent;
 
 #[derive(Debug, Deserialize)]
@@ -106,6 +106,8 @@ pub struct MeResponse {
     pub can_send_sounds: bool,
     /// Se a tela Sons mostra as abas Aprovação e Todos os sons (v0.9).
     pub can_approve_sounds: bool,
+    /// Se as Configurações mostram Aparelhos de transmissão (ADR 0038).
+    pub can_stream_from_device: bool,
 }
 
 #[derive(Debug, Deserialize, TS)]
@@ -317,6 +319,9 @@ async fn me_response(state: &AppState, user: &User) -> Result<MeResponse, ApiErr
         can_approve_sounds: effective
             .iter()
             .any(|(p, _)| *p == Permission::ApproveSounds),
+        can_stream_from_device: effective
+            .iter()
+            .any(|(p, _)| *p == Permission::StreamFromDevice),
     })
 }
 
@@ -331,6 +336,23 @@ impl FromRequestParts<AppState> for CurrentUser {
         let token = bearer_token(&parts.headers).ok_or(ApiError::Unauthenticated)?;
         let user = devices::authenticate(&state.db, token, now()).await?;
         Ok(Self(user))
+    }
+}
+
+/// Extrator: o aparelho de transmissão do `Authorization: Bearer <token>` (ADR 0038) e o dono dele.
+/// O token de um aparelho não passa no [`CurrentUser`], nem o de um computador aqui.
+pub struct CurrentStreamDevice {
+    pub owner: User,
+    pub device: stream_devices::StreamDevice,
+}
+
+impl FromRequestParts<AppState> for CurrentStreamDevice {
+    type Rejection = ApiError;
+
+    async fn from_request_parts(parts: &mut Parts, state: &AppState) -> Result<Self, ApiError> {
+        let token = bearer_token(&parts.headers).ok_or(ApiError::Unauthenticated)?;
+        let (owner, device) = stream_devices::authenticate(&state.db, token, now()).await?;
+        Ok(Self { owner, device })
     }
 }
 

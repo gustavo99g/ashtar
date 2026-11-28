@@ -1,0 +1,63 @@
+name: CI Android
+
+# O Transmissor do Odin 3 (ADR 0038, pasta `android/`): testes e o APK. Diferente dos outros, roda
+# também no PR que mexe em `android/`: o APK não tem outro lugar para ser compilado antes do merge.
+# O APK sai como artefato do run, para instalar à mão no Odin.
+on:
+  push:
+    branches: [dev, main]
+    paths:
+      - "android/**"
+      - ".github/workflows/ci-android.yml"
+  pull_request:
+    paths:
+      - "android/**"
+      - ".github/workflows/ci-android.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ci-android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    name: APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: android
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Testes
+        run: ./gradlew --no-daemon testDebugUnitTest
+
+      # A chave fixa (segredos ANDROID_KEYSTORE_BASE64 e ANDROID_KEYSTORE_PASSWORD): com ela, o APK
+      # novo instala por cima do antigo. Sem os segredos, sai com a chave de debug, como antes.
+      - name: Chave do APK
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$ANDROID_KEYSTORE_BASE64" ]; then
+            echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > app/transmissor.jks
+          fi
+
+      - name: APK
+        env:
+          ASHTAR_API_URL: ${{ vars.VITE_API_URL }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: ./gradlew --no-daemon assembleRelease "-PashtarApiUrl=${ASHTAR_API_URL}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ashtar-transmissor
+          path: android/app/build/outputs/apk/release/*.apk
+          if-no-files-found: error

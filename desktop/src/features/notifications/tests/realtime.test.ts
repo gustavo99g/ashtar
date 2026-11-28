@@ -50,7 +50,7 @@ function message(channelId: string, mentions: string[] = [], author = "ana"): Me
 }
 
 function participant(id: string, sharing: boolean): ParticipantView {
-	return { user_id: id, nick: id, display_name: null, screen_sharing: sharing, mic_off: false, deafened: false, camera: false, server_muted: false, server_deafened: false, sounds_blocked: false };
+	return { user_id: id, nick: id, display_name: null, screen_sharing: sharing, mic_off: false, deafened: false, camera: false, server_muted: false, server_deafened: false, sounds_blocked: false, devices: [] };
 }
 
 let client: QueryClient;
@@ -144,6 +144,22 @@ describe("handleNotificationsRealtime", () => {
 				body: "começou a transmitir",
 				sound: null,
 				target: { kind: "stream", channelId: "sala", userId: "ana" },
+			}),
+		]);
+	});
+
+	it("o aparelho que passa a transmitir avisa com o nome dele, menos o próprio", () => {
+		const odin = (owner: string) => ({
+			...participant(owner, false),
+			devices: [{ identity: `${owner}:screen-odin`, name: "Odin 3" }],
+		});
+		send({ type: "voice.participants", channel_id: "sala", participants: [participant("ana", false), participant("eu", false)] });
+		send({ type: "voice.participants", channel_id: "sala", participants: [odin("ana"), odin("eu")] });
+		expect(shown()).toEqual([
+			expect.objectContaining({
+				title: "ana · Odin 3",
+				body: "começou a transmitir",
+				target: { kind: "stream", channelId: "sala", userId: "ana:screen-odin" },
 			}),
 		]);
 	});

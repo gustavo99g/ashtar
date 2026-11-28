@@ -44,7 +44,7 @@ function meWith(
 		can_create_invite: isOwner,
 		can_view_panel: isOwner,
 		can_manage_channels: isOwner,
-		can_move_members: isOwner, can_manage_emojis: false, can_view_logs: false, can_moderate_voice: false, can_send_sounds: false, can_approve_sounds: false,
+		can_move_members: isOwner, can_manage_emojis: false, can_view_logs: false, can_moderate_voice: false, can_send_sounds: false, can_approve_sounds: false, can_stream_from_device: false,
 	};
 }
 

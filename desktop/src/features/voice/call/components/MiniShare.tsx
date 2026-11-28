@@ -22,7 +22,12 @@ import { useMatch, useNavigate } from "react-router-dom";
 import { Slider } from "@/components/ui/slider";
 import { Spinner } from "@/components/ui/spinner";
 import { Avatar } from "@/features/identity";
-import { shareOwner, useScreenShares } from "@/features/screen-share";
+import {
+	shareKey,
+	shareOwner,
+	sharerLabel,
+	useScreenShares,
+} from "@/features/screen-share";
 import { paths } from "@/lib/paths";
 import { cn } from "@/lib/utils";
 import { useLiveMembers } from "../../members/hooks/useLiveMembers";
@@ -98,16 +103,25 @@ function WatchedShare({ watching }: { watching: readonly string[] }) {
 		shares.some(
 			(share) =>
 				!share.isOwn &&
-				share.ownerId === id &&
-				members.some((member) => member.id === id),
+				share.key === id &&
+				members.some((member) => member.id === shareOwner(id)),
 		),
 	);
 	const current =
 		(miniPick && open.includes(miniPick) ? miniPick : null) ??
 		(focused && open.includes(focused) ? focused : null) ??
 		open[0];
-	const watched = shares.find((share) => share.ownerId === current)?.track;
-	const sharer = members.find((member) => member.id === current);
+	const watchedShare = shares.find((share) => share.key === current);
+	const watched = watchedShare?.track;
+	const owner =
+		current === undefined
+			? undefined
+			: members.find((member) => member.id === shareOwner(current));
+	// A tela de um aparelho leva o nome dele junto ("Kid · Odin 3", ADR 0038).
+	const sharer =
+		owner && watchedShare?.source
+			? { ...owner, name: sharerLabel(owner.name, watchedShare.source) }
+			: owner;
 
 	if (!current || !watched || !sharer) return null;
 	const index = open.indexOf(current);
@@ -148,7 +162,7 @@ function MiniShareFrame({
 	const [drag, setDrag] = useState<{ left: number; top: number } | null>(null);
 	const grab = useRef<{ x: number; y: number } | null>(null);
 
-	const sharerId = shareOwner(share.participant.identity);
+	const sharerId = shareKey(share.participant.identity);
 	useEffect(() => {
 		setShown(sharerId, "full");
 		return () => setShown(sharerId, null);

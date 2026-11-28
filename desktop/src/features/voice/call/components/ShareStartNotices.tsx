@@ -2,7 +2,11 @@ import { ScreenShareIcon } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { toast } from "@/components/ui/toast";
 import { useMyStatus } from "@/features/identity";
-import { useScreenShares } from "@/features/screen-share";
+import {
+	shareOwner,
+	sharerLabel,
+	useScreenShares,
+} from "@/features/screen-share";
 import { useSettingsStore } from "@/features/settings";
 import { useLiveMembers } from "../../members/hooks/useLiveMembers";
 import { joinNames, startedShares } from "../model/shareStarts";
@@ -30,7 +34,7 @@ export function ShareStartNotices() {
 
 	const current = shares
 		.filter((share) => !share.isOwn)
-		.map((share) => share.ownerId);
+		.map((share) => share.key);
 	const key = current.join("\n");
 
 	useEffect(() => {
@@ -48,9 +52,15 @@ export function ShareStartNotices() {
 		const { watching } = useRoomView.getState();
 		const fresh = started.filter((id) => !watching.includes(id));
 		if (fresh.length === 0 || status === "busy" || !streams) return;
+		// Cada chave nova vira quem transmite; a de um aparelho leva o nome dele (ADR 0038).
 		const people = fresh
-			.map((id) => members.find((member) => member.id === id))
-			.filter((member) => member !== undefined);
+			.map((id) => {
+				const member = members.find((m) => m.id === shareOwner(id));
+				if (!member) return undefined;
+				const source = shares.find((share) => share.key === id)?.source ?? null;
+				return { key: id, name: sharerLabel(member.name, source) };
+			})
+			.filter((person) => person !== undefined);
 		if (people.length === 0) return;
 
 		const names = joinNames(people.map((person) => person.name));
@@ -74,7 +84,7 @@ export function ShareStartNotices() {
 				children: "Assistir",
 				onClick: () => {
 					toast.close(id);
-					for (const person of people) watchShare(person.id);
+					for (const person of people) watchShare(person.key);
 				},
 			},
 		});

@@ -11,6 +11,7 @@ import {
 import { COLLAPSED_AVATARS } from "@/features/channels";
 import { Avatar } from "@/features/identity";
 import { UserCardPopup } from "@/features/members";
+import { DevicePicture } from "@/features/screen-share";
 import {
 	type ChannelMember,
 	ConnectionMark,
@@ -57,13 +58,22 @@ export function RoomMembers({
 		>
 			{members.map((member) => (
 				<li key={member.id}>
-					<MemberRow
+					{member.device ? (
+						<DeviceRow
+							member={member}
+							roomId={roomId}
+							roomName={roomName}
+							inCall={inCall}
+						/>
+					) : (
+						<MemberRow
 						member={member}
 						isMe={member.id === myId}
 						roomId={roomId}
 						roomName={roomName}
 						inCall={inCall}
-					/>
+						/>
+					)}
 				</li>
 			))}
 		</ul>
@@ -83,15 +93,19 @@ export function AvatarStrip({ members }: { members: ChannelMember[] }) {
 		>
 			{sharing && <LiveBadge />}
 			<span className="flex -space-x-1.5">
-				{shown.map((member) => (
-					<Avatar
-						key={member.id}
-						nick={member.nick}
-						displayName={member.name}
-						size={20}
-						className="ring-2 ring-card"
-					/>
-				))}
+				{shown.map((member) =>
+					member.device ? (
+						<DevicePicture key={member.id} name={member.name} size={20} />
+					) : (
+						<Avatar
+							key={member.id}
+							nick={member.nick}
+							displayName={member.name}
+							size={20}
+							className="ring-2 ring-card"
+						/>
+					),
+				)}
 			</span>
 			{rest > 0 && (
 				<span className="font-mono text-[11px] font-normal text-secondary-foreground">
@@ -100,6 +114,82 @@ export function AvatarStrip({ members }: { members: ChannelMember[] }) {
 			)}
 		</span>
 	);
+}
+
+/**
+ * Um aparelho que está transmitindo (ADR 0038), como uma pessoa a mais na lista: o controle, o nome
+ * dele ("Odin 3") e o selo. Não tem cartão: clicar já assiste, entrando na sala se precisar. Vale
+ * também para o dono, que pode assistir a tela do próprio aparelho.
+ */
+function DeviceRow({
+	member,
+	roomId,
+	roomName,
+	inCall,
+}: {
+	member: ChannelMember;
+	roomId: string;
+	roomName: string;
+	inCall: boolean;
+}) {
+	const { watch, dialog } = useWatch(member.id, roomId, roomName, inCall);
+	const owner = member.device?.ownerName;
+	return (
+		<>
+			<button
+				type="button"
+				aria-label={`Assistir ${member.name}${owner ? ` de ${owner}` : ""}`}
+				title={owner ? `${member.name} de ${owner}` : member.name}
+				onClick={watch}
+				className={cn(
+					"mx-2 flex w-[calc(100%-16px)] items-center gap-2 rounded-md py-[3px] pr-2 pl-6 text-left text-[13px]",
+					"text-muted-foreground hover:bg-secondary hover:text-foreground",
+				)}
+			>
+				<DevicePicture name={member.name} size={22} />
+				<span className="min-w-0 truncate">{member.name}</span>
+				<span className="ml-auto flex shrink-0 items-center gap-1">
+					{member.sharing && <LiveBadge />}
+				</span>
+			</button>
+			{dialog}
+		</>
+	);
+}
+
+/**
+ * Assistir a transmissão de chave `key` pela lista: entra na sala, se precisar (perguntando antes
+ * numa ligação), e abre a transmissão em foco na tela da chamada.
+ */
+function useWatch(
+	key: string,
+	roomId: string,
+	roomName: string,
+	inCall: boolean,
+) {
+	const { join } = useVoice();
+	const { guard, dialog } = useGuardedJoin();
+	const navigate = useNavigate();
+	const onRoom = useMatch(paths.voiceRoom) !== null;
+
+	function show() {
+		watchShare(key);
+		focusShare(key);
+		if (!onRoom) void navigate(paths.voiceRoom);
+	}
+
+	function watch() {
+		if (inCall) {
+			show();
+			return;
+		}
+		guard(roomName, () => {
+			join(roomId);
+			show();
+		});
+	}
+
+	return { watch, dialog };
 }
 
 function MemberRow({
@@ -228,30 +318,15 @@ function WatchPreview({
 	roomName: string;
 	inCall: boolean;
 }) {
-	const { join } = useVoice();
-	const { guard, dialog } = useGuardedJoin();
-	const navigate = useNavigate();
-	const onRoom = useMatch(paths.voiceRoom) !== null;
+	const open = useWatch(member.id, roomId, roomName, inCall);
+	const dialog = open.dialog;
 	const [hovered, setHovered] = useState(false);
 	const share = member.share;
 	const now = Date.now();
 
-	function show() {
-		watchShare(member.id);
-		focusShare(member.id);
-		if (!onRoom) void navigate(paths.voiceRoom);
-	}
-
 	function watch() {
 		setHovered(false);
-		if (inCall) {
-			show();
-			return;
-		}
-		guard(roomName, () => {
-			join(roomId);
-			show();
-		});
+		open.watch();
 	}
 
 	return (

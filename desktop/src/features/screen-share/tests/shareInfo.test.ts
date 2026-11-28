@@ -3,7 +3,14 @@ import {
 	compareShares,
 	decodeShareQuality,
 	encodeShareQuality,
+	isDeviceShareKey,
+	isScreenIdentity,
 	parseShareTrackName,
+	screenIdentityOf,
+	shareKey,
+	shareOwner,
+	sharerLabel,
+	shareSource,
 	shareSpec,
 	shareTrackName,
 } from "../model/shareInfo";
@@ -80,5 +87,39 @@ describe("aviso da qualidade", () => {
 		expect(decodeShareQuality(raw('{"quality":"4k"}'))).toBeNull();
 		expect(decodeShareQuality(raw('{"quality":3}'))).toBeNull();
 		expect(decodeShareQuality(raw("lixo"))).toBeNull();
+	});
+});
+
+describe("tela do computador e de um aparelho (ADR 0038)", () => {
+	it("reconhece as duas e acha o dono", () => {
+		expect(isScreenIdentity("kid:screen")).toBe(true);
+		expect(isScreenIdentity("kid:screen-0a1b2c")).toBe(true);
+		expect(isScreenIdentity("kid")).toBe(false);
+		expect(isScreenIdentity("kid:screen-")).toBe(false);
+		expect(isScreenIdentity(":screen")).toBe(false);
+		expect(shareOwner("kid:screen-0a1b2c")).toBe("kid");
+		expect(shareOwner("kid:screen")).toBe("kid");
+		expect(shareOwner("kid")).toBe("kid");
+	});
+
+	it("a chave do computador é o dono, a do aparelho é a identidade", () => {
+		expect(shareKey("kid:screen")).toBe("kid");
+		expect(shareKey("kid:screen-odin")).toBe("kid:screen-odin");
+		expect(shareKey("kid")).toBe("kid");
+		expect(isDeviceShareKey("kid:screen-odin")).toBe(true);
+		expect(isDeviceShareKey("kid")).toBe(false);
+		expect(screenIdentityOf("kid")).toBe("kid:screen");
+		expect(screenIdentityOf("kid:screen-odin")).toBe("kid:screen-odin");
+	});
+
+	it("lê o nome do aparelho dos metadados", () => {
+		expect(
+			shareSource('{"screenOf":"kid","nick":"kid","source":"Odin 3"}'),
+		).toBe("Odin 3");
+		expect(shareSource('{"screenOf":"kid","nick":"kid"}')).toBeNull();
+		expect(shareSource("nada")).toBeNull();
+		expect(shareSource(undefined)).toBeNull();
+		expect(sharerLabel("Kid", "Odin 3")).toBe("Kid · Odin 3");
+		expect(sharerLabel("Kid", null)).toBe("Kid");
 	});
 });

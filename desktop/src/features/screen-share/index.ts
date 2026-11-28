@@ -5,6 +5,8 @@ export {
 export { ShareDefaultsSection } from "./components/ShareDefaultsSection";
 export { ShareQuickSettings } from "./components/ShareQuickSettings";
 export { SourcePickerHost } from "./components/SourcePickerHost";
+export { DevicePicture, isOdin } from "./components/DevicePicture";
+export { StreamDevicesSettings } from "./components/StreamDevicesSettings";
 export { useNow } from "./hooks/useNow";
 export { useScreenShareState } from "./hooks/useScreenShareState";
 export { type ScreenShare, useScreenShares } from "./hooks/useScreenShares";
@@ -20,11 +22,16 @@ export {
 	compareShares,
 	decodeShareQuality,
 	encodeShareQuality,
+	isDeviceShareKey,
 	isScreenIdentity,
 	parseShareTrackName,
 	QUALITY_TOPIC,
+	screenIdentityOf,
 	type ShareInfo,
+	shareKey,
 	shareOwner,
+	sharerLabel,
+	shareSource,
 	shareSpec,
 } from "./model/shareInfo";
 export { NativeScreenShare } from "./native/NativeScreenShare";

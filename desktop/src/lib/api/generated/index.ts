@@ -240,6 +240,19 @@ export type DetectableGame = {
  */
 exe: string, name: string, };
 
+/**
+ * A tela de um aparelho de transmissão na sala (ADR 0038), na entrada do dono.
+ */
+export type DeviceShareView = { 
+/**
+ * A identidade da conexão (`{dono}:screen-{aparelho}`): é a chave da transmissão no app.
+ */
+identity: string, 
+/**
+ * O nome do aparelho ("Odin 3").
+ */
+name: string, };
+
 export type DeviceView = { linked_at: number, };
 
 export type DisconnectMemberRequest = { user_id: string, };
@@ -524,7 +537,11 @@ can_send_sounds: boolean,
 /**
  * Se a tela Sons mostra as abas Aprovação e Todos os sons (v0.9).
  */
-can_approve_sounds: boolean, };
+can_approve_sounds: boolean, 
+/**
+ * Se as Configurações mostram Aparelhos de transmissão (ADR 0038).
+ */
+can_stream_from_device: boolean, };
 
 export type MediaFilter = "media" | "files";
 
@@ -644,6 +661,30 @@ user_id: string, };
 export type Origin = "owner" | "direct";
 
 /**
+ * A resposta do `pair-code`: o código para digitar (ou ler no QR) e quando ele vence.
+ */
+export type PairCodeResponse = { 
+/**
+ * 6 números, como `042917`.
+ */
+code: string, 
+/**
+ * Em segundos (Unix).
+ */
+expires_at: number, };
+
+export type PairStreamDeviceRequest = { code: string, 
+/**
+ * O nome que o aparelho sugere ("Odin 3"). Vazio vira "Aparelho".
+ */
+name?: string, };
+
+/**
+ * A resposta do `pair`: a sessão do aparelho, quem é o dono e o aparelho criado.
+ */
+export type PairStreamDeviceResponse = { token: string, owner: UserView, device: StreamDevice, };
+
+/**
  * Uma pessoa na sala, com o nick e o nome visível do banco.
  */
 export type ParticipantView = { user_id: string, nick: string, display_name: string | null, 
@@ -672,6 +713,11 @@ camera: boolean,
  * transmite.
  */
 share?: ShareInfo | null, 
+/**
+ * As telas dos aparelhos de transmissão dela na sala (ADR 0038). A lista mostra cada uma como
+ * uma entrada à parte, logo depois da pessoa; não marcam a pessoa como transmitindo.
+ */
+devices: Array<DeviceShareView>, 
 /**
  * Silenciada pela moderação (ADR 0034): o microfone vermelho com o escudo.
  */
@@ -756,6 +802,8 @@ expires_in: number, };
 export type RejectSoundRequest = { reason?: string, };
 
 export type RenameEmojiRequest = { name: string, };
+
+export type RenameStreamDeviceRequest = { name: string, };
 
 /**
  * A citação da resposta: a original, ou só o id se ela foi excluída.
@@ -916,6 +964,52 @@ export type SoundStatus = "pending" | "approved" | "rejected";
  * O status que a pessoa escolheu.
  */
 export type Status = "available" | "away" | "busy" | "invisible";
+
+/**
+ * Um aparelho pareado, como a lista das Configurações mostra.
+ */
+export type StreamDevice = { id: string, name: string, 
+/**
+ * Em segundos (Unix).
+ */
+paired_at: number, 
+/**
+ * A última vez que o aparelho falou com a API, em segundos (Unix).
+ */
+last_seen_at: number, };
+
+/**
+ * A resposta do `self`: o aparelho, o dono e para onde a tela iria agora (`null` com o dono fora
+ * de toda sala e ligação).
+ */
+export type StreamDeviceSelfResponse = { device: StreamDevice, owner: UserView, target: StreamTarget | null, };
+
+/**
+ * A resposta do `self/screen-token`: o token da tela e para onde ele vale.
+ */
+export type StreamDeviceTokenResponse = { token: string, url: string, 
+/**
+ * A identidade da conexão (`{dono}:screen-{aparelho}`).
+ */
+identity: string, target: StreamTarget, };
+
+/**
+ * Para onde a tela do aparelho vai agora.
+ */
+export type StreamTarget = { 
+/**
+ * O id da sala de voz ou da conversa privada.
+ */
+channel_id: string, kind: StreamTargetKind, 
+/**
+ * "geral", ou o nome da outra pessoa na ligação.
+ */
+name: string, };
+
+/**
+ * Onde o dono está: uma sala de voz do grupo ou uma ligação privada.
+ */
+export type StreamTargetKind = "voice" | "call";
 
 /**
  * De onde o app busca atualizações.

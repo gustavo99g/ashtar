@@ -30,6 +30,32 @@ export interface ChannelMember {
 	share?: ShareSummary;
 	/** Só dentro da chamada, e só quando está ruim: a qualidade que o LiveKit dá (decisão 15). */
 	connection?: ConnectionTrouble;
+	/**
+	 * A entrada é a tela de um aparelho de transmissão (ADR 0038), não uma pessoa: o `id` é a
+	 * identidade da conexão (a chave da transmissão), e o `name` é o do aparelho ("Odin 3").
+	 */
+	device?: DeviceOf;
+}
+
+/** De quem é o aparelho que transmite. */
+export interface DeviceOf {
+	ownerId: string;
+	ownerName: string;
+}
+
+/** A entrada de um aparelho que está transmitindo, ao lado das pessoas da sala. */
+export function deviceMember(
+	identity: string,
+	name: string,
+	owner: { id: string; name: string },
+): ChannelMember {
+	return {
+		id: identity,
+		nick: name,
+		name,
+		sharing: true,
+		device: { ownerId: owner.id, ownerName: owner.name },
+	};
 }
 
 export interface ShareSummary {
@@ -69,6 +95,22 @@ export function memberFromApi(participant: ParticipantView): ChannelMember {
 				}
 			: undefined,
 	};
+}
+
+/**
+ * A lista da API com os aparelhos: cada tela de aparelho vira uma entrada à parte, logo depois do
+ * dono (ADR 0038).
+ */
+export function membersFromApi(participants: ParticipantView[]): ChannelMember[] {
+	return participants.flatMap((participant) => {
+		const person = memberFromApi(participant);
+		return [
+			person,
+			...(participant.devices ?? []).map((device) =>
+				deviceMember(device.identity, device.name, person),
+			),
+		];
+	});
 }
 
 /**

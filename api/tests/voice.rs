@@ -552,6 +552,7 @@ async fn silenciado_fica_ate_liberar_e_so_o_icone_muda() {
     let room = vec![api::voice::RoomParticipant {
         identity: ana_id.clone(),
         screen_sharing: false,
+        ..Default::default()
     }];
     let views = api::voice::join_participants(&ctx.db, room).await.unwrap();
     assert!(views[0].server_muted);
@@ -762,6 +763,7 @@ async fn tocar_um_som_vai_para_os_outros_da_sala_com_limite() {
     let room = vec![api::voice::RoomParticipant {
         identity: beto_id.clone(),
         screen_sharing: false,
+        ..Default::default()
     }];
     let views = api::voice::join_participants(&ctx.db, room).await.unwrap();
     assert!(views[0].sounds_blocked && !views[0].server_muted);

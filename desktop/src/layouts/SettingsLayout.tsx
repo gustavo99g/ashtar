@@ -69,6 +69,8 @@ export function SettingsLayout() {
 	const showSounds = useMe().data?.can_send_sounds === true;
 	const canApproveSounds = useMe().data?.can_approve_sounds === true;
 	const pendingSounds = usePendingSounds();
+	// Os aparelhos de transmissão (ADR 0038): só quem tem "Transmitir de um aparelho".
+	const showDevices = useMe().data?.can_stream_from_device === true;
 
 	useEffect(() => {
 		const onKeyDown = (event: KeyboardEvent) => {
@@ -89,6 +91,9 @@ export function SettingsLayout() {
 			>
 				<MenuGroup label="Você">
 					<MenuItem to={paths.settings.profile}>Perfil</MenuItem>
+					{showDevices && (
+						<MenuItem to={paths.settings.devices}>Dispositivos</MenuItem>
+					)}
 				</MenuGroup>
 				<MenuSeparator />
 				<MenuGroup label="Ajustes">

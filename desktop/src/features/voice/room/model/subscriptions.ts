@@ -25,7 +25,7 @@ import {
 	Track,
 	VideoQuality,
 } from "livekit-client";
-import { shareOwner } from "@/features/screen-share";
+import { shareKey } from "@/features/screen-share";
 import type { ShownSize } from "../../call/stores/roomViewStore";
 
 const SCREEN_SOURCES: ReadonlySet<Track.Source> = new Set([
@@ -54,8 +54,10 @@ export function wantsTrack(
 ): boolean {
 	if (source === Track.Source.Camera) return view.cameras !== false && identity !== me;
 	if (!SCREEN_SOURCES.has(source)) return true;
-	const owner = shareOwner(identity);
-	return owner !== me && owner in view.shown;
+	// A chave: a tela do computador conta o dono (a própria nunca é baixada); a de um aparelho conta
+	// a identidade inteira, e a de um aparelho da própria pessoa pode ser assistida (ADR 0038).
+	const key = shareKey(identity);
+	return key !== me && key in view.shown;
 }
 
 /**
@@ -71,7 +73,7 @@ export function wantedQuality(
 		if (view.bigCamera === identity) return VideoQuality.HIGH;
 		return view.cameras === "small" ? VideoQuality.LOW : VideoQuality.MEDIUM;
 	}
-	return view.shown[shareOwner(identity)] === "small"
+	return view.shown[shareKey(identity)] === "small"
 		? VideoQuality.LOW
 		: VideoQuality.HIGH;
 }

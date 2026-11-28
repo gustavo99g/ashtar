@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- O logo do Ashtar inteiro, com o quadrado azul: o cabeçalho da tela. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="256"
+    android:viewportHeight="256">
+    <group>
+        <path
+            android:fillColor="#FF2563EB"
+            android:pathData="M56,0 L200,0 A56,56 0 0 1 256,56 L256,200 A56,56 0 0 1 200,256 L56,256 A56,56 0 0 1 0,200 L0,56 A56,56 0 0 1 56,0 Z" />
+        <group
+            android:pivotX="128"
+            android:pivotY="146"
+            android:rotation="-16">
+            <path
+                android:pathData="M24,146 A104,32 0 1,0 232,146 A104,32 0 1,0 24,146 Z"
+                android:strokeWidth="5"
+                android:strokeColor="#FFE0F2FE" />
+        </group>
+        <path
+            android:fillColor="#FFF6C228"
+            android:fillType="evenOdd"
+            android:pathData="M128,36 L204,216 L172,216 L156.8,180 L99.2,180 L84,216 L52,216 Z M128,112 L144.1,150 L111.9,150 Z" />
+        <path
+            android:pathData="M28,174.7 A104,32 -16 0 0 228,117.3"
+            android:strokeWidth="13"
+            android:strokeColor="#FF2563EB" />
+        <path
+            android:pathData="M28,174.7 A104,32 -16 0 0 228,117.3"
+            android:strokeWidth="5"
+            android:strokeColor="#FFE0F2FE" />
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M200,42 Q200,58 216,58 Q200,58 200,74 Q200,58 184,58 Q200,58 200,42 Z" />
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M62,76 Q62,84 70,84 Q62,84 62,92 Q62,84 54,84 Q62,84 62,76 Z" />
+    </group>
+</vector>

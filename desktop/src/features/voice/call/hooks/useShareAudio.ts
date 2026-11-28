@@ -1,6 +1,6 @@
 import type { TrackReference } from "@livekit/components-react";
 import { RemoteAudioTrack, Track } from "livekit-client";
-import { shareOwner } from "@/features/screen-share";
+import { shareKey } from "@/features/screen-share";
 import { useTrackVolume } from "../../room/hooks/useTrackVolume";
 import { useVoice } from "../../room/hooks/useVoice";
 import { audibleVolume, useShareVolume } from "../stores/shareVolumeStore";
@@ -18,7 +18,7 @@ export function useShareAudio(share: TrackReference): {
 	heard: number;
 } {
 	const { room } = useVoice();
-	const owner = shareOwner(share.participant.identity);
+	const owner = shareKey(share.participant.identity);
 	const heard = useShareVolume((state) => audibleVolume(state, owner));
 	const audioTrack = share.participant.getTrackPublication(
 		Track.Source.ScreenShareAudio,

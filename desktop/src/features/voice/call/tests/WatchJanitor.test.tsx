@@ -11,7 +11,7 @@ vi.mock("@/features/screen-share", async (importOriginal) => ({
 
 function live(...owners: string[]) {
 	vi.mocked(useScreenShares).mockReturnValue(
-		owners.map((ownerId) => ({ ownerId, isOwn: false })) as never,
+		owners.map((ownerId) => ({ ownerId, key: ownerId, isOwn: false })) as never,
 	);
 }
 

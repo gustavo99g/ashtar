@@ -10,7 +10,10 @@ import {
 	BlackShareBand,
 	openSharePanel,
 	parseShareTrackName,
+	type ScreenShare,
 	type ScreenShareController,
+	shareOwner,
+	sharerLabel,
 	shareSpec,
 	sourceRefKey,
 	useScreenShareState,
@@ -190,12 +193,21 @@ function ConnectedRoom({
 	const remotes = useScreenShares().filter((share) => !share.isOwn);
 	const memberOf = (identity: string) =>
 		members.find((member) => member.id === identity);
+	// Quem transmite a transmissão de chave `key`: o dono, com o nome do aparelho junto quando a tela
+	// vem de um ("Kid · Odin 3", ADR 0038).
+	const sharerOf = (key: string): LiveMember | undefined => {
+		const member = memberOf(shareOwner(key));
+		const source = remotes.find((share) => share.key === key)?.source ?? null;
+		return member && source
+			? { ...member, name: sharerLabel(member.name, source) }
+			: member;
+	};
 
 	const watching = useRoomView((state) => state.watching);
 	const focused = useRoomView((state) => state.focused);
 	// As abertas que estão no ar, na ordem em que a pessoa abriu.
 	const open = watching.filter((id) =>
-		remotes.some((share) => share.ownerId === id && memberOf(id)),
+		remotes.some((share) => share.key === id && sharerOf(id)),
 	);
 	const layout = stageLayout(open, focused);
 	const focusedCamera = useRoomView((state) => state.focusedCamera);
@@ -211,7 +223,7 @@ function ConnectedRoom({
 	}, [focusedCamera, camMember]);
 	// As que estão no ar e a pessoa não abriu: aparecem pequenas embaixo do palco; clicar abre em foco.
 	const notOpen = remotes.filter(
-		(share) => !open.includes(share.ownerId) && memberOf(share.ownerId),
+		(share) => !open.includes(share.key) && sharerOf(share.key),
 	);
 
 	// Os blocos da sala à vista: as câmeras são baixadas, grandes na Grade e pequenas no palco.
@@ -224,7 +236,7 @@ function ConnectedRoom({
 	const fullscreen = useFullscreen();
 	const idle = useIdle(fullscreen.active);
 
-	const firstOpen = open[0] ? memberOf(open[0]) : undefined;
+	const firstOpen = open[0] ? sharerOf(open[0]) : undefined;
 	const subtitle = camMember
 		? `Câmera de ${camMember.name}`
 		: stage
@@ -238,7 +250,8 @@ function ConnectedRoom({
 		(member) => cameraTrackOf(member.participant) !== null,
 	);
 
-	const shareOf = (id: string) => remotes.find((share) => share.ownerId === id);
+	const shareOf = (id: string): ScreenShare | undefined =>
+		remotes.find((share) => share.key === id);
 
 	return (
 		<RoomFrame
@@ -257,7 +270,7 @@ function ConnectedRoom({
 								onGrid={stopWatching}
 								onFocus={() => {
 									const first = remotes[0];
-									if (first) watchShare(first.ownerId);
+									if (first) watchShare(first.key);
 									else if (withCamera[0]) focusCamera(withCamera[0].id);
 								}}
 							/>
@@ -294,7 +307,7 @@ function ConnectedRoom({
 						>
 							{layout.main.map((id) => {
 								const share = shareOf(id);
-								const sharer = memberOf(id);
+								const sharer = sharerOf(id);
 								if (!share || !sharer) return null;
 								return (
 									<WatchedShare
@@ -325,7 +338,7 @@ function ConnectedRoom({
 					>
 						{(camMember ? open : layout.strip).map((id) => {
 							const share = shareOf(id);
-							const sharer = memberOf(id);
+							const sharer = sharerOf(id);
 							if (!share || !sharer) return null;
 							return (
 								<SmallShare
@@ -337,17 +350,17 @@ function ConnectedRoom({
 							);
 						})}
 						{notOpen.map((share) => {
-							const sharer = memberOf(share.ownerId);
+							const sharer = sharerOf(share.key);
 							if (!sharer) return null;
 							// Pequena com a imagem, como as abertas: clicar abre e já põe em foco.
 							return (
 								<SmallShare
-									key={share.ownerId}
+									key={share.key}
 									share={share.track}
 									sharer={sharer}
 									onFocus={() => {
-										watchShare(share.ownerId);
-										focusShare(share.ownerId);
+										watchShare(share.key);
+										focusShare(share.key);
 									}}
 								/>
 							);
@@ -375,11 +388,11 @@ function ConnectedRoom({
 						/>
 					)}
 					{remotes.map((share) => {
-						const sharer = memberOf(share.ownerId);
+						const sharer = sharerOf(share.key);
 						if (!sharer) return null;
 						return (
 							<ShareTile
-								key={share.ownerId}
+								key={share.key}
 								title={`${sharer.name} está transmitindo`}
 								source={
 									parseShareTrackName(share.track.publication.trackName)?.title
@@ -387,7 +400,7 @@ function ConnectedRoom({
 								action={
 									<Button
 										className="h-[34px]"
-										onClick={() => watchShare(sharer.id)}
+										onClick={() => watchShare(share.key)}
 									>
 										Assistir transmissão
 									</Button>

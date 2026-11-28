@@ -13,6 +13,7 @@ import { InvitesSettings } from "@/features/invites";
 import { MembersSettings } from "@/features/members";
 import { NotificationsSettings } from "@/features/notifications";
 import { AppSettings } from "@/features/updater";
+import { StreamDevicesSettings } from "@/features/screen-share";
 import { useVoice, VoiceSettings } from "@/features/voice";
 
 /*
@@ -29,6 +30,10 @@ export function ProfileSettingsRoute() {
 
 export function VoiceSettingsRoute() {
 	return <VoiceSettings />;
+}
+
+export function DevicesSettingsRoute() {
+	return <StreamDevicesSettings />;
 }
 
 export function ShortcutsSettingsRoute() {

@@ -29,7 +29,7 @@ export function WatchJanitor() {
 	const ended = useRef(new Map<string, { at: number; focused: boolean }>());
 
 	const live = new Set(
-		shares.filter((share) => !share.isOwn).map((share) => share.ownerId),
+		shares.filter((share) => !share.isOwn).map((share) => share.key),
 	);
 	const liveKey = [...live].sort().join("\n");
 

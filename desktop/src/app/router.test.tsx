@@ -51,7 +51,7 @@ function me(canViewPanel: boolean): MeResponse {
 		can_create_invite: canViewPanel,
 		can_view_panel: canViewPanel,
 		can_manage_channels: false,
-		can_move_members: false, can_manage_emojis: false, can_view_logs: false, can_moderate_voice: false, can_send_sounds: false, can_approve_sounds: false,
+		can_move_members: false, can_manage_emojis: false, can_view_logs: false, can_moderate_voice: false, can_send_sounds: false, can_approve_sounds: false, can_stream_from_device: false,
 	};
 }
 
@@ -210,6 +210,26 @@ describe("Servidor › Arquivados", () => {
 		expect(router.state.location.pathname).toBe(paths.settings.archived);
 		expect(
 			screen.getByRole("heading", { name: "Arquivados" }),
+		).toBeInTheDocument();
+	});
+});
+
+describe("Você › Dispositivos", () => {
+	it("só aparece no menu de quem pode transmitir de um aparelho", () => {
+		renderAt([paths.server, paths.settings.profile]);
+		expect(screen.queryByRole("link", { name: "Dispositivos" })).toBeNull();
+	});
+
+	it("com can_stream_from_device, o menu leva para a página", () => {
+		const router = renderAt([paths.server, paths.settings.profile], {
+			me: { ...me(true), can_stream_from_device: true },
+		});
+
+		fireEvent.click(screen.getByRole("link", { name: "Dispositivos" }));
+
+		expect(router.state.location.pathname).toBe(paths.settings.devices);
+		expect(
+			screen.getByRole("heading", { name: "Dispositivos" }),
 		).toBeInTheDocument();
 	});
 });

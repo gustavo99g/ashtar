@@ -65,7 +65,18 @@ pub fn ends_call(event: &WebhookEvent) -> bool {
         && event
             .participant
             .as_ref()
-            .is_some_and(|p| !p.identity.ends_with(voice::SCREEN_SUFFIX))
+            .is_some_and(|p| !voice::is_screen_identity(&p.identity))
+}
+
+/// Quem saiu da sala pela voz, se o evento é essa saída. Os aparelhos de transmissão dele caem
+/// junto (ADR 0038): o aparelho transmite para onde o dono está, e ele não está mais ali.
+pub fn voice_left(event: &WebhookEvent) -> Option<(String, String)> {
+    if !LEAVES.contains(&event.event.as_str()) {
+        return None;
+    }
+    let room = event.room.as_ref()?.name.clone();
+    let identity = &event.participant.as_ref()?.identity;
+    (!voice::is_screen_identity(identity)).then(|| (room, identity.clone()))
 }
 
 /// Encerra a ligação da conversa `dm`, se o evento pede e ela está atendida.
@@ -107,6 +118,9 @@ pub async fn livekit(
         .is_some_and(|room| room.name.starts_with(voice::TEST_ROOM_PREFIX))
     {
         return StatusCode::OK;
+    }
+    if let Some((room, user_id)) = voice_left(&event) {
+        voice::drop_device_screens_in_background(room, user_id);
     }
     // A sala de uma ligação privada: nada sai para todos.
     if let Some(room) = event.room.as_ref() {
@@ -228,5 +242,20 @@ mod tests {
         )));
         assert!(!ends_call(&with_participant("participant_joined", "kid")));
         assert!(!ends_call(&with_participant("track_unpublished", "kid")));
+    }
+
+    #[test]
+    fn a_saida_da_voz_derruba_os_aparelhos_e_a_da_tela_nao() {
+        let left = voice_left(&with_participant("participant_left", "kid"));
+        assert_eq!(left.map(|(_, who)| who).as_deref(), Some("kid"));
+        assert!(voice_left(&with_participant("participant_connection_aborted", "kid")).is_some());
+        assert!(voice_left(&with_participant("participant_left", "kid:screen")).is_none());
+        assert!(voice_left(&with_participant("participant_left", "kid:screen-odin")).is_none());
+        assert!(voice_left(&with_participant("participant_joined", "kid")).is_none());
+        // A tela de um aparelho que cai também não encerra a ligação.
+        assert!(!ends_call(&with_participant(
+            "participant_left",
+            "kid:screen-odin"
+        )));
     }
 }

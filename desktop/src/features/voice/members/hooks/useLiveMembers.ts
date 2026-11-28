@@ -1,10 +1,20 @@
 import { useParticipants } from "@livekit/components-react";
 import { ConnectionQuality, type Participant } from "livekit-client";
 import { participantPerson } from "@/features/identity";
-import { isScreenIdentity, shareOwner } from "@/features/screen-share";
+import {
+	isDeviceShareKey,
+	isScreenIdentity,
+	shareKey,
+	shareOwner,
+	shareSource,
+} from "@/features/screen-share";
 import { useVoice } from "../../room/hooks/useVoice";
 import { useModeration } from "../../room/stores/moderationStore";
-import type { ChannelMember, ConnectionTrouble } from "../model/members";
+import {
+	type ChannelMember,
+	type ConnectionTrouble,
+	deviceMember,
+} from "../model/members";
 
 export interface LiveMember extends ChannelMember {
 	participant: Participant;
@@ -23,10 +33,16 @@ export function useLiveMembers(): LiveMember[] {
 	// O que a moderação impôs aos outros vem da lista da API (o `voice.participants`); o próprio, do
 	// estado que o `VoiceProvider` cumpre.
 	const own = useModeration();
-	// A tela de alguém é a `:screen` dele (ADR 0017): não é um membro, só marca o dono.
+	// A tela do computador de alguém é a `:screen` dele (ADR 0017): não é um membro, só marca o
+	// dono. A de um aparelho também não marca: ela vira uma entrada à parte (`useLiveDevices`).
 	const screens = new Set(
 		participants
-			.filter((p) => isScreenIdentity(p.identity) && p.isScreenShareEnabled)
+			.filter(
+				(p) =>
+					isScreenIdentity(p.identity) &&
+					!isDeviceShareKey(shareKey(p.identity)) &&
+					p.isScreenShareEnabled,
+			)
 			.map((p) => shareOwner(p.identity)),
 	);
 
@@ -53,6 +69,35 @@ export function useLiveMembers(): LiveMember[] {
 			soundsBlocked: own.others[participant.identity]?.sounds === true,
 			connection: trouble(participant.connectionQuality),
 		}));
+}
+
+/**
+ * Os aparelhos que estão transmitindo na sala (ADR 0038), cada um como uma entrada à parte na
+ * lista, com o nome dele ("Odin 3"). Sem o dono na sala, o aparelho fica de fora, como na API.
+ */
+export function useLiveDevices(): ChannelMember[] {
+	const participants = useParticipants();
+	return participants.flatMap((participant) => {
+		const key = shareKey(participant.identity);
+		if (
+			!isScreenIdentity(participant.identity) ||
+			!isDeviceShareKey(key) ||
+			!participant.isScreenShareEnabled
+		) {
+			return [];
+		}
+		const owner = participants.find(
+			(p) => p.identity === shareOwner(participant.identity),
+		);
+		if (!owner) return [];
+		return [
+			deviceMember(
+				key,
+				shareSource(participant.metadata) ?? "Aparelho",
+				{ id: owner.identity, name: participantPerson(owner).name },
+			),
+		];
+	});
 }
 
 /** Só a qualidade ruim vira marca; a boa não mostra nada. */

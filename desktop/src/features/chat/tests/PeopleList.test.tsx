@@ -111,6 +111,7 @@ beforeEach(() => {
 						server_muted: false,
 						server_deafened: false,
 						sounds_blocked: false,
+						devices: [],
 					},
 				]
 			: [
@@ -125,6 +126,7 @@ beforeEach(() => {
 						server_muted: false,
 						server_deafened: false,
 						sounds_blocked: false,
+						devices: [],
 					},
 				],
 	);

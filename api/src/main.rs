@@ -61,11 +61,18 @@ async fn main() {
 
     let app = api::app(state, policy);
 
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:3000")
+    // Só neste computador, por padrão (o Funnel chega por aqui). `BIND_ADDR=0.0.0.0:3000` abre para
+    // a rede local: é o que o Transmissor do Odin acha no modo Local (ADR 0038).
+    let addr = std::env::var("BIND_ADDR")
+        .ok()
+        .map(|addr| addr.trim().to_owned())
+        .filter(|addr| !addr.is_empty())
+        .unwrap_or_else(|| "127.0.0.1:3000".to_owned());
+    let listener = tokio::net::TcpListener::bind(&addr)
         .await
-        .expect("FAILED TO BIND PORT 3000 !!!");
+        .unwrap_or_else(|error| panic!("FAILED TO BIND {addr} !!! {error}"));
 
-    println!("Server running at http://127.0.0.1:3000");
+    println!("Server running at http://{addr}");
 
     axum::serve(listener, app)
         .await
